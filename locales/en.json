@@ -1,4 +1,24 @@
 {
+  "agentSettings": {
+    "title": "Settings",
+    "intro": "Choose the agent used for new production runs.",
+    "scope": "Settings scope",
+    "app": "App defaults",
+    "provider": "Production agent",
+    "appHint": "This choice applies to workspaces that inherit the app default.",
+    "workspaceHint": "Use the app default or choose a provider for this workspace.",
+    "providerChoice": "Provider",
+    "unset": "No provider selected",
+    "inherit": "Inherit app default",
+    "effective": "Effective provider",
+    "fromApp": "From app defaults",
+    "fromWorkspace": "From workspace override",
+    "save": "Save provider",
+    "saved": "Provider saved.",
+    "loading": "Loading agent settings…",
+    "loadError": "Agent settings couldn’t be loaded.",
+    "saveError": "The provider couldn’t be saved."
+  },
   "studio": {
     "closeNavigation": "Close navigation",
     "reviewInbox": "Review inbox",

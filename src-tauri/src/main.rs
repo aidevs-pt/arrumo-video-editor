@@ -11,6 +11,7 @@ use arrumo_workspaces::{
 };
 use tauri::{AppHandle, Manager, State};
 
+mod agent_settings;
 mod completed_video;
 mod delivery_stream;
 mod guided_preview;
@@ -605,6 +606,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             list_workspaces,
+            agent_settings::get_agent_settings,
+            agent_settings::set_agent_provider,
             create_workspace,
             list_profiles,
             create_profile,

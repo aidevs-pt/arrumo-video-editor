@@ -1,4 +1,24 @@
 {
+  "agentSettings": {
+    "title": "Ajustes",
+    "intro": "Elige el agente de los nuevos procesos de producción.",
+    "scope": "Ámbito de los ajustes",
+    "app": "Valores de la aplicación",
+    "provider": "Agente de producción",
+    "appHint": "Esta selección se aplica a los espacios que heredan el valor de la aplicación.",
+    "workspaceHint": "Usa el valor de la aplicación o elige un proveedor para este espacio.",
+    "providerChoice": "Proveedor",
+    "unset": "Sin proveedor",
+    "inherit": "Heredar de la aplicación",
+    "effective": "Proveedor efectivo",
+    "fromApp": "Valor de la aplicación",
+    "fromWorkspace": "Valor del espacio de trabajo",
+    "save": "Guardar proveedor",
+    "saved": "Proveedor guardado.",
+    "loading": "Cargando ajustes del agente…",
+    "loadError": "No se pudieron cargar los ajustes del agente.",
+    "saveError": "No se pudo guardar el proveedor."
+  },
   "studio": {
     "closeNavigation": "Cerrar navegación",
     "reviewInbox": "Bandeja de revisiones",

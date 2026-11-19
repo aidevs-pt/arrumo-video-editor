@@ -1,4 +1,24 @@
 {
+  "agentSettings": {
+    "title": "Definições",
+    "intro": "Escolhe o agente para novas execuções de produção.",
+    "scope": "Âmbito das definições",
+    "app": "Predefinições da aplicação",
+    "provider": "Agente de produção",
+    "appHint": "Esta escolha aplica-se aos espaços que herdam a predefinição da aplicação.",
+    "workspaceHint": "Usa a predefinição ou escolhe um fornecedor para este espaço.",
+    "providerChoice": "Fornecedor",
+    "unset": "Sem fornecedor selecionado",
+    "inherit": "Herdar da aplicação",
+    "effective": "Fornecedor efetivo",
+    "fromApp": "Predefinição da aplicação",
+    "fromWorkspace": "Definição do espaço de trabalho",
+    "save": "Guardar fornecedor",
+    "saved": "Fornecedor guardado.",
+    "loading": "A carregar definições do agente…",
+    "loadError": "Não foi possível carregar as definições do agente.",
+    "saveError": "Não foi possível guardar o fornecedor."
+  },
   "studio": {
     "closeNavigation": "Fechar navegação",
     "reviewInbox": "Caixa de revisões",

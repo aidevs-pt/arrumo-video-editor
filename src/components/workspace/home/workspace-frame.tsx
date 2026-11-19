@@ -1,4 +1,4 @@
-import { ChevronDown, Clapperboard, FileText, Film, FolderOpen, Images, Layers, ListVideo, Palette, Plus, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Clapperboard, FileText, Film, FolderOpen, Images, Layers, ListVideo, Palette, Plus, Settings2, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
@@ -6,7 +6,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarFooter,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarSeparator, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,7 +51,8 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
     { view: "videos", label: copy.completedVideos, icon: Film },
   ] as const;
   const workspaceSection = workspaceTabs.some((item) => item.view === view);
-  const sectionLabel = pathname === "/generation-run" ? messages.queue.runDetail
+  const sectionLabel = pathname === "/settings" ? messages.agentSettings.title
+    : pathname === "/generation-run" ? messages.queue.runDetail
     : pathname === "/completed-video" ? messages.completedVideo.details
     : pathname === "/profile" ? messages.profileFormats.title
     : [...workspaceTabs, ...production].find((item) => item.view === view)?.label ?? messages.profiles.title;
@@ -136,6 +137,12 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
             </SidebarGroup>
           </SidebarContent>
         )}
+        <SidebarFooter className="mt-auto px-3 pb-3">
+          <SidebarMenu><SidebarMenuItem>
+            <NavLink href={workspace ? `/settings?workspace=${workspace.id}` : "/settings"}
+              active={pathname === "/settings"} label={messages.agentSettings.title} icon={Settings2} />
+          </SidebarMenuItem></SidebarMenu>
+        </SidebarFooter>
       </Sidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -146,7 +153,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
               <BreadcrumbItem className="min-w-0">
                 {workspace ? <BreadcrumbLink asChild className="truncate font-medium">
                   <Link href={workspaceHref("profiles", workspace.id)}>{workspace.name}</Link>
-                </BreadcrumbLink> : <BreadcrumbPage>{messages.workspaces.title}</BreadcrumbPage>}
+                </BreadcrumbLink> : <BreadcrumbPage>{pathname === "/settings" ? sectionLabel : messages.workspaces.title}</BreadcrumbPage>}
               </BreadcrumbItem>
               {workspace && <>
                 <BreadcrumbSeparator />
