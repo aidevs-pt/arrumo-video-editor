@@ -351,3 +351,5 @@ Use `delete-generation <workspace-id> <run-id> <confirmed-title>` or the shared 
 Schedule a verified output with `set-output-schedule <workspace-id> <run-id> <format-id> <YYYY-MM-DD|clear>`. Each output format can have its own calendar date. Use `scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id]` to list an inclusive range. Calendar entries include the saved profile color and output dimensions.
 
 Through MCP or A2A, use `set_output_schedule` with a workspace, run, and format ID. Pass an ISO calendar `date` or null to clear it. Use `list_scheduled_outputs` with `start` and `end` dates and an optional `profileId` to browse the schedule.
+
+Open the desktop calendar at a specific month and profile with a link such as `arrumo://open/calendar?workspace=1&profile=2&month=2028-02`. Omit the profile for all workspace outputs. Completed-video links can include a `format` ID to select a specific delivered output.

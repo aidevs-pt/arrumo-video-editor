@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { CalendarDays, ChevronLeft, ChevronRight, RectangleHorizontal, RectangleVertical, Square } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { completedVideoHref } from "@/components/workspace/home/workspace-links";
+import { calendarHref, completedVideoHref } from "@/components/workspace/home/workspace-links";
 import { useWorkspaceCatalog } from "@/components/workspace/home/workspace-router";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
@@ -42,20 +42,20 @@ export function WorkspaceCalendar() {
   const { workspace, draftProfile } = useWorkspaceCatalog();
   const query = useSearchParams();
   if (!workspace) return null;
-  return <CalendarContent key={`${workspace.id}-${draftProfile}-${query.get("month")}`}
-    workspaceId={workspace.id} initialProfile={draftProfile} initialMonth={query.get("month")} />;
+  return <CalendarContent key={workspace.id}
+    workspaceId={workspace.id} profileId={draftProfile} monthQuery={query.get("month")} />;
 }
 
-function CalendarContent({ workspaceId, initialProfile, initialMonth }: {
+function CalendarContent({ workspaceId, profileId, monthQuery }: {
   workspaceId: number;
-  initialProfile: number | null;
-  initialMonth: string | null;
+  profileId: number | null;
+  monthQuery: string | null;
 }) {
   const { locale, messages } = useLocale();
   const copy = messages.calendar;
-  const [profileId, setProfileId] = useState(initialProfile);
+  const router = useRouter();
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [month, setMonth] = useState(() => monthStart(initialMonth));
+  const month = monthStart(monthQuery);
   const [retry, setRetry] = useState(0);
   const [results, setResults] = useState<{ key: string; rows?: Output[] }>();
   const year = month.getUTCFullYear();
@@ -67,6 +67,11 @@ function CalendarContent({ workspaceId, initialProfile, initialMonth }: {
   const failed = results?.key === key && !results.rows;
   const firstColumn = (month.getUTCDay() + 6) % 7;
   const monthLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(month);
+
+  function showMonth(offset: number) {
+    const next = asDate(new Date(Date.UTC(year, monthIndex + offset, 1))).slice(0, 7);
+    router.push(calendarHref(workspaceId, profileId ?? undefined, next), { scroll: false });
+  }
 
   useEffect(() => {
     let active = true;
@@ -107,14 +112,14 @@ function CalendarContent({ workspaceId, initialProfile, initialMonth }: {
             <div className="flex gap-1">
               <Button variant="outline" size="icon-sm" aria-label={copy.previousMonth}
                 disabled={year <= 1000 && monthIndex === 0}
-                onClick={() => setMonth(new Date(Date.UTC(year, monthIndex - 1, 1)))}><ChevronLeft /></Button>
+                onClick={() => showMonth(-1)}><ChevronLeft /></Button>
               <Button variant="outline" size="icon-sm" aria-label={copy.nextMonth}
                 disabled={year >= 9999 && monthIndex === 11}
-                onClick={() => setMonth(new Date(Date.UTC(year, monthIndex + 1, 1)))}><ChevronRight /></Button>
+                onClick={() => showMonth(1)}><ChevronRight /></Button>
             </div>
           </div>
           <Select value={profileId === null ? "all" : String(profileId)}
-            onValueChange={(value) => setProfileId(value === "all" ? null : Number(value))}>
+            onValueChange={(value) => router.push(calendarHref(workspaceId, value === "all" ? undefined : Number(value), start.slice(0, 7)), { scroll: false })}>
             <SelectTrigger aria-label={copy.profileFilter} className="w-full sm:w-56"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>
               <SelectItem value="all">{copy.allProfiles}</SelectItem>
@@ -167,7 +172,7 @@ function OutputList({ rows, workspaceId }: { rows: Output[]; workspaceId: number
         : row.width > row.height ? RectangleHorizontal : RectangleVertical;
       const color = row.profile_color && /^#[0-9a-f]{6}$/i.test(row.profile_color) ? row.profile_color : undefined;
       return <li key={`${row.run_id}-${row.format_id}`} className="min-w-0">
-        <Link href={`${completedVideoHref(workspaceId, row.run_id)}&format=${row.format_id}`}
+        <Link href={completedVideoHref(workspaceId, row.run_id, row.format_id)}
           className="flex min-w-0 items-start gap-1.5 rounded-md border bg-card p-1.5 text-xs hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
           style={color ? { borderInlineStartColor: color, borderInlineStartWidth: 3 } : undefined}>
           <Orientation aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
