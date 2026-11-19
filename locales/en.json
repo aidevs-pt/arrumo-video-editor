@@ -165,6 +165,9 @@
     "saveError": "Overrides couldn’t be saved. If the workspace format changed, reopen this view and try again."
   },
   "queue": {
+    "runDetail": "Generation run",
+    "openRun": "Open run",
+    "missingRun": "This run is unavailable in the selected workspace.",
     "title": "Generation queue",
     "back": "Back to drafts",
     "submit": "Queue generation",

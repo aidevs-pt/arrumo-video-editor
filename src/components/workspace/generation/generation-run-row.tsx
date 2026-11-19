@@ -15,11 +15,12 @@ export type Run = { id: number; draft_id: number; state: RunState; pending_revie
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
 type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
 
-export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
+export function GenerationRunRow({ run, workspaceId, disabled, onControl, detail = false }: {
   run: Run;
   workspaceId: number;
 
   disabled: boolean;
+  detail?: boolean;
   onControl: (runId: number, action: RunAction) => Promise<void>;
 }) {
   const [confirm, setConfirm] = useState(false);
@@ -87,6 +88,11 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
       {run.state === "completed" && (
         <Button asChild size="sm" variant="outline" className="mt-2.5">
           <Link href={completedVideoHref(workspaceId, run.id)}>{messages.completedVideo.details}</Link>
+        </Button>
+      )}
+      {!detail && run.state !== "completed" && (
+        <Button asChild size="sm" variant="outline" className="mt-2.5">
+          <Link href={`/generation-run?workspace=${workspaceId}&run=${run.id}`}>{copy.openRun}</Link>
         </Button>
       )}
       <GenerationPlan workspaceId={workspaceId} runId={run.id}

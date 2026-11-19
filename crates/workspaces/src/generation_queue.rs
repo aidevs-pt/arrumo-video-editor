@@ -201,6 +201,19 @@ impl WorkspaceStore {
         }))
     }
 
+    pub fn generation_run(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> rusqlite::Result<Option<GenerationRun>> {
+        self.0.query_row(
+            "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, run_id],
+            read_run,
+        ).optional()
+    }
+
     pub fn list_generation_runs(&self, workspace_id: i64) -> rusqlite::Result<Vec<GenerationRun>> {
         self.0
             .prepare(

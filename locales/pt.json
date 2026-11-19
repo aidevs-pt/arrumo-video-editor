@@ -165,6 +165,9 @@
     "saveError": "Não foi possível guardar as definições. Se o formato mudou, volte a abrir esta vista e tente novamente."
   },
   "queue": {
+    "runDetail": "Execução de geração",
+    "openRun": "Abrir execução",
+    "missingRun": "Esta execução não está disponível no espaço de trabalho selecionado.",
     "title": "Fila de geração",
     "back": "Voltar aos rascunhos",
     "submit": "Adicionar à fila",

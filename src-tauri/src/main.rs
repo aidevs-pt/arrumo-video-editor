@@ -436,6 +436,19 @@ async fn enqueue_video_draft(
 }
 
 #[tauri::command]
+async fn get_generation_run(
+    workspace_id: i64,
+    run_id: i64,
+    store: State<'_, Store>,
+) -> Result<Option<GenerationRun>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .generation_run(workspace_id, run_id)
+        .map_err(|_| "generation_run_failed")
+}
+
+#[tauri::command]
 async fn list_generation_runs(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -561,6 +574,7 @@ fn main() {
             update_video_draft,
             enqueue_video_draft,
             list_generation_runs,
+            get_generation_run,
             control_generation,
             generation_activity,
             generation_plan,

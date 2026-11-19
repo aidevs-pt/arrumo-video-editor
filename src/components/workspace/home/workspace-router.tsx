@@ -48,7 +48,7 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const section = pathname.replace(/\/$/, "");
-  const view = section === "/completed-video" ? "generations"
+  const view = (section === "/completed-video" || section === "/generation-run") ? "generations"
     : section === "/profile" ? "profiles"
     : views.find((view) => section === `/${view}`);
   const workspace = view ? workspaces.find((entry) => String(entry.id) === query.get("workspace")) : undefined;
