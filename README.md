@@ -68,3 +68,10 @@ Workspace output formats have supplemental delivery settings for thumbnail, titl
 cargo run --locked -- ./workspaces.sqlite set-format-delivery 1 1 '{"thumbnails":3,"titles":3,"descriptions":1,"tags":true}'
 cargo run --locked -- ./workspaces.sqlite format-delivery 1 1
 ```
+
+Profile delivery settings can override individual workspace values for each enabled format. The read command returns workspace values, overrides, and effective delivery. Saving replaces the profile override set. Omitted and null fields inherit. Zero, false, and empty text are explicit values.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite set-profile-delivery 1 1 1 '{"thumbnails":0,"tags":false}'
+cargo run --locked -- ./workspaces.sqlite profile-delivery 1 1 1
+```

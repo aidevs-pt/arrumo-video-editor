@@ -111,6 +111,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, profile, format] if command == "profile-delivery" => {
+            let delivery = WorkspaceStore::open(Path::new(database))?.profile_delivery(
+                utf8(workspace)?.parse()?,
+                utf8(profile)?.parse()?,
+                utf8(format)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&delivery)?);
+        }
+        [database, command, workspace, profile, format, overrides]
+            if command == "set-profile-delivery" =>
+        {
+            WorkspaceStore::open(Path::new(database))?.set_profile_delivery(
+                utf8(workspace)?.parse()?,
+                utf8(profile)?.parse()?,
+                utf8(format)?.parse()?,
+                &serde_json::from_str(utf8(overrides)?)?,
+            )?;
+            println!("null");
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -123,7 +142,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "profile-formats <workspace-id> <profile-id> | ",
                 "set-profile-format <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "format-delivery <workspace-id> <format-id> | ",
-                "set-format-delivery <workspace-id> <format-id> <settings-json>"
+                "set-format-delivery <workspace-id> <format-id> <settings-json> | ",
+                "profile-delivery <workspace-id> <profile-id> <format-id> | ",
+                "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json>"
             )
             .into());
         }

@@ -1,5 +1,5 @@
 use rusqlite::params;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::WorkspaceStore;
 
@@ -40,22 +40,7 @@ impl WorkspaceStore {
             params![workspace_id, format_id],
             |row| row.get(0),
         )?;
-        let supplemental = json
-            .as_deref()
-            .map(serde_json::from_str)
-            .transpose()
-            .map_err(|error| {
-                rusqlite::Error::FromSqlConversionFailure(
-                    0,
-                    rusqlite::types::Type::Text,
-                    Box::new(error),
-                )
-            })?
-            .unwrap_or_default();
-        Ok(FormatDelivery {
-            required: [RequiredOutput::FinalVideo, RequiredOutput::Subtitles],
-            supplemental,
-        })
+        Ok(assemble_delivery(read_settings(json, 0)?))
     }
 
     pub fn set_format_delivery(
@@ -74,6 +59,30 @@ impl WorkspaceStore {
             params![workspace_id, format_id, json],
             |_| Ok(()),
         )
+    }
+}
+
+pub(crate) fn read_settings<T: Default + DeserializeOwned>(
+    json: Option<String>,
+    column: usize,
+) -> rusqlite::Result<T> {
+    json.as_deref()
+        .map(serde_json::from_str)
+        .transpose()
+        .map(|settings| settings.unwrap_or_default())
+        .map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                column,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })
+}
+
+pub(crate) fn assemble_delivery(supplemental: SupplementalOutputs) -> FormatDelivery {
+    FormatDelivery {
+        required: [RequiredOutput::FinalVideo, RequiredOutput::Subtitles],
+        supplemental,
     }
 }
 

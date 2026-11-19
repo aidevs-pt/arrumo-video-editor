@@ -5,10 +5,12 @@ use serde::Serialize;
 
 mod format_deliveries;
 mod output_formats;
+mod profile_deliveries;
 mod profile_formats;
 
 pub use format_deliveries::{FormatDelivery, RequiredOutput, SupplementalOutputs};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
+pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -41,6 +43,7 @@ impl WorkspaceStore {
             include_str!("003-create-output-formats.sql"),
             include_str!("004-profile-format-overrides.sql"),
             include_str!("005-format-deliveries.sql"),
+            include_str!("006-profile-deliveries.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

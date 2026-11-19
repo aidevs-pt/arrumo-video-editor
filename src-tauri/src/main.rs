@@ -3,8 +3,8 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use arrumo_workspaces::{
-    DimensionOverrides, FormatDelivery, OutputFormat, OutputFormatSettings, Profile, ProfileFormat,
-    SupplementalOutputs, Workspace, WorkspaceStore,
+    DeliveryOverrides, DimensionOverrides, FormatDelivery, OutputFormat, OutputFormatSettings,
+    Profile, ProfileDelivery, ProfileFormat, SupplementalOutputs, Workspace, WorkspaceStore,
 };
 use tauri::{Manager, State};
 
@@ -178,6 +178,35 @@ async fn set_format_delivery(
         .map_err(|_| "format_delivery_save_failed")
 }
 
+#[tauri::command]
+async fn get_profile_delivery(
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    store: State<'_, Store>,
+) -> Result<ProfileDelivery, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .profile_delivery(workspace_id, profile_id, format_id)
+        .map_err(|_| "profile_delivery_load_failed")
+}
+
+#[tauri::command]
+async fn set_profile_delivery(
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    overrides: DeliveryOverrides,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_profile_delivery(workspace_id, profile_id, format_id, &overrides)
+        .map_err(|_| "profile_delivery_save_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -201,7 +230,9 @@ fn main() {
             list_profile_formats,
             set_profile_format_overrides,
             get_format_delivery,
-            set_format_delivery
+            set_format_delivery,
+            get_profile_delivery,
+            set_profile_delivery
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");
