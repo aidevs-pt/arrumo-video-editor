@@ -1,4 +1,5 @@
 use std::io::{self, BufRead, Read, Write};
+use std::path::Path;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -37,6 +38,7 @@ struct ActionArguments {
 
 pub fn serve_mcp(
     store: &WorkspaceStore,
+    database: &Path,
     mut input: impl BufRead,
     mut output: impl Write,
 ) -> io::Result<()> {
@@ -59,7 +61,7 @@ pub fn serve_mcp(
             ));
         }
         let response = match serde_json::from_slice(&line) {
-            Ok(message) => dispatch(store, &mut session, message),
+            Ok(message) => dispatch(store, database, &mut session, message),
             Err(_) => Some(rpc_error(Value::Null, -32700, "Parse error")),
         };
         if let Some(response) = response {
@@ -70,7 +72,12 @@ pub fn serve_mcp(
     }
 }
 
-fn dispatch(store: &WorkspaceStore, session: &mut Session, message: Value) -> Option<Value> {
+fn dispatch(
+    store: &WorkspaceStore,
+    database: &Path,
+    session: &mut Session,
+    message: Value,
+) -> Option<Value> {
     let request_id = message.get("id");
     let id = request_id.cloned().unwrap_or(Value::Null);
     let method = message["method"].as_str();
@@ -115,7 +122,7 @@ fn dispatch(store: &WorkspaceStore, session: &mut Session, message: Value) -> Op
             let Ok(call) = ToolCall::deserialize(params) else {
                 return Some(rpc_error(id, -32602, "Invalid tool call parameters"));
             };
-            match call_tool(store, call) {
+            match call_tool(store, database, call) {
                 Some(result) => result,
                 None => return Some(rpc_error(id, -32602, "Unknown tool")),
             }
@@ -161,7 +168,7 @@ fn tool_definitions() -> Value {
     json!({"tools": tools})
 }
 
-fn call_tool(store: &WorkspaceStore, call: ToolCall) -> Option<Value> {
+fn call_tool(store: &WorkspaceStore, database: &Path, call: ToolCall) -> Option<Value> {
     let result = match call.name.as_str() {
         "list_workspaces" if call.arguments.is_empty() => store
             .list()
@@ -187,7 +194,7 @@ fn call_tool(store: &WorkspaceStore, call: ToolCall) -> Option<Value> {
             ).map(|output| json!({"output": output}))
              .map_err(|_| "Plugin action could not run. Check the installed revision, scope and permissions")
         }
-        _ => generation::call(store, &call.name, call.arguments)?,
+        _ => generation::call(store, database, &call.name, call.arguments)?,
     };
     Some(match result {
         Ok(data) => json!({
@@ -223,7 +230,13 @@ mod tests {
 {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"list_plugin_actions","arguments":{"unexpected":true}}}
 "#;
         let mut output = Vec::new();
-        serve_mcp(&store, requests.trim_start().as_bytes(), &mut output).unwrap();
+        serve_mcp(
+            &store,
+            Path::new(":memory:"),
+            requests.trim_start().as_bytes(),
+            &mut output,
+        )
+        .unwrap();
         let responses: Vec<Value> = std::str::from_utf8(&output)
             .unwrap()
             .lines()
@@ -235,7 +248,7 @@ mod tests {
         assert_eq!(responses[2]["id"], "list");
         assert_eq!(
             responses[2]["result"]["tools"].as_array().unwrap().len(),
-            14
+            16
         );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],
@@ -249,7 +262,7 @@ mod tests {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let input = vec![b' '; MAX_MESSAGE_BYTES as usize + 1];
         let mut output = Vec::new();
-        assert!(serve_mcp(&store, input.as_slice(), &mut output).is_err());
+        assert!(serve_mcp(&store, Path::new(":memory:"), input.as_slice(), &mut output).is_err());
         assert!(output.is_empty());
     }
 }

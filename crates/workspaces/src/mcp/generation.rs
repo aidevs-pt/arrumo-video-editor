@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
@@ -66,7 +68,15 @@ struct StageResultInput {
     result: Value,
 }
 
-pub(super) fn definitions() -> [Value; 11] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct VerifyDeliveryInput {
+    workspace_id: i64,
+    run_id: i64,
+    attempt: i64,
+}
+
+pub(super) fn definitions() -> [Value; 13] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -95,6 +105,12 @@ pub(super) fn definitions() -> [Value; 11] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel"]}
             }, "required": ["workspaceId", "runId", "action"], "additionalProperties": false}}),
+        json!({"name": "verify_generation_delivery", "description": "Verify the final video and subtitle files in the managed delivery directory and complete the current leased run.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "attempt": id
+            }, "required": ["workspaceId", "runId", "attempt"], "additionalProperties": false}}),
+        json!({"name": "get_completed_video", "description": "Read the verified outputs and production history for a completed video.",
+            "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, and current step.",
@@ -118,6 +134,7 @@ pub(super) fn definitions() -> [Value; 11] {
 
 pub(super) fn call(
     store: &WorkspaceStore,
+    database: &Path,
     name: &str,
     arguments: serde_json::Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
@@ -167,6 +184,18 @@ pub(super) fn call(
                 .control_generation(args.workspace_id, args.run_id, args.action)
                 .map(|run| json!({"run": run_summary(&run)}))
                 .map_err(|_| "Could not change this run in its current state or workspace")
+        }),
+        "verify_generation_delivery" => parse(arguments).and_then(|args: VerifyDeliveryInput| {
+            store
+                .verify_generation_delivery(database, args.workspace_id, args.run_id, args.attempt)
+                .map(|run| json!({"run": run_summary(&run)}))
+                .map_err(|_| "Could not verify delivery. Check the current lease and required media files")
+        }),
+        "get_completed_video" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .completed_video(args.workspace_id, args.run_id)
+                .map(|video| json!({"video": video}))
+                .map_err(|_| "Could not read completed video")
         }),
         "get_generation_activity" => parse(arguments).and_then(|args: RunInput| {
             store

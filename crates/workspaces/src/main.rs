@@ -44,7 +44,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     match arguments.as_slice() {
         [database, command] if command == "mcp" => {
             let store = WorkspaceStore::open(Path::new(database))?;
-            arrumo_workspaces::serve_mcp(&store, io::stdin().lock(), io::stdout().lock())?;
+            arrumo_workspaces::serve_mcp(
+                &store,
+                Path::new(database),
+                io::stdin().lock(),
+                io::stdout().lock(),
+            )?;
         }
         [database, command] if command == "list" => {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
