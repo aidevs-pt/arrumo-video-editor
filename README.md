@@ -116,3 +116,10 @@ cargo run --locked -- ./workspaces.sqlite drafts 1
 ```
 
 Use `update-draft <workspace-id> <draft-id> <settings-json>` to replace the saved draft settings and source order. The desktop Drafts view also supports editing and cancelling. An invalid source group leaves the original draft intact.
+
+Queue a saved draft with a request key and run options. Retrying with the same workspace, request key, draft, and options returns the existing run. Queued runs retain their submitted snapshot after later draft or workspace edits.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite enqueue-draft 1 1 request-1 '{"autopilot":false,"platform":"YouTube"}'
+cargo run --locked -- ./workspaces.sqlite generation-runs 1
+```

@@ -247,6 +247,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&draft)?);
         }
+        [database, command, workspace] if command == "generation-runs" => {
+            let runs = WorkspaceStore::open(Path::new(database))?
+                .list_generation_runs(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&runs)?);
+        }
+        [database, command, workspace, draft, key, options] if command == "enqueue-draft" => {
+            let run = WorkspaceStore::open(Path::new(database))?.enqueue_video_draft(
+                utf8(workspace)?.parse()?,
+                utf8(draft)?.parse()?,
+                utf8(key)?,
+                &serde_json::from_str(utf8(options)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -273,7 +287,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "attach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
                 "detach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
                 "drafts <workspace-id> | create-draft <workspace-id> <settings-json> | ",
-                "update-draft <workspace-id> <draft-id> <settings-json>"
+                "update-draft <workspace-id> <draft-id> <settings-json> | ",
+                "generation-runs <workspace-id> | ",
+                "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json>"
             )
             .into());
         }

@@ -4,9 +4,9 @@ use std::{path::PathBuf, sync::Mutex};
 
 use arrumo_workspaces::{
     BrandAsset, BrandAssetRole, DeliveryOverrides, DimensionOverrides, DraftSettings,
-    FormatDelivery, OutputFormat, OutputFormatSettings, Profile, ProfileDelivery, ProfileFormat,
-    SupplementalOutputs, VideoDraft, Workspace, WorkspaceAsset, WorkspaceFeedback, WorkspaceStore,
-    asset_root,
+    FormatDelivery, GenerationRun, OutputFormat, OutputFormatSettings, Profile, ProfileDelivery,
+    ProfileFormat, RunOptions, SupplementalOutputs, VideoDraft, Workspace, WorkspaceAsset,
+    WorkspaceFeedback, WorkspaceStore, asset_root,
 };
 use tauri::{AppHandle, Manager, State};
 
@@ -414,6 +414,33 @@ async fn update_video_draft(
         .map_err(|_| "draft_update_failed")
 }
 
+#[tauri::command]
+async fn enqueue_video_draft(
+    workspace_id: i64,
+    draft_id: i64,
+    request_key: String,
+    options: RunOptions,
+    store: State<'_, Store>,
+) -> Result<GenerationRun, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .enqueue_video_draft(workspace_id, draft_id, &request_key, &options)
+        .map_err(|_| "generation_enqueue_failed")
+}
+
+#[tauri::command]
+async fn list_generation_runs(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<GenerationRun>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_generation_runs(workspace_id)
+        .map_err(|_| "generation_list_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -455,7 +482,9 @@ fn main() {
             detach_brand_asset,
             list_video_drafts,
             create_video_draft,
-            update_video_draft
+            update_video_draft,
+            enqueue_video_draft,
+            list_generation_runs
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");
