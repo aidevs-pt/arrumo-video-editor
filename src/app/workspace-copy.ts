@@ -1,0 +1,55 @@
+export const workspaceCopy = {
+  en: {
+    title: "Workspaces",
+    intro: "Give each production its own place for profiles, assets, and settings.",
+    list: "Your workspaces",
+    empty: "No workspaces yet",
+    emptyHint: "Create a workspace to start organizing a production.",
+    loading: "Loading workspaces…",
+    form: "New workspace",
+    name: "Workspace name",
+    create: "Create workspace",
+    creating: "Creating…",
+    loadError: "Workspaces couldn’t be loaded.",
+    createError: "The workspace couldn’t be saved. Try again.",
+    retry: "Retry",
+    desktop: "Open Arrumo on your desktop to manage workspaces.",
+  },
+  es: {
+    title: "Espacios de trabajo",
+    intro: "Organiza los perfiles, recursos y ajustes de cada producción.",
+    list: "Tus espacios de trabajo",
+    empty: "Aún no hay espacios de trabajo",
+    emptyHint: "Crea un espacio de trabajo para organizar una producción.",
+    loading: "Cargando espacios de trabajo…",
+    form: "Nuevo espacio de trabajo",
+    name: "Nombre del espacio de trabajo",
+    create: "Crear espacio de trabajo",
+    creating: "Creando…",
+    loadError: "No se pudieron cargar los espacios de trabajo.",
+    createError: "No se pudo guardar el espacio de trabajo. Inténtalo de nuevo.",
+    retry: "Reintentar",
+    desktop: "Abre Arrumo en tu escritorio para gestionar los espacios de trabajo.",
+  },
+  pt: {
+    title: "Espaços de trabalho",
+    intro: "Organize os perfis, recursos e definições de cada produção.",
+    list: "Os seus espaços de trabalho",
+    empty: "Ainda não há espaços de trabalho",
+    emptyHint: "Crie um espaço de trabalho para organizar uma produção.",
+    loading: "A carregar espaços de trabalho…",
+    form: "Novo espaço de trabalho",
+    name: "Nome do espaço de trabalho",
+    create: "Criar espaço de trabalho",
+    creating: "A criar…",
+    loadError: "Não foi possível carregar os espaços de trabalho.",
+    createError: "Não foi possível guardar o espaço de trabalho. Tente novamente.",
+    retry: "Tentar novamente",
+    desktop: "Abra o Arrumo no computador para gerir os espaços de trabalho.",
+  },
+};
+
+export function workspaceLocale(language: string): keyof typeof workspaceCopy {
+  const locale = language.split("-")[0];
+  return locale === "es" || locale === "pt" ? locale : "en";
+}

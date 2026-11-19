@@ -5,3 +5,7 @@
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+/next-env.d.ts
+*.tsbuildinfo
+/src-tauri/gen
