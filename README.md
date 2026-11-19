@@ -286,3 +286,5 @@ Use `list_workspace_feedback`, `add_workspace_feedback`, and `update_workspace_f
 Use `list_provider_preferences` or `get_provider_preferences` to inspect provider availability, effective ordering, and provenance. Use `set_provider_preferences` to save an order and `clear_provider_preferences` to restore inheritance. Omit `workspaceId` for app scope. Passing an empty order explicitly disables providers for the capability at that scope.
 
 Use `get_plugin_settings`, `set_plugin_setting`, and `clear_plugin_setting` to manage SDK-declared non-secret settings. Omit `workspaceId` for app scope. Clearing a workspace override restores inheritance. Stored credentials are excluded from these tools.
+
+Use `list_agent_plugins` to discover bundled production agents and `get_agent_settings` to read the effective choice. Use `set_agent_provider` or `clear_agent_provider` at app or workspace scope. Omit `workspaceId` for app scope. Changes affect future run snapshots.
