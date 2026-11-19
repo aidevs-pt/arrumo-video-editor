@@ -1,33 +1,43 @@
 "use client";
 
-import { useWorkspaceCatalog } from "../home/workspace-router";
-import { Clapperboard } from "lucide-react";
-import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Clapperboard, Film, ListVideo, Pencil, Plus } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MarkdownEditor } from "@/components/markdown/editor";
 import { GenerationQueue } from "@/components/workspace/generation/generation-queue";
+import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { useLocale } from "@/lib/locale-provider";
+import { useWorkspaceCatalog } from "../home/workspace-router";
+import { DraftSourceClips } from "./draft-source-clips";
 
 type CatalogEntry = { id: number; name: string };
 type Asset = CatalogEntry & { kind: string };
 type Draft = { id: number; title: string; intent: string; profile_id: number | null; source_ids: number[] };
 
-export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = false, onBack }: {
+export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = false, startComposing = false, onBack }: {
   workspace: CatalogEntry;
   startInQueue?: boolean;
+  startComposing?: boolean;
   initialProfile: number | null;
 
   onBack: () => void;
 }) {
   const [queueView, setQueueView] = useState<{ draftId: number | null } | null>(startInQueue ? { draftId: null } : null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const [tab, setTab] = useState<"compose" | "saved">();
+  const [notice, setNotice] = useState<string>();
   const [drafts, setDrafts] = useState<Draft[]>();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [profiles, setProfiles] = useState<CatalogEntry[]>([]);
@@ -45,7 +55,8 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
   const workspaceId = workspace.id;
   const { messages } = useLocale();
   const copy = messages.drafts;
-  const names = new Map(assets.map((asset) => [asset.id, asset.name]));
+  const canSave = Boolean(title.trim() && (sources.length || intent.trim()));
+  const activeTab = tab ?? (startComposing || !drafts?.length ? "compose" : "saved");
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
@@ -90,23 +101,17 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
     }
   }
 
-  function move(index: number, offset: number) {
-    setSources((current) => {
-      const next = [...current];
-      [next[index], next[index + offset]] = [next[index + offset], next[index]];
-      return next;
-    });
-  }
-
   function edit(draft: Draft) {
     newDraft.current = { title, intent, profile_id: profile, source_ids: sources };
     setEditing(draft.id);
+    setTab("compose");
+    setNotice(undefined);
     setTitle(draft.title);
     setProfile(draft.profile_id);
     setIntent(draft.intent);
     setSources(draft.source_ids);
     setError(null);
-    titleInput.current?.focus();
+    window.requestAnimationFrame(() => titleInput.current?.focus());
   }
 
   function reset() {
@@ -122,7 +127,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending || !title.trim() || (!sources.length && !intent.trim())) return;
+    if (pending || !canSave) return;
     setPending("saving");
     setError(null);
     try {
@@ -136,6 +141,8 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
         return editing === null ? [...rows, draft] : rows.map((row) => row.id === draft.id ? draft : row);
       });
       reset();
+      setNotice(draft.title);
+      setTab("saved");
     } catch {
       setError("saveError");
     } finally {
@@ -155,103 +162,127 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
   return (
     <WorkspaceShell>
       <WorkspaceHeading icon={Clapperboard}>
-        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p>{workspace.name}</p>
+        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
+        <p>{copy.description}</p>
       </WorkspaceHeading>
-      {loadError ? <Alert variant="destructive">
-        <AlertDescription>{copy.loadError}</AlertDescription>
-        <Button type="button" variant="outline" onClick={() => {
-          setLoadError(false);
-          setAttempt((value) => value + 1);
-        }}>{copy.retry}</Button>
-      </Alert> : !drafts ? <p role="status">{copy.loading}</p> : (
-        <WorkspaceColumns>
-          <section aria-label={copy.title}>
-            {drafts.length === 0 ? <p>{copy.empty}</p> : (
-              <WorkspaceRows  aria-live="polite">
-                {drafts.map((draft) => (
-                  <li key={draft.id}>
-                    <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-                      <h2>{draft.title}</h2>
-                      <div className="flex flex-wrap items-baseline gap-2.5">
-                        <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
-                          aria-label={`${copy.edit} · ${draft.title}`} onClick={() => edit(draft)}>{copy.edit}</Button>
-                        <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
-                          aria-label={`${messages.queue.submit} · ${draft.title}`}
-                          onClick={() => setQueueView({ draftId: draft.id })}>{messages.queue.submit}</Button>
-                      </div>
-                    </div>
-                    {draft.profile_id !== null && <p>{profiles.find((entry) => entry.id === draft.profile_id)?.name}</p>}
-                    {draft.intent && <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{draft.intent}</p>}
-                    {draft.source_ids.length > 0 && <ol className="list-decimal ps-6 [&>li]:py-0.75">
-                      {draft.source_ids.map((id) => <li key={id}>{names.get(id) ?? id}</li>)}
-                    </ol>}
-                  </li>
-                ))}
-              </WorkspaceRows>
-            )}
-          </section>
-          <WorkspaceForm  onSubmit={save} aria-labelledby="new-draft-title" aria-busy={pending !== null}>
-            <h2 id="new-draft-title">{editing === null ? copy.newDraft : copy.edit}</h2>
-            <fieldset disabled={pending !== null}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="draft-title">{copy.name}</FieldLabel>
-                  <Input ref={titleInput} id="draft-title" name="title" required value={title} onChange={(event) => setTitle(event.target.value)} />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="draft-profile">{copy.profile}</FieldLabel>
-                  <NativeSelect id="draft-profile" className="w-full"
-                    value={profile ?? ""} onChange={(event) => setProfile(event.target.value ? Number(event.target.value) : null)}>
-                    <NativeSelectOption value="">{copy.noProfile}</NativeSelectOption>
-                    {profiles.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{entry.name}</NativeSelectOption>)}
-                  </NativeSelect>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="draft-intent">{copy.intent}</FieldLabel>
-                  <Textarea id="draft-intent" value={intent} aria-describedby="draft-intent-hint" onChange={(event) => setIntent(event.target.value)} />
-                  <FieldDescription id="draft-intent-hint">{copy.intentHint}</FieldDescription>
-                </Field>
-                <FieldSet>
-                  <FieldLegend>{copy.sources}</FieldLegend>
-                  <Button type="button" variant="outline" onClick={() => void importClips()}>{copy.import}</Button>
-                  <FieldGroup>
-                    {assets.map((asset) => (
-                      <Field key={asset.id} orientation="horizontal">
-                        <input id={`draft-asset-${asset.id}`} type="checkbox" checked={sources.includes(asset.id)}
-                          onChange={(event) => {
-                            const checked = event.target.checked;
-                            setSources((current) => checked
-                              ? [...current, asset.id] : current.filter((id) => id !== asset.id));
-                          }} />
-                        <FieldLabel htmlFor={`draft-asset-${asset.id}`}>{asset.name}</FieldLabel>
+      {loadError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{copy.loadError}</AlertDescription>
+          <Button type="button" variant="outline" size="sm" onClick={() => {
+            setLoadError(false);
+            setAttempt((value) => value + 1);
+          }}>{copy.retry}</Button>
+        </Alert>
+      ) : !drafts ? (
+        <div className="grid gap-3" role="status" aria-label={copy.loading}>
+          <Skeleton className="h-9 w-52" />
+          <Skeleton className="h-52 w-full" />
+        </div>
+      ) : (
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setNotice(undefined);
+          setTab(value === "saved" ? "saved" : "compose");
+        }} className="gap-5">
+          <TabsList aria-label={copy.title} className="w-fit max-w-full">
+            <TabsTrigger value="compose"><Plus />{editing === null ? copy.newDraft : copy.edit}</TabsTrigger>
+            <TabsTrigger value="saved"><ListVideo />{copy.savedDrafts}
+              {drafts.length > 0 && <Badge variant="secondary" className="hidden sm:inline-flex">{drafts.length}</Badge>}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="compose">
+            <form onSubmit={save} aria-busy={pending !== null} className="@container grid gap-4">
+              <div className="grid items-start gap-4 @min-[46rem]:grid-cols-2">
+                <DraftSourceClips assets={assets} sources={sources} disabled={pending !== null}
+                  importing={pending === "importing"} onImport={() => void importClips()} onChange={setSources} />
+                <Card>
+                  <CardHeader>
+                    <CardTitle><h2>{copy.details}</h2></CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FieldGroup>
+                      <Field>
+                        <FieldLabel htmlFor="draft-title">{copy.name}</FieldLabel>
+                        <Input ref={titleInput} id="draft-title" name="title" required value={title}
+                          disabled={pending !== null} onChange={(event) => setTitle(event.target.value)} />
                       </Field>
-                    ))}
-                  </FieldGroup>
-                </FieldSet>
-                {sources.length > 0 && <ol className="list-decimal ps-6 [&>li]:py-0.75" aria-label={copy.order}>
-                  {sources.map((id, index) => (
-                    <li key={id}>
-                      {names.get(id) ?? id}
-                      <div className="flex flex-wrap items-baseline gap-2.5">
-                        <Button type="button" size="sm" variant="outline" disabled={index === 0}
-                          aria-label={`${copy.up} · ${names.get(id) ?? id}`} onClick={() => move(index, -1)}>{copy.up}</Button>
-                        <Button type="button" size="sm" variant="outline" disabled={index === sources.length - 1}
-                          aria-label={`${copy.down} · ${names.get(id) ?? id}`} onClick={() => move(index, 1)}>{copy.down}</Button>
-                      </div>
+                      <Field>
+                        <FieldLabel htmlFor="draft-profile">{copy.profile}</FieldLabel>
+                        <Select value={profile === null ? "none" : String(profile)} disabled={pending !== null}
+                          onValueChange={(value) => setProfile(value === "none" ? null : Number(value))}>
+                          <SelectTrigger id="draft-profile" className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">{copy.noProfile}</SelectItem>
+                            {profiles.map((entry) => <SelectItem key={entry.id} value={String(entry.id)}>{entry.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="draft-intent">{copy.intent}</FieldLabel>
+                        <MarkdownEditor id="draft-intent" label={copy.intent} value={intent}
+                          disabled={pending !== null} onChange={setIntent} />
+                        <FieldDescription>{copy.intentHint}</FieldDescription>
+                      </Field>
+                    </FieldGroup>
+                  </CardContent>
+                </Card>
+              </div>
+              {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+                {editing !== null && <Button type="button" variant="outline" disabled={pending !== null}
+                  onClick={() => { reset(); setTab("saved"); }}>{copy.cancel}</Button>}
+                <Button type="submit" disabled={pending !== null || !canSave}>
+                  {pending === "saving" ? copy.saving : copy.save}
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+          <TabsContent value="saved" className="grid gap-3">
+            {notice && <Alert><AlertDescription role="status">{copy.saved} · {notice}</AlertDescription></Alert>}
+            {drafts.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><Clapperboard /></EmptyMedia>
+                  <EmptyTitle>{copy.empty}</EmptyTitle>
+                  <EmptyDescription>{copy.emptyHint}</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent><Button type="button" onClick={() => setTab("compose")}>
+                  <Plus data-icon="inline-start" />{copy.newDraft}
+                </Button></EmptyContent>
+              </Empty>
+            ) : (
+              <ul aria-label={copy.savedDrafts} className="grid gap-3">
+                {drafts.map((draft) => {
+                  const draftProfile = profiles.find((entry) => entry.id === draft.profile_id);
+                  return (
+                    <li key={draft.id}>
+                      <Card size="sm">
+                        <CardHeader>
+                          <CardTitle className="wrap-anywhere"><h2>{draft.title}</h2></CardTitle>
+                          {draft.intent && <CardDescription className="line-clamp-2 wrap-anywhere">{draft.intent}</CardDescription>}
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2">
+                          {draftProfile && <Badge variant="secondary">{draftProfile.name}</Badge>}
+                          {draft.source_ids.length > 0 ? <Badge variant="outline">
+                            <Film />{copy.sources} · {draft.source_ids.length}
+                          </Badge> : <Badge variant="outline">{copy.intentOnly}</Badge>}
+                        </CardContent>
+                        <CardFooter className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
+                            aria-label={`${copy.edit} · ${draft.title}`} onClick={() => edit(draft)}>
+                            <Pencil data-icon="inline-start" />{copy.edit}
+                          </Button>
+                          <Button type="button" size="sm" disabled={pending !== null || editing !== null}
+                            aria-label={`${messages.queue.submit} · ${draft.title}`}
+                            onClick={() => setQueueView({ draftId: draft.id })}>{messages.queue.submit}</Button>
+                        </CardFooter>
+                      </Card>
                     </li>
-                  ))}
-                </ol>}
-                {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-                <div className="flex flex-wrap items-baseline gap-2.5">
-                  <Button type="submit" disabled={!title.trim() || (!sources.length && !intent.trim())}>
-                    {pending === "saving" ? copy.saving : copy.save}
-                  </Button>
-                  {editing !== null && <Button type="button" variant="outline" onClick={reset}>{copy.cancel}</Button>}
-                </div>
-              </FieldGroup>
-            </fieldset>
-          </WorkspaceForm>
-        </WorkspaceColumns>
+                  );
+                })}
+              </ul>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
     </WorkspaceShell>
   );
@@ -260,7 +291,8 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
 
 export function WorkspaceDraftsRoute({ queue = false }: { queue?: boolean }) {
   const { workspace, draftProfile, navigate } = useWorkspaceCatalog();
-  return workspace ? <WorkspaceDrafts key={`${workspace.id}-${queue}-${draftProfile}`}
-    workspace={workspace} initialProfile={draftProfile} startInQueue={queue}
+  const compose = useSearchParams().get("compose") === "1" || draftProfile !== null;
+  return workspace ? <WorkspaceDrafts key={`${workspace.id}-${queue}-${draftProfile}-${compose}`}
+    workspace={workspace} initialProfile={draftProfile} startInQueue={queue} startComposing={compose}
     onBack={() => navigate("drafts")} /> : null;
 }

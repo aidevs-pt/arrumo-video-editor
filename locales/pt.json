@@ -83,6 +83,18 @@
     "saveError": "Não foi possível guardar as definições de entrega. Tente novamente."
   },
   "drafts": {
+    "description": "Organize as gravações e prepare as orientações para cada vídeo.",
+    "savedDrafts": "Rascunhos guardados",
+    "saved": "Rascunho guardado",
+    "details": "Orientações do vídeo",
+    "sourcesHint": "Importe ou selecione clipes e coloque-os pela ordem de reprodução.",
+    "noSources": "Nenhum clipe selecionado",
+    "noSourcesHint": "Adicione gravações ou escreva as orientações para começar do zero.",
+    "importing": "A importar clipes…",
+    "existingClips": "Clipes do espaço de trabalho",
+    "removeSource": "Remover do rascunho",
+    "emptyHint": "Guarde as orientações de um vídeo para voltar a elas ou enviá-las para a fila de geração.",
+    "intentOnly": "Apenas orientações",
     "title": "Rascunhos",
     "back": "Voltar aos perfis",
     "newDraft": "Novo rascunho",

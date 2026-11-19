@@ -83,6 +83,18 @@
     "saveError": "Delivery settings couldn’t be saved. Try again."
   },
   "drafts": {
+    "description": "Arrange your footage and prepare the brief for each video.",
+    "savedDrafts": "Saved drafts",
+    "saved": "Draft saved",
+    "details": "Video brief",
+    "sourcesHint": "Import or select clips and put them in playback order.",
+    "noSources": "No clips selected",
+    "noSourcesHint": "Add footage below, or write a brief to start from scratch.",
+    "importing": "Importing clips…",
+    "existingClips": "Workspace clips",
+    "removeSource": "Remove from draft",
+    "emptyHint": "Save a video brief to return to it or send it to the generation queue.",
+    "intentOnly": "Brief only",
     "title": "Drafts",
     "back": "Back to profiles",
     "newDraft": "New video draft",

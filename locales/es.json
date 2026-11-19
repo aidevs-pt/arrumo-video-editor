@@ -83,6 +83,18 @@
     "saveError": "No se pudieron guardar los ajustes de entrega. Inténtalo de nuevo."
   },
   "drafts": {
+    "description": "Ordena tus grabaciones y prepara las indicaciones para cada vídeo.",
+    "savedDrafts": "Borradores guardados",
+    "saved": "Borrador guardado",
+    "details": "Indicaciones del vídeo",
+    "sourcesHint": "Importa o selecciona clips y ponlos en orden de reproducción.",
+    "noSources": "No hay clips seleccionados",
+    "noSourcesHint": "Añade grabaciones o escribe las indicaciones para empezar desde cero.",
+    "importing": "Importando clips…",
+    "existingClips": "Clips del espacio de trabajo",
+    "removeSource": "Quitar del borrador",
+    "emptyHint": "Guarda las indicaciones de un vídeo para volver a ellas o enviarlas a la cola de generación.",
+    "intentOnly": "Solo indicaciones",
     "title": "Borradores",
     "back": "Volver a los perfiles",
     "newDraft": "Nuevo borrador",
