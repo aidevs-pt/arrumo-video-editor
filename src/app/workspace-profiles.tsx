@@ -19,10 +19,12 @@ export function WorkspaceProfiles({
   workspace,
   locale,
   onBack,
+  onOutputs,
 }: {
   workspace: { id: number; name: string };
   locale: keyof typeof profileCopy;
   onBack: () => void;
+  onOutputs: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [attempt, setAttempt] = useState(0);
@@ -109,6 +111,7 @@ export function WorkspaceProfiles({
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
       </Button>
+      <Button type="button" variant="outline" onClick={onOutputs} disabled={saving || editing !== null}>{copy.outputs}</Button>
       <div className="workspace-heading">
         <h1 ref={heading} tabIndex={-1}>{workspace.name}</h1>
       </div>
