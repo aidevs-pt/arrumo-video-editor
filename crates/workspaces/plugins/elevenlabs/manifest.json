@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "elevenlabs",
   "name": "Arrumo ElevenLabs Plugin",
   "description": "The default ElevenLabs adapter for transcription and audio generation.",
@@ -12,5 +12,15 @@
       "name": "Text to speech",
       "description": "Generate speech audio from supplied text."
     }
-  }
+  },
+  "settings": [
+    {
+      "id": "api-key",
+      "label": "API key",
+      "description": "Credential used for API calls to ElevenLabs.",
+      "kind": "secret",
+      "scope": "workspace",
+      "required": true
+    }
+  ]
 }

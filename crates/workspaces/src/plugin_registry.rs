@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     CatalogPlugin, WorkspaceStore,
-    plugin_catalog::{PLUGIN_MANIFEST_SCHEMA_VERSION, identifier},
+    plugin_catalog::{SUPPORTED_PLUGIN_MANIFEST_SCHEMAS, identifier},
     plugin_package::valid_sha256,
 };
 
@@ -55,7 +55,7 @@ pub struct RegistryRelease {
 
 impl RegistryRelease {
     pub fn compatible(&self) -> bool {
-        self.manifest_schema_version == PLUGIN_MANIFEST_SCHEMA_VERSION
+        SUPPORTED_PLUGIN_MANIFEST_SCHEMAS.contains(&self.manifest_schema_version)
     }
 }
 

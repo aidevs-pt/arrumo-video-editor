@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "higgsfield",
   "name": "Arrumo Higgsfield Plugin",
   "description": "The default Higgsfield adapter for generated video assets.",
@@ -8,5 +8,15 @@
       "name": "Video generation",
       "description": "Generate video assets from prompts."
     }
-  }
+  },
+  "settings": [
+    {
+      "id": "api-key",
+      "label": "API key",
+      "description": "Credential used for API calls to Higgsfield.",
+      "kind": "secret",
+      "scope": "workspace",
+      "required": true
+    }
+  ]
 }

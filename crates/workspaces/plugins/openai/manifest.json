@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "openai",
   "name": "Arrumo OpenAI Plugin",
   "description": "The default OpenAI adapter for transcription and image generation.",
@@ -12,5 +12,15 @@
       "name": "Image generation",
       "description": "Generate image assets from prompts."
     }
-  }
+  },
+  "settings": [
+    {
+      "id": "api-key",
+      "label": "API key",
+      "description": "Credential used for API calls to OpenAI.",
+      "kind": "secret",
+      "scope": "workspace",
+      "required": true
+    }
+  ]
 }

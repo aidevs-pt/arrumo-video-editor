@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "gemini",
   "name": "Arrumo Gemini Plugin",
   "description": "The default Gemini adapter for image generation.",
@@ -8,5 +8,15 @@
       "name": "Image generation",
       "description": "Generate image assets from prompts."
     }
-  }
+  },
+  "settings": [
+    {
+      "id": "api-key",
+      "label": "API key",
+      "description": "Credential used for API calls to Gemini.",
+      "kind": "secret",
+      "scope": "workspace",
+      "required": true
+    }
+  ]
 }

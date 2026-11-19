@@ -22,6 +22,7 @@ mod output_formats;
 mod plugin_catalog;
 mod plugin_package;
 mod plugin_registry;
+mod plugin_schema;
 mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
@@ -46,13 +47,14 @@ pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use plugin_catalog::{
-    CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PLUGIN_MANIFEST_SCHEMA_VERSION, PluginManifest,
+    CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
 };
 pub use plugin_package::{PluginPackageInfo, THIRD_PARTY_PLUGIN_NOTICE};
 pub use plugin_registry::{
     PluginRegistry, RegistryPlugin, RegistryRelease, RegistryReleaseSource, fetch_plugin_registry,
     read_plugin_registry, validate_registry_url,
 };
+pub use plugin_schema::{PluginSetting, PluginSettingKind, PluginSettingScope};
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};

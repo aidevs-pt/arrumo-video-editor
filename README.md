@@ -187,9 +187,9 @@ Use **Check sign-in** in Settings or `agent-login-status <plugin-id>` in the CLI
 
 Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. The editor bundles byte-for-byte copies under `crates/workspaces/plugins` so its standalone build needs only this repository. Sync bundled copies when updating the official plugin manifests. Runtime installation and trust grants are separate host features.
 
-The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
+The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 and v2 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
 
-Use `install-plugin-zip <package.zip>` to register a local ZIP containing a root SDK v1 `manifest.json`. The catalog reports the package size and SHA-256 digest and retains the original ZIP in the app database. Removing the local entry removes its stored ZIP. The CLI displays the third-party plugin notice on registration. ZIP contents remain inert.
+Use `install-plugin-zip <package.zip>` to register a local ZIP containing a root SDK `manifest.json`. The catalog reports the package size and SHA-256 digest and retains the original ZIP in the app database. Removing the local entry removes its stored ZIP. The CLI displays the third-party plugin notice on registration. ZIP contents remain inert.
 
 Pass `--sha256 <digest>` after the ZIP path to compare the package against an independently obtained release checksum before registration. A malformed or mismatched digest prevents registration. A checksum establishes that the package matches the expected bytes. Publisher trust still depends on how you obtained the checksum.
 
@@ -197,7 +197,7 @@ Use `install-plugin-release <catalog.json> <plugin-id> <version> <package.zip>` 
 
 Use `download-plugin-release <catalog-url> <plugin-id> <version>` to fetch an exact release from an HTTPS registry and register it locally. Arrumo verifies the release using the same checks as local snapshot registration and records the registry URL. The command expects a registry and package that can be fetched without authentication.
 
-List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. Releases with `manifestSchemaVersion` set to `1` are compatible with this host. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
+List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 and 2. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
 
 In desktop Settings, open **Browse registry** under **Plugins** and load an HTTPS catalog URL. Expand a plugin to review its source repository and available versions. Arrumo checks the reviewed release again before downloading. If its source or checksum changed, reload the catalog and review the release again.
 

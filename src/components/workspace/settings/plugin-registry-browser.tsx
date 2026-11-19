@@ -27,7 +27,7 @@ type Release = {
 type RegistryPlugin = { id: string; repository: string; releases: Release[] };
 type Listing = {
   registry: { plugins: RegistryPlugin[] };
-  supportedManifestSchemaVersion: number;
+  supportedManifestSchemaVersions: number[];
   updateVersions: Record<string, string[]>;
 };
 
@@ -137,7 +137,7 @@ export function PluginRegistryBrowser({
                             {releases.map((release) => (
                               <li key={release.version} className="flex flex-wrap items-center justify-between gap-2 py-2">
                                 <span className="min-w-0 wrap-anywhere">{release.version}</span>
-                                {release.manifestSchemaVersion !== listing.supportedManifestSchemaVersion
+                                {!listing.supportedManifestSchemaVersions.includes(release.manifestSchemaVersion)
                                   ? <span className="text-xs text-muted-foreground">{copy.incompatible}</span>
                                   : (
                                     <AlertDialog>

@@ -1,10 +1,15 @@
-use std::{collections::BTreeMap, error::Error, io, sync::OnceLock};
+use std::{
+    collections::{BTreeMap, HashSet},
+    error::Error,
+    io,
+    sync::OnceLock,
+};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{PluginPackageInfo, RegistryReleaseSource, WorkspaceStore};
+use crate::{PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const PLUGIN_MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 2] = [1, 2];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -18,16 +23,22 @@ pub struct PluginManifest {
     pub capabilities: BTreeMap<String, PluginCapability>,
     #[serde(
         default,
-        deserialize_with = "deserialize_provider",
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub settings: Option<Vec<PluginSetting>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
         skip_serializing_if = "Option::is_none"
     )]
     pub agent_provider: Option<ProviderDescriptor>,
 }
 
-fn deserialize_provider<'de, D: serde::Deserializer<'de>>(
+fn deserialize_present<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
     deserializer: D,
-) -> Result<Option<ProviderDescriptor>, D::Error> {
-    ProviderDescriptor::deserialize(deserializer).map(Some)
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -67,7 +78,7 @@ impl PluginManifest {
             return Err(invalid_manifest("Plugin manifest exceeds 64 KiB").into());
         }
         let manifest: Self = serde_json::from_slice(bytes)?;
-        if manifest.schema_version != PLUGIN_MANIFEST_SCHEMA_VERSION {
+        if !SUPPORTED_PLUGIN_MANIFEST_SCHEMAS.contains(&manifest.schema_version) {
             return Err(invalid_manifest("Unsupported plugin manifest schema version").into());
         }
         if !identifier(&manifest.id) || blank(&manifest.name) || blank(&manifest.description) {
@@ -79,6 +90,19 @@ impl PluginManifest {
             })
         {
             return Err(invalid_manifest("Invalid plugin capabilities").into());
+        }
+        let mut setting_ids = HashSet::new();
+        if let Some(settings) = &manifest.settings
+            && (manifest.schema_version < 2
+                || settings.len() > 64
+                || settings.iter().any(|setting| {
+                    !identifier(&setting.id)
+                        || !setting_ids.insert(&setting.id)
+                        || blank(&setting.label)
+                        || blank(&setting.description)
+                }))
+        {
+            return Err(invalid_manifest("Invalid or duplicate plugin setting declaration").into());
         }
         if let Some(provider) = &manifest.agent_provider
             && (!manifest.capabilities.contains_key("agents")
@@ -140,6 +164,12 @@ impl WorkspaceStore {
             return Err(
                 invalid_manifest("Package plugin ID differs from the registry entry").into(),
             );
+        }
+        if source.is_some_and(|source| source.manifest_schema_version != manifest.schema_version) {
+            return Err(invalid_manifest(
+                "Package manifest schema differs from the registry entry",
+            )
+            .into());
         }
         if bundled_manifests()
             .iter()
