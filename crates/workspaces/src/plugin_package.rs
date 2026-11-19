@@ -25,6 +25,29 @@ pub struct PluginPackageInfo {
 
 impl WorkspaceStore {
     pub fn install_plugin_zip(&self, archive: impl Read) -> Result<CatalogPlugin, Box<dyn Error>> {
+        self.register_plugin_zip(archive, None)
+    }
+
+    pub fn install_verified_plugin_zip(
+        &self,
+        archive: impl Read,
+        expected_sha256: &str,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        if expected_sha256.len() != 64
+            || !expected_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(
+                invalid_package("Expected SHA-256 must contain 64 hexadecimal digits").into(),
+            );
+        }
+        self.register_plugin_zip(archive, Some(expected_sha256))
+    }
+
+    fn register_plugin_zip(
+        &self,
+        archive: impl Read,
+        expected_sha256: Option<&str>,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
         let mut bytes = Vec::new();
         archive
             .take(MAX_ARCHIVE_BYTES + 1)
@@ -33,11 +56,17 @@ impl WorkspaceStore {
             return Err(invalid_package("Plugin package exceeds 16 MiB").into());
         }
 
-        let manifest = read_package_manifest(&bytes)?;
         let mut sha256 = String::with_capacity(64);
         for byte in Sha256::digest(&bytes) {
             write!(sha256, "{byte:02x}")?;
         }
+        if expected_sha256.is_some_and(|expected| !sha256.eq_ignore_ascii_case(expected)) {
+            return Err(invalid_package(
+                "Plugin package SHA-256 does not match the expected digest",
+            )
+            .into());
+        }
+        let manifest = read_package_manifest(&bytes)?;
         let info = PluginPackageInfo {
             sha256,
             byte_length: bytes.len() as i64,
@@ -99,6 +128,48 @@ mod tests {
     use zip::{ZipWriter, write::SimpleFileOptions};
 
     use super::*;
+
+    #[test]
+    fn verifies_expected_digest_before_registering_package() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let mut archive = ZipWriter::new(Cursor::new(Vec::new()));
+        archive
+            .start_file("manifest.json", SimpleFileOptions::default())
+            .unwrap();
+        archive
+            .write_all(
+                br#"{
+            "schemaVersion": 1,
+            "id": "local-plugin",
+            "name": "Local Plugin",
+            "description": "Fixture",
+            "capabilities": {"custom": {"name": "Custom", "description": "Fixture"}}
+        }"#,
+            )
+            .unwrap();
+        let bytes = archive.finish().unwrap().into_inner();
+        let mut checksum = String::new();
+        for byte in Sha256::digest(&bytes) {
+            write!(checksum, "{byte:02X}").unwrap();
+        }
+        let initial_count = store.plugin_catalog().unwrap().len();
+        for digest in ["invalid", &"0".repeat(64)] {
+            assert!(
+                store
+                    .install_verified_plugin_zip(bytes.as_slice(), digest)
+                    .is_err()
+            );
+        }
+        assert_eq!(store.plugin_catalog().unwrap().len(), initial_count);
+        let plugin = store
+            .install_verified_plugin_zip(bytes.as_slice(), &checksum)
+            .unwrap();
+        assert_eq!(plugin.manifest.id, "local-plugin");
+        assert_eq!(
+            plugin.package.unwrap().sha256,
+            checksum.to_ascii_lowercase()
+        );
+    }
 
     #[test]
     fn rejects_conflicting_and_unsafe_archive_paths() {

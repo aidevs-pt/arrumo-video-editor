@@ -45,6 +45,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .install_plugin_zip(File::open(archive)?)?;
             println!("{}", serde_json::to_string(&installed)?);
         }
+        [database, command, archive, flag, checksum]
+            if command == "install-plugin-zip" && flag == "--sha256" =>
+        {
+            eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
+            let installed = WorkspaceStore::open(Path::new(database))?
+                .install_verified_plugin_zip(File::open(archive)?, utf8(checksum)?)?;
+            println!("{}", serde_json::to_string(&installed)?);
+        }
         [database, command, id] if command == "remove-plugin-manifest" => {
             let removed = WorkspaceStore::open(Path::new(database))?
                 .remove_installed_plugin_manifest(utf8(id)?)?;
@@ -582,7 +590,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | remove-plugin-manifest <plugin-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
