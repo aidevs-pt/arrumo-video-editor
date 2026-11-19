@@ -1,4 +1,18 @@
 {
+  "runProviders": {
+    "title": "Providers for this run",
+    "loading": "Loading providers…",
+    "loadError": "Could not load providers.",
+    "empty": "No providers are registered for this run.",
+    "inherit": "Use saved order",
+    "capabilities": {
+      "actions": "Actions",
+      "image-generation": "Image generation",
+      "text-to-speech": "Text to speech",
+      "transcription": "Transcription",
+      "video-generation": "Video generation"
+    }
+  },
   "pluginCredentials": {
     "unavailable": "The system credential store is unavailable. Unlock it and try again.",
     "saveError": "Could not update the credential. Check the system credential store and try again.",

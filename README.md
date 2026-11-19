@@ -220,3 +220,5 @@ Use `provider-preferences <capability> <app|workspace-id>` to inspect the catalo
 New generation runs capture the effective provider order and its source for each capability. A replay using captured settings preserves that order. A replay using current settings resolves it again. Agent selection continues to use the separately captured agent settings. Snapshots created before provider order capture remain readable.
 
 The `enqueue-draft` options JSON can include `provider_overrides`, a map from capability ID to an ordered array of provider plugin IDs. An omitted capability inherits the workspace or app order. An empty array disables providers for that capability for this run. Both replay modes preserve the requested per-run overrides. A replay with current settings revalidates the requested providers. Agent selection uses the agent settings.
+
+In the desktop generation form, expand **Providers for this run** to include or exclude individual providers. **Use saved order** clears a capability override. Closing the disclosure preserves your selections for that draft. Submitting the run leaves the workspace preferences unchanged.

@@ -244,3 +244,15 @@ fn open_credential_workspace_store(app: &AppHandle) -> Result<WorkspaceStore, &'
         .join("workspaces.sqlite");
     WorkspaceStore::open(database).map_err(|_| "store_unavailable")
 }
+
+#[tauri::command]
+pub fn list_provider_preferences(
+    workspace_id: Option<i64>,
+    store: State<'_, Store>,
+) -> Result<BTreeMap<String, arrumo_workspaces::ProviderPreferences>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_provider_preferences(workspace_id)
+        .map_err(|_| "provider_preferences_failed")
+}

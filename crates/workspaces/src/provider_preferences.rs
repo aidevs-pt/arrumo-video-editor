@@ -60,26 +60,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         overrides: &BTreeMap<String, Vec<String>>,
     ) -> Result<BTreeMap<String, CapturedProviderOrder>, Box<dyn Error>> {
-        let mut capabilities: BTreeMap<String, Vec<CapabilityProvider>> = BTreeMap::new();
-        for plugin in self.plugin_catalog()? {
-            for capability in plugin.manifest.capabilities.keys() {
-                capabilities
-                    .entry(capability.clone())
-                    .or_default()
-                    .push(CapabilityProvider {
-                        id: plugin.manifest.id.clone(),
-                        name: plugin.manifest.name.clone(),
-                        bundled: plugin.bundled,
-                    });
-            }
-        }
-        let mut query = self.0.prepare(
-            "SELECT DISTINCT capability FROM plugin_provider_preferences
-             WHERE workspace_id IS NULL OR workspace_id = ?1",
-        )?;
-        for stored in query.query_map([workspace_id], |row| row.get::<_, String>(0))? {
-            capabilities.entry(stored?).or_default();
-        }
+        let capabilities = self.capability_index(Some(workspace_id))?;
         for (capability, order) in overrides {
             let available = capabilities
                 .get(capability)
@@ -110,6 +91,52 @@ impl WorkspaceStore {
                 ))
             })
             .collect()
+    }
+
+    pub fn list_provider_preferences(
+        &self,
+        workspace_id: Option<i64>,
+    ) -> Result<BTreeMap<String, ProviderPreferences>, Box<dyn Error>> {
+        let _transaction = self.0.unchecked_transaction()?;
+        if let Some(id) = workspace_id {
+            self.0
+                .query_row("SELECT id FROM workspaces WHERE id = ?1", [id], |_| Ok(()))?;
+        }
+        self.capability_index(workspace_id)?
+            .into_iter()
+            .map(|(capability, available)| {
+                let preference =
+                    self.resolve_provider_preferences(&capability, workspace_id, available)?;
+                Ok((capability, preference))
+            })
+            .collect()
+    }
+
+    fn capability_index(
+        &self,
+        workspace_id: Option<i64>,
+    ) -> Result<BTreeMap<String, Vec<CapabilityProvider>>, Box<dyn Error>> {
+        let mut capabilities: BTreeMap<String, Vec<CapabilityProvider>> = BTreeMap::new();
+        for plugin in self.plugin_catalog()? {
+            for capability in plugin.manifest.capabilities.keys() {
+                capabilities
+                    .entry(capability.clone())
+                    .or_default()
+                    .push(CapabilityProvider {
+                        id: plugin.manifest.id.clone(),
+                        name: plugin.manifest.name.clone(),
+                        bundled: plugin.bundled,
+                    });
+            }
+        }
+        let mut query = self.0.prepare(
+            "SELECT DISTINCT capability FROM plugin_provider_preferences
+             WHERE workspace_id IS NULL OR workspace_id = ?1",
+        )?;
+        for stored in query.query_map([workspace_id], |row| row.get::<_, String>(0))? {
+            capabilities.entry(stored?).or_default();
+        }
+        Ok(capabilities)
     }
 
     fn resolve_provider_preferences(

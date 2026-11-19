@@ -611,6 +611,7 @@ fn main() {
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,
+            plugin_settings::list_provider_preferences,
             plugin_settings::read_plugin_settings,
             plugin_settings::write_plugin_setting,
             plugin_settings::read_plugin_credential_status,

@@ -1,4 +1,18 @@
 {
+  "runProviders": {
+    "title": "Fornecedores para esta execução",
+    "loading": "A carregar fornecedores…",
+    "loadError": "Não foi possível carregar os fornecedores.",
+    "empty": "Não há fornecedores registados para esta execução.",
+    "inherit": "Usar ordem guardada",
+    "capabilities": {
+      "actions": "Ações",
+      "image-generation": "Geração de imagens",
+      "text-to-speech": "Texto para fala",
+      "transcription": "Transcrição",
+      "video-generation": "Geração de vídeo"
+    }
+  },
   "pluginCredentials": {
     "unavailable": "O armazenamento de credenciais do sistema não está disponível. Desbloqueie-o e tente novamente.",
     "saveError": "Não foi possível atualizar a credencial. Verifique o armazenamento do sistema e tente novamente.",

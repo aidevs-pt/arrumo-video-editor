@@ -16,6 +16,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GenerationRunRow, runNeedsReview, type Run } from "./generation-run-row";
 
+import { RunProviders } from "./run-providers";
+
 type Draft = { id: number; title: string };
 export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }: {
   workspaceId: number;
@@ -60,7 +62,11 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
     event.preventDefault();
     if (!selected || !runs || pending) return;
     const fields = new FormData(event.currentTarget);
-    const options = { autopilot: fields.has("autopilot"), platform: String(fields.get("platform") ?? "").trim() || null };
+    const options = {
+      autopilot: fields.has("autopilot"),
+      platform: String(fields.get("platform") ?? "").trim() || null,
+      provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
+    };
     const payload = JSON.stringify({ draftId: selected.id, options });
     if (request.current?.payload !== payload) {
       request.current = { key: crypto.randomUUID(), payload };
@@ -123,6 +129,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
                         <FieldDescription id="run-autopilot-description">{copy.autopilotHint}</FieldDescription>
                       </div>
                     </Field>
+                    <RunProviders workspaceId={workspaceId} disabled={pending} />
                     {submitError && <Alert variant="destructive"><AlertDescription>{copy.submitError}</AlertDescription></Alert>}
                     <Button className="self-start" type="submit" disabled={pending}>
                       <Plus data-icon="inline-start" />{pending ? copy.submitting : copy.submit}

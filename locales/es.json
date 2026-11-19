@@ -1,4 +1,18 @@
 {
+  "runProviders": {
+    "title": "Proveedores para esta ejecución",
+    "loading": "Cargando proveedores…",
+    "loadError": "No se pudieron cargar los proveedores.",
+    "empty": "No hay proveedores registrados para esta ejecución.",
+    "inherit": "Usar orden guardado",
+    "capabilities": {
+      "actions": "Acciones",
+      "image-generation": "Generación de imágenes",
+      "text-to-speech": "Texto a voz",
+      "transcription": "Transcripción",
+      "video-generation": "Generación de vídeo"
+    }
+  },
   "pluginCredentials": {
     "unavailable": "El almacén de credenciales del sistema no está disponible. Desbloquéalo e inténtalo de nuevo.",
     "saveError": "No se pudo actualizar la credencial. Comprueba el almacén del sistema e inténtalo de nuevo.",
