@@ -1,7 +1,9 @@
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
-use crate::{GenerationRun, ReviewDecision, RunControl, RunOptions, WorkspaceStore};
+use crate::{
+    GenerationRun, ProductionStage, ReviewDecision, RunControl, RunOptions, WorkspaceStore,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -45,7 +47,26 @@ struct ReviewInput {
     notes: String,
 }
 
-pub(super) fn definitions() -> [Value; 7] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CheckpointInput {
+    workspace_id: i64,
+    run_id: i64,
+    attempt: i64,
+    checkpoint: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StageResultInput {
+    workspace_id: i64,
+    run_id: i64,
+    attempt: i64,
+    stage: ProductionStage,
+    result: Value,
+}
+
+pub(super) fn definitions() -> [Value; 11] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -74,6 +95,19 @@ pub(super) fn definitions() -> [Value; 7] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel"]}
             }, "required": ["workspaceId", "runId", "action"], "additionalProperties": false}}),
+        json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
+            "inputSchema": run, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, and current step.",
+            "inputSchema": workspace}),
+        json!({"name": "checkpoint_generation", "description": "Save progress and renew the lease for the current attempt.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "attempt": id, "checkpoint": {}
+            }, "required": ["workspaceId", "runId", "attempt", "checkpoint"], "additionalProperties": false}}),
+        json!({"name": "submit_production_result", "description": "Submit the result for the current production stage and leased attempt. Delivery verification is separate.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "attempt": id,
+                "stage": {"enum": ["script", "assets", "preview", "supplemental_outputs", "final_render"]}, "result": {"type": "object"}
+            }, "required": ["workspaceId", "runId", "attempt", "stage", "result"], "additionalProperties": false}}),
         json!({"name": "review_production_result", "description": "Submit an explicit approval, rejection, or revision request for a pending result.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "resultId": id,
@@ -133,6 +167,43 @@ pub(super) fn call(
                 .control_generation(args.workspace_id, args.run_id, args.action)
                 .map(|run| json!({"run": run_summary(&run)}))
                 .map_err(|_| "Could not change this run in its current state or workspace")
+        }),
+        "get_generation_activity" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .generation_activity(args.workspace_id, args.run_id)
+                .map(|events| json!({"events": events}))
+                .map_err(|_| "Could not read generation activity")
+        }),
+        "claim_generation" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .claim_generation(args.workspace_id)
+                .map(|claim| json!({"claim": claim}))
+                .map_err(|_| "Could not claim generation")
+        }),
+        "checkpoint_generation" => parse(arguments).and_then(|args: CheckpointInput| {
+            store
+                .checkpoint_generation(
+                    args.workspace_id,
+                    args.run_id,
+                    args.attempt,
+                    &args.checkpoint,
+                )
+                .map(|lease_until| json!({"leaseUntil": lease_until}))
+                .map_err(|_| "Could not save checkpoint. Check the workspace and current lease")
+        }),
+        "submit_production_result" => parse(arguments).and_then(|args: StageResultInput| {
+            store
+                .submit_production_result(
+                    args.workspace_id,
+                    args.run_id,
+                    args.attempt,
+                    args.stage,
+                    &args.result,
+                )
+                .map(|id| json!({"resultId": id}))
+                .map_err(
+                    |_| "Could not submit result. Check the workspace, current lease and stage",
+                )
         }),
         "review_production_result" => parse(arguments).and_then(|args: ReviewInput| {
             store
