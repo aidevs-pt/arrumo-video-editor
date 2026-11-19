@@ -351,6 +351,12 @@
     "saveError": "Não foi possível guardar as definições. Se o formato mudou, volte a abrir esta vista e tente novamente."
   },
   "queue": {
+    "deleteTitle": "Eliminar geração",
+    "deleting": "A eliminar geração…",
+    "deleteDescription": "Escreve o título exato para parar esta geração e eliminar os seus ficheiros. O rascunho e os ficheiros partilhados ficam no espaço de trabalho.",
+    "confirmTitle": "Confirma o título da geração",
+    "deleteError": "Não foi possível eliminar completamente a geração. Verifica se tem novas gerações ou tenta novamente.",
+    "cancelDelete": "Cancelar",
     "reviewRun": "Rever execução",
     "reviewFilter": "Por rever",
     "filterRuns": "Filtrar execuções de geração",

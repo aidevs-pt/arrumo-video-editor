@@ -351,6 +351,12 @@
     "saveError": "Overrides couldn’t be saved. If the workspace format changed, reopen this view and try again."
   },
   "queue": {
+    "deleteTitle": "Delete run",
+    "deleting": "Deleting run…",
+    "deleteDescription": "Type the exact title to stop this run and delete its managed files. The draft and shared sources stay in the workspace.",
+    "confirmTitle": "Confirm run title",
+    "deleteError": "The run could not be fully deleted. Check for replays or try again.",
+    "cancelDelete": "Cancel",
     "reviewRun": "Review run",
     "reviewFilter": "Needs review",
     "filterRuns": "Filter generation runs",

@@ -550,6 +550,28 @@ async fn control_generation(
 }
 
 #[tauri::command]
+async fn delete_generation(
+    workspace_id: i64,
+    run_id: i64,
+    confirmed_title: String,
+    app: tauri::AppHandle,
+) -> Result<bool, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
+        store
+            .delete_generation(&database, workspace_id, run_id, &confirmed_title)
+            .map_err(|_| "generation_delete_failed")
+    })
+    .await
+    .map_err(|_| "generation_delete_failed")?
+}
+
+#[tauri::command]
 async fn generation_activity(
     workspace_id: i64,
     run_id: i64,
@@ -712,6 +734,7 @@ fn main() {
             generation_inbox,
             control_generation,
             generation_activity,
+            delete_generation,
             generation_plan,
             production_progress,
             review_production_result,

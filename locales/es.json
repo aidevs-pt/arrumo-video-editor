@@ -351,6 +351,12 @@
     "saveError": "No se pudieron guardar los ajustes. Si el formato cambió, vuelve a abrir esta vista e inténtalo de nuevo."
   },
   "queue": {
+    "deleteTitle": "Eliminar generación",
+    "deleting": "Eliminando generación…",
+    "deleteDescription": "Escribe el título exacto para detener esta generación y eliminar sus archivos. El borrador y los archivos compartidos se conservan.",
+    "confirmTitle": "Confirma el título de la generación",
+    "deleteError": "No se pudo eliminar por completo la generación. Comprueba si tiene regeneraciones o vuelve a intentarlo.",
+    "cancelDelete": "Cancelar",
     "reviewRun": "Revisar proceso",
     "reviewFilter": "Por revisar",
     "filterRuns": "Filtrar procesos de generación",

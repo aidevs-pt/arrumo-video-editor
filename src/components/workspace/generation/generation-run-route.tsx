@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ListVideo } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
+import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { GenerationRunControls, GenerationRunPanels, runTitle, type Run, type RunAction } from "./generation-run-row";
 
 export function GenerationRunRoute() {
@@ -25,6 +26,7 @@ export function GenerationRunRoute() {
 
 function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runId: number | null }) {
   const { messages: { queue: copy } } = useLocale();
+  const router = useRouter();
   const [run, setRun] = useState<Run | null>();
   const [loadError, setLoadError] = useState(false);
   const [controlError, setControlError] = useState(false);
@@ -76,6 +78,15 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
       {run ? (
         <div className="flex flex-col gap-5">
           <GenerationRunControls run={run} workspaceId={workspaceId} disabled={pending} onControl={control} />
+          {run.state !== "completed" && (
+            <div>
+              <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy}
+                onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", {
+                  workspaceId, runId: run.id, confirmedTitle,
+                })}
+                onDelete={() => router.replace(workspaceHref("generations", workspaceId))} />
+            </div>
+          )}
           <GenerationRunPanels run={run} workspaceId={workspaceId} />
         </div>
       ) : !problem && <Skeleton className="min-h-40" aria-label={copy.loading} />}
