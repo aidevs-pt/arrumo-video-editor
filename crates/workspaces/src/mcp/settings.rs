@@ -3,7 +3,9 @@ use std::{fs::File, path::Path};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
-use crate::{THIRD_PARTY_PLUGIN_NOTICE, WorkspaceStore};
+use crate::{
+    THIRD_PARTY_PLUGIN_NOTICE, WorkspaceStore, fetch_plugin_registry, read_plugin_registry,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -66,7 +68,19 @@ struct RegistryPackageInput {
     version: String,
 }
 
-pub(super) fn definitions() -> [Value; 13] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RegistryUrlInput {
+    catalog_url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RegistryFileInput {
+    catalog: String,
+}
+
+pub(super) fn definitions() -> [Value; 15] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -127,6 +141,14 @@ pub(super) fn definitions() -> [Value; 13] {
             "inputSchema": registry_package}),
         json!({"name": "update_plugin_release_from_snapshot", "description": format!("Update an offline-installed plugin to a newer exact release using absolute paths to a reviewed local registry catalog and its ZIP. {THIRD_PARTY_PLUGIN_NOTICE}"),
             "inputSchema": registry_package}),
+        json!({"name": "fetch_plugin_registry", "description": "Fetch and validate an HTTPS plugin registry catalog. Returns release metadata without installing packages.",
+            "inputSchema": {"type": "object", "properties": {"catalogUrl": {"type": "string", "minLength": 1}},
+                "required": ["catalogUrl"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "read_plugin_registry_snapshot", "description": "Read and validate a local registry catalog at an absolute path.",
+            "inputSchema": {"type": "object", "properties": {"catalog": {"type": "string", "minLength": 1}},
+                "required": ["catalog"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
     ]
 }
 
@@ -217,6 +239,16 @@ pub(super) fn call(
                     .map_err(|_| "Could not register plugin release. Check the registry, version, and package")
             })
         }
+        "fetch_plugin_registry" => parse(arguments).and_then(|args: RegistryUrlInput| {
+            fetch_plugin_registry(&args.catalog_url)
+                .map(|registry| json!({"registry": registry}))
+                .map_err(|_| "Could not fetch HTTPS plugin registry")
+        }),
+        "read_plugin_registry_snapshot" => parse(arguments).and_then(|args: RegistryFileInput| {
+            read_plugin_registry(open_local_file(&args.catalog)?)
+                .map(|registry| json!({"registry": registry}))
+                .map_err(|_| "Could not read plugin registry snapshot")
+        }),
         _ => return None,
     })
 }

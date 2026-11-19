@@ -300,3 +300,5 @@ Use `list_plugin_context_requests` with a workspace ID to inspect packages that 
 Use `install_plugin_zip` with an absolute local source path and the expected `packageSha256` to install a reviewed package. The digest must match the archive before registration. The response includes the installed catalog entry and the third-party plugin notice. Workspace context access requires a separate grant.
 
 Use `install_plugin_release_from_snapshot` or `update_plugin_release_from_snapshot` with absolute local `catalog` and ZIP `source` paths, the plugin ID, and an exact version. The host verifies the archive against the catalog and records release provenance. Offline updates require a newer release from the same repository.
+
+Use `fetch_plugin_registry` to inspect an HTTPS registry catalog, or `read_plugin_registry_snapshot` to validate a catalog at an absolute local path. Both return release metadata for review before installation.
