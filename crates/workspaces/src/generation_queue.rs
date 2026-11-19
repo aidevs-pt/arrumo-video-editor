@@ -22,6 +22,32 @@ pub struct GenerationRun {
     pub pending_review_id: Option<i64>,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplayMode {
+    Captured,
+    Current,
+}
+
+impl ReplayMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Captured => "captured",
+            Self::Current => "current",
+        }
+    }
+}
+
+type ReplayOrigin = (i64, String);
+
+fn generation_request_key(request_key: &str) -> rusqlite::Result<&str> {
+    let key = request_key.trim();
+    if key.is_empty() || key.len() > 128 || key.contains('\0') {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    Ok(key)
+}
+
 impl WorkspaceStore {
     pub fn enqueue_video_draft(
         &self,
@@ -30,84 +56,147 @@ impl WorkspaceStore {
         request_key: &str,
         options: &RunOptions,
     ) -> rusqlite::Result<GenerationRun> {
-        let key = request_key.trim();
-        if key.is_empty() || key.len() > 128 || key.contains('\0') {
-            return Err(rusqlite::Error::InvalidQuery);
-        }
+        let key = generation_request_key(request_key)?;
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
-        let existing = tx
-            .query_row(
-                "SELECT id, draft_id, state, snapshot_json, pending_review_id FROM generation_runs
-             WHERE workspace_id = ?1 AND request_key = ?2",
-                params![workspace_id, key],
-                read_run,
-            )
-            .optional()?;
         let options = json!(options);
-        let run = if let Some(run) = existing {
-            if run.draft_id != draft_id || run.snapshot["options"] != options {
+        let run = if let Some((run, replay)) = self.generation_request(workspace_id, key)? {
+            if replay.is_some() || run.draft_id != draft_id || run.snapshot["options"] != options {
                 return Err(rusqlite::Error::InvalidQuery);
             }
             run
         } else {
-            let draft = self
-                .list_video_drafts(workspace_id)?
-                .into_iter()
-                .find(|draft| draft.id == draft_id)
-                .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
-            let profile = match draft.settings.profile_id {
-                Some(id) => Some(
-                    self.list_profiles(workspace_id)?
-                        .into_iter()
-                        .find(|profile| profile.id == id)
-                        .ok_or(rusqlite::Error::QueryReturnedNoRows)?,
-                ),
-                None => None,
-            };
-            let formats = match &profile {
-                Some(profile) => self
-                    .list_profile_formats(workspace_id, profile.id)?
-                    .into_iter()
-                    .map(|format| {
-                        let delivery =
-                            self.profile_delivery(workspace_id, profile.id, format.id)?;
-                        Ok(json!({"format": format, "delivery": delivery.effective}))
-                    })
-                    .collect::<rusqlite::Result<Vec<_>>>()?,
-                None => self
-                    .list_output_formats(workspace_id)?
-                    .into_iter()
-                    .filter(|format| format.settings.enabled)
-                    .map(|format| {
-                        let delivery = self.format_delivery(workspace_id, format.id)?;
-                        Ok(json!({"format": format, "delivery": delivery}))
-                    })
-                    .collect::<rusqlite::Result<Vec<_>>>()?,
-            };
-            if formats.is_empty() {
-                return Err(rusqlite::Error::InvalidQuery);
-            }
-            let snapshot = json!({
-                "schema_version": 1,
-                "draft": draft,
-                "options": options,
-                "preview_settings": self.preview_settings()?,
-                "workspace_context": self.workspace_context(workspace_id)?,
-                "brand_colors": self.brand_colors(workspace_id)?,
-                "brand_assets": self.list_brand_assets(workspace_id)?,
-                "feedback": self.list_workspace_feedback(workspace_id)?,
-                "profile": profile,
-                "formats": formats,
-            });
-            tx.query_row(
-                "INSERT INTO generation_runs (workspace_id, draft_id, request_key, snapshot_json)
-                 VALUES (?1, ?2, ?3, ?4) RETURNING id, draft_id, state, snapshot_json, pending_review_id",
-                params![workspace_id, draft_id, key, snapshot.to_string()],
-                read_run,
-            )?
+            let snapshot = self.capture_generation_inputs(workspace_id, draft_id, &options)?;
+            self.insert_generation_run(workspace_id, draft_id, key, &snapshot, None)?
         };
         tx.commit()?;
         Ok(run)
+    }
+
+    pub fn replay_generation(
+        &self,
+        workspace_id: i64,
+        source_run_id: i64,
+        request_key: &str,
+        mode: ReplayMode,
+    ) -> rusqlite::Result<GenerationRun> {
+        let key = generation_request_key(request_key)?;
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let source = self.0.query_row(
+            "SELECT id, draft_id, state, snapshot_json, pending_review_id FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2 AND state = 'completed'",
+            params![workspace_id, source_run_id],
+            read_run,
+        )?;
+        let replay = Some((source_run_id, mode.as_str().to_owned()));
+        let run =
+            if let Some((run, existing_replay)) = self.generation_request(workspace_id, key)? {
+                if existing_replay != replay {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
+                run
+            } else {
+                let snapshot = match mode {
+                    ReplayMode::Captured => source.snapshot,
+                    ReplayMode::Current => self.capture_generation_inputs(
+                        workspace_id,
+                        source.draft_id,
+                        &source.snapshot["options"],
+                    )?,
+                };
+                self.insert_generation_run(workspace_id, source.draft_id, key, &snapshot, replay)?
+            };
+        tx.commit()?;
+        Ok(run)
+    }
+
+    fn generation_request(
+        &self,
+        workspace_id: i64,
+        key: &str,
+    ) -> rusqlite::Result<Option<(GenerationRun, Option<ReplayOrigin>)>> {
+        self.0.query_row(
+            "SELECT id, draft_id, state, snapshot_json, pending_review_id, replay_of_run_id, replay_mode
+             FROM generation_runs WHERE workspace_id = ?1 AND request_key = ?2",
+            params![workspace_id, key],
+            |row| {
+                let source = row.get::<_, Option<i64>>(5)?;
+                let replay = source.map(|id| row.get::<_, String>(6).map(|mode| (id, mode))).transpose()?;
+                Ok((read_run(row)?, replay))
+            },
+        ).optional()
+    }
+
+    fn insert_generation_run(
+        &self,
+        workspace_id: i64,
+        draft_id: i64,
+        key: &str,
+        snapshot: &Value,
+        replay: Option<ReplayOrigin>,
+    ) -> rusqlite::Result<GenerationRun> {
+        let (source, mode) = replay.unzip();
+        self.0.query_row(
+            "INSERT INTO generation_runs (workspace_id, draft_id, request_key, snapshot_json, replay_of_run_id, replay_mode)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id, draft_id, state, snapshot_json, pending_review_id",
+            params![workspace_id, draft_id, key, snapshot.to_string(), source, mode],
+            read_run,
+        )
+    }
+
+    fn capture_generation_inputs(
+        &self,
+        workspace_id: i64,
+        draft_id: i64,
+        options: &Value,
+    ) -> rusqlite::Result<Value> {
+        let draft = self
+            .list_video_drafts(workspace_id)?
+            .into_iter()
+            .find(|draft| draft.id == draft_id)
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+        let profile = match draft.settings.profile_id {
+            Some(id) => Some(
+                self.list_profiles(workspace_id)?
+                    .into_iter()
+                    .find(|profile| profile.id == id)
+                    .ok_or(rusqlite::Error::QueryReturnedNoRows)?,
+            ),
+            None => None,
+        };
+        let formats = match &profile {
+            Some(profile) => self
+                .list_profile_formats(workspace_id, profile.id)?
+                .into_iter()
+                .map(|format| {
+                    let delivery = self.profile_delivery(workspace_id, profile.id, format.id)?;
+                    Ok(json!({"format": format, "delivery": delivery.effective}))
+                })
+                .collect::<rusqlite::Result<Vec<_>>>()?,
+            None => self
+                .list_output_formats(workspace_id)?
+                .into_iter()
+                .filter(|format| format.settings.enabled)
+                .map(|format| {
+                    let delivery = self.format_delivery(workspace_id, format.id)?;
+                    Ok(json!({"format": format, "delivery": delivery}))
+                })
+                .collect::<rusqlite::Result<Vec<_>>>()?,
+        };
+        if formats.is_empty() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(json!({
+            "schema_version": 1,
+            "draft": draft,
+            "options": options,
+            "preview_settings": self.preview_settings()?,
+            "workspace_context": self.workspace_context(workspace_id)?,
+            "brand_colors": self.brand_colors(workspace_id)?,
+            "brand_assets": self.list_brand_assets(workspace_id)?,
+            "feedback": self.list_workspace_feedback(workspace_id)?,
+            "profile": profile,
+            "formats": formats,
+        }))
     }
 
     pub fn list_generation_runs(&self, workspace_id: i64) -> rusqlite::Result<Vec<GenerationRun>> {

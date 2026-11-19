@@ -30,7 +30,7 @@ pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
-pub use generation_queue::{GenerationRun, RunOptions};
+pub use generation_queue::{GenerationRun, ReplayMode, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
@@ -85,6 +85,7 @@ impl WorkspaceStore {
             include_str!("../migrations/017-production-progress.sql"),
             include_str!("../migrations/018-preview-settings.sql"),
             include_str!("../migrations/019-completed-video-title.sql"),
+            include_str!("../migrations/020-generation-replay.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

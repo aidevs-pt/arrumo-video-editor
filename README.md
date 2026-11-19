@@ -153,3 +153,5 @@ Use `process-media-stage <workspace-id> <run-id> [preview-edit-json]` to claim a
 Use `export-delivery <workspace-id> <run-id> <destination-zip>` after delivery verification. It exports the primary MP4 and SRT files recorded as verified for the completed run. Choose a new ZIP path in an existing directory. An incomplete export leaves that path free.
 
 Use `completed-video <workspace-id> <run-id>` to read the current title, captured inputs and settings, verified delivery, production decisions, and activity history together. Use `rename-completed-video <workspace-id> <run-id> <title>` to change the display title while preserving the title in the run snapshot.
+
+Use `replay-generation <workspace-id> <source-run-id> <request-key> <captured|current>` to queue a fresh run from a completed video. Captured mode copies the original input snapshot. Current mode resolves the latest saved draft, workspace, profile, output and preview settings with the original run's platform and autopilot options. Both modes start at the beginning of the production plan. Repeat the same request key, source and mode to retrieve the same replay.

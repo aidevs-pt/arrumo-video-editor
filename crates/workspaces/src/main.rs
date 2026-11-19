@@ -274,6 +274,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&run)?);
         }
+        [database, command, workspace, source, key, mode] if command == "replay-generation" => {
+            let run = WorkspaceStore::open(Path::new(database))?.replay_generation(
+                utf8(workspace)?.parse()?,
+                utf8(source)?.parse()?,
+                utf8(key)?,
+                serde_json::from_value(serde_json::json!(utf8(mode)?))?,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
+        }
         [database, command, workspace] if command == "claim-generation" => {
             let claim = WorkspaceStore::open(Path::new(database))?
                 .claim_generation(utf8(workspace)?.parse()?)?;
@@ -462,6 +471,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "update-draft <workspace-id> <draft-id> <settings-json> | ",
                 "generation-runs <workspace-id> | ",
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
+                "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
                 "generation-activity <workspace-id> <run-id> | ",
