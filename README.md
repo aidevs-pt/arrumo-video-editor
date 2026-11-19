@@ -278,3 +278,5 @@ Use `create_workspace` to initialize a workspace, then `get_workspace_context` a
 Use `list_output_formats`, `create_output_format`, and `update_output_format` to configure workspace output dimensions. Use `get_format_delivery` and `set_format_delivery` for supplemental deliverables. Sending a replacement resets omitted supplemental fields to their defaults. Final video and subtitles remain required.
 
 Use `list_profile_formats` and `get_profile_delivery` to inspect inherited and effective format settings. Use `set_profile_format_overrides` and `set_profile_delivery` to replace one format's overrides for a profile. Omit a field to inherit its workspace value, or send an empty overrides object to inherit all fields in that group. Explicit zero and false values remain overrides.
+
+Use `process_media_stage` to claim and execute a ready media stage for one run. Pass `previewEdit` at Preview, using an empty object for whole clips. Omit it for final rendering or delivery verification. For each rendered format, call `import_delivery_subtitles` with its format ID and an absolute local SRT `source` before verifying delivery.

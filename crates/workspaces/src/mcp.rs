@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(responses[2]["id"], "list");
         assert_eq!(
             responses[2]["result"]["tools"].as_array().unwrap().len(),
-            45
+            47
         );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],

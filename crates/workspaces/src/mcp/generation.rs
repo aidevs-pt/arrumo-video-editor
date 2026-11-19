@@ -143,7 +143,24 @@ struct CompletedFeedbackInput {
     markdown: String,
 }
 
-pub(super) fn definitions() -> [Value; 23] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MediaStageInput {
+    workspace_id: i64,
+    run_id: i64,
+    preview_edit: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SubtitleInput {
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    source: String,
+}
+
+pub(super) fn definitions() -> [Value; 25] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -184,6 +201,14 @@ pub(super) fn definitions() -> [Value; 23] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel"]}
             }, "required": ["workspaceId", "runId", "action"], "additionalProperties": false}}),
+        json!({"name": "process_media_stage", "description": "Claim and execute one ready media stage. Pass previewEdit (or an empty object for whole clips) for preview rendering. Omit it for final rendering or verification.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "previewEdit": {"type": "object"}
+            }, "required": ["workspaceId", "runId"], "additionalProperties": false}}),
+        json!({"name": "import_delivery_subtitles", "description": "Validate and import a local SRT for a rendered output at the delivery verification stage.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "formatId": id, "source": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "formatId", "source"], "additionalProperties": false}}),
         json!({"name": "verify_generation_delivery", "description": "Verify the final video and subtitle files in the managed delivery directory and complete the current leased run.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "attempt": id
@@ -306,6 +331,22 @@ pub(super) fn call(
                 .control_generation(args.workspace_id, args.run_id, args.action)
                 .map(|run| json!({"run": run_summary(&run)}))
                 .map_err(|_| "Could not change this run in its current state or workspace")
+        }),
+        "process_media_stage" => parse(arguments).and_then(|args: MediaStageInput| {
+            store
+                .process_media_stage(database, args.workspace_id, args.run_id, args.preview_edit.as_ref())
+                .map(|work| json!({"work": work}))
+                .map_err(|_| "Media processing failed. Check the edit and run activity")
+        }),
+        "import_delivery_subtitles" => parse(arguments).and_then(|args: SubtitleInput| {
+            let source = Path::new(&args.source);
+            if !source.is_absolute() {
+                return Err("Subtitle source must be an absolute local path");
+            }
+            store
+                .import_delivery_subtitles(database, args.workspace_id, args.run_id, args.format_id, source)
+                .map(|cues| json!({"cues": cues}))
+                .map_err(|_| "Could not import subtitles. Check the rendered format and SRT file")
         }),
         "verify_generation_delivery" => parse(arguments).and_then(|args: VerifyDeliveryInput| {
             store
