@@ -2,6 +2,7 @@ export const profileCopy = {
   en: {
     back: "Back to workspaces",
     outputs: "Outputs",
+    formats: "Formats",
     title: "Profiles",
     empty: "No profiles yet",
     emptyHint: "Create a profile for a recurring type of video, such as reviews.",
@@ -25,6 +26,7 @@ export const profileCopy = {
   es: {
     back: "Volver a los espacios de trabajo",
     outputs: "Salidas",
+    formats: "Formatos",
     title: "Perfiles",
     empty: "Aún no hay perfiles",
     emptyHint: "Crea un perfil para un tipo de vídeo recurrente, como las reseñas.",
@@ -48,6 +50,7 @@ export const profileCopy = {
   pt: {
     back: "Voltar aos espaços de trabalho",
     outputs: "Saídas",
+    formats: "Formatos",
     title: "Perfis",
     empty: "Ainda não há perfis",
     emptyHint: "Crie um perfil para um tipo de vídeo recorrente, como análises.",
@@ -71,6 +74,7 @@ export const profileCopy = {
 } satisfies Record<"en" | "es" | "pt", Record<keyof {
   back: string;
   outputs: string;
+  formats: string;
   title: string;
   empty: string;
   emptyHint: string;

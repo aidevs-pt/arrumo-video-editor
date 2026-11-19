@@ -9,6 +9,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ProfileFormats } from "./profile-formats";
 import { profileCopy } from "./profile-copy";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
@@ -33,6 +34,7 @@ export function WorkspaceProfiles({
   const nameInput = useRef<HTMLInputElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  const [formatProfile, setFormatProfile] = useState<Profile | null>(null);
   const [editing, setEditing] = useState<{ id: number; draft: Draft } | null>(null);
   const editId = editing?.id;
   const draft = editing?.draft ?? newDraft;
@@ -105,6 +107,18 @@ export function WorkspaceProfiles({
     }
   }
 
+  if (formatProfile) {
+    return (
+      <ProfileFormats
+        workspaceId={workspace.id}
+        profile={formatProfile}
+        locale={locale}
+        onBack={() => setFormatProfile(null)}
+        onOutputs={onOutputs}
+      />
+    );
+  }
+
   return (
     <main className="workspace-shell profile-shell">
       <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
@@ -137,23 +151,31 @@ export function WorkspaceProfiles({
                       {profile.color && <span className="profile-color" style={{ backgroundColor: profile.color }} aria-hidden="true" />}
                       {profile.name}
                     </h3>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      aria-label={`${copy.edit} ${profile.name}`}
-                      disabled={saving || editing !== null}
-                      onClick={(event) => {
-                        editButton.current = event.currentTarget;
-                        setSaveError(false);
-                        setEditing({
-                          id: profile.id,
-                          draft: { name: profile.name, guidance: profile.guidance, color: profile.color ?? "" },
-                        });
-                      }}
-                    >
-                      {copy.edit}
-                    </Button>
+                    <div className="profile-edit-actions">
+                      <Button type="button" size="sm" variant="outline"
+                        aria-label={`${copy.formats} · ${profile.name}`}
+                        disabled={saving || editing !== null}
+                        onClick={() => setFormatProfile(profile)}>
+                        {copy.formats}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        aria-label={`${copy.edit} ${profile.name}`}
+                        disabled={saving || editing !== null}
+                        onClick={(event) => {
+                          editButton.current = event.currentTarget;
+                          setSaveError(false);
+                          setEditing({
+                            id: profile.id,
+                            draft: { name: profile.name, guidance: profile.guidance, color: profile.color ?? "" },
+                          });
+                        }}
+                      >
+                        {copy.edit}
+                      </Button>
+                    </div>
                   </div>
                   {profile.guidance && <p className="profile-guidance">{profile.guidance}</p>}
                 </li>

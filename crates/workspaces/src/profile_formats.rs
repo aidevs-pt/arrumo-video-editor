@@ -17,6 +17,8 @@ pub struct ProfileFormat {
     pub width: u32,
     pub height: u32,
     pub overrides: DimensionOverrides,
+    pub workspace_width: u32,
+    pub workspace_height: u32,
 }
 
 impl WorkspaceStore {
@@ -30,7 +32,7 @@ impl WorkspaceStore {
                 "SELECT format.id, format.name,
                         COALESCE(custom.width, format.width),
                         COALESCE(custom.height, format.height),
-                        custom.width, custom.height
+                        custom.width, custom.height, format.width, format.height
                  FROM profiles AS profile
                  JOIN output_formats AS format ON format.workspace_id = profile.workspace_id
                  LEFT JOIN profile_format_overrides AS custom
@@ -50,6 +52,8 @@ impl WorkspaceStore {
                         width: row.get(4)?,
                         height: row.get(5)?,
                     },
+                    workspace_width: row.get(6)?,
+                    workspace_height: row.get(7)?,
                 })
             })?
             .collect()
@@ -130,6 +134,10 @@ mod tests {
         let formats = store.list_profile_formats(workspace, profile).unwrap();
         assert_eq!((formats[0].width, formats[0].height), (1280, 1440));
         assert_eq!(formats[0].overrides, custom);
+        assert_eq!(
+            (formats[0].workspace_width, formats[0].workspace_height),
+            (2560, 1440)
+        );
         settings.enabled = false;
         store
             .update_output_format(workspace, landscape, &settings)
