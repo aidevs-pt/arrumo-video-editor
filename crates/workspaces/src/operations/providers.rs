@@ -1,7 +1,7 @@
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
-use crate::{WorkspaceStore, agent_plugins};
+use crate::{WorkspaceStore, agent_plugins, check_agent_login};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -31,7 +31,13 @@ struct AgentInput {
     plugin_id: String,
 }
 
-pub(super) fn definitions() -> [Value; 8] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AgentProbeInput {
+    plugin_id: String,
+}
+
+pub(super) fn definitions() -> [Value; 9] {
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let capability = json!({"type": "string", "minLength": 1});
     let preference = json!({"type": "object", "properties": {"workspaceId": workspace, "capability": capability},
@@ -52,6 +58,10 @@ pub(super) fn definitions() -> [Value; 8] {
             "inputSchema": preference}),
         json!({"name": "list_agent_plugins", "description": "List bundled plugins eligible to provide the production agent.",
             "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_agent_login_status", "description": "Run the bundled agent plugin's sign-in probe and return only its readiness status.",
+            "inputSchema": {"type": "object", "properties": {"pluginId": {"type": "string", "minLength": 1}},
+                "required": ["pluginId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_agent_settings", "description": "Read the effective production agent and where it was configured.",
             "inputSchema": scope, "annotations": {"readOnlyHint": true}}),
@@ -96,6 +106,8 @@ pub(super) fn call(
         }),
         "list_agent_plugins" if arguments.is_empty() => Ok(json!({"plugins": agent_plugins()})),
         "list_agent_plugins" => Err("Unexpected agent listing arguments"),
+        "get_agent_login_status" => parse(arguments)
+            .map(|args: AgentProbeInput| json!({"status": check_agent_login(&args.plugin_id)})),
         "get_agent_settings" => parse(arguments).and_then(|args: Scope| {
             store.agent_settings(args.workspace_id)
                 .map(|settings| json!({"settings": settings}))
