@@ -61,20 +61,35 @@ impl WorkspaceStore {
         database: &Path,
         workspace_id: i64,
     ) -> Result<DeliveryCleanupReport, Box<dyn Error>> {
+        self.recover_pending_deliveries(database, Some(workspace_id))
+    }
+
+    pub fn recover_all_delivery_cleanup(
+        &self,
+        database: &Path,
+    ) -> Result<DeliveryCleanupReport, Box<dyn Error>> {
+        self.recover_pending_deliveries(database, None)
+    }
+
+    fn recover_pending_deliveries(
+        &self,
+        database: &Path,
+        workspace_id: Option<i64>,
+    ) -> Result<DeliveryCleanupReport, Box<dyn Error>> {
         let database = database.canonicalize()?;
-        let ids: Vec<i64> = self
+        let ids: Vec<(i64, i64)> = self
             .0
             .prepare(
-                "SELECT run_id FROM pending_delivery_cleanup
-             WHERE workspace_id = ?1 ORDER BY run_id",
+                "SELECT workspace_id, run_id FROM pending_delivery_cleanup
+                 WHERE ?1 IS NULL OR workspace_id = ?1 ORDER BY workspace_id, run_id",
             )?
-            .query_map([workspace_id], |row| row.get(0))?
+            .query_map([workspace_id], |row| Ok((row.get(0)?, row.get(1)?)))?
             .collect::<rusqlite::Result<_>>()?;
         let mut report = DeliveryCleanupReport {
             removed_run_ids: Vec::new(),
             pending_run_ids: Vec::new(),
         };
-        for run_id in ids {
+        for (workspace_id, run_id) in ids {
             if self
                 .finish_delivery_cleanup(&database, workspace_id, run_id)
                 .is_ok()

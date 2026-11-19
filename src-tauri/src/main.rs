@@ -628,9 +628,25 @@ fn main() {
 
             let data_dir: PathBuf = app.path().app_local_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
-            app.manage(Mutex::new(WorkspaceStore::open(
-                data_dir.join("workspaces.sqlite"),
-            )?));
+            let database = data_dir.join("workspaces.sqlite");
+            app.manage(Mutex::new(WorkspaceStore::open(&database)?));
+            tauri::async_runtime::spawn_blocking(move || {
+                let result = WorkspaceStore::open(&database)
+                    .map_err(|_| ())
+                    .and_then(|store| {
+                        store
+                            .recover_all_delivery_cleanup(&database)
+                            .map_err(|_| ())
+                    });
+                match result {
+                    Ok(report) if report.pending_run_ids.is_empty() => {}
+                    Ok(report) => eprintln!(
+                        "Arrumo still has {} pending delivery cleanup entries.",
+                        report.pending_run_ids.len()
+                    ),
+                    Err(()) => eprintln!("Arrumo could not retry pending delivery cleanup."),
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
