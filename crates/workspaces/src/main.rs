@@ -53,6 +53,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .install_verified_plugin_zip(File::open(archive)?, utf8(checksum)?)?;
             println!("{}", serde_json::to_string(&installed)?);
         }
+        [database, command, registry, id, version, archive]
+            if command == "install-plugin-release" =>
+        {
+            eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
+            let installed = WorkspaceStore::open(Path::new(database))?.install_plugin_release(
+                File::open(registry)?,
+                utf8(id)?,
+                utf8(version)?,
+                File::open(archive)?,
+            )?;
+            println!("{}", serde_json::to_string(&installed)?);
+        }
         [database, command, id] if command == "remove-plugin-manifest" => {
             let removed = WorkspaceStore::open(Path::new(database))?
                 .remove_installed_plugin_manifest(utf8(id)?)?;
@@ -591,6 +603,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
                 "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | remove-plugin-manifest <plugin-id> | ",
+                "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",

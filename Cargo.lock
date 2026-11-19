@@ -71,10 +71,12 @@ name = "arrumo-workspaces"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "semver",
  "serde",
  "serde_json",
  "sha2 0.11.1",
  "tempfile",
+ "url",
  "zip",
 ]
 

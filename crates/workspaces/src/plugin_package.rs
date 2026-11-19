@@ -9,7 +9,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use zip::ZipArchive;
 
-use crate::{CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, WorkspaceStore};
+use crate::{CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, RegistryReleaseSource, WorkspaceStore};
 
 const MAX_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES: usize = 512;
@@ -21,11 +21,13 @@ pub const THIRD_PARTY_PLUGIN_NOTICE: &str = "Third-party plugins can be unsafe, 
 pub struct PluginPackageInfo {
     pub sha256: String,
     pub byte_length: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release: Option<RegistryReleaseSource>,
 }
 
 impl WorkspaceStore {
     pub fn install_plugin_zip(&self, archive: impl Read) -> Result<CatalogPlugin, Box<dyn Error>> {
-        self.register_plugin_zip(archive, None)
+        self.register_plugin_zip(archive, None, None)
     }
 
     pub fn install_verified_plugin_zip(
@@ -33,21 +35,22 @@ impl WorkspaceStore {
         archive: impl Read,
         expected_sha256: &str,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
-        if expected_sha256.len() != 64
-            || !expected_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
-        {
+        self.register_plugin_zip(archive, Some(expected_sha256), None)
+    }
+
+    pub(crate) fn register_plugin_zip(
+        &self,
+        archive: impl Read,
+        expected_sha256: Option<&str>,
+        release: Option<RegistryReleaseSource>,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        if expected_sha256.is_some_and(|digest| {
+            digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        }) {
             return Err(
                 invalid_package("Expected SHA-256 must contain 64 hexadecimal digits").into(),
             );
         }
-        self.register_plugin_zip(archive, Some(expected_sha256))
-    }
-
-    fn register_plugin_zip(
-        &self,
-        archive: impl Read,
-        expected_sha256: Option<&str>,
-    ) -> Result<CatalogPlugin, Box<dyn Error>> {
         let mut bytes = Vec::new();
         archive
             .take(MAX_ARCHIVE_BYTES + 1)
@@ -70,8 +73,15 @@ impl WorkspaceStore {
         let info = PluginPackageInfo {
             sha256,
             byte_length: bytes.len() as i64,
+            release,
         };
-        self.register_plugin(&manifest, Some((&info, &bytes)))
+        self.register_plugin(
+            &manifest,
+            Some((&info, &bytes)),
+            info.release
+                .as_ref()
+                .map(|source| source.plugin_id.as_str()),
+        )
     }
 }
 

@@ -21,6 +21,7 @@ mod media_worker;
 mod output_formats;
 mod plugin_catalog;
 mod plugin_package;
+mod plugin_registry;
 mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
@@ -46,6 +47,7 @@ pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use plugin_catalog::{CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest};
 pub use plugin_package::{PluginPackageInfo, THIRD_PARTY_PLUGIN_NOTICE};
+pub use plugin_registry::RegistryReleaseSource;
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
@@ -103,6 +105,7 @@ impl WorkspaceStore {
             include_str!("../migrations/023-agent-plugin-ids.sql"),
             include_str!("../migrations/024-plugin-catalog.sql"),
             include_str!("../migrations/025-plugin-packages.sql"),
+            include_str!("../migrations/026-plugin-release-source.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
