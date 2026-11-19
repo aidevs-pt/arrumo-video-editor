@@ -186,3 +186,5 @@ Use **Check sign-in** in Settings or `agent-login-status <plugin-id>` in the CLI
 
 
 Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. The editor bundles byte-for-byte copies under `crates/workspaces/plugins` so its standalone build needs only this repository. Sync bundled copies when updating the official plugin manifests. Runtime installation and trust grants are separate host features.
+
+The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.

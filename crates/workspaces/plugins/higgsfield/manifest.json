@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "higgsfield",
+  "name": "Arrumo Higgsfield Plugin",
+  "description": "The default Higgsfield adapter for generated video assets.",
+  "capabilities": {
+    "video-generation": {
+      "name": "Video generation",
+      "description": "Generate video assets from prompts."
+    }
+  }
+}

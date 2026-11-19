@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "openai",
+  "name": "Arrumo OpenAI Plugin",
+  "description": "The default OpenAI adapter for transcription and image generation.",
+  "capabilities": {
+    "transcription": {
+      "name": "Transcription",
+      "description": "Convert source audio to timestamped text."
+    },
+    "image-generation": {
+      "name": "Image generation",
+      "description": "Generate image assets from prompts."
+    }
+  }
+}

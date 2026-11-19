@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "gemini",
+  "name": "Arrumo Gemini Plugin",
+  "description": "The default Gemini adapter for image generation.",
+  "capabilities": {
+    "image-generation": {
+      "name": "Image generation",
+      "description": "Generate image assets from prompts."
+    }
+  }
+}

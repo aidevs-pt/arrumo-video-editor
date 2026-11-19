@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "elevenlabs",
+  "name": "Arrumo ElevenLabs Plugin",
+  "description": "The default ElevenLabs adapter for transcription and audio generation.",
+  "capabilities": {
+    "transcription": {
+      "name": "Transcription",
+      "description": "Convert source audio to timestamped text."
+    },
+    "text-to-speech": {
+      "name": "Text to speech",
+      "description": "Generate speech audio from supplied text."
+    }
+  }
+}
