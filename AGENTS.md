@@ -17,3 +17,5 @@ Store user-facing strings in `locales/<language-tag>.json` and read them through
 ## Domain organization
 
 Keep `src/app` for Next.js routes, layouts, and application-wide configuration. Put workspace features in named domain folders under `src/components/workspace`, with layout primitives shared at the workspace level. Keep UI state and components close to the workflow they support. Use descriptive feature boundaries in Rust as well, with application rules in shared domain modules and transport adapters calling those modules.
+
+Keep numbered SQLite migrations in `crates/workspaces/migrations`, next to the crate's `src` directory. Register new migrations in order in the workspace store.

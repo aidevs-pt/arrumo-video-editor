@@ -59,23 +59,23 @@ impl WorkspaceStore {
         let migration = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let version: i64 = migration.pragma_query_value(None, "user_version", |row| row.get(0))?;
         let migrations = [
-            include_str!("001-create-workspaces.sql"),
-            include_str!("002-create-profiles.sql"),
-            include_str!("003-create-output-formats.sql"),
-            include_str!("004-profile-format-overrides.sql"),
-            include_str!("005-format-deliveries.sql"),
-            include_str!("006-profile-deliveries.sql"),
-            include_str!("007-workspace-assets.sql"),
-            include_str!("008-workspace-context.sql"),
-            include_str!("009-workspace-feedback.sql"),
-            include_str!("010-workspace-brand.sql"),
-            include_str!("011-brand-assets.sql"),
-            include_str!("012-video-drafts.sql"),
-            include_str!("013-generation-queue.sql"),
-            include_str!("014-generation-activity.sql"),
-            include_str!("015-generation-failures.sql"),
-            include_str!("016-generation-plan.sql"),
-            include_str!("017-production-progress.sql"),
+            include_str!("../migrations/001-create-workspaces.sql"),
+            include_str!("../migrations/002-create-profiles.sql"),
+            include_str!("../migrations/003-create-output-formats.sql"),
+            include_str!("../migrations/004-profile-format-overrides.sql"),
+            include_str!("../migrations/005-format-deliveries.sql"),
+            include_str!("../migrations/006-profile-deliveries.sql"),
+            include_str!("../migrations/007-workspace-assets.sql"),
+            include_str!("../migrations/008-workspace-context.sql"),
+            include_str!("../migrations/009-workspace-feedback.sql"),
+            include_str!("../migrations/010-workspace-brand.sql"),
+            include_str!("../migrations/011-brand-assets.sql"),
+            include_str!("../migrations/012-video-drafts.sql"),
+            include_str!("../migrations/013-generation-queue.sql"),
+            include_str!("../migrations/014-generation-activity.sql"),
+            include_str!("../migrations/015-generation-failures.sql"),
+            include_str!("../migrations/016-generation-plan.sql"),
+            include_str!("../migrations/017-production-progress.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -245,7 +245,7 @@ mod tests {
             std::process::id()
         ));
         let old = Connection::open(&path).unwrap();
-        old.execute_batch(include_str!("001-create-workspaces.sql"))
+        old.execute_batch(include_str!("../migrations/001-create-workspaces.sql"))
             .unwrap();
         old.execute(
             "INSERT INTO workspaces (name) VALUES ('Existing studio')",
