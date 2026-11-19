@@ -53,7 +53,7 @@ impl WorkspaceStore {
             return Err(io::Error::other("Installed plugin identity mismatch"));
         }
         let context = if let Some(workspace_id) = workspace_id
-            && manifest.requests_workspace_context()
+            && manifest.backend_requests_workspace_context()
             && self.plugin_context_granted(plugin_id, workspace_id)?
         {
             let value = self

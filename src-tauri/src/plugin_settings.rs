@@ -345,3 +345,18 @@ pub fn apply_plugin_context_grant(
         .apply_reviewed_plugin_context_grant(&plugin_id, workspace_id, &package_sha256, allowed)
         .map_err(|_| "plugin_grant_write_failed")
 }
+
+#[tauri::command]
+pub fn read_plugin_surface_context(
+    plugin_id: String,
+    surface_id: String,
+    package_sha256: String,
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Option<String>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .plugin_surface_context(&plugin_id, &surface_id, &package_sha256, workspace_id)
+        .map_err(|_| "plugin_surface_context_unavailable")
+}

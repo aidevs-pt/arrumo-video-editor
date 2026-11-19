@@ -81,7 +81,7 @@ export function WorkspaceContext({ workspace }: {
         </WorkspaceForm>
       )}
       <WorkspaceFeedback workspaceId={workspace.id} />
-      <PluginSurfaces placement="workspace" />
+      <PluginSurfaces placement="workspace" workspaceId={workspace.id} />
     </WorkspaceShell>
   );
 }

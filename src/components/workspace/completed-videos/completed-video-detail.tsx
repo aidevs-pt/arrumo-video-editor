@@ -239,7 +239,7 @@ function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; vi
             results={video.production.results} stages={video.plan.steps} />
         </TabsContent>
       </Tabs>
-      <PluginSurfaces placement="completed_video" />
+      <PluginSurfaces placement="completed_video" workspaceId={workspaceId} />
     </>
   );
 }

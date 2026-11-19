@@ -193,7 +193,7 @@ Use **Check sign-in** in Settings or `agent-login-status <plugin-id>` in the CLI
 
 Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. Builds import the registry defaults from their separate plugin checkouts. Runtime installation and trust grants are separate host features.
 
-The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 through v4 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
+The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 through v5 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
 
 Use `install-plugin-zip <package.zip>` to register a local ZIP containing a root SDK `manifest.json`. The catalog reports the package size and SHA-256 digest and retains the original ZIP in the app database. Removing the local entry removes its stored ZIP. The CLI displays the third-party plugin notice on registration. ZIP contents remain inert.
 
@@ -203,7 +203,7 @@ Use `install-plugin-release <catalog.json> <plugin-id> <version> <package.zip>` 
 
 Use `download-plugin-release <catalog-url> <plugin-id> <version>` to fetch an exact release from an HTTPS registry and register it locally. Arrumo verifies the release using the same checks as local snapshot registration and records the registry URL. The command expects a registry and package that can be fetched without authentication.
 
-List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 through 4. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
+List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 through 5. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
 
 In desktop Settings, open **Browse registry** under **Plugins** and load an HTTPS catalog URL. Expand a plugin to review its source repository and available versions. Arrumo checks the reviewed release again before downloading. If its source or checksum changed, reload the catalog and review the release again.
 
@@ -231,7 +231,7 @@ In the desktop generation form, expand **Providers for this run** to include or 
 
 Use `transcribe-wav <workspace-id> [plugin-id] <audio.wav>` to submit a WAV to a bundled transcription adapter. Omit the plugin ID to use the effective provider order. Each plugin declares its limits and transcript fields. The host skips unavailable adapters, oversized inputs for a particular adapter, and missing credentials before upload. An HTTP 401, 403, or 429 permits fallback. Other failures stop the request. This is an explicit cloud upload.
 
-The bundled plugin index is generated from the official registry defaults and local plugin checkouts. Provider-specific transcription settings live in the plugin's SDK descriptor. Manifest schema v3 accepts ZIPs with declared WebAssembly backend and HTML frontend entrypoints, validates their presence, and retains the code. Installed backend components support explicit CLI invocation. Installed frontend panels render from declared documents. A frontend-to-host capability bridge is pending.
+The bundled plugin index is generated from the official registry defaults and local plugin checkouts. Provider-specific transcription settings live in the plugin's SDK descriptor. Manifest schema v3 accepts ZIPs with declared WebAssembly backend and HTML frontend entrypoints, validates their presence, and retains the code. Installed backend components support explicit CLI invocation. Installed frontend panels render from declared documents. Workspace-scoped panels can request explicitly granted context access.
 
 Use `invoke-plugin <plugin-id>` with JSON on standard input to invoke an installed package's declared WebAssembly backend. The runtime instantiates the component with no host imports or WASI and limits its size, execution fuel, linear memory and JSON payloads. The result is JSON on standard output.
 
@@ -240,3 +240,5 @@ A plugin that declares workspace context access needs a separate grant. Use `gra
 Desktop Settings, workspace Context, and completed video details can show **Plugin panels** from installed ZIPs. Opening a panel loads its declared HTML from a dedicated local protocol and checks the package revision. A sandbox isolates the panel from the editor and its native commands.
 
 In desktop Settings, choose a workspace and open **Plugin permissions** to grant or revoke context access for a requesting plugin. The confirmation names the plugin and workspace, and the host verifies the package revision before applying your choice.
+
+Workspace and completed video plugin panels can request the host’s selected workspace context if their manifest declares that permission and the operator grants it. The bridge handles one request per panel opening and rechecks the package revision and grant before returning the context.

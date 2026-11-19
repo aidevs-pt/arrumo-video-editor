@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 4] = [1, 2, 3, 4];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 5] = [1, 2, 3, 4, 5];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -80,6 +80,17 @@ pub struct CatalogPlugin {
 
 impl PluginManifest {
     pub(crate) fn requests_workspace_context(&self) -> bool {
+        self.backend_requests_workspace_context()
+            || self.code.as_ref().is_some_and(|code| {
+                code.frontend.iter().any(|surface| {
+                    surface
+                        .permissions
+                        .contains(&crate::plugin_schema::PluginPermission::WorkspaceContextRead)
+                })
+            })
+    }
+
+    pub(crate) fn backend_requests_workspace_context(&self) -> bool {
         self.code
             .as_ref()
             .and_then(|code| code.backend.as_ref())
@@ -135,6 +146,10 @@ impl PluginManifest {
                 || code.frontend.iter().any(|surface| {
                     !identifier(&surface.id)
                         || !surfaces.insert(&surface.id)
+                        || surface.permissions.len() > 1
+                        || (!surface.permissions.is_empty()
+                            && (manifest.schema_version < 5
+                                || surface.placement == crate::PluginSurfacePlacement::Settings))
                         || blank(&surface.title)
                         || !valid_code_path(&surface.document, ".html")
                 })

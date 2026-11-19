@@ -61,6 +61,8 @@ pub struct PluginSurface {
     pub title: String,
     pub document: String,
     pub placement: PluginSurfacePlacement,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub permissions: Vec<PluginPermission>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -614,6 +614,7 @@ fn main() {
             plugin_settings::list_plugin_catalog,
             plugin_settings::list_provider_preferences,
             plugin_settings::list_plugin_surfaces,
+            plugin_settings::read_plugin_surface_context,
             plugin_settings::list_plugin_context_requests,
             plugin_settings::apply_plugin_context_grant,
             plugin_settings::read_plugin_settings,
