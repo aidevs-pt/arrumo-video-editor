@@ -205,7 +205,7 @@ pub async fn read_plugin_credential_status(
     workspace_id: Option<i64>,
 ) -> Result<arrumo_workspaces::PluginCredentialStatus, &'static str> {
     tauri::async_runtime::spawn_blocking(move || {
-        let store = open_credential_workspace_store(&app)?;
+        let store = open_app_workspace_store(&app)?;
         store
             .plugin_credential_status(&plugin_id, &setting_id, workspace_id)
             .map_err(|_| "plugin_credential_status_failed")
@@ -224,7 +224,7 @@ pub async fn write_plugin_credential(
 ) -> Result<arrumo_workspaces::PluginCredentialStatus, &'static str> {
     let secret = secret.map(|value| zeroize::Zeroizing::new(value.into_bytes()));
     tauri::async_runtime::spawn_blocking(move || {
-        let store = open_credential_workspace_store(&app)?;
+        let store = open_app_workspace_store(&app)?;
         store
             .set_plugin_credential(&plugin_id, &setting_id, workspace_id, secret)
             .map_err(|_| "plugin_credential_save_failed")?;
@@ -236,7 +236,7 @@ pub async fn write_plugin_credential(
     .map_err(|_| "plugin_credential_save_failed")?
 }
 
-fn open_credential_workspace_store(app: &AppHandle) -> Result<WorkspaceStore, &'static str> {
+fn open_app_workspace_store(app: &AppHandle) -> Result<WorkspaceStore, &'static str> {
     let database = app
         .path()
         .app_local_data_dir()
@@ -359,4 +359,54 @@ pub fn read_plugin_surface_context(
         .map_err(|_| "store_unavailable")?
         .plugin_surface_context(&plugin_id, &surface_id, &package_sha256, workspace_id)
         .map_err(|_| "plugin_surface_context_unavailable")
+}
+
+#[tauri::command]
+pub fn list_plugin_actions(
+    workspace_id: Option<i64>,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::InstalledPluginAction>, &'static str> {
+    let actions = store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .plugin_actions()
+        .map_err(|_| "plugin_action_list_failed")?;
+    let scope = if workspace_id.is_some() {
+        arrumo_workspaces::PluginActionScope::Workspace
+    } else {
+        arrumo_workspaces::PluginActionScope::App
+    };
+    Ok(actions
+        .into_iter()
+        .filter(|entry| entry.action.scope == scope)
+        .collect())
+}
+
+#[tauri::command]
+pub async fn invoke_reviewed_plugin_action(
+    app: AppHandle,
+    plugin_id: String,
+    action_id: String,
+    package_sha256: String,
+    workspace_id: Option<i64>,
+    input_json: String,
+) -> Result<String, &'static str> {
+    if input_json.len() > arrumo_workspaces::MAX_PLUGIN_IO_BYTES {
+        return Err("plugin_action_input_invalid");
+    }
+    let input = serde_json::from_str(&input_json).map_err(|_| "plugin_action_input_invalid")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let output = open_app_workspace_store(&app)?
+            .invoke_reviewed_plugin_action(
+                &plugin_id,
+                &action_id,
+                &package_sha256,
+                workspace_id,
+                &input,
+            )
+            .map_err(|_| "plugin_action_failed")?;
+        serde_json::to_string_pretty(&output).map_err(|_| "plugin_action_failed")
+    })
+    .await
+    .map_err(|_| "plugin_action_failed")?
 }

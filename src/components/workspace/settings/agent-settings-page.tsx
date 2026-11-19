@@ -16,6 +16,7 @@ import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginCatalog } from "./plugin-catalog";
+import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
 import { WorkspacePluginPreferences } from "./plugin-preferences";
 
@@ -70,6 +71,7 @@ export function AgentSettingsPage() {
             {!requested && !setupWorkspace && <PluginCatalog />}
             {workspace && !setupWorkspace && <WorkspacePluginPreferences key={workspace.id} workspaceId={workspace.id} />}
             {workspace && !setupWorkspace && <PluginGrants key={workspace.id} workspace={workspace} />}
+            {workspace && !setupWorkspace && <PluginActions key={workspace.id} workspaceId={workspace.id} />}
           </div>
         )}
     </WorkspaceShell>

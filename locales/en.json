@@ -1,4 +1,15 @@
 {
+  "pluginActions": {
+    "title": "Plugin actions",
+    "loadError": "Could not load plugin actions.",
+    "input": "JSON input",
+    "run": "Run action",
+    "running": "Running action…",
+    "invalidInput": "Enter valid JSON of at most 64 KiB.",
+    "runError": "Could not run this action. Check plugin permissions and reopen Settings if the package changed.",
+    "result": "Result",
+    "finished": "Plugin action finished."
+  },
   "pluginGrants": {
     "title": "Plugin permissions",
     "description": "Manage which installed plugins can read this workspace’s context.",

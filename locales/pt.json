@@ -1,4 +1,15 @@
 {
+  "pluginActions": {
+    "title": "Ações de plugins",
+    "loadError": "Não foi possível carregar as ações dos plugins.",
+    "input": "Entrada JSON",
+    "run": "Executar ação",
+    "running": "A executar a ação…",
+    "invalidInput": "Introduza JSON válido com até 64 KiB.",
+    "runError": "Não foi possível executar esta ação. Verifique as permissões e volte a abrir Definições se o pacote tiver sido alterado.",
+    "result": "Resultado",
+    "finished": "A ação do plugin terminou."
+  },
   "pluginGrants": {
     "title": "Permissões de plugins",
     "description": "Gira os plugins instalados que podem ler o contexto deste espaço de trabalho.",

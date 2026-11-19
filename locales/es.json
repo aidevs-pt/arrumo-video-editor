@@ -1,4 +1,15 @@
 {
+  "pluginActions": {
+    "title": "Acciones de complementos",
+    "loadError": "No se pudieron cargar las acciones de complementos.",
+    "input": "Entrada JSON",
+    "run": "Ejecutar acción",
+    "running": "Ejecutando acción…",
+    "invalidInput": "Introduce JSON válido de hasta 64 KiB.",
+    "runError": "No se pudo ejecutar esta acción. Comprueba los permisos y vuelve a abrir Configuración si el paquete cambió.",
+    "result": "Resultado",
+    "finished": "La acción del complemento ha terminado."
+  },
   "pluginGrants": {
     "title": "Permisos de complementos",
     "description": "Gestiona qué complementos instalados pueden leer el contexto de este espacio de trabajo.",

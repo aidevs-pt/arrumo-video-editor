@@ -612,6 +612,8 @@ fn main() {
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,
+            plugin_settings::list_plugin_actions,
+            plugin_settings::invoke_reviewed_plugin_action,
             plugin_settings::list_provider_preferences,
             plugin_settings::list_plugin_surfaces,
             plugin_settings::read_plugin_surface_context,

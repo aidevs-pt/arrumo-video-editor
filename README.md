@@ -244,3 +244,5 @@ In desktop Settings, choose a workspace and open **Plugin permissions** to grant
 Workspace and completed video plugin panels can request the host’s selected workspace context if their manifest declares that permission and the operator grants it. The bridge handles one request per panel opening and rechecks the package revision and grant before returning the context.
 
 Use `plugin-actions` to discover named backend actions. Invoke an action with `invoke-plugin-action <plugin-id> <action-id> <app|workspace-id>` and pass JSON on standard input. The host validates the action's declared scope before running the component.
+
+In desktop Settings, expand an action under **Plugin actions**. The Settings scope determines which actions are shown. Enter JSON, select **Run action**, and review the result. The editor checks that the package matches the version shown when the form was opened.
