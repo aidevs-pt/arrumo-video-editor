@@ -149,6 +149,7 @@
     "saving": "Creating…"
   },
   "profileFormats": {
+    "missingProfile": "This profile is unavailable in the selected workspace.",
     "title": "Profile formats",
     "back": "Back to profiles",
     "manage": "Manage workspace formats",

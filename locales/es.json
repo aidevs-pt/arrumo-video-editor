@@ -149,6 +149,7 @@
     "saving": "Creando…"
   },
   "profileFormats": {
+    "missingProfile": "Este perfil no está disponible en el espacio de trabajo seleccionado.",
     "title": "Formatos del perfil",
     "back": "Volver a los perfiles",
     "manage": "Gestionar los formatos del espacio de trabajo",

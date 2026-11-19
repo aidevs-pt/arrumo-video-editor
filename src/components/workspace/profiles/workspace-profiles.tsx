@@ -12,7 +12,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceCatalog } from "../home/workspace-router";
-import { ProfileFormats } from "./profile-formats";
+import Link from "next/link";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
 type Draft = { name: string; guidance: string; color: string };
@@ -20,12 +20,10 @@ const emptyDraft: Draft = { name: "", guidance: "", color: "" };
 
 export function WorkspaceProfiles({
   workspace,
-  onOutputs,
   onDrafts,
 }: {
   workspace: { id: number; name: string };
 
-  onOutputs: () => void;
   onDrafts: (profileId?: number) => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -35,7 +33,6 @@ export function WorkspaceProfiles({
   const nameInput = useRef<HTMLInputElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
-  const [formatProfile, setFormatProfile] = useState<Profile | null>(null);
   const [editing, setEditing] = useState<{ id: number; draft: Draft } | null>(null);
   const editId = editing?.id;
   const draft = editing?.draft ?? newDraft;
@@ -109,17 +106,6 @@ export function WorkspaceProfiles({
     }
   }
 
-  if (formatProfile) {
-    return (
-      <ProfileFormats
-        workspaceId={workspace.id}
-        profile={formatProfile}
-        onBack={() => setFormatProfile(null)}
-        onOutputs={onOutputs}
-      />
-    );
-  }
-
   return (
     <WorkspaceShell>
       <WorkspaceHeading icon={Layers}>
@@ -152,12 +138,14 @@ export function WorkspaceProfiles({
                         aria-label={`${copy.drafts} · ${profile.name}`} onClick={() => onDrafts(profile.id)}>
                         {copy.drafts}
                       </Button>
-                      <Button type="button" size="sm" variant="outline"
-                        aria-label={`${copy.formats} · ${profile.name}`}
-                        disabled={saving || editing !== null}
-                        onClick={() => setFormatProfile(profile)}>
-                        {copy.formats}
-                      </Button>
+                      {saving || editing !== null ? (
+                        <Button type="button" size="sm" variant="outline" disabled>{copy.formats}</Button>
+                      ) : (
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/profile?workspace=${workspace.id}&profile=${profile.id}`}
+                            aria-label={`${copy.formats} · ${profile.name}`}>{copy.formats}</Link>
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         size="sm"
@@ -232,5 +220,5 @@ export function WorkspaceProfiles({
 export function WorkspaceProfilesRoute() {
   const { workspace, navigate } = useWorkspaceCatalog();
   return workspace ? <WorkspaceProfiles key={workspace.id} workspace={workspace}
-    onOutputs={() => navigate("outputs")} onDrafts={(profile) => navigate("drafts", profile)} /> : null;
+    onDrafts={(profile) => navigate("drafts", profile)} /> : null;
 }
