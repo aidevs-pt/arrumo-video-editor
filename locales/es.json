@@ -21,6 +21,7 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "intro": "Importa y organiza archivos reutilizables para este espacio.",
     "title": "Recursos",
     "back": "Volver a los perfiles",
     "list": "Recursos del espacio de trabajo",
@@ -243,6 +244,9 @@
     "saveError": "No se pudieron guardar los colores."
   },
   "brandImages": {
+    "manage": "Elegir imágenes",
+    "manageHint": "Los cambios se guardan al seleccionar o desmarcar una imagen.",
+    "noAssignments": "Aún no hay imágenes asignadas.",
     "title": "Imágenes de marca",
     "identity": "Recursos de marca",
     "style": "Referencias de estilo",

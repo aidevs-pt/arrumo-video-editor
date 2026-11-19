@@ -21,6 +21,7 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "intro": "Import and organize reusable media for this workspace.",
     "title": "Assets",
     "back": "Back to profiles",
     "list": "Workspace assets",
@@ -243,6 +244,9 @@
     "saveError": "Brand colors couldn’t be saved."
   },
   "brandImages": {
+    "manage": "Choose images",
+    "manageHint": "Changes are saved when you select or clear an image.",
+    "noAssignments": "No images assigned yet.",
     "title": "Brand images",
     "identity": "Brand assets",
     "style": "Style references",

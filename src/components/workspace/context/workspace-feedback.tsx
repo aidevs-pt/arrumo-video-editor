@@ -1,7 +1,8 @@
 "use client";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceRows } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -54,7 +55,7 @@ export function WorkspaceFeedback({ workspaceId }: {
   }
 
   return (
-    <section className="mt-8 [&>h2]:mb-3 [&_summary]:cursor-pointer [&_summary]:font-semibold" aria-labelledby="feedback-title">
+    <section className="mt-7 [&>h2]:mb-3" aria-labelledby="feedback-title">
       <h2 id="feedback-title" className="flex min-w-0 items-baseline gap-2.5 font-[680]">{copy.title}</h2>
       {loadError ? (
         <Alert variant="destructive">
@@ -64,12 +65,12 @@ export function WorkspaceFeedback({ workspaceId }: {
             setAttempt((value) => value + 1);
           }}>{copy.retry}</Button>
         </Alert>
-      ) : !cards ? <p role="status">{copy.loading}</p> : cards.length === 0 ? <p>{copy.empty}</p> : (
-        <WorkspaceRows>
+      ) : !cards ? <Skeleton className="h-10 w-full" role="status" aria-label={copy.loading} /> : cards.length === 0 ? <p className="text-sm text-muted-foreground">{copy.empty}</p> : (
+        <Accordion type="multiple" className="rounded-xl border px-4">
           {cards.map((card) => (
-            <li key={card.id}>
-              <details>
-                <summary>{card.title}</summary>
+            <AccordionItem value={String(card.id)} key={card.id}>
+              <AccordionTrigger>{card.title}</AccordionTrigger>
+              <AccordionContent>
                 {editing === card.id ? (
                   <form className="mt-3.5" onSubmit={(event) => void save(event, card.id)}>
                     <fieldset disabled={saving}>
@@ -100,10 +101,10 @@ export function WorkspaceFeedback({ workspaceId }: {
                       onClick={() => setEditing(card.id)}>{copy.edit}</Button>
                   </>
                 )}
-              </details>
-            </li>
+              </AccordionContent>
+            </AccordionItem>
           ))}
-        </WorkspaceRows>
+        </Accordion>
       )}
     </section>
   );

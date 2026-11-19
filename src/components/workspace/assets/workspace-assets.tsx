@@ -1,8 +1,7 @@
 "use client";
 
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Upload, Images } from "lucide-react";
@@ -11,6 +10,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AssetThumbnail } from "./asset-thumbnail";
 
 const kinds = ["image", "audio", "video"] as const;
 type MediaKind = typeof kinds[number];
@@ -91,17 +99,26 @@ export function WorkspaceAssets({ workspace }: {
     <WorkspaceShell>
       <WorkspaceHeading icon={Images}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
-        <p>{workspace.name}</p>
+        <p>{copy.intro}</p>
       </WorkspaceHeading>
-      <section aria-labelledby="asset-list-title">
-        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2.5">
-          <h2 id="asset-list-title" className="flex min-w-0 items-baseline gap-2.5 font-[680]">{copy.list}</h2>
+      <section aria-labelledby="asset-list-title" className="flex flex-col gap-4">
+        <h2 id="asset-list-title" className="sr-only">{copy.list}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs value={filter} onValueChange={setFilter}>
+            <TabsList aria-label={copy.filter} className="h-auto max-w-full flex-wrap">
+              <TabsTrigger value="all">{copy.all}</TabsTrigger>
+              {kinds.map((kind) => <TabsTrigger key={kind} value={kind}>{copy[kind]}</TabsTrigger>)}
+            </TabsList>
+          </Tabs>
           <Button type="button" onClick={() => void importFiles()} disabled={!assets || busy !== null || editing !== null}>
-            <Upload data-icon="inline-start" />
-            {busy === "import" ? copy.picking : copy.pick}
+            <Upload data-icon="inline-start" />{busy === "import" ? copy.picking : copy.pick}
           </Button>
         </div>
-        {progress && <p role="status">{copy.picking} {progress.completed}/{progress.total}</p>}
+        {progress && <div role="status" className="flex flex-col gap-2 text-sm">
+          {copy.picking} {progress.completed}/{progress.total}
+          <Progress aria-label={copy.picking} value={progress.completed / progress.total * 100} />
+        </div>}
+        {error === "importError" && <Alert variant="destructive"><AlertDescription>{copy.importError}</AlertDescription></Alert>}
         {loadError ? (
           <Alert variant="destructive">
             <AlertDescription>{copy.loadError}</AlertDescription>
@@ -110,53 +127,60 @@ export function WorkspaceAssets({ workspace }: {
               setAttempt((value) => value + 1);
             }}>{copy.retry}</Button>
           </Alert>
-        ) : !assets ? <p role="status">{copy.loading}</p> : (
-          <>
-            <Field orientation="horizontal" className="mb-4">
-              <FieldLabel htmlFor="asset-filter">{copy.filter}</FieldLabel>
-              <NativeSelect id="asset-filter" className="w-full"
-                disabled={editing !== null} value={filter} onChange={(event) => setFilter(event.target.value)}>
-                <NativeSelectOption value="all">{copy.all}</NativeSelectOption>
-                {kinds.map((kind) => <NativeSelectOption key={kind} value={kind}>{copy[kind]}</NativeSelectOption>)}
-              </NativeSelect>
-            </Field>
-            {error === "importError" && <Alert variant="destructive"><AlertDescription>{copy.importError}</AlertDescription></Alert>}
-            {visible?.length ? (
-              <WorkspaceRows>
-                {visible.map((asset) => (
-                  <li key={asset.id}>
-                    <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-                      <div>
-                        <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">{asset.name}</h3>
-                        <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy[asset.kind]}</p>
-                      </div>
-                      <Button type="button" size="sm" variant="outline" disabled={busy !== null || editing !== null}
-                        aria-label={`${copy.edit} · ${asset.name}`}
-                        onClick={() => { setError(null); setEditing(asset); }}>{copy.edit}</Button>
+        ) : !assets ? (
+          <div role="status" aria-label={copy.loading} className="grid grid-cols-2 gap-4 md:grid-cols-3">
+            {[0, 1, 2].map((item) => <Skeleton key={item} className="aspect-video" />)}
+          </div>
+        ) : visible?.length ? (
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-4">
+            {visible.map((asset) => (
+              <li key={asset.id} className="min-w-0">
+                <Card className="gap-3 pt-0">
+                  <AssetThumbnail workspaceId={workspace.id} assetId={asset.id} kind={asset.kind} />
+                  <CardContent className="flex min-w-0 flex-col gap-2">
+                    <h3 title={asset.name} className="truncate font-semibold">{asset.name}</h3>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="secondary">{copy[asset.kind]}</Badge>
+                      {!asset.notes.trim() && <Badge variant="outline">{copy.noNotes}</Badge>}
                     </div>
-                    {editing?.id === asset.id ? (
-                      <form onSubmit={saveNotes} className="mt-3.5">
-                        <FieldGroup>
-                          <Field>
-                            <FieldLabel htmlFor="asset-notes">{copy.notes}</FieldLabel>
-                            <Textarea id="asset-notes" name="notes" defaultValue={asset.notes} disabled={busy !== null} />
-                          </Field>
-                          {error === "notesError" && <Alert variant="destructive"><AlertDescription>{copy.notesError}</AlertDescription></Alert>}
-                          <div className="flex flex-wrap items-baseline gap-2.5">
-                            <Button type="submit" disabled={busy !== null}>{copy.save}</Button>
-                            <Button type="button" variant="outline" disabled={busy !== null}
-                              onClick={() => { setError(null); setEditing(null); }}>{copy.cancel}</Button>
-                          </div>
-                        </FieldGroup>
-                      </form>
-                    ) : <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{asset.notes || copy.noNotes}</p>}
-                  </li>
-                ))}
-              </WorkspaceRows>
-            ) : <p>{copy.empty}</p>}
-          </>
+                    {asset.notes.trim() && <p className="line-clamp-2 wrap-anywhere text-sm text-muted-foreground">{asset.notes}</p>}
+                  </CardContent>
+                  <CardFooter className="py-2">
+                    <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
+                      aria-label={`${copy.edit} · ${asset.name}`}
+                      onClick={() => { setError(null); setEditing(asset); }}>{copy.edit}</Button>
+                  </CardFooter>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty className="min-h-56 rounded-xl border">
+            <EmptyHeader><EmptyMedia variant="icon"><Images /></EmptyMedia><EmptyTitle>{copy.empty}</EmptyTitle></EmptyHeader>
+            {assets.length === 0 && <Button onClick={() => void importFiles()} disabled={busy !== null}>{copy.pick}</Button>}
+          </Empty>
         )}
       </section>
+      <Dialog open={editing !== null} onOpenChange={(open) => {
+        if (!open && busy === null) { setEditing(null); setError(null); }
+      }}>
+        {editing && <DialogContent showCloseButton={busy === null}>
+          <DialogHeader><DialogTitle>{copy.edit}</DialogTitle><DialogDescription>{editing.name}</DialogDescription></DialogHeader>
+          <form onSubmit={saveNotes}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="asset-notes">{copy.notes}</FieldLabel>
+                <Textarea id="asset-notes" name="notes" defaultValue={editing.notes} disabled={busy !== null} />
+              </Field>
+              {error === "notesError" && <Alert variant="destructive"><AlertDescription>{copy.notesError}</AlertDescription></Alert>}
+              <DialogFooter>
+                <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setEditing(null)}>{copy.cancel}</Button>
+                <Button type="submit" disabled={busy !== null}>{copy.save}</Button>
+              </DialogFooter>
+            </FieldGroup>
+          </form>
+        </DialogContent>}
+      </Dialog>
     </WorkspaceShell>
   );
 }
