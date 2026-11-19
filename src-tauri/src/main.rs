@@ -444,6 +444,20 @@ async fn create_video_draft(
 }
 
 #[tauri::command]
+async fn delete_video_draft(
+    workspace_id: i64,
+    draft_id: i64,
+    confirmed_title: String,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .delete_video_draft(workspace_id, draft_id, &confirmed_title)
+        .map_err(|_| "draft_delete_failed")
+}
+
+#[tauri::command]
 async fn update_video_draft(
     workspace_id: i64,
     draft_id: i64,
@@ -674,6 +688,7 @@ fn main() {
             list_video_drafts,
             create_video_draft,
             update_video_draft,
+            delete_video_draft,
             enqueue_video_draft,
             list_generation_runs,
             get_generation_run,

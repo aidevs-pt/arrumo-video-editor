@@ -238,6 +238,13 @@
     "saveError": "No se pudieron guardar los ajustes de entrega. Inténtalo de nuevo."
   },
   "drafts": {
+    "deleteDraft": "Eliminar borrador",
+    "deletingDraft": "Eliminando borrador…",
+    "deleteDescription": "Escribe el título exacto para eliminar este borrador. Sus archivos de origen se conservan en la biblioteca.",
+    "confirmTitle": "Confirma el título del borrador",
+    "deleteError": "No se pudo eliminar el borrador. Puede que se haya renombrado o puesto en cola.",
+    "cancelDelete": "Cancelar",
+    "draftDeleted": "Borrador eliminado.",
     "description": "Ordena tus grabaciones y prepara las indicaciones para cada vídeo.",
     "savedDrafts": "Borradores guardados",
     "saved": "Borrador guardado",

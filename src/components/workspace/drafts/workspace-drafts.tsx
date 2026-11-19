@@ -20,6 +20,7 @@ import { GenerationQueue } from "@/components/workspace/generation/generation-qu
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { useWorkspaceCatalog } from "../home/workspace-router";
+import { DeleteDraftDialog } from "./delete-draft-dialog";
 import { DraftSourceClips } from "./draft-source-clips";
 
 type CatalogEntry = { id: number; name: string };
@@ -141,7 +142,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
         return editing === null ? [...rows, draft] : rows.map((row) => row.id === draft.id ? draft : row);
       });
       reset();
-      setNotice(draft.title);
+      setNotice(`${copy.saved} · ${draft.title}`);
       setTab("saved");
     } catch {
       setError("saveError");
@@ -237,7 +238,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
             </form>
           </TabsContent>
           <TabsContent value="saved" className="grid gap-3">
-            {notice && <Alert><AlertDescription role="status">{copy.saved} · {notice}</AlertDescription></Alert>}
+            {notice && <Alert><AlertDescription role="status">{notice}</AlertDescription></Alert>}
             {drafts.length === 0 ? (
               <Empty>
                 <EmptyHeader>
@@ -274,6 +275,14 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                           <Button type="button" size="sm" disabled={pending !== null || editing !== null}
                             aria-label={`${messages.queue.submit} · ${draft.title}`}
                             onClick={() => setQueueView({ draftId: draft.id })}>{messages.queue.submit}</Button>
+                          <DeleteDraftDialog workspaceId={workspaceId} draftId={draft.id} title={draft.title}
+                            disabled={pending !== null || editing !== null}
+                            onDelete={() => {
+                              setDrafts((current) => current?.filter((entry) => entry.id !== draft.id));
+                              setNotice(copy.draftDeleted);
+                              setTab("saved");
+                              heading.current?.focus();
+                            }} />
                         </CardFooter>
                       </Card>
                     </li>

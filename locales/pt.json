@@ -238,6 +238,13 @@
     "saveError": "Não foi possível guardar as definições de entrega. Tente novamente."
   },
   "drafts": {
+    "deleteDraft": "Eliminar rascunho",
+    "deletingDraft": "A eliminar rascunho…",
+    "deleteDescription": "Escreve o título exato para eliminar este rascunho. Os ficheiros de origem ficam na biblioteca.",
+    "confirmTitle": "Confirma o título do rascunho",
+    "deleteError": "Não foi possível eliminar o rascunho. Pode ter mudado de nome ou entrado na fila.",
+    "cancelDelete": "Cancelar",
+    "draftDeleted": "Rascunho eliminado.",
     "description": "Organize as gravações e prepare as orientações para cada vídeo.",
     "savedDrafts": "Rascunhos guardados",
     "saved": "Rascunho guardado",

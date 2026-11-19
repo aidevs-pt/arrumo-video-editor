@@ -238,6 +238,13 @@
     "saveError": "Delivery settings couldn’t be saved. Try again."
   },
   "drafts": {
+    "deleteDraft": "Delete draft",
+    "deletingDraft": "Deleting draft…",
+    "deleteDescription": "Type the exact title to delete this draft. Its source files stay in the workspace library.",
+    "confirmTitle": "Confirm draft title",
+    "deleteError": "The draft could not be deleted. It may have been renamed or queued.",
+    "cancelDelete": "Cancel",
+    "draftDeleted": "Draft deleted.",
     "description": "Arrange your footage and prepare the brief for each video.",
     "savedDrafts": "Saved drafts",
     "saved": "Draft saved",
