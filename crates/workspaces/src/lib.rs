@@ -51,7 +51,7 @@ pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_direc
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
-pub use generation_notifications::GenerationNotification;
+pub use generation_notifications::{GenerationInbox, GenerationNotification};
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};

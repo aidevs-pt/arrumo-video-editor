@@ -150,6 +150,9 @@
   },
   "studio": {
     "closeNavigation": "Close navigation",
+    "notifications": "Notifications",
+    "recentCompletions": "Recently completed",
+    "noNotifications": "No generation notifications",
     "reviewInbox": "Review inbox",
     "noReviews": "No runs are waiting for review.",
     "videoStudio": "Video Studio",

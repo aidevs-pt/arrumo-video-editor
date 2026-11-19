@@ -150,6 +150,9 @@
   },
   "studio": {
     "closeNavigation": "Cerrar navegación",
+    "notifications": "Notificaciones",
+    "recentCompletions": "Vídeos completados recientemente",
+    "noNotifications": "No hay notificaciones de generación",
     "reviewInbox": "Bandeja de revisiones",
     "noReviews": "Ningún proceso está esperando revisión.",
     "videoStudio": "Estudio de vídeo",

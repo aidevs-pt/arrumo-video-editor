@@ -485,6 +485,18 @@ async fn pending_generation_reviews(
 }
 
 #[tauri::command]
+async fn generation_inbox(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::GenerationInbox, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .generation_inbox(workspace_id)
+        .map_err(|_| "generation_inbox_failed")
+}
+
+#[tauri::command]
 async fn get_generation_run(
     workspace_id: i64,
     run_id: i64,
@@ -666,6 +678,7 @@ fn main() {
             list_generation_runs,
             get_generation_run,
             pending_generation_reviews,
+            generation_inbox,
             control_generation,
             generation_activity,
             generation_plan,
