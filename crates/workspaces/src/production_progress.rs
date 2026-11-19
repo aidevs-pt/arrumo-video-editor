@@ -85,7 +85,7 @@ impl WorkspaceStore {
                 |row| row.get(0),
             )?;
             let source_ids: Vec<i64> = read_settings(Some(source_ids), 0)?;
-            crate::final_render::preview_cuts(result, &source_ids)
+            crate::clip_render::preview_cuts(result, &source_ids)
                 .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         }
         let id = tx.query_row(

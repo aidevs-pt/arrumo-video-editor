@@ -39,6 +39,18 @@ struct Dimensions {
     height: u32,
 }
 
+impl Dimensions {
+    fn scale_preview(&mut self) {
+        // Keep the output aspect ratio while limiting the longest edge to 480 pixels.
+        let longest = self.width.max(self.height);
+        if longest > 480 {
+            let scale = |edge| (u64::from(edge) * 480 / u64::from(longest)).max(1) as u32;
+            self.width = scale(self.width);
+            self.height = scale(self.height);
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct PreviewCut {
     asset_id: i64,
@@ -88,6 +100,56 @@ impl WorkspaceStore {
         run_id: i64,
         attempt: i64,
     ) -> Result<i64, Box<dyn Error>> {
+        self.render_clips(
+            database,
+            ActiveRender {
+                store: self,
+                workspace_id,
+                run_id,
+                attempt,
+            },
+            ProductionStage::FinalRender,
+            None,
+        )
+    }
+
+    pub fn render_preview_videos(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        edit: &Value,
+    ) -> Result<i64, Box<dyn Error>> {
+        if !edit.is_object() {
+            return Err(io::Error::other("Preview edit must be an object").into());
+        }
+        self.render_clips(
+            database,
+            ActiveRender {
+                store: self,
+                workspace_id,
+                run_id,
+                attempt,
+            },
+            ProductionStage::Preview,
+            Some(edit),
+        )
+    }
+
+    fn render_clips(
+        &self,
+        database: &Path,
+        renderer: ActiveRender<'_>,
+        stage: ProductionStage,
+        edit: Option<&Value>,
+    ) -> Result<i64, Box<dyn Error>> {
+        let ActiveRender {
+            workspace_id,
+            run_id,
+            attempt,
+            ..
+        } = renderer;
         let (snapshot, plan, index): (String, GenerationPlan, i64) = self.0.query_row(
             "SELECT snapshot_json, plan_json, stage_index FROM generation_runs
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
@@ -95,58 +157,39 @@ impl WorkspaceStore {
             params![workspace_id, run_id, attempt],
             |row| Ok((row.get(0)?, read_settings(row.get(1)?, 1)?, row.get(2)?)),
         )?;
-        if plan.steps.get(index as usize).map(|step| step.stage)
-            != Some(ProductionStage::FinalRender)
-        {
-            return Err(io::Error::other("The run is not at the final render stage").into());
+        if plan.steps.get(index as usize).map(|step| step.stage) != Some(stage) {
+            return Err(io::Error::other("The run is not at the requested render stage").into());
         }
         let inputs: RenderInputs = serde_json::from_str(&snapshot)?;
         if inputs.draft.source_ids.is_empty() || inputs.formats.is_empty() {
             return Err(io::Error::other(
-                "Final clip assembly requires managed source videos and output formats",
+                "Clip assembly requires managed source videos and output formats",
             )
             .into());
         }
 
-        let (preview_index, preview_step) = plan
-            .steps
-            .iter()
-            .enumerate()
-            .find(|(_, step)| step.stage == ProductionStage::Preview)
-            .ok_or_else(|| io::Error::other("No preview step exists in the saved plan"))?;
-        let preview: String = self.0.query_row(
-            "SELECT result_json FROM production_results
-             WHERE run_id = ?1 AND stage_index = ?2
-               AND ((?3 AND decision = 'approved') OR (NOT ?3 AND decision IS NULL))
-             ORDER BY id DESC LIMIT 1",
-            params![run_id, preview_index as i64, preview_step.review_required],
-            |row| row.get(0),
-        )?;
-        let sources =
-            match preview_cuts(&serde_json::from_str(&preview)?, &inputs.draft.source_ids)? {
-                Some(cuts) => cuts
-                    .into_iter()
-                    .map(|cut| (cut.asset_id, Some(cut)))
-                    .collect(),
-                None => inputs
-                    .draft
-                    .source_ids
-                    .into_iter()
-                    .map(|id| (id, None))
-                    .collect::<Vec<_>>(),
-            };
+        let edit = match edit {
+            Some(edit) => edit.clone(),
+            None => self.accepted_preview(run_id, &plan)?,
+        };
+        let sources = match preview_cuts(&edit, &inputs.draft.source_ids)? {
+            Some(cuts) => cuts
+                .into_iter()
+                .map(|cut| (cut.asset_id, Some(cut)))
+                .collect(),
+            None => inputs
+                .draft
+                .source_ids
+                .into_iter()
+                .map(|id| (id, None))
+                .collect::<Vec<_>>(),
+        };
 
         let delivery = delivery_directory(database, workspace_id, run_id);
         fs::create_dir_all(&delivery)?;
         let delivery = delivery.canonicalize()?;
         let scratch = delivery.join(format!("render-attempt-{attempt}"));
         fs::create_dir(&scratch)?;
-        let renderer = ActiveRender {
-            store: self,
-            workspace_id,
-            run_id,
-            attempt,
-        };
         let rendered = (|| -> Result<i64, Box<dyn Error>> {
             let root = asset_root(database);
             let mut clips = Vec::new();
@@ -165,21 +208,38 @@ impl WorkspaceStore {
             }
             let mut filenames = Vec::new();
             for output in inputs.formats {
-                let format = output.format;
+                let mut format = output.format;
+                if stage == ProductionStage::Preview {
+                    format.scale_preview();
+                }
                 renderer.render_format(&scratch, &clips, &format)?;
-                filenames.push(format!("{}.mp4", format.id));
+                let filename = if stage == ProductionStage::Preview {
+                    format!("preview-{attempt}-{}.mp4", format.id)
+                } else {
+                    format!("{}.mp4", format.id)
+                };
+                filenames.push((format.id, filename));
             }
+            let result = if stage == ProductionStage::Preview {
+                let mut result = edit;
+                result["preview_videos"] =
+                    json!(filenames.iter().map(|(_, name)| name).collect::<Vec<_>>());
+                result
+            } else {
+                json!({ "primary_videos": filenames.iter().map(|(_, name)| name).collect::<Vec<_>>() })
+            };
             self.submit_production_result_with(
                 workspace_id,
                 run_id,
                 attempt,
-                ProductionStage::FinalRender,
-                &json!({ "primary_videos": filenames }),
+                stage,
+                &result,
                 || {
-                    for filename in &filenames {
-                        fs::rename(scratch.join(filename), delivery.join(filename)).map_err(
-                            |error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)),
-                        )?;
+                    for (id, filename) in &filenames {
+                        fs::rename(scratch.join(format!("{id}.mp4")), delivery.join(filename))
+                            .map_err(|error| {
+                                rusqlite::Error::ToSqlConversionFailure(Box::new(error))
+                            })?;
                     }
                     Ok(())
                 },
@@ -190,6 +250,27 @@ impl WorkspaceStore {
             eprintln!("Temporary render files could not be cleaned up: {error}");
         }
         rendered
+    }
+    fn accepted_preview(
+        &self,
+        run_id: i64,
+        plan: &GenerationPlan,
+    ) -> Result<Value, Box<dyn Error>> {
+        let (preview_index, preview_step) = plan
+            .steps
+            .iter()
+            .enumerate()
+            .find(|(_, step)| step.stage == ProductionStage::Preview)
+            .ok_or_else(|| io::Error::other("No preview step exists in the saved plan"))?;
+        let preview: String = self.0.query_row(
+            "SELECT result_json FROM production_results
+             WHERE run_id = ?1 AND stage_index = ?2
+               AND ((?3 AND decision = 'approved') OR (NOT ?3 AND decision IS NULL))
+             ORDER BY id DESC LIMIT 1",
+            params![run_id, preview_index as i64, preview_step.review_required],
+            |row| row.get(0),
+        )?;
+        Ok(serde_json::from_str(&preview)?)
     }
 }
 
