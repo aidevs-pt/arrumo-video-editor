@@ -99,7 +99,31 @@ struct ProfileOverridesInput<T> {
     overrides: T,
 }
 
-pub(super) fn definitions() -> [Value; 15] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FeedbackInput {
+    workspace_id: i64,
+    title: String,
+    markdown: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct UpdateFeedbackInput {
+    workspace_id: i64,
+    feedback_id: i64,
+    title: String,
+    markdown: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrandColorsInput {
+    workspace_id: i64,
+    colors: Vec<String>,
+}
+
+pub(super) fn definitions() -> [Value; 20] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -178,6 +202,22 @@ pub(super) fn definitions() -> [Value; 15] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "profileId": id, "formatId": id, "overrides": supplemental
             }, "required": ["workspaceId", "profileId", "formatId", "overrides"], "additionalProperties": false}}),
+        json!({"name": "list_workspace_feedback", "description": "List saved workspace feedback and guidance cards.",
+            "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "add_workspace_feedback", "description": "Add a workspace feedback card with a title and Markdown guidance.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "title": name, "markdown": text
+            }, "required": ["workspaceId", "title", "markdown"], "additionalProperties": false}}),
+        json!({"name": "update_workspace_feedback", "description": "Replace a workspace feedback card's title and Markdown guidance.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "feedbackId": id, "title": name, "markdown": text
+            }, "required": ["workspaceId", "feedbackId", "title", "markdown"], "additionalProperties": false}}),
+        json!({"name": "get_brand_colors", "description": "Read the workspace's saved brand palette.",
+            "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_brand_colors", "description": "Replace the workspace brand palette with an ordered list of hex colors.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "colors": {"type": "array", "items": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}}
+            }, "required": ["workspaceId", "colors"], "additionalProperties": false}}),
     ]
 }
 
@@ -304,6 +344,41 @@ pub(super) fn call(
                     .map_err(|_| "Could not save profile delivery settings")
             })
         }
+        "list_workspace_feedback" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .list_workspace_feedback(args.workspace_id)
+                .map(|feedback| json!({"feedback": feedback}))
+                .map_err(|_| "Could not list workspace feedback")
+        }),
+        "add_workspace_feedback" => parse(arguments).and_then(|args: FeedbackInput| {
+            store
+                .add_workspace_feedback(args.workspace_id, &args.title, &args.markdown)
+                .map(|card| json!({"card": card}))
+                .map_err(|_| "Could not add workspace feedback")
+        }),
+        "update_workspace_feedback" => parse(arguments).and_then(|args: UpdateFeedbackInput| {
+            store
+                .update_workspace_feedback(
+                    args.workspace_id,
+                    args.feedback_id,
+                    &args.title,
+                    &args.markdown,
+                )
+                .map(|card| json!({"card": card}))
+                .map_err(|_| "Could not update workspace feedback")
+        }),
+        "get_brand_colors" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .brand_colors(args.workspace_id)
+                .map(|colors| json!({"colors": colors}))
+                .map_err(|_| "Could not read brand colors")
+        }),
+        "set_brand_colors" => parse(arguments).and_then(|args: BrandColorsInput| {
+            store
+                .set_brand_colors(args.workspace_id, &args.colors)
+                .map(|colors| json!({"colors": colors}))
+                .map_err(|_| "Could not save brand colors")
+        }),
         _ => return None,
     })
 }
