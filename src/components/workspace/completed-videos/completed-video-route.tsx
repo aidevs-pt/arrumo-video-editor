@@ -21,8 +21,8 @@ export function CompletedVideoRoute() {
   return (
     <WorkspaceShell>
       <Button asChild variant="ghost" className="mb-4">
-        <Link href={workspaceHref("generations", workspace.id)}>
-          <ArrowLeft data-icon="inline-start" />{messages.queue.title}
+        <Link href={workspaceHref("videos", workspace.id)}>
+          <ArrowLeft data-icon="inline-start" />{messages.studio.completedVideos}
         </Link>
       </Button>
       {/^[1-9]\d*$/.test(rawRun) && Number.isSafeInteger(runId) ? (

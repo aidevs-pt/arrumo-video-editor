@@ -330,7 +330,22 @@
     "previewError": "Could not open the verified files. Check that the delivery is still available.",
     "loadingPreview": "Loading delivery preview…",
     "playbackError": "Could not play this video. You can still export the delivery ZIP.",
-    "subtitleText": "Subtitle text"
+    "subtitleText": "Subtitle text",
+    "videoTab": "Video",
+    "detailsTab": "Details",
+    "outputFormat": "Output format",
+    "resolution": "Resolution",
+    "duration": "Duration",
+    "videoFile": "Video file",
+    "subtitleFile": "Subtitle file",
+    "noOutputs": "No verified outputs",
+    "sourceTitle": "Original draft",
+    "sourceProfile": "Profile",
+    "sourceClips": "Source clips",
+    "noActivity": "No activity recorded",
+    "noFeedback": "No feedback yet",
+    "exporting": "Exporting…",
+    "replayMode": "Settings to use"
   },
   "productionPlan": {
     "resultDetails": "Result data",

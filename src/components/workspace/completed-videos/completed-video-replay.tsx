@@ -3,7 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocale } from "@/lib/locale-provider";
 
 type ReplayMode = "captured" | "current";
@@ -36,13 +36,15 @@ export function CompletedVideoReplay({ workspaceId, runId }: { workspaceId: numb
     <form onSubmit={replay}>
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor={`replay-mode-${runId}`}>{copy.replaySettings}</FieldLabel>
+          <FieldLabel htmlFor={`replay-mode-${runId}`}>{copy.replayMode}</FieldLabel>
           <div className="flex flex-wrap items-center gap-2">
-            <NativeSelect id={`replay-mode-${runId}`} disabled={pending} value={mode}
-              onChange={(event) => setMode(event.target.value === "current" ? "current" : "captured")}>
-              <NativeSelectOption value="captured">{copy.replayCaptured}</NativeSelectOption>
-              <NativeSelectOption value="current">{copy.replayCurrent}</NativeSelectOption>
-            </NativeSelect>
+            <Select disabled={pending} value={mode} onValueChange={(value) => setMode(value === "current" ? "current" : "captured")}>
+              <SelectTrigger id={`replay-mode-${runId}`}><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup>
+                <SelectItem value="captured">{copy.replayCaptured}</SelectItem>
+                <SelectItem value="current">{copy.replayCurrent}</SelectItem>
+              </SelectGroup></SelectContent>
+            </Select>
             <Button type="submit" size="sm" variant="outline" disabled={pending}>{copy.queueReplay}</Button>
           </div>
           {status === "replayQueued" && <p role="status" className="text-sm text-muted-foreground">{copy[status]}</p>}

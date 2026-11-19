@@ -330,7 +330,22 @@
     "previewError": "Não foi possível abrir os ficheiros verificados. Confirma que a entrega ainda está disponível.",
     "loadingPreview": "A carregar a pré-visualização da entrega…",
     "playbackError": "Não foi possível reproduzir este vídeo. Podes exportar o ZIP da entrega.",
-    "subtitleText": "Texto das legendas"
+    "subtitleText": "Texto das legendas",
+    "videoTab": "Vídeo",
+    "detailsTab": "Detalhes",
+    "outputFormat": "Formato de saída",
+    "resolution": "Resolução",
+    "duration": "Duração",
+    "videoFile": "Ficheiro de vídeo",
+    "subtitleFile": "Ficheiro de legendas",
+    "noOutputs": "Sem entregas verificadas",
+    "sourceTitle": "Rascunho original",
+    "sourceProfile": "Perfil",
+    "sourceClips": "Clipes de origem",
+    "noActivity": "Sem atividade registada",
+    "noFeedback": "Ainda sem comentários",
+    "exporting": "A exportar…",
+    "replayMode": "Definições a usar"
   },
   "productionPlan": {
     "resultDetails": "Dados do resultado",
