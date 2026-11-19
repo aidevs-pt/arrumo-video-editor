@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "pluginId": "openai",
+  "protocol": "text-multipart",
+  "endpoint": "https://api.openai.com/v1/audio/transcriptions",
+  "credentialSetting": "api-key",
+  "credentialHeader": "authorization",
+  "model": "gpt-transcribe"
+}

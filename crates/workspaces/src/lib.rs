@@ -66,7 +66,7 @@ pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecisi
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
 pub use provider_preferences::{CapabilityProvider, ProviderPreferences};
-pub use transcription::{Transcript, TranscriptWord};
+pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
 

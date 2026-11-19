@@ -36,6 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let plugins = WorkspaceStore::open(Path::new(database))?.plugin_catalog()?;
             println!("{}", serde_json::to_string(&plugins)?);
         }
+        [database, command, workspace, wav] if command == "transcribe-wav" => {
+            let transcript = WorkspaceStore::open(Path::new(database))?
+                .transcribe_preferred_wav(utf8(workspace)?.parse()?, File::open(wav)?)?;
+            println!("{}", serde_json::to_string(&transcript)?);
+        }
         [database, command, workspace, provider, wav] if command == "transcribe-wav" => {
             let transcript = WorkspaceStore::open(Path::new(database))?.transcribe_wav(
                 utf8(workspace)?.parse()?,
@@ -747,7 +752,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-settings <plugin-id> <app|workspace-id> | set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json> | clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id> | ",
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
-                "transcribe-wav <workspace-id> <plugin-id> <audio.wav> | ",
+                "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
