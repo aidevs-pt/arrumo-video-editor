@@ -739,6 +739,7 @@ fn main() {
             production_progress,
             review_production_result,
             completed_video::get_completed_video,
+            completed_video::set_output_schedule,
             completed_video::read_completion_notification,
             completed_video::rename_completed_video,
             completed_video::export_completed_video,

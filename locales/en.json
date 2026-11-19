@@ -470,6 +470,11 @@
     "saveError": "Feedback couldn’t be saved."
   },
   "completedVideo": {
+    "scheduleDate": "Schedule date",
+    "saveDate": "Save date",
+    "clearDate": "Clear date",
+    "dateSaved": "Date saved.",
+    "dateError": "Could not save the date.",
     "deleteTitle": "Delete video",
     "deleting": "Deleting video…",
     "deleteDescription": "Type the exact title to delete this completed video and its managed delivery files.",

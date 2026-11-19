@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rusqlite::{Transaction, TransactionBehavior, params};
 use serde::Serialize;
 
@@ -47,6 +49,19 @@ impl WorkspaceStore {
             )?;
         }
         tx.commit()
+    }
+
+    pub(crate) fn run_output_dates(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> rusqlite::Result<BTreeMap<i64, String>> {
+        self.0.prepare(
+            "SELECT schedule.format_id, schedule.scheduled_date FROM output_schedules AS schedule
+             JOIN generation_runs AS run ON run.id = schedule.run_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2 AND run.state = 'completed'",
+        )?.query_map(params![workspace_id, run_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect()
     }
 
     pub fn scheduled_outputs(

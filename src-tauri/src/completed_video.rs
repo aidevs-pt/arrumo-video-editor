@@ -32,6 +32,21 @@ pub async fn read_completion_notification(
 }
 
 #[tauri::command]
+pub async fn set_output_schedule(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    date: Option<String>,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_output_schedule(workspace_id, run_id, format_id, date.as_deref())
+        .map_err(|_| "output_schedule_failed")
+}
+
+#[tauri::command]
 pub async fn rename_completed_video(
     workspace_id: i64,
     run_id: i64,

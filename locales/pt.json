@@ -470,6 +470,11 @@
     "saveError": "Não foi possível guardar a observação."
   },
   "completedVideo": {
+    "scheduleDate": "Data agendada",
+    "saveDate": "Guardar data",
+    "clearDate": "Limpar data",
+    "dateSaved": "Data guardada.",
+    "dateError": "Não foi possível guardar a data.",
     "deleteTitle": "Eliminar vídeo",
     "deleting": "A eliminar vídeo…",
     "deleteDescription": "Escreve o título exato para eliminar este vídeo concluído e os seus ficheiros de entrega.",

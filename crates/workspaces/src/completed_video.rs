@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rusqlite::params;
 use serde::Serialize;
 
@@ -13,6 +15,7 @@ pub struct CompletedVideo {
     pub run: GenerationRun,
     pub title: String,
     pub delivery: VerifiedDelivery,
+    pub output_dates: BTreeMap<i64, String>,
     pub plan: GenerationPlan,
     pub production: ProductionProgress,
     pub activity: Vec<GenerationActivity>,
@@ -36,6 +39,7 @@ impl WorkspaceStore {
             run,
             title,
             delivery: self.verified_delivery(workspace_id, run_id)?,
+            output_dates: self.run_output_dates(workspace_id, run_id)?,
             plan,
             production: self.production_progress(workspace_id, run_id)?,
             activity: self.generation_activity(workspace_id, run_id)?,

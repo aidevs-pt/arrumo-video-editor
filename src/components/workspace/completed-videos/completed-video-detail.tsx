@@ -21,6 +21,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { workspaceHref } from "../home/workspace-links";
 import type { Stage } from "../generation/generation-plan";
+import { OutputDateField } from "./output-date-field";
 import { CompletedOutputPreview } from "./completed-output-preview";
 import { CompletedVideoFeedback, type FeedbackResult, type VideoFeedback } from "./completed-video-feedback";
 import { CompletedVideoReplay } from "./completed-video-replay";
@@ -55,6 +56,7 @@ type CompletedVideo = {
   feedback: VideoFeedback[];
   title: string;
   delivery: { verified_outputs: Output[] };
+  output_dates: Record<number, string>;
 };
 
 export function CompletedVideoDetail({ workspaceId, runId }: { workspaceId: number; runId: number }) {
@@ -113,6 +115,7 @@ function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; vi
   const [action, setAction] = useState<"rename" | "export">();
   const [error, setError] = useState<"renameError" | "exportError">();
   const [notice, setNotice] = useState<"saved" | "exported">();
+  const [outputDates, setOutputDates] = useState(video.output_dates);
   const [formatId, setFormatId] = useState(video.delivery.verified_outputs[0]?.format_id);
   const selected = video.delivery.verified_outputs.find((output) => output.format_id === formatId);
   const formats = snapshot.formats ?? [];
@@ -207,6 +210,10 @@ function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; vi
                     <Metadata name={copy.videoFile} value={selected.video} />
                     <Metadata name={copy.subtitleFile} value={selected.subtitles} />
                   </dl>
+                  <Separator />
+                  <OutputDateField key={selected.format_id} workspaceId={workspaceId} runId={runId}
+                    formatId={selected.format_id} savedDate={outputDates[selected.format_id] ?? ""}
+                    onSaved={(date) => setOutputDates((current) => ({ ...current, [selected.format_id]: date }))} />
                 </CardContent>
               </Card>
             </div>
