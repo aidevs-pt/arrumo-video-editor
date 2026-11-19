@@ -339,3 +339,5 @@ Use `remove_reviewed_plugin_package` through MCP or A2A with the plugin ID and i
 Use `get_agent_login_status` through MCP or A2A with the bundled agent plugin ID to check local sign-in readiness. The host returns a status and discards the probe's output.
 
 Delete an unqueued draft with `delete-draft <workspace-id> <draft-id> <confirmed-title>` in the CLI or `delete_video_draft` through MCP and A2A. Pass the exact saved title. A draft referenced by a run stays available for that run and its replays. Managed sources remain in the workspace library.
+
+Use `delete-completed-video <workspace-id> <run-id> <confirmed-title>` in the CLI to remove a completed run and its managed delivery directory. Use the exact current display title. A run referenced by a replay stays available. If file cleanup is interrupted, rerun the same command to finish the pending cleanup. Shared source assets stay in the workspace library.

@@ -727,6 +727,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&work)?);
         }
+        [database, command, workspace, run, title] if command == "delete-completed-video" => {
+            let database = Path::new(database);
+            let deleted = WorkspaceStore::open(database)?.delete_completed_generation(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(title)?,
+            )?;
+            println!("{deleted}");
+        }
         [database, command, workspace, run] if command == "completed-video" => {
             let video = WorkspaceStore::open(Path::new(database))?
                 .completed_video(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
@@ -864,7 +874,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
-                "completed-video <workspace-id> <run-id> | ",
+                "delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",

@@ -12,6 +12,7 @@ mod brand_assets;
 mod clip_render;
 mod completed_video;
 mod completed_video_feedback;
+mod delivery_cleanup;
 mod delivery_export;
 mod delivery_verification;
 mod format_deliveries;
@@ -145,6 +146,7 @@ impl WorkspaceStore {
             include_str!("../migrations/030-plugin-grants.sql"),
             include_str!("../migrations/031-generation-notifications.sql"),
             include_str!("../migrations/032-generation-notification-reads.sql"),
+            include_str!("../migrations/033-delivery-cleanup.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
