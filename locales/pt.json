@@ -284,6 +284,9 @@
     "subtitleText": "Texto das legendas"
   },
   "productionPlan": {
+    "importSubtitles": "Importar SRT",
+    "subtitlesImported": "Legendas importadas.",
+    "subtitleImportError": "Não foi possível importar as legendas. Escolhe um SRT válido em UTF-8 com tempos dentro da duração do vídeo.",
     "renderWholePreview": "Gerar pré-visualização com clipes completos",
     "renderFinalVideo": "Gerar vídeo final",
     "verifyFiles": "Verificar ficheiros de entrega",

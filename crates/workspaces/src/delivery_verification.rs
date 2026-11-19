@@ -190,9 +190,25 @@ fn probe(
 fn verify_output(directory: &Path, format: Format) -> Result<VerifiedOutput, Box<dyn Error>> {
     let video = format!("{}.mp4", format.id);
     let subtitles = format!("{}.srt", format.id);
+    let duration = verified_video_duration(directory, &video, &format)?;
+    let subtitle_cues = verify_subtitle_cues(directory, &subtitles, duration)?;
+    Ok(VerifiedOutput {
+        format_id: format.id,
+        video,
+        subtitles,
+        duration_seconds: duration,
+        subtitle_cues,
+    })
+}
+
+fn verified_video_duration(
+    directory: &Path,
+    video: &str,
+    format: &Format,
+) -> Result<f64, Box<dyn Error>> {
     let media: VideoProbe = serde_json::from_slice(&probe(
         directory,
-        &video,
+        video,
         "mov",
         "stream=width,height:format=duration",
         &["-select_streams", "v:0"],
@@ -209,9 +225,17 @@ fn verify_output(directory: &Path, format: Format) -> Result<VerifiedOutput, Box
             io::Error::other(format!("Unexpected duration or dimensions in {video}")).into(),
         );
     }
+    Ok(duration)
+}
+
+fn verify_subtitle_cues(
+    directory: &Path,
+    subtitles: &str,
+    duration: f64,
+) -> Result<usize, Box<dyn Error>> {
     let captions: SubtitleProbe = serde_json::from_slice(&probe(
         directory,
-        &subtitles,
+        subtitles,
         "srt",
         "packet=pts_time,duration_time",
         &["-show_packets"],
@@ -231,13 +255,7 @@ fn verify_output(directory: &Path, format: Format) -> Result<VerifiedOutput, Box
             return Err(io::Error::other(format!("Invalid subtitle timing in {subtitles}")).into());
         }
     }
-    Ok(VerifiedOutput {
-        format_id: format.id,
-        video,
-        subtitles,
-        duration_seconds: duration,
-        subtitle_cues: captions.packets.len(),
-    })
+    Ok(captions.packets.len())
 }
 
 impl WorkspaceStore {
@@ -276,4 +294,71 @@ pub(crate) fn managed_delivery_file(
         return Err(io::Error::other("Invalid managed delivery file"));
     }
     Ok(path)
+}
+
+impl WorkspaceStore {
+    pub fn import_delivery_subtitles(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+        source: &Path,
+    ) -> Result<usize, Box<dyn Error>> {
+        use std::{
+            fs::File,
+            io::{Read, Write},
+        };
+
+        const MAX_SUBTITLE_BYTES: u64 = 2 * 1024 * 1024;
+        let snapshot = self.subtitle_import_snapshot(workspace_id, run_id)?;
+        let format = serde_json::from_str::<Snapshot>(&snapshot)?
+            .formats
+            .into_iter()
+            .map(|entry| entry.format)
+            .find(|format| format.id == format_id)
+            .ok_or_else(|| io::Error::other("Format is not in the run snapshot"))?;
+        let video = format!("{format_id}.mp4");
+        let video_path = managed_delivery_file(database, workspace_id, run_id, &video)?;
+        let directory = video_path
+            .parent()
+            .ok_or_else(|| io::Error::other("Missing delivery directory"))?;
+        let duration = verified_video_duration(directory, &video, &format)?;
+
+        if !source.metadata()?.is_file() {
+            return Err(io::Error::other("Choose an SRT file").into());
+        }
+        let mut subtitles = String::new();
+        File::open(source)?
+            .take(MAX_SUBTITLE_BYTES + 1)
+            .read_to_string(&mut subtitles)?;
+        if subtitles.is_empty() || subtitles.len() as u64 > MAX_SUBTITLE_BYTES {
+            return Err(io::Error::other("Invalid subtitle file size").into());
+        }
+
+        let mut incoming = tempfile::NamedTempFile::new_in(directory)?;
+        incoming.write_all(subtitles.as_bytes())?;
+        let name = incoming
+            .path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| io::Error::other("Unable to stage the subtitles"))?;
+        let cues = verify_subtitle_cues(directory, name, duration)?;
+        incoming.as_file().sync_all()?;
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        self.subtitle_import_snapshot(workspace_id, run_id)?;
+        incoming.persist(directory.join(format!("{format_id}.srt")))?;
+        tx.commit()?;
+        Ok(cues)
+    }
+
+    fn subtitle_import_snapshot(&self, workspace_id: i64, run_id: i64) -> rusqlite::Result<String> {
+        self.0.query_row(
+            "SELECT snapshot_json FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2 AND state IN ('queued', 'failed')
+               AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'verify_delivery'",
+            params![workspace_id, run_id],
+            |row| row.get(0),
+        )
+    }
 }

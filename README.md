@@ -167,3 +167,5 @@ Use **Preview delivery** beside a verified output to play its MP4 and inspect th
 In a guided run's production plan, open **Watch preview** to play a rendered MP4 before submitting the stage decision. Each replacement preview appears with its own attempt number.
 
 The desktop production plan can render a whole-clip preview for recorded-source runs, render the accepted edit at final resolution, and verify delivery after the SRT files are present. Each action claims only the stage shown in the plan.
+
+At delivery verification, use **Import SRT** beside an output format or run `import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt>`. The importer checks UTF-8 text and cue timing against the rendered MP4 before replacing the delivery subtitle file. The CLI prints the number of accepted cues.

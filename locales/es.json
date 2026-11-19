@@ -284,6 +284,9 @@
     "subtitleText": "Texto de los subtítulos"
   },
   "productionPlan": {
+    "importSubtitles": "Importar SRT",
+    "subtitlesImported": "Subtítulos importados.",
+    "subtitleImportError": "No se pudieron importar los subtítulos. Elige un SRT válido en UTF-8 con tiempos dentro de la duración del vídeo.",
     "renderWholePreview": "Generar vista previa con clips completos",
     "renderFinalVideo": "Generar vídeo final",
     "verifyFiles": "Verificar archivos de entrega",

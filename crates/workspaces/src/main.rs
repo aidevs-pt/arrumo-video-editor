@@ -427,6 +427,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run, format, source]
+            if command == "import-delivery-subtitles" =>
+        {
+            let database = Path::new(database);
+            let cues = WorkspaceStore::open(database)?.import_delivery_subtitles(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(format)?.parse()?,
+                Path::new(source),
+            )?;
+            println!("{cues}");
+        }
         [database, command, workspace, run, attempt] if command == "verify-delivery" => {
             let path = Path::new(database);
             let run = WorkspaceStore::open(path)?.verify_generation_delivery(
@@ -501,6 +514,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "completed-video <workspace-id> <run-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
+                "import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
                 "export-delivery <workspace-id> <run-id> <destination-zip> | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"

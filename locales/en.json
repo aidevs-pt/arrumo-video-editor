@@ -284,6 +284,9 @@
     "subtitleText": "Subtitle text"
   },
   "productionPlan": {
+    "importSubtitles": "Import SRT",
+    "subtitlesImported": "Subtitles imported.",
+    "subtitleImportError": "Could not import subtitles. Choose a valid UTF-8 SRT with timings within the rendered video.",
     "renderWholePreview": "Render whole-clip preview",
     "renderFinalVideo": "Render final video",
     "verifyFiles": "Verify delivery files",

@@ -573,7 +573,8 @@ fn main() {
             completed_video::add_completed_video_feedback,
             completed_video::preview_completed_output,
             guided_preview::open_guided_preview,
-            media_worker::process_desktop_media_stage
+            media_worker::process_desktop_media_stage,
+            media_worker::import_delivery_subtitles
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");
