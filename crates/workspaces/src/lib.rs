@@ -27,6 +27,7 @@ mod plugin_registry;
 mod plugin_runtime;
 mod plugin_schema;
 mod plugin_settings;
+mod plugin_surfaces;
 mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
@@ -62,8 +63,11 @@ pub use plugin_registry::{
     read_plugin_registry, validate_registry_url,
 };
 pub use plugin_runtime::MAX_PLUGIN_IO_BYTES;
-pub use plugin_schema::{PluginCode, PluginSetting, PluginSettingKind, PluginSettingScope};
+pub use plugin_schema::{
+    PluginCode, PluginSetting, PluginSettingKind, PluginSettingScope, PluginSurfacePlacement,
+};
 pub use plugin_settings::ResolvedPluginSetting;
+pub use plugin_surfaces::InstalledPluginSurface;
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};

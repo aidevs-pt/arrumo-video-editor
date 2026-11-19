@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
+import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
@@ -80,6 +81,7 @@ export function WorkspaceContext({ workspace }: {
         </WorkspaceForm>
       )}
       <WorkspaceFeedback workspaceId={workspace.id} />
+      <PluginSurfaces placement="workspace" />
     </WorkspaceShell>
   );
 }

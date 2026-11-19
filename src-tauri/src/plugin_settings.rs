@@ -256,3 +256,65 @@ pub fn list_provider_preferences(
         .list_provider_preferences(workspace_id)
         .map_err(|_| "provider_preferences_failed")
 }
+
+#[tauri::command]
+pub fn list_plugin_surfaces(
+    placement: arrumo_workspaces::PluginSurfacePlacement,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::InstalledPluginSurface>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .plugin_surfaces(placement)
+        .map_err(|_| "plugin_surface_list_failed")
+}
+
+pub fn serve_plugin_surface(
+    context: tauri::UriSchemeContext<'_, tauri::Wry>,
+    request: tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{Method, Response, StatusCode};
+
+    const POLICY: &str = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'; frame-src 'none'";
+    let document = (|| {
+        if request.method() != Method::GET
+            || request.uri().query().is_some()
+            || context.webview_label() != "main"
+        {
+            return None;
+        }
+        let mut parts = request.uri().path().strip_prefix('/')?.split('.');
+        let (plugin_id, surface_id, sha256) = (parts.next()?, parts.next()?, parts.next()?);
+        if parts.next().is_some() || sha256.len() != 64 {
+            return None;
+        }
+        let store = context.app_handle().try_state::<Store>()?;
+        store
+            .lock()
+            .ok()?
+            .plugin_surface_document(plugin_id, surface_id, sha256)
+            .ok()
+    })();
+    let (status, content_type, body) = match document {
+        Some(document) => (
+            StatusCode::OK,
+            "text/html; charset=utf-8",
+            document.into_bytes(),
+        ),
+        None => (
+            StatusCode::NOT_FOUND,
+            "text/plain; charset=utf-8",
+            Vec::new(),
+        ),
+    };
+    Response::builder()
+        .status(status)
+        .header("Content-Type", content_type)
+        .header("Content-Security-Policy", POLICY)
+        .header("Cache-Control", "no-store")
+        .header("Referrer-Policy", "no-referrer")
+        .header("X-Content-Type-Options", "nosniff")
+        .header("X-DNS-Prefetch-Control", "off")
+        .body(body)
+        .expect("valid fixed plugin response headers")
+}

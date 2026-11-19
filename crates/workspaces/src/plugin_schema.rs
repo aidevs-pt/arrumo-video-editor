@@ -63,7 +63,7 @@ pub struct PluginSurface {
     pub placement: PluginSurfacePlacement,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PluginSurfacePlacement {
     Settings,

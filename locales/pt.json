@@ -1,4 +1,9 @@
 {
+  "pluginSurfaces": {
+    "title": "Painéis de plugins",
+    "listError": "Não foi possível carregar os painéis dos plugins.",
+    "loading": "A abrir o painel do plugin…"
+  },
   "runProviders": {
     "title": "Fornecedores para esta execução",
     "loading": "A carregar fornecedores…",

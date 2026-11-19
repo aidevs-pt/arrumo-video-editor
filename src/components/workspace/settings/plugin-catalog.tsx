@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginRegistryBrowser } from "./plugin-registry-browser";
 import { PluginPreferences, type PluginSettingsManifest } from "./plugin-preferences";
@@ -148,6 +149,8 @@ export function PluginCatalog() {
           {plugins && <PluginRegistryBrowser installedIds={plugins.map(({ manifest }) => manifest.id)} onInstalled={load} />}
         </CardContent>
       </Card>
+      {plugins && <PluginSurfaces placement="settings"
+        revision={plugins.map((plugin) => plugin.package?.sha256 ?? "").join(":")} />}
     </>
   );
 }

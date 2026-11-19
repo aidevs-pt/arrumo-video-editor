@@ -1,4 +1,9 @@
 {
+  "pluginSurfaces": {
+    "title": "Paneles de complementos",
+    "listError": "No se pudieron cargar los paneles de complementos.",
+    "loading": "Abriendo el panel del complemento…"
+  },
   "runProviders": {
     "title": "Proveedores para esta ejecución",
     "loading": "Cargando proveedores…",

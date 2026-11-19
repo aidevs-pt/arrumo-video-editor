@@ -589,6 +589,7 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .register_uri_scheme_protocol("arrumo-panel", plugin_settings::serve_plugin_surface)
         .manage(delivery_stream::DeliveryStream::default())
         .setup(|app| {
             #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
@@ -612,6 +613,7 @@ fn main() {
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,
             plugin_settings::list_provider_preferences,
+            plugin_settings::list_plugin_surfaces,
             plugin_settings::read_plugin_settings,
             plugin_settings::write_plugin_setting,
             plugin_settings::read_plugin_credential_status,

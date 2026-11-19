@@ -1,5 +1,6 @@
 "use client";
 
+import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
 import { Archive, CheckCircle2, ClipboardList, Film, FileText, MessageSquare } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
@@ -238,6 +239,7 @@ function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; vi
             results={video.production.results} stages={video.plan.steps} />
         </TabsContent>
       </Tabs>
+      <PluginSurfaces placement="completed_video" />
     </>
   );
 }

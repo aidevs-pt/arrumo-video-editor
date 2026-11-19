@@ -1,4 +1,9 @@
 {
+  "pluginSurfaces": {
+    "title": "Plugin panels",
+    "listError": "Could not load plugin panels.",
+    "loading": "Opening plugin panel…"
+  },
   "runProviders": {
     "title": "Providers for this run",
     "loading": "Loading providers…",
