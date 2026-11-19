@@ -294,3 +294,5 @@ Use `get_preview_settings` to inspect preview resolution. Set `maxEdge` with `se
 Use `list_plugin_catalog` to discover plugin IDs and declared settings. Use `get_plugin_credential_status` for a declared credential and optional workspace ID. The response reports configuration flags and the effective source. Set credentials through desktop Settings or the CLI's redirected-stdin command.
 
 Use `clear_plugin_credential` with a plugin and setting ID to remove an app credential. Include `workspaceId` to clear only that workspace's credential and restore inheritance.
+
+Use `list_plugin_context_requests` with a workspace ID to inspect packages that request workspace context access. After reviewing a package, call `apply_reviewed_plugin_context_grant` with the workspace ID, plugin ID, the listed package SHA-256, and the desired `allowed` value. The host rejects a digest that no longer matches the installed package.

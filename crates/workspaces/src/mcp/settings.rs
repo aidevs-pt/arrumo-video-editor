@@ -33,7 +33,23 @@ struct PreviewInput {
     max_edge: Value,
 }
 
-pub(super) fn definitions() -> [Value; 8] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkspaceInput {
+    workspace_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ContextGrantInput {
+    workspace_id: i64,
+    plugin_id: String,
+    package_sha256: String,
+    allowed: bool,
+}
+
+pub(super) fn definitions() -> [Value; 10] {
+    let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
     [
@@ -68,6 +84,17 @@ pub(super) fn definitions() -> [Value; 8] {
             "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
                 "required": ["pluginId", "settingId"], "additionalProperties": false},
             "annotations": {"idempotentHint": true, "destructiveHint": true}}),
+        json!({"name": "list_plugin_context_requests", "description": "List installed packages requesting workspace context and their current grant status.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": workspace_id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "apply_reviewed_plugin_context_grant", "description": "Grant or revoke workspace context access after reviewing the specific plugin package. Use the digest from list_plugin_context_requests.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": workspace_id, "pluginId": id,
+                "packageSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "allowed": {"type": "boolean"}
+            }, "required": ["workspaceId", "pluginId", "packageSha256", "allowed"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
     ]
 }
 
@@ -124,6 +151,18 @@ pub(super) fn call(
                 .set_plugin_credential(&args.plugin_id, &args.setting_id, args.workspace_id, None)
                 .map(|()| json!({"cleared": true}))
                 .map_err(|_| "Could not clear plugin credential. Check the setting, scope and credential store")
+        }),
+        "list_plugin_context_requests" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .plugin_context_requests(args.workspace_id)
+                .map(|requests| json!({"requests": requests}))
+                .map_err(|_| "Could not list workspace context requests")
+        }),
+        "apply_reviewed_plugin_context_grant" => parse(arguments).and_then(|args: ContextGrantInput| {
+            store
+                .apply_reviewed_plugin_context_grant(&args.plugin_id, args.workspace_id, &args.package_sha256, args.allowed)
+                .map(|()| json!({"saved": true}))
+                .map_err(|_| "Could not change context grant. Check workspace, package digest and requested permission")
         }),
         _ => return None,
     })
