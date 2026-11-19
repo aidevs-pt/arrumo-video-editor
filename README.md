@@ -106,3 +106,11 @@ cargo run --locked -- ./workspaces.sqlite attach-brand-asset 1 1 identity
 cargo run --locked -- ./workspaces.sqlite brand-assets 1
 cargo run --locked -- ./workspaces.sqlite detach-brand-asset 1 1 identity
 ```
+
+Create video drafts with an ordered list of workspace video asset IDs, or start from scratch with an intent brief. An optional `profile_id` must refer to a profile in the same workspace.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite create-draft 1 '{"title":"Review","source_ids":[2,1],"profile_id":1}'
+cargo run --locked -- ./workspaces.sqlite create-draft 1 '{"title":"Explainer","intent":"Show how a cube works"}'
+cargo run --locked -- ./workspaces.sqlite drafts 1
+```

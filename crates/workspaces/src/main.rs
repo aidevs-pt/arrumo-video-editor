@@ -227,6 +227,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 );
             }
         }
+        [database, command, workspace] if command == "drafts" => {
+            let drafts = WorkspaceStore::open(Path::new(database))?
+                .list_video_drafts(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&drafts)?);
+        }
+        [database, command, workspace, settings] if command == "create-draft" => {
+            let draft = WorkspaceStore::open(Path::new(database))?.create_video_draft(
+                utf8(workspace)?.parse()?,
+                serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&draft)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -251,7 +263,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "brand-colors <workspace-id> | set-brand-colors <workspace-id> <colors-json> | ",
                 "brand-assets <workspace-id> | ",
                 "attach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
-                "detach-brand-asset <workspace-id> <asset-id> <identity|style>"
+                "detach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
+                "drafts <workspace-id> | create-draft <workspace-id> <settings-json>"
             )
             .into());
         }

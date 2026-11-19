@@ -9,6 +9,7 @@ mod format_deliveries;
 mod output_formats;
 mod profile_deliveries;
 mod profile_formats;
+mod video_drafts;
 mod workspace_feedback;
 
 pub use assets::{WorkspaceAsset, asset_path, asset_root};
@@ -19,6 +20,7 @@ pub use format_deliveries::{
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
+pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -57,6 +59,7 @@ impl WorkspaceStore {
             include_str!("009-workspace-feedback.sql"),
             include_str!("010-workspace-brand.sql"),
             include_str!("011-brand-assets.sql"),
+            include_str!("012-video-drafts.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

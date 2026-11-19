@@ -3,9 +3,10 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use arrumo_workspaces::{
-    BrandAsset, BrandAssetRole, DeliveryOverrides, DimensionOverrides, FormatDelivery,
-    OutputFormat, OutputFormatSettings, Profile, ProfileDelivery, ProfileFormat,
-    SupplementalOutputs, Workspace, WorkspaceAsset, WorkspaceFeedback, WorkspaceStore, asset_root,
+    BrandAsset, BrandAssetRole, DeliveryOverrides, DimensionOverrides, DraftSettings,
+    FormatDelivery, OutputFormat, OutputFormatSettings, Profile, ProfileDelivery, ProfileFormat,
+    SupplementalOutputs, VideoDraft, Workspace, WorkspaceAsset, WorkspaceFeedback, WorkspaceStore,
+    asset_root,
 };
 use tauri::{AppHandle, Manager, State};
 
@@ -374,6 +375,31 @@ async fn detach_brand_asset(
         .map_err(|_| "brand_asset_detach_failed")
 }
 
+#[tauri::command]
+async fn list_video_drafts(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<VideoDraft>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_video_drafts(workspace_id)
+        .map_err(|_| "drafts_load_failed")
+}
+
+#[tauri::command]
+async fn create_video_draft(
+    workspace_id: i64,
+    settings: DraftSettings,
+    store: State<'_, Store>,
+) -> Result<VideoDraft, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .create_video_draft(workspace_id, settings)
+        .map_err(|_| "draft_create_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -412,7 +438,9 @@ fn main() {
             set_brand_colors,
             list_brand_assets,
             attach_brand_asset,
-            detach_brand_asset
+            detach_brand_asset,
+            list_video_drafts,
+            create_video_draft
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");
