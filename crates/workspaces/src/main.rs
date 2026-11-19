@@ -1,6 +1,6 @@
 use std::{env, error::Error, ffi::OsStr, io, path::Path};
 
-use arrumo_workspaces::{BrandAssetRole, WorkspaceStore, asset_root};
+use arrumo_workspaces::{BrandAssetRole, RunControl, WorkspaceStore, asset_root};
 
 fn utf8(value: &OsStr) -> io::Result<&str> {
     value
@@ -261,6 +261,41 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&run)?);
         }
+        [database, command, workspace] if command == "claim-generation" => {
+            let claim = WorkspaceStore::open(Path::new(database))?
+                .claim_generation(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&claim)?);
+        }
+        [database, command, workspace, run, attempt, checkpoint]
+            if command == "checkpoint-generation" =>
+        {
+            let expires = WorkspaceStore::open(Path::new(database))?.checkpoint_generation(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(attempt)?.parse()?,
+                &serde_json::from_str(utf8(checkpoint)?)?,
+            )?;
+            println!("{expires}");
+        }
+        [database, command, workspace, run, action] if command == "control-generation" => {
+            let action = match utf8(action)? {
+                "pause" => RunControl::Pause,
+                "resume" => RunControl::Resume,
+                "cancel" => RunControl::Cancel,
+                _ => return Err("Action must be pause, resume, or cancel".into()),
+            };
+            let run = WorkspaceStore::open(Path::new(database))?.control_generation(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                action,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
+        }
+        [database, command, workspace, run] if command == "generation-activity" => {
+            let events = WorkspaceStore::open(Path::new(database))?
+                .generation_activity(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            println!("{}", serde_json::to_string(&events)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -289,7 +324,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "drafts <workspace-id> | create-draft <workspace-id> <settings-json> | ",
                 "update-draft <workspace-id> <draft-id> <settings-json> | ",
                 "generation-runs <workspace-id> | ",
-                "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json>"
+                "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
+                "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
+                "control-generation <workspace-id> <run-id> <pause|resume|cancel> | ",
+                "generation-activity <workspace-id> <run-id>"
             )
             .into());
         }

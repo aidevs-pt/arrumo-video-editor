@@ -119,7 +119,7 @@ impl WorkspaceStore {
     }
 }
 
-fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
+pub(crate) fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
     Ok(GenerationRun {
         id: row.get(0)?,
         draft_id: row.get(1)?,

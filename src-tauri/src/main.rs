@@ -4,9 +4,9 @@ use std::{path::PathBuf, sync::Mutex};
 
 use arrumo_workspaces::{
     BrandAsset, BrandAssetRole, DeliveryOverrides, DimensionOverrides, DraftSettings,
-    FormatDelivery, GenerationRun, OutputFormat, OutputFormatSettings, Profile, ProfileDelivery,
-    ProfileFormat, RunOptions, SupplementalOutputs, VideoDraft, Workspace, WorkspaceAsset,
-    WorkspaceFeedback, WorkspaceStore, asset_root,
+    FormatDelivery, GenerationActivity, GenerationRun, OutputFormat, OutputFormatSettings, Profile,
+    ProfileDelivery, ProfileFormat, RunControl, RunOptions, SupplementalOutputs, VideoDraft,
+    Workspace, WorkspaceAsset, WorkspaceFeedback, WorkspaceStore, asset_root,
 };
 use tauri::{AppHandle, Manager, State};
 
@@ -441,6 +441,33 @@ async fn list_generation_runs(
         .map_err(|_| "generation_list_failed")
 }
 
+#[tauri::command]
+async fn control_generation(
+    workspace_id: i64,
+    run_id: i64,
+    action: RunControl,
+    store: State<'_, Store>,
+) -> Result<GenerationRun, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .control_generation(workspace_id, run_id, action)
+        .map_err(|_| "generation_control_failed")
+}
+
+#[tauri::command]
+async fn generation_activity(
+    workspace_id: i64,
+    run_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<GenerationActivity>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .generation_activity(workspace_id, run_id)
+        .map_err(|_| "generation_activity_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -484,7 +511,9 @@ fn main() {
             create_video_draft,
             update_video_draft,
             enqueue_video_draft,
-            list_generation_runs
+            list_generation_runs,
+            control_generation,
+            generation_activity
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

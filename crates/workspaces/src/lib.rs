@@ -7,6 +7,7 @@ mod assets;
 mod brand_assets;
 mod format_deliveries;
 mod generation_queue;
+mod generation_worker;
 mod output_formats;
 mod profile_deliveries;
 mod profile_formats;
@@ -19,6 +20,7 @@ pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
 pub use generation_queue::{GenerationRun, RunOptions};
+pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
@@ -63,6 +65,7 @@ impl WorkspaceStore {
             include_str!("011-brand-assets.sql"),
             include_str!("012-video-drafts.sql"),
             include_str!("013-generation-queue.sql"),
+            include_str!("014-generation-activity.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

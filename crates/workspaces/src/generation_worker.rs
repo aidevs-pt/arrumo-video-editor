@@ -1,0 +1,229 @@
+use rusqlite::{OptionalExtension, params};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::format_deliveries::read_settings;
+use crate::generation_queue::read_run;
+use crate::{GenerationRun, WorkspaceStore};
+
+const LEASE_SECONDS: i64 = 60;
+
+#[derive(Debug, Serialize)]
+pub struct GenerationClaim {
+    pub run: GenerationRun,
+    pub attempt: i64,
+    pub lease_until: i64,
+    pub checkpoint: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GenerationActivity {
+    pub attempt: i64,
+    pub state: String,
+    pub kind: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunControl {
+    Pause,
+    Resume,
+    Cancel,
+}
+
+impl WorkspaceStore {
+    pub fn claim_generation(&self, workspace_id: i64) -> rusqlite::Result<Option<GenerationClaim>> {
+        self.0
+            .query_row(
+                "UPDATE generation_runs
+             SET state = 'running', attempt = attempt + 1, lease_until = unixepoch() + ?2
+             WHERE workspace_id = ?1 AND id = (
+                 SELECT id FROM generation_runs WHERE workspace_id = ?1
+                 AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
+                 ORDER BY id LIMIT 1
+             )
+             RETURNING id, draft_id, state, snapshot_json, attempt, lease_until, checkpoint_json",
+                params![workspace_id, LEASE_SECONDS],
+                |row| {
+                    Ok(GenerationClaim {
+                        run: read_run(row)?,
+                        attempt: row.get(4)?,
+                        lease_until: row.get(5)?,
+                        checkpoint: read_settings(row.get(6)?, 6)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn checkpoint_generation(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        checkpoint: &Value,
+    ) -> rusqlite::Result<i64> {
+        self.0.query_row(
+            "UPDATE generation_runs
+             SET checkpoint_json = ?4, lease_until = unixepoch() + ?5
+             WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
+               AND state = 'running' AND lease_until > unixepoch()
+             RETURNING lease_until",
+            params![
+                workspace_id,
+                run_id,
+                attempt,
+                checkpoint.to_string(),
+                LEASE_SECONDS
+            ],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn control_generation(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        action: RunControl,
+    ) -> rusqlite::Result<GenerationRun> {
+        let (target, allowed) = match action {
+            RunControl::Pause => ("paused", ["queued", "running", "paused"]),
+            RunControl::Resume => ("queued", ["paused", "queued", "queued"]),
+            RunControl::Cancel => ("cancelled", ["queued", "running", "paused"]),
+        };
+        self.0.query_row(
+            "UPDATE generation_runs SET state = ?3, lease_until = NULL
+             WHERE workspace_id = ?1 AND id = ?2 AND state IN (?4, ?5, ?6)
+             RETURNING id, draft_id, state, snapshot_json",
+            params![
+                workspace_id,
+                run_id,
+                target,
+                allowed[0],
+                allowed[1],
+                allowed[2]
+            ],
+            read_run,
+        )
+    }
+
+    pub fn generation_activity(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> rusqlite::Result<Vec<GenerationActivity>> {
+        self.0
+            .prepare(
+                "SELECT event.attempt, event.state, event.kind, event.created_at
+             FROM generation_activity AS event JOIN generation_runs AS run ON run.id = event.run_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2 ORDER BY event.id",
+            )?
+            .query_map(params![workspace_id, run_id], |row| {
+                Ok(GenerationActivity {
+                    attempt: row.get(0)?,
+                    state: row.get(1)?,
+                    kind: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
+            })?
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{DraftSettings, RunOptions};
+    use serde_json::json;
+
+    #[test]
+    fn expired_and_paused_attempts_cannot_overwrite_checkpoints() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "First".into(),
+                    intent: "Demo".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "key",
+                &RunOptions {
+                    autopilot: false,
+                    platform: None,
+                },
+            )
+            .unwrap();
+        assert!(store.claim_generation(other).unwrap().is_none());
+        let first = store.claim_generation(workspace).unwrap().unwrap();
+        assert_eq!(first.attempt, 1);
+        assert!(store.claim_generation(workspace).unwrap().is_none());
+        store
+            .checkpoint_generation(workspace, run.id, first.attempt, &json!({"step":1}))
+            .unwrap();
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET lease_until = 0 WHERE id = ?1",
+                [run.id],
+            )
+            .unwrap();
+        let second = store.claim_generation(workspace).unwrap().unwrap();
+        assert_eq!(second.attempt, 2);
+        assert_eq!(second.checkpoint, Some(json!({"step":1})));
+        assert!(
+            store
+                .checkpoint_generation(workspace, run.id, first.attempt, &json!({}))
+                .is_err()
+        );
+        store
+            .control_generation(workspace, run.id, RunControl::Pause)
+            .unwrap();
+        assert!(
+            store
+                .checkpoint_generation(workspace, run.id, second.attempt, &json!({}))
+                .is_err()
+        );
+        assert!(store.claim_generation(workspace).unwrap().is_none());
+        store
+            .control_generation(workspace, run.id, RunControl::Resume)
+            .unwrap();
+        assert_eq!(
+            store.claim_generation(workspace).unwrap().unwrap().attempt,
+            3
+        );
+        store
+            .control_generation(workspace, run.id, RunControl::Cancel)
+            .unwrap();
+        assert!(store.claim_generation(workspace).unwrap().is_none());
+        let states: Vec<_> = store
+            .generation_activity(workspace, run.id)
+            .unwrap()
+            .into_iter()
+            .map(|event| event.state)
+            .collect();
+        assert_eq!(
+            states,
+            [
+                "queued",
+                "running",
+                "running",
+                "paused",
+                "queued",
+                "running",
+                "cancelled"
+            ]
+        );
+        assert!(store.generation_activity(other, run.id).unwrap().is_empty());
+    }
+}
