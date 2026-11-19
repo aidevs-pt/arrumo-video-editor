@@ -38,11 +38,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&profile)?);
         }
+        [
+            database,
+            command,
+            workspace_id,
+            profile_id,
+            name,
+            guidance,
+            options @ ..,
+        ] if command == "update-profile" && options.len() <= 1 => {
+            let color = options.first().map(|value| utf8(value)).transpose()?;
+            let profile = WorkspaceStore::open(Path::new(database))?.update_profile(
+                utf8(workspace_id)?.parse()?,
+                utf8(profile_id)?.parse()?,
+                utf8(name)?,
+                utf8(guidance)?,
+                color,
+            )?;
+            println!("{}", serde_json::to_string(&profile)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
                 "list | create <name> | profiles <workspace-id> | ",
-                "create-profile <workspace-id> <name> [guidance] [color]"
+                "create-profile <workspace-id> <name> [guidance] [color] | ",
+                "update-profile <workspace-id> <profile-id> <name> <guidance> [color]"
             )
             .into());
         }

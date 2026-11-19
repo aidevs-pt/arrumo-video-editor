@@ -211,3 +211,12 @@ body { font-family: system-ui, sans-serif; margin: 0; }
   color: var(--muted-foreground);
   white-space: pre-wrap;
 }
+
+.profile-row-heading, .profile-edit-actions {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.profile-row-heading { justify-content: space-between; }
+.profile-row-heading h3 { min-width: 0; }

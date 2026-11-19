@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { profileCopy } from "./profile-copy";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
+type Draft = { name: string; guidance: string; color: string };
+const emptyDraft: Draft = { name: "", guidance: "", color: "" };
 
 export function WorkspaceProfiles({
   workspace,
@@ -26,9 +28,13 @@ export function WorkspaceProfiles({
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [name, setName] = useState("");
-  const [guidance, setGuidance] = useState("");
-  const [color, setColor] = useState("");
+  const nameInput = useRef<HTMLInputElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  const [editing, setEditing] = useState<{ id: number; draft: Draft } | null>(null);
+  const editId = editing?.id;
+  const draft = editing?.draft ?? newDraft;
+  const { name, guidance, color } = draft;
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const copy = profileCopy[locale];
@@ -37,6 +43,14 @@ export function WorkspaceProfiles({
   useEffect(() => {
     heading.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (editId !== undefined) {
+      nameInput.current?.focus();
+    } else {
+      editButton.current?.focus();
+    }
+  }, [editId]);
 
   useEffect(() => {
     let active = true;
@@ -53,22 +67,35 @@ export function WorkspaceProfiles({
     return () => { active = false; };
   }, [workspace.id, attempt]);
 
-  async function createProfile(event: FormEvent<HTMLFormElement>) {
+  function setField(field: keyof Draft, value: string) {
+    const next = { ...draft, [field]: value };
+    if (editing) {
+      setEditing({ ...editing, draft: next });
+    } else {
+      setNewDraft(next);
+    }
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (disabled || !name.trim()) return;
     setSaving(true);
     setSaveError(false);
     try {
-      const profile = await invoke<Profile>("create_profile", {
+      const profile = await invoke<Profile>(editing ? "update_profile" : "create_profile", {
         workspaceId: workspace.id,
+        ...(editing && { profileId: editing.id }),
         name,
         guidance,
         color: color || null,
       });
-      setProfiles((current) => [...current, profile]);
-      setName("");
-      setGuidance("");
-      setColor("");
+      if (editing) {
+        setProfiles((current) => current.map((row) => row.id === profile.id ? profile : row));
+        setEditing(null);
+      } else {
+        setProfiles((current) => [...current, profile]);
+        setNewDraft(emptyDraft);
+      }
     } catch {
       setSaveError(true);
     } finally {
@@ -102,10 +129,29 @@ export function WorkspaceProfiles({
             <ul className="workspace-rows" aria-live="polite">
               {profiles.map((profile) => (
                 <li key={profile.id}>
-                  <h3 className="profile-name">
-                    {profile.color && <span className="profile-color" style={{ backgroundColor: profile.color }} aria-hidden="true" />}
-                    {profile.name}
-                  </h3>
+                  <div className="profile-row-heading">
+                    <h3 className="profile-name">
+                      {profile.color && <span className="profile-color" style={{ backgroundColor: profile.color }} aria-hidden="true" />}
+                      {profile.name}
+                    </h3>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-label={`${copy.edit} ${profile.name}`}
+                      disabled={saving || editing !== null}
+                      onClick={(event) => {
+                        editButton.current = event.currentTarget;
+                        setSaveError(false);
+                        setEditing({
+                          id: profile.id,
+                          draft: { name: profile.name, guidance: profile.guidance, color: profile.color ?? "" },
+                        });
+                      }}
+                    >
+                      {copy.edit}
+                    </Button>
+                  </div>
                   {profile.guidance && <p className="profile-guidance">{profile.guidance}</p>}
                 </li>
               ))}
@@ -119,27 +165,37 @@ export function WorkspaceProfiles({
             </Empty>
           ))}
         </section>
-        <form className="workspace-form" onSubmit={createProfile} aria-labelledby="new-profile-title">
-          <h2 id="new-profile-title">{copy.form}</h2>
+        <form className="workspace-form" onSubmit={saveProfile} aria-labelledby="profile-form-title">
+          <h2 id="profile-form-title">{editing ? copy.editTitle : copy.form}</h2>
           <FieldGroup>
             <Field data-disabled={disabled}>
               <FieldLabel htmlFor="profile-name">{copy.name}</FieldLabel>
-              <Input id="profile-name" value={name} onChange={(event) => setName(event.target.value)} disabled={disabled} required />
+              <Input ref={nameInput} id="profile-name" value={name} onChange={(event) => setField("name", event.target.value)} disabled={disabled} required />
             </Field>
             <Field data-disabled={disabled}>
               <FieldLabel htmlFor="profile-guidance">{copy.guidance}</FieldLabel>
-              <Textarea id="profile-guidance" value={guidance} onChange={(event) => setGuidance(event.target.value)} disabled={disabled} />
+              <Textarea id="profile-guidance" value={guidance} onChange={(event) => setField("guidance", event.target.value)} disabled={disabled} />
             </Field>
             <Field data-disabled={disabled}>
               <FieldLabel htmlFor="profile-color">{copy.color}</FieldLabel>
-              <Input id="profile-color" value={color} onChange={(event) => setColor(event.target.value)} disabled={disabled}
+              <Input id="profile-color" value={color} onChange={(event) => setField("color", event.target.value)} disabled={disabled}
                 pattern="#[0-9A-Fa-f]{6}" aria-describedby="profile-color-hint" />
               <FieldDescription id="profile-color-hint">{copy.colorHint}</FieldDescription>
             </Field>
-            {saveError && <Alert variant="destructive" role="alert"><AlertDescription>{copy.createError}</AlertDescription></Alert>}
-            <Button type="submit" disabled={disabled || !name.trim()}>
-              {saving ? copy.saving : copy.submit}
-            </Button>
+            {saveError && <Alert variant="destructive" role="alert"><AlertDescription>{editing ? copy.updateError : copy.createError}</AlertDescription></Alert>}
+            {editing ? (
+              <div className="profile-edit-actions">
+                <Button type="submit" disabled={disabled || !name.trim()}>{copy.save}</Button>
+                <Button type="button" variant="outline" disabled={saving} onClick={() => {
+                  setEditing(null);
+                  setSaveError(false);
+                }}>{copy.cancel}</Button>
+              </div>
+            ) : (
+              <Button type="submit" disabled={disabled || !name.trim()}>
+                {saving ? copy.saving : copy.submit}
+              </Button>
+            )}
           </FieldGroup>
         </form>
       </div>

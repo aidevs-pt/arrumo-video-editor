@@ -31,7 +31,13 @@ cargo run --locked -- ./workspaces.sqlite create-profile 1 "Reviews" "## Keep ha
 cargo run --locked -- ./workspaces.sqlite profiles 1
 ```
 
-Guidance and color are optional. Colors use `#RRGGBB`. The commands print JSON. The database persists across runs. Run the backend tests with `cargo test --locked`.
+To update profile ID 1 within workspace ID 1:
+
+```sh
+cargo run --locked -- ./workspaces.sqlite update-profile 1 1 "Tutorials" "## Explain each step" "#532A9D"
+```
+
+Pass an empty guidance string to clear it, or omit color on update to clear the color. On creation, guidance and color are optional. Colors use `#RRGGBB`. The commands print JSON. The database persists across runs. Run the backend tests with `cargo test --locked`.
 
 Copyright © 2026 DEVS AI Unipessoal LDA. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 

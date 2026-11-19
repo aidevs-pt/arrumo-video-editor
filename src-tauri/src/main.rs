@@ -52,6 +52,22 @@ async fn create_profile(
         .map_err(|_| "profile_create_failed")
 }
 
+#[tauri::command]
+async fn update_profile(
+    workspace_id: i64,
+    profile_id: i64,
+    name: String,
+    guidance: String,
+    color: Option<String>,
+    store: State<'_, Store>,
+) -> Result<Profile, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .update_profile(workspace_id, profile_id, &name, &guidance, color.as_deref())
+        .map_err(|_| "profile_update_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -66,7 +82,8 @@ fn main() {
             list_workspaces,
             create_workspace,
             list_profiles,
-            create_profile
+            create_profile,
+            update_profile
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

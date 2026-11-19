@@ -14,6 +14,11 @@ export const profileCopy = {
     color: "Color (optional)",
     colorHint: "Use a hex color such as #532A9D.",
     submit: "Create profile",
+    edit: "Edit",
+    editTitle: "Edit profile",
+    save: "Save changes",
+    cancel: "Cancel",
+    updateError: "Changes couldn’t be saved. Try again.",
     saving: "Creating…",
   },
   es: {
@@ -31,6 +36,11 @@ export const profileCopy = {
     color: "Color (opcional)",
     colorHint: "Usa un color hexadecimal, como #532A9D.",
     submit: "Crear perfil",
+    edit: "Editar",
+    editTitle: "Editar perfil",
+    save: "Guardar cambios",
+    cancel: "Cancelar",
+    updateError: "No se pudieron guardar los cambios. Inténtalo de nuevo.",
     saving: "Creando…",
   },
   pt: {
@@ -48,6 +58,11 @@ export const profileCopy = {
     color: "Cor (opcional)",
     colorHint: "Use uma cor hexadecimal, como #532A9D.",
     submit: "Criar perfil",
+    edit: "Editar",
+    editTitle: "Editar perfil",
+    save: "Guardar alterações",
+    cancel: "Cancelar",
+    updateError: "Não foi possível guardar as alterações. Tente novamente.",
     saving: "A criar…",
   },
 } satisfies Record<"en" | "es" | "pt", Record<keyof {
@@ -65,5 +80,10 @@ export const profileCopy = {
   color: string;
   colorHint: string;
   submit: string;
+  edit: string;
+  editTitle: string;
+  save: string;
+  cancel: string;
+  updateError: string;
   saving: string;
 }, string>>;

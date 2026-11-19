@@ -73,6 +73,23 @@ impl WorkspaceStore {
         )
     }
 
+    pub fn update_profile(
+        &self,
+        workspace_id: i64,
+        profile_id: i64,
+        name: &str,
+        guidance: &str,
+        color: Option<&str>,
+    ) -> rusqlite::Result<Profile> {
+        self.0.query_row(
+            "UPDATE profiles SET name = ?3, guidance = ?4, color = ?5
+             WHERE workspace_id = ?1 AND id = ?2
+             RETURNING id, workspace_id, name, guidance, color",
+            rusqlite::params![workspace_id, profile_id, name.trim(), guidance, color],
+            Self::read_profile,
+        )
+    }
+
     pub fn list_profiles(&self, workspace_id: i64) -> rusqlite::Result<Vec<Profile>> {
         self.0
             .prepare(
@@ -164,5 +181,33 @@ mod tests {
         assert_eq!(reopened.list_profiles(existing.id).unwrap(), vec![profile]);
         drop(reopened);
         std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn updates_only_the_profile_in_the_requested_workspace() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let first = store.create("First").unwrap();
+        let second = store.create("Second").unwrap();
+        let profile = store
+            .create_profile(first.id, "Reviews", "# Notes", Some("#532A9D"))
+            .unwrap();
+        assert!(matches!(
+            store.update_profile(second.id, profile.id, "Wrong", "", None),
+            Err(rusqlite::Error::QueryReturnedNoRows)
+        ));
+        assert!(
+            store
+                .update_profile(first.id, profile.id, " ", "", None)
+                .is_err()
+        );
+        let profile_id = profile.id;
+        assert_eq!(store.list_profiles(first.id).unwrap(), vec![profile]);
+        let updated = store
+            .update_profile(first.id, profile_id, "  Tutorials ", "## New", None)
+            .unwrap();
+        assert_eq!(updated.id, profile_id);
+        assert_eq!(updated.name, "Tutorials");
+        assert_eq!(updated.guidance, "## New");
+        assert_eq!(updated.color, None);
+        assert_eq!(store.list_profiles(first.id).unwrap(), vec![updated]);
     }
 }
