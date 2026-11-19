@@ -1,0 +1,7 @@
+/target
+/node_modules
+/.next
+/out
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
