@@ -77,6 +77,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
             )?;
         }
+        [database, command, capability, scope] if command == "provider-preferences" => {
+            let result = WorkspaceStore::open(Path::new(database))?
+                .provider_preferences(utf8(capability)?, plugin_workspace(scope)?)?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
+        [database, command, capability, scope, order] if command == "set-provider-preferences" => {
+            let order: Vec<String> = serde_json::from_str(utf8(order)?)?;
+            WorkspaceStore::open(Path::new(database))?.set_provider_preferences(
+                utf8(capability)?,
+                plugin_workspace(scope)?,
+                Some(&order),
+            )?;
+        }
+        [database, command, capability, scope] if command == "clear-provider-preferences" => {
+            WorkspaceStore::open(Path::new(database))?.set_provider_preferences(
+                utf8(capability)?,
+                plugin_workspace(scope)?,
+                None,
+            )?;
+        }
         [database, command, id, scope] if command == "plugin-settings" => {
             let workspace_id = plugin_workspace(scope)?;
             let settings = WorkspaceStore::open(Path::new(database))?
@@ -718,6 +738,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "update-plugin-release-from-snapshot <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "plugin-settings <plugin-id> <app|workspace-id> | set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json> | clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id> | ",
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
+                "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",

@@ -29,6 +29,7 @@ mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
 mod profile_formats;
+mod provider_preferences;
 mod video_drafts;
 mod workspace_feedback;
 
@@ -63,6 +64,7 @@ pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
+pub use provider_preferences::{CapabilityProvider, ProviderPreferences};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
 
@@ -119,6 +121,7 @@ impl WorkspaceStore {
             include_str!("../migrations/026-plugin-release-source.sql"),
             include_str!("../migrations/027-plugin-settings.sql"),
             include_str!("../migrations/028-credential-namespace.sql"),
+            include_str!("../migrations/029-provider-preferences.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

@@ -1,0 +1,156 @@
+use std::{collections::HashSet, error::Error, io};
+
+use rusqlite::{OptionalExtension, params};
+use serde::Serialize;
+
+use crate::{WorkspaceStore, plugin_catalog::identifier};
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum PreferenceSource {
+    BundledDefault,
+    App,
+    Workspace,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityProvider {
+    pub id: String,
+    pub name: String,
+    pub bundled: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderPreferences {
+    pub available: Vec<CapabilityProvider>,
+    pub app: Option<Vec<String>>,
+    pub workspace_override: Option<Vec<String>>,
+    pub effective: Vec<String>,
+    source: PreferenceSource,
+}
+
+impl WorkspaceStore {
+    pub fn provider_preferences(
+        &self,
+        capability: &str,
+        workspace_id: Option<i64>,
+    ) -> Result<ProviderPreferences, Box<dyn Error>> {
+        let _transaction = self.0.unchecked_transaction()?;
+        self.check_preference_scope(capability, workspace_id)?;
+        let available = self.capability_providers(capability)?;
+        let resolve_scope = |scope: Option<i64>| -> Result<Option<Vec<String>>, Box<dyn Error>> {
+            let stored: Option<String> = self.0.query_row(
+                "SELECT plugin_ids FROM plugin_provider_preferences WHERE capability = ?1 AND workspace_id IS ?2",
+                params![capability, scope],
+                |row| row.get(0),
+            ).optional()?;
+            let providers = stored
+                .map(|value| serde_json::from_str::<Vec<String>>(&value))
+                .transpose()?;
+            Ok(providers.map(|mut providers| {
+                providers.retain(|id| available.iter().any(|plugin| &plugin.id == id));
+                providers
+            }))
+        };
+        let app = resolve_scope(None)?;
+        let workspace_override = if workspace_id.is_some() {
+            resolve_scope(workspace_id)?
+        } else {
+            None
+        };
+        let (effective, source) = if let Some(order) = &workspace_override {
+            (order.clone(), PreferenceSource::Workspace)
+        } else if let Some(order) = &app {
+            (order.clone(), PreferenceSource::App)
+        } else {
+            let defaults = available
+                .iter()
+                .filter(|plugin| plugin.bundled)
+                .map(|plugin| plugin.id.clone())
+                .collect();
+            (defaults, PreferenceSource::BundledDefault)
+        };
+        Ok(ProviderPreferences {
+            available,
+            app,
+            workspace_override,
+            effective,
+            source,
+        })
+    }
+
+    pub fn set_provider_preferences(
+        &self,
+        capability: &str,
+        workspace_id: Option<i64>,
+        order: Option<&[String]>,
+    ) -> Result<(), Box<dyn Error>> {
+        let transaction = self.0.unchecked_transaction()?;
+        self.check_preference_scope(capability, workspace_id)?;
+        if let Some(order) = order {
+            let mut seen = HashSet::new();
+            let available = self.capability_providers(capability)?;
+            if order
+                .iter()
+                .any(|id| !seen.insert(id) || !available.iter().any(|plugin| &plugin.id == id))
+            {
+                return Err(invalid_preference(
+                    "Provider order contains a duplicate or an unavailable plugin",
+                )
+                .into());
+            }
+            transaction.execute(
+                "INSERT INTO plugin_provider_preferences (capability, workspace_id, plugin_ids)
+                 VALUES (?1, ?2, ?3) ON CONFLICT DO UPDATE SET plugin_ids = excluded.plugin_ids",
+                params![capability, workspace_id, serde_json::to_string(order)?],
+            )?;
+        } else {
+            transaction.execute(
+                "DELETE FROM plugin_provider_preferences WHERE capability = ?1 AND workspace_id IS ?2",
+                params![capability, workspace_id],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn capability_providers(
+        &self,
+        capability: &str,
+    ) -> Result<Vec<CapabilityProvider>, Box<dyn Error>> {
+        let mut available: Vec<_> = self
+            .plugin_catalog()?
+            .into_iter()
+            .filter(|plugin| plugin.manifest.capabilities.contains_key(capability))
+            .map(|plugin| CapabilityProvider {
+                id: plugin.manifest.id,
+                name: plugin.manifest.name,
+                bundled: plugin.bundled,
+            })
+            .collect();
+        available.sort_by(|first, second| first.id.cmp(&second.id));
+        Ok(available)
+    }
+
+    fn check_preference_scope(
+        &self,
+        capability: &str,
+        workspace_id: Option<i64>,
+    ) -> io::Result<()> {
+        if !identifier(capability) {
+            return Err(invalid_preference("Invalid capability ID"));
+        }
+        if let Some(id) = workspace_id {
+            self.0
+                .query_row("SELECT id FROM workspaces WHERE id = ?1", [id], |_| Ok(()))
+                .map_err(|_| invalid_preference("Workspace not found"))?;
+        }
+        Ok(())
+    }
+}
+
+fn invalid_preference(message: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, message)
+}
