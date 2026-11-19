@@ -1,7 +1,10 @@
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
-use crate::{OutputFormatSettings, SupplementalOutputs, WorkspaceStore};
+use crate::{
+    DeliveryOverrides, DimensionOverrides, OutputFormatSettings, SupplementalOutputs,
+    WorkspaceStore,
+};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,7 +75,31 @@ struct DeliveryInput {
     settings: SupplementalOutputs,
 }
 
-pub(super) fn definitions() -> [Value; 11] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProfileInput {
+    workspace_id: i64,
+    profile_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProfileFormatInput {
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProfileOverridesInput<T> {
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    overrides: T,
+}
+
+pub(super) fn definitions() -> [Value; 15] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -101,6 +128,11 @@ pub(super) fn definitions() -> [Value; 11] {
             ]}
         }, "additionalProperties": false}
     }, "additionalProperties": false});
+    let profile = json!({"type": "object", "properties": {"workspaceId": id, "profileId": id},
+        "required": ["workspaceId", "profileId"], "additionalProperties": false});
+    let profile_format = json!({"type": "object", "properties": {
+        "workspaceId": id, "profileId": id, "formatId": id
+    }, "required": ["workspaceId", "profileId", "formatId"], "additionalProperties": false});
     [
         json!({"name": "create_workspace", "description": "Create a workspace with its default output formats.",
             "inputSchema": {"type": "object", "properties": {"name": name},
@@ -133,6 +165,19 @@ pub(super) fn definitions() -> [Value; 11] {
         json!({"name": "set_format_delivery", "description": "Replace a workspace format's supplemental outputs. Omitted settings reset to defaults.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "formatId": id, "settings": supplemental},
                 "required": ["workspaceId", "formatId", "settings"], "additionalProperties": false}}),
+        json!({"name": "list_profile_formats", "description": "List enabled formats with inherited and overridden dimensions for a profile.",
+            "inputSchema": profile, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_profile_format_overrides", "description": "Replace the profile's dimension overrides for one format. Omit a dimension to inherit it.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "profileId": id, "formatId": id,
+                "overrides": {"type": "object", "properties": {"width": id, "height": id}, "additionalProperties": false}
+            }, "required": ["workspaceId", "profileId", "formatId", "overrides"], "additionalProperties": false}}),
+        json!({"name": "get_profile_delivery", "description": "Read workspace defaults, profile overrides, and effective delivery settings.",
+            "inputSchema": profile_format, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_profile_delivery", "description": "Replace the profile's supplemental delivery overrides. Omitted fields inherit workspace values.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "profileId": id, "formatId": id, "overrides": supplemental
+            }, "required": ["workspaceId", "profileId", "formatId", "overrides"], "additionalProperties": false}}),
     ]
 }
 
@@ -221,6 +266,44 @@ pub(super) fn call(
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not save format delivery settings")
         }),
+        "list_profile_formats" => parse(arguments).and_then(|args: ProfileInput| {
+            store
+                .list_profile_formats(args.workspace_id, args.profile_id)
+                .map(|formats| json!({"formats": formats}))
+                .map_err(|_| "Could not list profile formats")
+        }),
+        "set_profile_format_overrides" => {
+            parse(arguments).and_then(|args: ProfileOverridesInput<DimensionOverrides>| {
+                store
+                    .set_profile_format_overrides(
+                        args.workspace_id,
+                        args.profile_id,
+                        args.format_id,
+                        &args.overrides,
+                    )
+                    .map(|()| json!({"saved": true}))
+                    .map_err(|_| "Could not save dimension overrides")
+            })
+        }
+        "get_profile_delivery" => parse(arguments).and_then(|args: ProfileFormatInput| {
+            store
+                .profile_delivery(args.workspace_id, args.profile_id, args.format_id)
+                .map(|delivery| json!({"delivery": delivery}))
+                .map_err(|_| "Could not read profile delivery settings")
+        }),
+        "set_profile_delivery" => {
+            parse(arguments).and_then(|args: ProfileOverridesInput<DeliveryOverrides>| {
+                store
+                    .set_profile_delivery(
+                        args.workspace_id,
+                        args.profile_id,
+                        args.format_id,
+                        &args.overrides,
+                    )
+                    .map(|()| json!({"saved": true}))
+                    .map_err(|_| "Could not save profile delivery settings")
+            })
+        }
         _ => return None,
     })
 }

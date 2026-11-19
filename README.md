@@ -276,3 +276,5 @@ Use `rename_completed_video` to change a completed run's display title. Use `add
 Use `create_workspace` to initialize a workspace, then `get_workspace_context` and `set_workspace_context` to read or replace its Markdown context. Use `list_profiles`, `create_profile`, and `update_profile` to manage production profiles. Pass a profile's ID as `profile_id` in draft settings. The queue captures the saved context and profile when it creates the run.
 
 Use `list_output_formats`, `create_output_format`, and `update_output_format` to configure workspace output dimensions. Use `get_format_delivery` and `set_format_delivery` for supplemental deliverables. Sending a replacement resets omitted supplemental fields to their defaults. Final video and subtitles remain required.
+
+Use `list_profile_formats` and `get_profile_delivery` to inspect inherited and effective format settings. Use `set_profile_format_overrides` and `set_profile_delivery` to replace one format's overrides for a profile. Omit a field to inherit its workspace value, or send an empty overrides object to inherit all fields in that group. Explicit zero and false values remain overrides.
