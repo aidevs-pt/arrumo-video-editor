@@ -4,7 +4,8 @@ import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CompletedVideoDetail } from "@/components/workspace/completed-videos/completed-video-detail";
+import Link from "next/link";
+import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 import { GenerationPlan } from "./generation-plan";
 
 import type { DeliveryFormat } from "./delivery-subtitles";
@@ -27,9 +28,7 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
   const [historyError, setHistoryError] = useState(false);
   const { locale, messages } = useLocale();
   const copy = messages.queue;
-  const [displayTitle, setDisplayTitle] = useState<string>();
-  useEffect(() => { setDisplayTitle(undefined); }, [run.display_title]);
-  const title = displayTitle ?? run.display_title ?? run.snapshot.draft.title;
+  const title = run.display_title ?? run.snapshot.draft.title;
   const canPause = run.state === "queued" || run.state === "running";
   const canResume = run.state === "paused" && run.pending_review_id === null;
 
@@ -86,7 +85,9 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
           aria-label={`${copy.retryRun} · ${title}`} onClick={() => void onControl(run.id, "retry")}>{copy.retryRun}</Button>
       )}
       {run.state === "completed" && (
-        <CompletedVideoDetail workspaceId={workspaceId} runId={run.id} onTitle={setDisplayTitle} />
+        <Button asChild size="sm" variant="outline" className="mt-2.5">
+          <Link href={completedVideoHref(workspaceId, run.id)}>{messages.completedVideo.details}</Link>
+        </Button>
       )}
       <GenerationPlan workspaceId={workspaceId} runId={run.id}
         pendingReviewId={run.state === "paused" ? run.pending_review_id : null}

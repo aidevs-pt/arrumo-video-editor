@@ -272,7 +272,7 @@
     "loading": "Loading completed video…",
     "saved": "Title saved.",
     "exported": "ZIP exported.",
-    "loadError": "Could not load the completed video. Close and reopen the details to retry.",
+    "loadError": "This completed video is unavailable in the selected workspace.",
     "renameError": "Could not save the title. Try again.",
     "exportError": "Could not export the ZIP. Check the delivery files and choose a new destination.",
     "replaySettings": "Replay settings",

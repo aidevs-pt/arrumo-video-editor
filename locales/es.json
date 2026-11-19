@@ -272,7 +272,7 @@
     "loading": "Cargando vídeo completado…",
     "saved": "Título guardado.",
     "exported": "ZIP exportado.",
-    "loadError": "No se pudo cargar el vídeo completado. Cierra y vuelve a abrir los detalles.",
+    "loadError": "Este vídeo completado no está disponible en el espacio de trabajo seleccionado.",
     "renameError": "No se pudo guardar el título. Inténtalo de nuevo.",
     "exportError": "No se pudo exportar el ZIP. Revisa los archivos y elige otro destino.",
     "replaySettings": "Ajustes de repetición",

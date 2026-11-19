@@ -1,5 +1,7 @@
 "use client";
 
+import { Film } from "lucide-react";
+import { WorkspaceHeading } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,13 +30,11 @@ type CompletedVideo = {
   };
 };
 
-export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
+export function CompletedVideoDetail({ workspaceId, runId }: {
   workspaceId: number;
   runId: number;
-  onTitle: (title: string) => void;
 }) {
   const { locale, messages: { completedVideo: copy } } = useLocale();
-  const [open, setOpen] = useState(false);
   const [video, setVideo] = useState<CompletedVideo>();
   const [title, setTitle] = useState("");
   const [error, setError] = useState<"loadError" | "renameError" | "exportError">();
@@ -42,18 +42,16 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
   const [notice, setNotice] = useState<"saved" | "exported">();
 
   useEffect(() => {
-    if (!open || video) return;
     let active = true;
     invoke<CompletedVideo>("get_completed_video", { workspaceId, runId }).then((result) => {
       if (!active) return;
       setVideo(result);
       setTitle(result.title);
-      onTitle(result.title);
     }).catch(() => {
       if (active) setError("loadError");
     });
     return () => { active = false; };
-  }, [open, onTitle, runId, video, workspaceId]);
+  }, [runId, workspaceId]);
 
   async function rename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,7 +63,6 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
       const saved = await invoke<string>("rename_completed_video", { workspaceId, runId, title });
       setVideo((current) => current && { ...current, title: saved });
       setTitle(saved);
-      onTitle(saved);
       setNotice("saved");
     } catch {
       setError("renameError");
@@ -89,13 +86,10 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
   }
 
   return (
-    <details className="mt-2.5" onToggle={(event) => {
-      setOpen(event.currentTarget.open);
-      if (!video) setError(undefined);
-    }}>
-      <summary className="cursor-pointer">{copy.details}</summary>
+    <>
+      <WorkspaceHeading icon={Film}><h1>{video?.title ?? copy.details}</h1></WorkspaceHeading>
       {error && <Alert variant="destructive" className="mt-3"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-      {open && !video && !error && <p role="status" className="mt-3 text-sm text-muted-foreground">{copy.loading}</p>}
+      {!video && !error && <p role="status" className="mt-3 text-sm text-muted-foreground">{copy.loading}</p>}
       {video && (
         <div className="mt-4 flex flex-col gap-5">
           <form onSubmit={rename}>
@@ -112,7 +106,7 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
             </FieldGroup>
           </form>
           <section aria-labelledby={`delivery-files-${runId}`}>
-            <h4 id={`delivery-files-${runId}`} className="font-medium">{copy.files}</h4>
+            <h2 id={`delivery-files-${runId}`} className="font-medium">{copy.files}</h2>
             <ul className="mt-2 flex flex-col gap-2 text-sm text-muted-foreground">
               {video.delivery.verified_outputs.map((output) => (
                 <li className="flex flex-col gap-1" key={output.format_id}>
@@ -140,6 +134,6 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
             results={video.production.results} stages={video.plan.steps} />
         </div>
       )}
-    </details>
+    </>
   );
 }

@@ -35,6 +35,11 @@ export function workspaceHref(view: WorkspaceView, workspaceId: number, profile?
   return `/${view}?${query}`;
 }
 
+export function completedVideoHref(workspaceId: number, runId: number) {
+  const query = new URLSearchParams({ workspace: String(workspaceId), run: String(runId) });
+  return `/completed-video?${query}`;
+}
+
 export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -42,7 +47,8 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const { messages: { workspaces: copy } } = useLocale();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [status, setStatus] = useState<Status>("loading");
-  const view = views.find((section) => pathname === `/${section}` || pathname === `/${section}/`);
+  const section = pathname.replace(/\/$/, "");
+  const view = section === "/completed-video" ? "generations" : views.find((view) => section === `/${view}`);
   const workspace = view ? workspaces.find((entry) => String(entry.id) === query.get("workspace")) : undefined;
   const profile = Number(query.get("profile"));
   const draftProfile = Number.isSafeInteger(profile) && profile > 0 ? profile : null;
