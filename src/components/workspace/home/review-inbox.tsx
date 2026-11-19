@@ -12,34 +12,47 @@ type RunNotice = { run_id: number; title: string };
 
 type Inbox = { reviews: RunNotice[]; completions: RunNotice[] };
 
-export function ReviewInbox({ workspaceId }: { workspaceId: number }) {
-  const router = useRouter();
-  const { messages } = useLocale();
-  const copy = messages.studio;
-  const [inbox, setInbox] = useState<Inbox>();
-  const reviews = inbox?.reviews ?? [];
-  const completions = inbox?.completions ?? [];
-  const [failed, setFailed] = useState(false);
-  const [open, setOpen] = useState(false);
+type InboxState = { workspaceId: number; inbox?: Inbox; failed: boolean };
+
+export function useGenerationInbox(workspaceId: number | undefined) {
+  const [state, setState] = useState<InboxState>();
 
   useEffect(() => {
+    if (workspaceId === undefined) return;
+    const id = workspaceId;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const rows = await invoke<Inbox>("generation_inbox", { workspaceId });
-        if (active) { setInbox(rows); setFailed(false); }
+        const rows = await invoke<Inbox>("generation_inbox", { workspaceId: id });
+        if (active) setState({ workspaceId: id, inbox: rows, failed: false });
       } catch {
-        if (active) setFailed(true);
+        if (active) setState((current) => ({
+          workspaceId: id,
+          inbox: current?.workspaceId === id ? current.inbox : undefined,
+          failed: true,
+        }));
       }
       if (active) timer = setTimeout(refresh, 5000);
     }
     void refresh();
     return () => { active = false; clearTimeout(timer); };
-  }, [open, workspaceId]);
+  }, [workspaceId]);
+
+  return state?.workspaceId === workspaceId ? state : undefined;
+}
+
+export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state?: InboxState }) {
+  const router = useRouter();
+  const { messages } = useLocale();
+  const copy = messages.studio;
+  const inbox = state?.inbox;
+  const failed = state?.failed;
+  const reviews = inbox?.reviews ?? [];
+  const completions = inbox?.completions ?? [];
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="ghost" size="icon" aria-label={copy.notifications} className="relative">
           <Bell />

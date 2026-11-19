@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLocale } from "@/lib/locale-provider";
-import { ReviewInbox } from "./review-inbox";
+import { cn } from "@/lib/utils";
+import { ReviewInbox, useGenerationInbox } from "./review-inbox";
 import { WorkspaceOverview } from "./workspace-overview";
 import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
@@ -39,6 +40,8 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
   const pathname = usePathname().replace(/\/$/, "");
   const query = useSearchParams();
   const copy = messages.studio;
+  const inbox = useGenerationInbox(workspace?.id);
+  const hasPendingReviews = (inbox?.inbox?.reviews.length ?? 0) > 0;
   const workspaceTabs = [
     { view: "context", label: messages.profiles.context, icon: FileText },
     { view: "brand", label: messages.brand.title, icon: Palette },
@@ -129,7 +132,8 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
                 <SidebarMenu aria-label={copy.production}>
                   {production.map(({ view: section, label, icon }) => (
                     <SidebarMenuItem key={section}>
-                      <NavLink href={workspaceHref(section, workspace.id)} active={view === section} label={label} icon={icon} />
+                      <NavLink href={workspaceHref(section, workspace.id)} active={view === section} label={label} icon={icon}
+                        attention={section === "generations" && hasPendingReviews ? messages.productionPlan.reviewRequired : undefined} />
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -161,7 +165,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
               </>}
             </BreadcrumbList>
           </Breadcrumb>
-          {workspace && <ReviewInbox key={workspace.id} workspaceId={workspace.id} />}
+          {workspace && <ReviewInbox key={workspace.id} workspaceId={workspace.id} state={inbox} />}
           {workspace && !(view === "drafts" && query.get("compose") === "1") && <Button asChild size="sm">
             <Link href={`${workspaceHref("drafts", workspace.id)}&compose=1`}><Plus data-icon="inline-start" />{copy.newVideo}</Link>
           </Button>}
@@ -192,17 +196,22 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
   );
 }
 
-function NavLink({ href, label, active, icon: Icon }: {
+function NavLink({ href, label, active, icon: Icon, attention }: {
   href: string;
   label: string;
   active: boolean;
   icon: typeof Layers;
+  attention?: string;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
     <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground">
-      <Link href={href} aria-current={active ? "page" : undefined} onClick={() => setOpenMobile(false)}>
-        <Icon /><span>{label}</span>
+      <Link href={href} aria-current={active ? "page" : undefined}
+        aria-label={attention ? `${label} · ${attention}` : label}
+        onClick={() => setOpenMobile(false)}>
+        <Icon /><span className="truncate">{label}</span>
+        {attention && <span aria-hidden="true"
+          className={cn("pointer-events-none absolute end-2 size-1.5 rounded-full group-data-[collapsible=icon]:end-1 group-data-[collapsible=icon]:top-1", active ? "bg-current" : "bg-primary")} />}
       </Link>
     </SidebarMenuButton>
   );
