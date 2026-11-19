@@ -292,3 +292,5 @@ Use `list_agent_plugins` to discover bundled production agents and `get_agent_se
 Use `get_preview_settings` to inspect preview resolution. Set `maxEdge` with `set_preview_max_edge` to a value between 144 and 2160 pixels or pass null to restore the app recommendation. Queued runs retain their captured preview settings.
 
 Use `list_plugin_catalog` to discover plugin IDs and declared settings. Use `get_plugin_credential_status` for a declared credential and optional workspace ID. The response reports configuration flags and the effective source. Set credentials through desktop Settings or the CLI's redirected-stdin command.
+
+Use `clear_plugin_credential` with a plugin and setting ID to remove an app credential. Include `workspaceId` to clear only that workspace's credential and restore inheritance.

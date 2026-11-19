@@ -33,7 +33,7 @@ struct PreviewInput {
     max_edge: Value,
 }
 
-pub(super) fn definitions() -> [Value; 7] {
+pub(super) fn definitions() -> [Value; 8] {
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
     [
@@ -64,6 +64,10 @@ pub(super) fn definitions() -> [Value; 7] {
             "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
                 "required": ["pluginId", "settingId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
+        json!({"name": "clear_plugin_credential", "description": "Remove a plugin credential at the specified scope. A workspace can then inherit its app credential. Omit workspaceId to remove the app credential.",
+            "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
+                "required": ["pluginId", "settingId"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true, "destructiveHint": true}}),
     ]
 }
 
@@ -114,6 +118,12 @@ pub(super) fn call(
                 .plugin_credential_status(&args.plugin_id, &args.setting_id, args.workspace_id)
                 .map(|status| json!({"status": status}))
                 .map_err(|_| "Could not check credential status")
+        }),
+        "clear_plugin_credential" => parse(arguments).and_then(|args: SettingInput| {
+            store
+                .set_plugin_credential(&args.plugin_id, &args.setting_id, args.workspace_id, None)
+                .map(|()| json!({"cleared": true}))
+                .map_err(|_| "Could not clear plugin credential. Check the setting, scope and credential store")
         }),
         _ => return None,
     })
