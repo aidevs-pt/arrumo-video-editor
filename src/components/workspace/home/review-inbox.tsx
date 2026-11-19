@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Bell, CircleAlert } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useLocale } from "@/lib/locale-provider";
 type Review = { run_id: number; title: string };
 
 export function ReviewInbox({ workspaceId }: { workspaceId: number }) {
+  const router = useRouter();
   const { messages } = useLocale();
   const copy = messages.studio;
   const [reviews, setReviews] = useState<Review[]>();
@@ -50,10 +51,9 @@ export function ReviewInbox({ workspaceId }: { workspaceId: number }) {
           <ScrollArea className={reviews.length > 5 ? "h-56" : "max-h-56"}>
             <DropdownMenuGroup>
               {reviews.map((review) => (
-                <DropdownMenuItem asChild key={review.run_id}>
-                  <Link href={`/generation-run?workspace=${workspaceId}&run=${review.run_id}`}>
-                    <CircleAlert aria-hidden="true" /><span className="truncate">{review.title}</span>
-                  </Link>
+                <DropdownMenuItem key={review.run_id}
+                  onSelect={() => router.push(`/generation-run?workspace=${workspaceId}&run=${review.run_id}`)}>
+                  <CircleAlert aria-hidden="true" /><span className="truncate">{review.title}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>

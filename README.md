@@ -158,11 +158,11 @@ Use `replay-generation <workspace-id> <source-run-id> <request-key> <captured|cu
 
 Use `add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown>` to comment on a completed video or one of its production results. The comments appear in the completed-video detail. New runs and current-settings replays of the same draft capture those comments as delivery feedback. Captured replays reuse the feedback in the original snapshot.
 
-In the desktop Generation queue, open **Completed video details** to review the verified file list, save a display title, or export the delivery through the native ZIP save dialog.
+In the desktop sidebar, open **Completed videos** and select a video to review the verified file list, save a display title, or export the delivery through the native ZIP save dialog.
 
 The completed-video panel also queues a replay with captured or current settings and saves Markdown feedback against the whole video or a selected production result.
 
-Use **Preview delivery** beside a verified output to play its MP4 and inspect the SRT text. Arrumo streams the selected file through its local loopback interface. Playback uses the desktop WebView's codecs. On Linux, WebKitGTK needs GStreamer H.264 and AAC decoders, such as those provided by `gstreamer1.0-libav` on Ubuntu.
+The **Video** tab opens the verified player, shows a format picker when several outputs exist, and includes **Subtitle text**. Arrumo streams the selected file through its local loopback interface. Playback uses the desktop WebView's codecs. On Linux, WebKitGTK needs GStreamer H.264 and AAC decoders, such as those provided by `gstreamer1.0-libav` on Ubuntu.
 
 In a guided run's production plan, open **Watch preview** to play a rendered MP4 before submitting the stage decision. Each replacement preview appears with its own attempt number.
 
@@ -170,6 +170,6 @@ The desktop production plan can render a whole-clip preview for recorded-source 
 
 At delivery verification, use **Import SRT** beside an output format or run `import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt>`. The importer checks UTF-8 text and cue timing against the rendered MP4 before replacing the delivery subtitle file. The CLI prints the number of accepted cues.
 
-The desktop frontend exports separate App Router pages for Profiles, Context, Brand, Assets, Outputs, Drafts, and Generations. Workspace IDs are created in the local database after the app is built, so an exported page takes the ID as a query parameter, for example `/brand?workspace=2`. Profile-to-draft navigation also carries the profile ID in the URL. The studio layout resolves those IDs through Tauri.
+The desktop frontend exports separate App Router pages for Profiles, Context, Brand, Assets, Outputs, Drafts, Generations, and Completed videos. Workspace IDs are created in the local database after the app is built, so an exported page takes the ID as a query parameter, for example `/brand?workspace=2`. Profile-to-draft navigation also carries the profile ID in the URL. The studio layout resolves those IDs through Tauri.
 
 Completed runs open at `/completed-video?workspace=<workspace-id>&run=<run-id>`. The app resolves the video from the selected local workspace, so the link works with the matching Arrumo database.

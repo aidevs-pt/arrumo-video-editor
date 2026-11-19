@@ -1,26 +1,28 @@
 # Arrumo Video Studio
 
-## Visual direction
+## Product and visual direction
 
-Use the supplied reference set in `../reference-style` as the source for the studio's visual language. The workspace is bright and utilitarian, with white working surfaces, quiet gray rails and forms, ink-black typography and icon tiles, and vermilion for decisions and navigation. Preserve the supplied Arrumo icon and its SVG component IDs. The reference layouts guide the interface structure, density, and hierarchy.
+Arrumo is a desktop production tool for directing Codex or Claude Code through repeatable video workflows. The five workspace references in `../reference-style` establish the visual system. Keep the supplied Arrumo icon and its SVG identifiers. Use white for the working canvas, a quiet gray rail and panel surface, ink-black type, and vermilion for the current destination, review attention, and primary commit.
 
-## Shell
+Give each surface a clear job. The asset library puts media and usage notes first. Draft composition starts with clips and their order, then profile and guidance. A generation review leads with the current artifact and its decision, with stage progress and real activity nearby. A completed video leads with playback and export, with metadata, activity and feedback in secondary views.
 
-- Keep workspace switching and workflow navigation in a persistent left rail. Group Context, Brand, Assets, and Outputs under Workspace. Give Profiles, Drafts, and Generations their own destinations.
-- Use the compact top bar for location and the main navigation action. Use the dark icon tile and a single strong title at the start of each working view.
-- Reserve the right rail for information that helps the current task, such as actual workspace counts or runs awaiting review. Keep the main column usable at the minimum window width. The overview rail appears from 1200 px, and the left navigation reflows above content below 800 px.
-- Use native window chrome. Keep one content scroll flow and let cards and forms grow for localized labels.
+## Desktop shell
 
-## Tokens and type
+- Use the shadcn Sidebar with grouped workspace and production navigation, a workspace switcher, and a color-coded profile hierarchy. On narrow windows, open navigation in a Sheet. Keep the toolbar and location breadcrumbs consistent across routes.
+- Keep Workspace settings (Context, Brand, Assets, Outputs) distinct from production (Drafts, Generations, Completed videos). The New video action opens the composer. Link attention items to the specific run.
+- Use a contextual inspector on wide displays. On setup screens this can show relevant workspace context. On a run, show its stage and activity. Keep primary controls available when the inspector stacks or is absent.
+- Use native window chrome. Use a contained scrolling region for long popups or media lists. Keep basic navigation and decisions keyboard accessible at the minimum window width.
 
-- Define semantic shadcn tokens in `src/app/globals.css`. The light palette uses white for content, `#f8f8f7` for the rail, `#f7f7f6` for form surfaces, `#171719` for ink, and `#e2e2e3` for dividers.
-- Use `#c92c1b` for primary controls and selected destinations, with white text. Use the pale accent surface and its darker foreground for workspace tabs and selection. Keep destructive feedback on its own semantic token.
-- Use Geist for body and heading text. Page titles are bold, compact, and approximately 26–34 px. Section headings are 16 px, and secondary text uses the muted foreground token. Use tabular numerals for counts, durations, and hex labels.
+## Tokens and components
 
-## Components and behavior
+- Define semantic tokens in `src/app/globals.css`. The light palette uses white for content, `#f8f8f7` for navigation, `#f7f7f6` for forms, `#171719` for ink, and `#e2e2e3` for dividers.
+- Use `#c92c1b` for primary actions and the related tinted surface for selection. Reserve destructive styling for the destructive action. Use outline controls for secondary actions and ghost controls for low-emphasis inline actions.
+- Use Geist. The page title is 28 px, section titles are 16 px, normal interface text is 14 px, and compact metadata is 12–13 px. Allow labels to wrap. Use tabular numerals for counts and durations and keep prose near 65 characters per line.
+- Prefer the installed shadcn primitives for navigation, cards, tables, disclosures, forms, dialogs, selects, confirmation, feedback, and states. Compose them in their owning domain. Use shared variants and tokens for common treatment.
+- Use border, spacing, and typographic weight to separate groups. Use real media previews when available. Use a file-type icon when the format has no rendered preview.
+- Show real readiness, provider, and review states. Use Skeleton, Empty, or Alert with appropriate recovery. Keep stable file and entity names in accessible labels.
+- Use Motion for purposeful transitions and honor reduced motion. Keep user-facing strings in the English, Spanish, and Portuguese catalogs.
 
-- Compose the shared shadcn Button, Card, Field, Input, Native Select, Alert, and Empty primitives. Put reusable variants in the primitives and layout utilities in the owning component. Use `src/components/workspace/layout.tsx` for shared page structure.
-- Use thin borders, a single radius family, and spacing to distinguish groups. Show brand colors as swatches, and use creator-owned media when the current view can display it.
-- Use red sparingly for the current destination and the action that advances the work. Choose outline buttons for secondary actions, ghost buttons for inline controls, and explicit alert states for failures.
-- Keep keyboard focus visible on controls and respect reduced motion. Store user-facing text in the English, Spanish, and Portuguese catalogs. Verify changes at wide and minimum window widths with real data and useful empty states.
-- Keep feature UI in named folders under `src/components/workspace`. Add workflow steps, agent state, and output previews as their corresponding capabilities become available.
+## Release verification
+
+Exercise the first-run path, recorded and brief-only drafts, generation and review, playback and export, workspace switching, and error recovery with the real desktop host. Check keyboard navigation and window resizing. Visible agent connection and worker progress must come from the actual runtime. Outstanding orchestration, onboarding, provider, plugin, and release work is tracked in the root TODO.
