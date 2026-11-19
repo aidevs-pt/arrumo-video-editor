@@ -8,6 +8,7 @@ use crate::WorkspaceStore;
 
 mod assets;
 mod generation;
+mod setup;
 
 const VERSION: &str = "2025-11-25";
 const MAX_MESSAGE_BYTES: u64 = 128 * 1024;
@@ -167,6 +168,7 @@ fn tool_definitions() -> Value {
     ];
     tools.extend(generation::definitions());
     tools.extend(assets::definitions());
+    tools.extend(setup::definitions());
     json!({"tools": tools})
 }
 
@@ -197,6 +199,7 @@ fn call_tool(store: &mut WorkspaceStore, database: &Path, call: ToolCall) -> Opt
              .map_err(|_| "Plugin action could not run. Check the installed revision, scope and permissions")
         }
         _ => assets::call(store, database, &call.name, &call.arguments)
+            .or_else(|| setup::call(store, &call.name, &call.arguments))
             .or_else(|| generation::call(store, database, &call.name, call.arguments))?,
     };
     Some(match result {
@@ -251,7 +254,7 @@ mod tests {
         assert_eq!(responses[2]["id"], "list");
         assert_eq!(
             responses[2]["result"]["tools"].as_array().unwrap().len(),
-            30
+            36
         );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],

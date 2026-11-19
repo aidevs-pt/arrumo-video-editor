@@ -272,3 +272,5 @@ Use `import_workspace_asset` with a workspace ID and an absolute local `source` 
 Use `import_thumbnail_reference` to import a local image with thumbnail reference notes. Use `set_asset_notes` with the workspace ID, asset ID, and Markdown notes to change the asset's usage guidance. Pass an empty string to clear the notes.
 
 Use `rename_completed_video` to change a completed run's display title. Use `add_completed_video_feedback` to save Markdown feedback about the full run or a specific production result. Pass the result ID from `get_completed_video` for stage feedback.
+
+Use `create_workspace` to initialize a workspace, then `get_workspace_context` and `set_workspace_context` to read or replace its Markdown context. Use `list_profiles`, `create_profile`, and `update_profile` to manage production profiles. Pass a profile's ID as `profile_id` in draft settings. The queue captures the saved context and profile when it creates the run.
