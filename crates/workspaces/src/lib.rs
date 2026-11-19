@@ -20,6 +20,7 @@ mod generation_queue;
 mod generation_worker;
 mod mcp;
 mod media_worker;
+mod operations;
 mod output_formats;
 mod plugin_actions;
 mod plugin_catalog;

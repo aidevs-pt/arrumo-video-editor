@@ -4,13 +4,7 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::WorkspaceStore;
-
-mod assets;
-mod generation;
-mod providers;
-mod settings;
-mod setup;
+use crate::{WorkspaceStore, operations};
 
 const VERSION: &str = "2025-11-25";
 const MAX_MESSAGE_BYTES: u64 = 128 * 1024;
@@ -28,16 +22,6 @@ struct ToolCall {
     name: String,
     #[serde(default)]
     arguments: serde_json::Map<String, Value>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ActionArguments {
-    plugin_id: String,
-    action_id: String,
-    package_sha256: String,
-    workspace_id: Option<i64>,
-    input: Value,
 }
 
 pub fn serve_mcp(
@@ -118,7 +102,7 @@ fn dispatch(
         _ if !matches!(session, Session::Ready) => {
             return Some(rpc_error(id, -32002, "MCP session is not initialized"));
         }
-        "tools/list" => tool_definitions(),
+        "tools/list" => json!({"tools": operations::definitions()}),
         "tools/call" => {
             let Some(params) = message.get("params") else {
                 return Some(rpc_error(id, -32602, "Missing tool call parameters"));
@@ -136,85 +120,16 @@ fn dispatch(
     Some(json!({"jsonrpc": "2.0", "id": id, "result": result}))
 }
 
-fn tool_definitions() -> Value {
-    let no_input = json!({"type": "object", "additionalProperties": false});
-    let mut tools = vec![
-        json!({
-            "name": "list_workspaces",
-            "description": "List local Arrumo workspaces and their IDs.",
-            "inputSchema": no_input,
-            "annotations": {"readOnlyHint": true}
-        }),
-        json!({
-            "name": "list_plugin_actions",
-            "description": "List installed plugin actions, their scopes and current package digests.",
-            "inputSchema": no_input,
-            "annotations": {"readOnlyHint": true}
-        }),
-        json!({
-            "name": "invoke_plugin_action",
-            "description": "Invoke a declared plugin action in its app or workspace scope. Use the package digest returned by list_plugin_actions.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "pluginId": {"type": "string"},
-                    "actionId": {"type": "string"},
-                    "packageSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-                    "workspaceId": {"type": "integer", "minimum": 1, "description": "Required for workspace actions. Omit for app actions."},
-                    "input": {}
-                },
-                "required": ["pluginId", "actionId", "packageSha256", "input"],
-                "additionalProperties": false
-            }
-        }),
-    ];
-    tools.extend(generation::definitions());
-    tools.extend(assets::definitions());
-    tools.extend(setup::definitions());
-    tools.extend(providers::definitions());
-    tools.extend(settings::definitions());
-    json!({"tools": tools})
-}
-
 fn call_tool(store: &mut WorkspaceStore, database: &Path, call: ToolCall) -> Option<Value> {
-    let result = match call.name.as_str() {
-        "list_workspaces" if call.arguments.is_empty() => store
-            .list()
-            .map(|workspaces| json!({"workspaces": workspaces}))
-            .map_err(|_| "Could not list workspaces"),
-        "list_plugin_actions" if call.arguments.is_empty() => store
-            .plugin_actions()
-            .map(|actions| json!({"actions": actions}))
-            .map_err(|_| "Could not list plugin actions"),
-        "list_workspaces" | "list_plugin_actions" => Err("This tool takes no arguments"),
-        "invoke_plugin_action" => {
-            let arguments: ActionArguments =
-                match serde_json::from_value(Value::Object(call.arguments)) {
-                    Ok(arguments) => arguments,
-                    Err(_) => return Some(tool_error("Invalid plugin action arguments")),
-                };
-            if arguments.package_sha256.len() != 64 {
-                return Some(tool_error("Use a package digest from list_plugin_actions"));
-            }
-            store.invoke_reviewed_plugin_action(
-                &arguments.plugin_id, &arguments.action_id, &arguments.package_sha256,
-                arguments.workspace_id, &arguments.input,
-            ).map(|output| json!({"output": output}))
-             .map_err(|_| "Plugin action could not run. Check the installed revision, scope and permissions")
-        }
-        _ => assets::call(store, database, &call.name, &call.arguments)
-            .or_else(|| setup::call(store, &call.name, &call.arguments))
-            .or_else(|| providers::call(store, &call.name, &call.arguments))
-            .or_else(|| settings::call(store, &call.name, &call.arguments))
-            .or_else(|| generation::call(store, database, &call.name, call.arguments))?,
-    };
-    Some(match result {
-        Ok(data) => json!({
-            "content": [{"type": "text", "text": data.to_string()}],
-            "structuredContent": data
-        }),
-        Err(error) => tool_error(error),
-    })
+    Some(
+        match operations::invoke(store, database, &call.name, call.arguments)? {
+            Ok(data) => json!({
+                "content": [{"type": "text", "text": data.to_string()}],
+                "structuredContent": data
+            }),
+            Err(error) => tool_error(error),
+        },
+    )
 }
 
 fn tool_error(message: &str) -> Value {
