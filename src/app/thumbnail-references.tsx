@@ -1,14 +1,16 @@
+import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { deliveryCopy } from "./delivery-copy";
 
 export type ReferenceImage = { id: number; name: string };
 
-export function ThumbnailReferences({ id, images, selected, copy, onChange }: {
+export function ThumbnailReferences({ id, images, selected, copy, onChange, onImport }: {
   id: string;
   images: ReferenceImage[];
   selected: number[];
   copy: (typeof deliveryCopy)["en"];
   onChange: (selected: number[]) => void;
+  onImport: () => void;
 }) {
   return (
     <FieldSet>
@@ -26,6 +28,7 @@ export function ThumbnailReferences({ id, images, selected, copy, onChange }: {
           ))}
         </FieldGroup>
       )}
+      <Button type="button" size="sm" variant="outline" className="self-start" onClick={onImport}>{copy.importReference}</Button>
     </FieldSet>
   );
 }

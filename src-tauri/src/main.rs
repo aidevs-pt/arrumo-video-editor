@@ -224,6 +224,7 @@ async fn list_assets(
 async fn import_asset(
     workspace_id: i64,
     source: PathBuf,
+    thumbnail_reference: Option<bool>,
     app: AppHandle,
     store: State<'_, Store>,
 ) -> Result<WorkspaceAsset, &'static str> {
@@ -232,11 +233,14 @@ async fn import_asset(
         .app_local_data_dir()
         .map_err(|_| "asset_storage_unavailable")?
         .join("workspaces.sqlite");
-    store
-        .lock()
-        .map_err(|_| "store_unavailable")?
-        .import_asset(&asset_root(&database), workspace_id, &source)
-        .map_err(|_| "asset_import_failed")
+    let root = asset_root(&database);
+    let mut store = store.lock().map_err(|_| "store_unavailable")?;
+    let imported = if thumbnail_reference.unwrap_or(false) {
+        store.import_thumbnail_reference(&root, workspace_id, &source)
+    } else {
+        store.import_asset(&root, workspace_id, &source)
+    };
+    imported.map_err(|_| "asset_import_failed")
 }
 
 #[tauri::command]

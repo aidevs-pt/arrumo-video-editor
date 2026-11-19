@@ -19,12 +19,13 @@ const emptyManual: ManualSource = {
   type: "manual", guidance: "", thumbnails_per_video: 0, thumbnail_guidance: "", thumbnail_reference_ids: [],
 };
 
-export function PortraitFields({ value, profiles, images, copy, onChange }: {
+export function PortraitFields({ value, profiles, images, copy, onChange, onImportReference }: {
   value: PortraitDerivatives;
   profiles: SourceProfile[];
   images: ReferenceImage[];
   copy: (typeof deliveryCopy)["en"];
   onChange: (value: PortraitDerivatives) => void;
+  onImportReference: () => void;
 }) {
   const { count, source } = value;
   return (
@@ -69,7 +70,7 @@ export function PortraitFields({ value, profiles, images, copy, onChange }: {
               <Textarea id="portrait-thumbnail-guidance" value={source.thumbnail_guidance}
                 onChange={(event) => onChange({ ...value, source: { ...source, thumbnail_guidance: event.target.value } })} />
             </Field>
-            <ThumbnailReferences id="portrait-reference" images={images} selected={source.thumbnail_reference_ids} copy={copy}
+            <ThumbnailReferences id="portrait-reference" images={images} selected={source.thumbnail_reference_ids} copy={copy} onImport={onImportReference}
               onChange={(ids) => onChange({ ...value, source: { ...source, thumbnail_reference_ids: ids } })} />
           </>
         )}

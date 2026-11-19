@@ -51,11 +51,42 @@ impl WorkspaceStore {
         workspace_id: i64,
         source: &Path,
     ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
+        self.copy_asset(media_root, workspace_id, source, false)
+    }
+
+    pub fn import_thumbnail_reference(
+        &mut self,
+        media_root: &Path,
+        workspace_id: i64,
+        source: &Path,
+    ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
+        self.copy_asset(media_root, workspace_id, source, true)
+    }
+
+    fn copy_asset(
+        &mut self,
+        media_root: &Path,
+        workspace_id: i64,
+        source: &Path,
+        thumbnail_reference: bool,
+    ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
         let name = source
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid asset filename"))?;
         let kind = media_kind(source)?;
+        let notes = if thumbnail_reference {
+            if kind != "image" {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Reference must be an image",
+                )
+                .into());
+            }
+            "Thumbnail reference"
+        } else {
+            ""
+        };
         if !source.metadata()?.is_file() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Asset must be a file").into());
         }
@@ -65,9 +96,9 @@ impl WorkspaceStore {
             .0
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let asset = transaction.query_row(
-            "INSERT INTO workspace_assets (workspace_id, name, kind, byte_size)
-             VALUES (?1, ?2, ?3, ?4) RETURNING id, workspace_id, name, kind, byte_size, notes",
-            params![workspace_id, name, kind, length],
+            "INSERT INTO workspace_assets (workspace_id, name, kind, byte_size, notes)
+             VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id, workspace_id, name, kind, byte_size, notes",
+            params![workspace_id, name, kind, length, notes],
             read_asset,
         )?;
         let directory = media_root.join(workspace_id.to_string());

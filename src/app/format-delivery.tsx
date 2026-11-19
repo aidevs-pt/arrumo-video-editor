@@ -1,5 +1,6 @@
 "use client";
 
+import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -58,7 +59,7 @@ export function FormatDelivery({
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(false);
-  const [result, setResult] = useState<"saved" | "saveError" | null>(null);
+  const [result, setResult] = useState<"saved" | "saveError" | "importReferenceError" | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const copy = deliveryCopy[locale];
 
@@ -128,6 +129,38 @@ export function FormatDelivery({
       setResult("saved");
     } catch {
       setResult("saveError");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function importReference(target: "thumbnail" | "portrait") {
+    if (pending) return;
+    setPending(true);
+    setResult(null);
+    try {
+      const source = await open({
+        title: copy.importReference,
+        filters: [{ name: copy.thumbnail_reference_ids, extensions: ["png", "jpg", "jpeg", "webp", "gif", "avif"] }],
+      });
+      if (!source) return;
+      const image = await invoke<ReferenceImage>("import_asset", {
+        workspaceId, source, thumbnailReference: true,
+      });
+      setImages((current) => [...current, image]);
+      if (target === "thumbnail") {
+        setReferences((current) => [...current, image.id]);
+      } else {
+        setPortrait((current) => current?.source.type === "manual" ? {
+          ...current,
+          source: {
+            ...current.source,
+            thumbnail_reference_ids: [...current.source.thumbnail_reference_ids, image.id],
+          },
+        } : current);
+      }
+    } catch {
+      setResult("importReferenceError");
     } finally {
       setPending(false);
     }
@@ -210,18 +243,20 @@ export function FormatDelivery({
                 ))}
                 {isProfile && overrideControl("thumbnail_reference_ids")}
                 {(!isProfile || overridden("thumbnail_reference_ids")) && (
-                  <ThumbnailReferences id="delivery-reference" images={images} selected={references} copy={copy} onChange={setReferences} />
+                  <ThumbnailReferences id="delivery-reference" images={images} selected={references} copy={copy} onChange={setReferences} onImport={() => void importReference("thumbnail")} />
                 )}
                 {showPortrait && portrait && (
                   <FieldGroup>
                     {isProfile && overrideControl("portrait_derivatives")}
                     {(!isProfile || overridden("portrait_derivatives")) && (
-                      <PortraitFields value={portrait} profiles={profiles} images={images} copy={copy} onChange={setPortrait} />
+                      <PortraitFields value={portrait} profiles={profiles} images={images} copy={copy} onChange={setPortrait} onImportReference={() => void importReference("portrait")} />
                     )}
                   </FieldGroup>
                 )}
                 {result === "saved" && <p role="status">{copy.saved}</p>}
-                {result === "saveError" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
+                {(result === "saveError" || result === "importReferenceError") && (
+                  <Alert variant="destructive"><AlertDescription>{copy[result]}</AlertDescription></Alert>
+                )}
                 <Button type="submit">{copy.save}</Button>
               </FieldGroup>
             </fieldset>

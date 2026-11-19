@@ -135,15 +135,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .list_assets(utf8(workspace)?.parse()?)?;
             println!("{}", serde_json::to_string(&assets)?);
         }
-        [database, command, workspace, source] if command == "import-asset" => {
+        [database, command, workspace, source]
+            if command == "import-asset" || command == "import-thumbnail-reference" =>
+        {
             let database = Path::new(database);
-            let asset = WorkspaceStore::open(database)?
-                .import_asset(
-                    &asset_root(database),
-                    utf8(workspace)?.parse()?,
-                    Path::new(source),
-                )
-                .map_err(io::Error::other)?;
+            let mut store = WorkspaceStore::open(database)?;
+            let workspace_id = utf8(workspace)?.parse()?;
+            let root = asset_root(database);
+            let asset = if command == "import-thumbnail-reference" {
+                store.import_thumbnail_reference(&root, workspace_id, Path::new(source))
+            } else {
+                store.import_asset(&root, workspace_id, Path::new(source))
+            }
+            .map_err(io::Error::other)?;
             println!("{}", serde_json::to_string(&asset)?);
         }
         [database, command, workspace, asset, notes] if command == "set-asset-notes" => {
@@ -170,6 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "profile-delivery <workspace-id> <profile-id> <format-id> | ",
                 "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
+                "import-thumbnail-reference <workspace-id> <source-path> | ",
                 "set-asset-notes <workspace-id> <asset-id> <notes>"
             )
             .into());
