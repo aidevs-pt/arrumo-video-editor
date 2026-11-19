@@ -101,6 +101,40 @@ impl WorkspaceStore {
         id: &str,
         version: &str,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        let (previous, source) = self.installed_release_for_update(id, version)?;
+        let catalog_url = source.catalog_url.as_deref().ok_or_else(|| {
+            invalid_registry("Plugin was installed from a local registry snapshot")
+        })?;
+        self.download_registry_release(
+            catalog_url,
+            id,
+            version,
+            None,
+            Some((&previous, &source.repository)),
+        )
+    }
+
+    pub fn update_plugin_release_from_snapshot(
+        &self,
+        catalog: impl Read,
+        id: &str,
+        version: &str,
+        archive: impl Read,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        let (previous, installed) = self.installed_release_for_update(id, version)?;
+        if installed.catalog_url.is_some() {
+            return Err(invalid_registry("Plugin was installed from a remote registry").into());
+        }
+        let (source, digest) = read_plugin_registry(catalog)?.select_release(id, version)?;
+        validate_update_repository(&installed.repository, &source)?;
+        self.register_plugin_zip(archive, Some(&digest), Some(source), Some(&previous))
+    }
+
+    fn installed_release_for_update(
+        &self,
+        id: &str,
+        version: &str,
+    ) -> Result<(InstalledRelease, RegistryReleaseSource), Box<dyn Error>> {
         let previous = self
             .0
             .query_row(
@@ -117,22 +151,13 @@ impl WorkspaceStore {
             .optional()?
             .ok_or_else(|| invalid_registry("Plugin has no installed registry release"))?;
         let source: RegistryReleaseSource = serde_json::from_str(&previous.raw_source)?;
-        let catalog_url = source.catalog_url.as_deref().ok_or_else(|| {
-            invalid_registry("Plugin was installed from a local registry snapshot")
-        })?;
         if !semver::Version::parse(version)?
             .cmp_precedence(&semver::Version::parse(&source.version)?)
             .is_gt()
         {
             return Err(invalid_registry("Update must target a newer plugin version").into());
         }
-        self.download_registry_release(
-            catalog_url,
-            id,
-            version,
-            None,
-            Some((&previous, &source.repository)),
-        )
+        Ok((previous, source))
     }
 
     fn download_registry_release(
@@ -156,11 +181,8 @@ impl WorkspaceStore {
         {
             return Err(invalid_registry("Plugin release changed since review").into());
         }
-        if previous.is_some_and(|(_, repository)| repository != source.repository) {
-            return Err(invalid_registry(
-                "Plugin update source repository differs from the installed release",
-            )
-            .into());
+        if let Some((_, repository)) = previous {
+            validate_update_repository(repository, &source)?;
         }
         let archive = get_release_response(&client, &source.package_url)?;
         source.catalog_url = Some(catalog_url.to_owned());
@@ -171,6 +193,15 @@ impl WorkspaceStore {
             previous.map(|(record, _)| record),
         )
     }
+}
+
+fn validate_update_repository(repository: &str, source: &RegistryReleaseSource) -> io::Result<()> {
+    if repository != source.repository {
+        return Err(invalid_registry(
+            "Plugin update source repository differs from the installed release",
+        ));
+    }
+    Ok(())
 }
 
 fn registry_client() -> Result<reqwest::blocking::Client, reqwest::Error> {

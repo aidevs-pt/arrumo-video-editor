@@ -202,3 +202,5 @@ List plugin IDs, source repositories, defaults, and available release versions w
 In desktop Settings, open **Browse registry** under **Plugins** and load an HTTPS catalog URL. Expand a plugin to review its source repository and available versions. Arrumo checks the reviewed release again before downloading. If its source or checksum changed, reload the catalog and review the release again.
 
 Use `update-plugin-release <plugin-id> <version>` to replace a remotely installed package with a newer SemVer release from its recorded HTTPS catalog and source repository. Arrumo validates the replacement before saving it and checks that the installed release did not change during the download. Updates to bundled plugins ship with Arrumo.
+
+For packages installed from a local registry snapshot, use `update-plugin-release-from-snapshot <catalog.json> <plugin-id> <version> <package.zip>`. Use a catalog snapshot obtained independently of the ZIP. Arrumo requires the recorded source repository and a newer compatible release and verifies the ZIP before replacing the installed package. Remotely installed packages continue to use their recorded HTTPS catalog.
