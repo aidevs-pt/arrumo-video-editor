@@ -1,5 +1,6 @@
 "use client";
 
+import { useWorkspaceCatalog } from "../home/workspace-router";
 import { Clapperboard } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
@@ -254,4 +255,12 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
       )}
     </WorkspaceShell>
   );
+}
+
+
+export function WorkspaceDraftsRoute({ queue = false }: { queue?: boolean }) {
+  const { workspace, draftProfile, navigate } = useWorkspaceCatalog();
+  return workspace ? <WorkspaceDrafts key={`${workspace.id}-${queue}-${draftProfile}`}
+    workspace={workspace} initialProfile={draftProfile} startInQueue={queue}
+    onBack={() => navigate("drafts")} /> : null;
 }

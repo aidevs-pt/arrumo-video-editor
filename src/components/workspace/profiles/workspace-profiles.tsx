@@ -11,6 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useWorkspaceCatalog } from "../home/workspace-router";
 import { ProfileFormats } from "./profile-formats";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
@@ -225,4 +226,11 @@ export function WorkspaceProfiles({
       </WorkspaceColumns>
     </WorkspaceShell>
   );
+}
+
+
+export function WorkspaceProfilesRoute() {
+  const { workspace, navigate } = useWorkspaceCatalog();
+  return workspace ? <WorkspaceProfiles key={workspace.id} workspace={workspace}
+    onOutputs={() => navigate("outputs")} onDrafts={(profile) => navigate("drafts", profile)} /> : null;
 }

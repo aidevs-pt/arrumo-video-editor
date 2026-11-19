@@ -197,6 +197,7 @@
     "transition": "Estado atualizado"
   },
   "workspaces": {
+    "missing": "Este espaço de trabalho não foi encontrado.",
     "title": "Espaços de trabalho",
     "intro": "Organize os perfis, recursos e definições de cada produção.",
     "list": "Os seus espaços de trabalho",

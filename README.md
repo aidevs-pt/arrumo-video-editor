@@ -169,3 +169,5 @@ In a guided run's production plan, open **Watch preview** to play a rendered MP4
 The desktop production plan can render a whole-clip preview for recorded-source runs, render the accepted edit at final resolution, and verify delivery after the SRT files are present. Each action claims only the stage shown in the plan.
 
 At delivery verification, use **Import SRT** beside an output format or run `import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt>`. The importer checks UTF-8 text and cue timing against the rendered MP4 before replacing the delivery subtitle file. The CLI prints the number of accepted cues.
+
+The desktop frontend exports separate App Router pages for Profiles, Context, Brand, Assets, Outputs, Drafts, and Generations. Workspace IDs are created in the local database after the app is built, so an exported page takes the ID as a query parameter, for example `/brand?workspace=2`. Profile-to-draft navigation also carries the profile ID in the URL. The studio layout resolves those IDs through Tauri.

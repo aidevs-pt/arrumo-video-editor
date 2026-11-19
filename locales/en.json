@@ -197,6 +197,7 @@
     "transition": "State changed"
   },
   "workspaces": {
+    "missing": "This workspace could not be found.",
     "title": "Workspaces",
     "intro": "Give each production its own place for profiles, assets, and settings.",
     "list": "Your workspaces",
