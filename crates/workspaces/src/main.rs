@@ -622,6 +622,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .generation_notifications(utf8(workspace)?.parse()?, after)?;
             println!("{}", serde_json::to_string(&notifications)?);
         }
+        [database, command, workspace, run] if command == "read-completion-notification" => {
+            let changed = WorkspaceStore::open(Path::new(database))?
+                .read_completion_notification(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            println!("{changed}");
+        }
         [database, command, workspace, run] if command == "generation-activity" => {
             let events = WorkspaceStore::open(Path::new(database))?
                 .generation_activity(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
@@ -812,6 +817,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
                 "generation-activity <workspace-id> <run-id> | generation-notifications <workspace-id> <after-id> | ",
+                "read-completion-notification <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
                 "production-progress <workspace-id> <run-id> | ",

@@ -27,6 +27,7 @@ pub async fn read_completion_notification(
         .lock()
         .map_err(|_| "store_unavailable")?
         .read_completion_notification(workspace_id, run_id)
+        .map(|_| ())
         .map_err(|_| "notification_read_failed")
 }
 

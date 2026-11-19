@@ -9,6 +9,7 @@ pub struct GenerationNotification {
     pub run_id: i64,
     pub kind: String,
     pub created_at: i64,
+    pub read_at: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -47,15 +48,16 @@ impl WorkspaceStore {
         &self,
         workspace_id: i64,
         run_id: i64,
-    ) -> rusqlite::Result<()> {
-        self.0.execute(
-            "UPDATE generation_notifications SET read_at = unixepoch()
+    ) -> rusqlite::Result<bool> {
+        self.0
+            .execute(
+                "UPDATE generation_notifications SET read_at = unixepoch()
              WHERE run_id = ?2 AND kind = 'completed' AND read_at IS NULL
                AND EXISTS (SELECT 1 FROM generation_runs
                            WHERE id = ?2 AND workspace_id = ?1 AND state = 'completed')",
-            params![workspace_id, run_id],
-        )?;
-        Ok(())
+                params![workspace_id, run_id],
+            )
+            .map(|changed| changed > 0)
     }
 
     pub fn generation_notifications(
@@ -65,7 +67,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<Vec<GenerationNotification>> {
         self.0
             .prepare(
-                "SELECT notice.id, notice.run_id, notice.kind, notice.created_at
+                "SELECT notice.id, notice.run_id, notice.kind, notice.created_at, notice.read_at
                  FROM generation_notifications AS notice
                  JOIN generation_runs AS run ON run.id = notice.run_id
                  WHERE run.workspace_id = ?1 AND notice.id > ?2
@@ -77,6 +79,7 @@ impl WorkspaceStore {
                     run_id: row.get(1)?,
                     kind: row.get(2)?,
                     created_at: row.get(3)?,
+                    read_at: row.get(4)?,
                 })
             })?
             .collect()

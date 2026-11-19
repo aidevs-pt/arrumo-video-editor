@@ -92,7 +92,7 @@ struct NotificationInput {
     after_id: u64,
 }
 
-pub(super) fn definitions() -> [Value; 15] {
+pub(super) fn definitions() -> [Value; 16] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -136,6 +136,8 @@ pub(super) fn definitions() -> [Value; 15] {
                 "workspaceId": id, "afterId": {"type": "integer", "minimum": 0}
             }, "required": ["workspaceId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
+        json!({"name": "read_completion_notification", "description": "Mark a completed run's notification as read. Returns whether the read state changed.",
+            "inputSchema": run, "annotations": {"idempotentHint": true, "destructiveHint": false}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, and current step.",
@@ -238,6 +240,12 @@ pub(super) fn call(
                 .generation_notifications(args.workspace_id, cursor)
                 .map(|notifications| json!({"notifications": notifications}))
                 .map_err(|_| "Could not read generation notifications")
+        }),
+        "read_completion_notification" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .read_completion_notification(args.workspace_id, args.run_id)
+                .map(|changed| json!({"changed": changed}))
+                .map_err(|_| "Could not acknowledge completion notification")
         }),
         "get_generation_activity" => parse(arguments).and_then(|args: RunInput| {
             store
