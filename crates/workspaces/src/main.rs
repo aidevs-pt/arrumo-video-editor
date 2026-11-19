@@ -25,6 +25,20 @@ fn plugin_workspace(value: &OsStr) -> Result<Option<i64>, Box<dyn Error>> {
     }
 }
 
+fn read_plugin_invocation_input() -> Result<serde_json::Value, Box<dyn Error>> {
+    let limit = arrumo_workspaces::MAX_PLUGIN_IO_BYTES;
+    let mut input = Vec::new();
+    io::stdin().take(limit as u64 + 1).read_to_end(&mut input)?;
+    if input.len() > limit {
+        return Err(
+            io::Error::new(io::ErrorKind::InvalidInput, "Plugin input exceeds 64 KiB").into(),
+        );
+    }
+    serde_json::from_slice(&input).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidInput, "Expected JSON plugin input").into()
+    })
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
     match arguments.as_slice() {
@@ -135,22 +149,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
             )?;
         }
+        [database, command] if command == "plugin-actions" => {
+            let actions = WorkspaceStore::open(Path::new(database))?.plugin_actions()?;
+            println!("{}", serde_json::to_string(&actions)?);
+        }
+        [database, command, plugin_id, action_id, scope] if command == "invoke-plugin-action" => {
+            let input = read_plugin_invocation_input()?;
+            let result = WorkspaceStore::open(Path::new(database))?.invoke_plugin_action(
+                utf8(plugin_id)?,
+                utf8(action_id)?,
+                plugin_workspace(scope)?,
+                &input,
+            )?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
         [database, command, plugin_id, scope @ ..]
             if command == "invoke-plugin" && scope.len() <= 1 =>
         {
-            let limit = arrumo_workspaces::MAX_PLUGIN_IO_BYTES;
-            let mut input = Vec::new();
-            io::stdin().take(limit as u64 + 1).read_to_end(&mut input)?;
-            if input.len() > limit {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Plugin input exceeds 64 KiB",
-                )
-                .into());
-            }
-            let input = serde_json::from_slice(&input).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidInput, "Expected JSON plugin input")
-            })?;
+            let input = read_plugin_invocation_input()?;
             let store = WorkspaceStore::open(Path::new(database))?;
             let result = if let Some(workspace) = scope.first() {
                 store.invoke_plugin_in_workspace(
@@ -795,6 +811,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
+                "plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",

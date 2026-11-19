@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 5] = [1, 2, 3, 4, 5];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 6] = [1, 2, 3, 4, 5, 6];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -33,6 +33,12 @@ pub struct PluginManifest {
         skip_serializing_if = "Option::is_none"
     )]
     pub code: Option<PluginCode>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub actions: Option<Vec<crate::PluginAction>>,
     #[serde(
         default,
         deserialize_with = "deserialize_present",
@@ -155,6 +161,25 @@ impl PluginManifest {
                 })
             {
                 return Err(invalid_manifest("Invalid plugin code declaration").into());
+            }
+        }
+        if let Some(actions) = &manifest.actions {
+            let mut ids = HashSet::new();
+            if manifest.schema_version < 6
+                || manifest
+                    .code
+                    .as_ref()
+                    .is_none_or(|code| code.backend.is_none())
+                || actions.is_empty()
+                || actions.len() > 64
+                || actions.iter().any(|action| {
+                    !identifier(&action.id)
+                        || !ids.insert(&action.id)
+                        || blank(&action.label)
+                        || blank(&action.description)
+                })
+            {
+                return Err(invalid_manifest("Invalid plugin action declaration").into());
             }
         }
         if let Some(provider) = &manifest.agent_provider

@@ -19,6 +19,7 @@ mod generation_queue;
 mod generation_worker;
 mod media_worker;
 mod output_formats;
+mod plugin_actions;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
@@ -53,6 +54,7 @@ pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions}
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
+pub use plugin_actions::InstalledPluginAction;
 pub use plugin_catalog::{
     CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
 };
@@ -65,7 +67,8 @@ pub use plugin_registry::{
 };
 pub use plugin_runtime::MAX_PLUGIN_IO_BYTES;
 pub use plugin_schema::{
-    PluginCode, PluginSetting, PluginSettingKind, PluginSettingScope, PluginSurfacePlacement,
+    PluginAction, PluginActionScope, PluginCode, PluginSetting, PluginSettingKind,
+    PluginSettingScope, PluginSurfacePlacement,
 };
 pub use plugin_settings::ResolvedPluginSetting;
 pub use plugin_surfaces::InstalledPluginSurface;

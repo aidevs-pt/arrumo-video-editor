@@ -97,3 +97,19 @@ pub(crate) fn valid_code_path(path: &str, extension: &str) -> bool {
                     .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
         })
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginAction {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub scope: PluginActionScope,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginActionScope {
+    App,
+    Workspace,
+}

@@ -9,7 +9,7 @@ use wasmtime::{
     component::{Component, Linker},
 };
 
-use crate::{PluginManifest, WorkspaceStore};
+use crate::{PluginActionScope, PluginManifest, WorkspaceStore};
 
 const MAX_COMPONENT_BYTES: u64 = 4 * 1024 * 1024;
 pub const MAX_PLUGIN_IO_BYTES: usize = 64 * 1024;
@@ -17,7 +17,7 @@ const GUEST_FUEL: u64 = 5_000_000;
 
 impl WorkspaceStore {
     pub fn invoke_plugin_component(&self, plugin_id: &str, input: &Value) -> io::Result<Value> {
-        self.invoke_plugin(plugin_id, None, input)
+        self.invoke_plugin(plugin_id, None, input, None)
     }
 
     pub fn invoke_plugin_in_workspace(
@@ -26,25 +26,26 @@ impl WorkspaceStore {
         workspace_id: i64,
         input: &Value,
     ) -> io::Result<Value> {
-        self.invoke_plugin(plugin_id, Some(workspace_id), input)
+        self.invoke_plugin(plugin_id, Some(workspace_id), input, None)
     }
 
-    fn invoke_plugin(
+    pub(crate) fn invoke_plugin(
         &self,
         plugin_id: &str,
         workspace_id: Option<i64>,
         input: &Value,
+        action: Option<(&str, Option<&str>)>,
     ) -> io::Result<Value> {
         let tx = self
             .0
             .unchecked_transaction()
             .map_err(|_| io::Error::other("Could not read plugin invocation state"))?;
-        let (manifest, package): (Vec<u8>, Vec<u8>) = tx
+        let (manifest, package, digest): (Vec<u8>, Vec<u8>, String) = tx
             .query_row(
-                "SELECT manifest, package_bytes FROM installed_plugin_manifests
+                "SELECT manifest, package_bytes, package_sha256 FROM installed_plugin_manifests
                  WHERE plugin_id = ?1 AND package_bytes IS NOT NULL",
                 [plugin_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .map_err(|_| io::Error::other("Installed plugin package unavailable"))?;
         let manifest = PluginManifest::parse(&manifest)
@@ -52,6 +53,38 @@ impl WorkspaceStore {
         if manifest.id != plugin_id {
             return Err(io::Error::other("Installed plugin identity mismatch"));
         }
+        let input = if let Some((action_id, expected_digest)) = action {
+            if expected_digest.is_some_and(|expected| expected != digest) {
+                return Err(io::Error::other(
+                    "Plugin package changed after action review",
+                ));
+            }
+            let action = manifest
+                .actions
+                .as_ref()
+                .and_then(|actions| actions.iter().find(|action| action.id == action_id))
+                .ok_or_else(|| io::Error::other("Plugin action is not declared"))?;
+            if (action.scope == PluginActionScope::Workspace) != workspace_id.is_some() {
+                return Err(io::Error::other("Plugin action requires a different scope"));
+            }
+            if let Some(workspace_id) = workspace_id {
+                tx.query_row(
+                    "SELECT id FROM workspaces WHERE id = ?1",
+                    [workspace_id],
+                    |_| Ok(()),
+                )
+                .map_err(|_| io::Error::other("Plugin action workspace unavailable"))?;
+            }
+            serde_json::to_string(&serde_json::json!({"action": action_id, "input": input}))
+        } else {
+            if manifest.actions.is_some() {
+                return Err(io::Error::other(
+                    "Invoke plugins that declare actions by action ID",
+                ));
+            }
+            serde_json::to_string(input)
+        }
+        .map_err(|_| io::Error::other("Could not encode plugin input"))?;
         let context = if let Some(workspace_id) = workspace_id
             && manifest.backend_requests_workspace_context()
             && self.plugin_context_granted(plugin_id, workspace_id)?
@@ -91,8 +124,6 @@ impl WorkspaceStore {
             .take(MAX_COMPONENT_BYTES + 1)
             .read_to_end(&mut component)
             .map_err(|_| io::Error::other("Could not read plugin backend component"))?;
-        let input = serde_json::to_string(input)
-            .map_err(|_| io::Error::other("Could not encode plugin input"))?;
         execute_component(&component, &input, context.as_deref())
     }
 }
