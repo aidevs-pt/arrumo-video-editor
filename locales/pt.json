@@ -1,4 +1,22 @@
 {
+  "pluginPreferences": {
+    "title": "Definições dos plugins",
+    "appIntro": "Defina os valores predefinidos desta instalação do Arrumo.",
+    "workspaceIntro": "Personalize os valores deste espaço de trabalho.",
+    "loading": "A carregar as definições dos plugins…",
+    "loadError": "Não foi possível carregar as definições dos plugins.",
+    "unset": "Sem valor definido",
+    "app": "A usar o valor predefinido da aplicação",
+    "workspace": "A usar um valor deste espaço de trabalho",
+    "yes": "Sim",
+    "no": "Não",
+    "save": "Guardar",
+    "inherit": "Usar valor predefinido",
+    "clear": "Limpar valor",
+    "invalid": "Introduza um valor válido para esta definição.",
+    "saveError": "Não foi possível guardar esta definição. Verifique o valor e tente novamente.",
+    "saved": "Definição guardada."
+  },
   "pluginRegistry": {
     "update": "Atualizar",
     "updated": "Plugin atualizado.",

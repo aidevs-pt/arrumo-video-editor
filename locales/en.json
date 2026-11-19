@@ -1,4 +1,22 @@
 {
+  "pluginPreferences": {
+    "title": "Plugin settings",
+    "appIntro": "Set defaults for this Arrumo installation.",
+    "workspaceIntro": "Set overrides for this workspace.",
+    "loading": "Loading plugin settings…",
+    "loadError": "Could not load plugin settings.",
+    "unset": "No value set",
+    "app": "Using the app default",
+    "workspace": "Using a workspace override",
+    "yes": "Yes",
+    "no": "No",
+    "save": "Save",
+    "inherit": "Use app default",
+    "clear": "Clear value",
+    "invalid": "Enter a valid value for this setting.",
+    "saveError": "Could not save this setting. Check the value and try again.",
+    "saved": "Setting saved."
+  },
   "pluginRegistry": {
     "update": "Update",
     "updated": "Plugin updated.",

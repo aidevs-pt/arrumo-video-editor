@@ -208,3 +208,5 @@ For packages installed from a local registry snapshot, use `update-plugin-releas
 When you load the same registry in desktop Settings, installed packages show **Update** for newer compatible releases from their recorded repository. Review the release and confirm the update. Local-snapshot packages use the offline CLI update command.
 
 Use `plugin-settings <plugin-id> <app|workspace-id>` to read declared non-secret values and their effective source. Use `set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json>` to store a string, boolean, or signed 64-bit integer. Use `clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id>` to unset a value. Clearing a workspace override restores its app default. Empty strings, `false`, and `0` are explicit values. Secret fields require separate credential storage and are excluded from these commands.
+
+Desktop Settings shows **Plugin settings** when an installed manifest declares editable non-secret fields. Choose the app scope to set defaults or a workspace scope to override workspace fields. **Use app default** clears an override. The form shows where each effective value comes from.

@@ -1,4 +1,22 @@
 {
+  "pluginPreferences": {
+    "title": "Configuración de complementos",
+    "appIntro": "Establece los valores predeterminados de esta instalación de Arrumo.",
+    "workspaceIntro": "Personaliza los valores de este espacio de trabajo.",
+    "loading": "Cargando la configuración de complementos…",
+    "loadError": "No se pudo cargar la configuración de complementos.",
+    "unset": "Sin valor configurado",
+    "app": "Usa el valor predeterminado de la aplicación",
+    "workspace": "Usa un valor de este espacio de trabajo",
+    "yes": "Sí",
+    "no": "No",
+    "save": "Guardar",
+    "inherit": "Usar valor predeterminado",
+    "clear": "Borrar valor",
+    "invalid": "Introduce un valor válido para este ajuste.",
+    "saveError": "No se pudo guardar este ajuste. Comprueba el valor e inténtalo de nuevo.",
+    "saved": "Ajuste guardado."
+  },
   "pluginRegistry": {
     "update": "Actualizar",
     "updated": "Complemento actualizado.",

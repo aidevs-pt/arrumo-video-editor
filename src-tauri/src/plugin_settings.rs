@@ -139,3 +139,60 @@ pub fn open_plugin_repository(app: AppHandle, url: String) -> Result<(), &'stati
         .open_url(url, None::<&str>)
         .map_err(|_| "plugin_repository_failed")
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditablePluginSetting {
+    app: Option<String>,
+    workspace_override: Option<String>,
+    effective: Option<String>,
+    source: Option<arrumo_workspaces::PluginSettingScope>,
+}
+
+#[tauri::command]
+pub fn read_plugin_settings(
+    plugin_id: String,
+    workspace_id: Option<i64>,
+    store: State<'_, Store>,
+) -> Result<BTreeMap<String, EditablePluginSetting>, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    let settings = store
+        .plugin_settings(&plugin_id, workspace_id)
+        .map_err(|_| "plugin_settings_load_failed")?;
+    Ok(settings
+        .into_iter()
+        .map(|(key, state)| {
+            let encode = |value: serde_json::Value| value.to_string();
+            (
+                key,
+                EditablePluginSetting {
+                    app: state.app.map(encode),
+                    workspace_override: state.workspace_override.map(encode),
+                    effective: state.effective.map(encode),
+                    source: state.source,
+                },
+            )
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub fn write_plugin_setting(
+    plugin_id: String,
+    setting_id: String,
+    workspace_id: Option<i64>,
+    value_json: Option<String>,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    // Text transport preserves the full range of signed integer settings in the webview.
+    let value = value_json
+        .as_deref()
+        .map(serde_json::from_str)
+        .transpose()
+        .map_err(|_| "plugin_setting_invalid")?;
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_plugin_setting(&plugin_id, &setting_id, workspace_id, value.as_ref())
+        .map_err(|_| "plugin_setting_save_failed")
+}

@@ -16,6 +16,7 @@ import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginCatalog } from "./plugin-catalog";
+import { WorkspacePluginPreferences } from "./plugin-preferences";
 
 type AgentPlugin = { id: string; label: string };
 type Settings = {
@@ -66,6 +67,7 @@ export function AgentSettingsPage() {
               <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
             </Button>}
             {!requested && !setupWorkspace && <PluginCatalog />}
+            {workspace && !setupWorkspace && <WorkspacePluginPreferences key={workspace.id} workspaceId={workspace.id} />}
           </div>
         )}
     </WorkspaceShell>
