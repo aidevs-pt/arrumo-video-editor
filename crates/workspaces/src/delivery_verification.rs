@@ -57,13 +57,13 @@ struct Cue {
     duration_time: String,
 }
 
-#[derive(Deserialize, Serialize)]
-pub(crate) struct VerifiedDelivery {
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct VerifiedDelivery {
     pub verified_outputs: Vec<VerifiedOutput>,
 }
 
-#[derive(Deserialize, Serialize)]
-pub(crate) struct VerifiedOutput {
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct VerifiedOutput {
     pub format_id: i64,
     pub video: String,
     pub subtitles: String,
@@ -80,6 +80,24 @@ pub fn delivery_directory(database: &Path, workspace_id: i64, run_id: i64) -> Pa
 }
 
 impl WorkspaceStore {
+    pub(crate) fn verified_delivery(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> rusqlite::Result<VerifiedDelivery> {
+        self.0.query_row(
+            "SELECT results.result_json FROM production_results AS results
+             JOIN generation_runs AS runs ON runs.id = results.run_id
+             WHERE runs.workspace_id = ?1 AND runs.id = ?2 AND runs.state = 'completed'
+               AND results.stage_index = runs.stage_index - 1
+               AND json_extract(runs.plan_json, '$.steps[' || results.stage_index || '].stage')
+                   = 'verify_delivery'
+             ORDER BY results.id DESC LIMIT 1",
+            params![workspace_id, run_id],
+            |row| read_settings(row.get(0)?, 0),
+        )
+    }
+
     pub fn verify_generation_delivery(
         &self,
         database: &Path,

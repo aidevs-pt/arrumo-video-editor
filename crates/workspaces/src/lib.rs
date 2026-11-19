@@ -6,6 +6,7 @@ use serde::Serialize;
 mod assets;
 mod brand_assets;
 mod clip_render;
+mod completed_video;
 mod delivery_export;
 mod delivery_verification;
 mod format_deliveries;
@@ -23,7 +24,8 @@ mod workspace_feedback;
 
 pub use assets::{WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
-pub use delivery_verification::delivery_directory;
+pub use completed_video::CompletedVideo;
+pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
@@ -82,6 +84,7 @@ impl WorkspaceStore {
             include_str!("../migrations/016-generation-plan.sql"),
             include_str!("../migrations/017-production-progress.sql"),
             include_str!("../migrations/018-preview-settings.sql"),
+            include_str!("../migrations/019-completed-video-title.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

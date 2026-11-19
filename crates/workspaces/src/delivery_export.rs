@@ -5,11 +5,9 @@ use std::{
     path::Path,
 };
 
-use rusqlite::params;
 use tempfile::NamedTempFile;
 use zip::{ZipWriter, write::SimpleFileOptions};
 
-use crate::delivery_verification::VerifiedDelivery;
 use crate::{WorkspaceStore, delivery_directory};
 
 impl WorkspaceStore {
@@ -20,18 +18,7 @@ impl WorkspaceStore {
         run_id: i64,
         destination: &Path,
     ) -> Result<(), Box<dyn Error>> {
-        let result: String = self.0.query_row(
-            "SELECT results.result_json FROM production_results AS results
-             JOIN generation_runs AS runs ON runs.id = results.run_id
-             WHERE runs.workspace_id = ?1 AND runs.id = ?2 AND runs.state = 'completed'
-               AND results.stage_index = runs.stage_index - 1
-               AND json_extract(runs.plan_json, '$.steps[' || results.stage_index || '].stage')
-                   = 'verify_delivery'
-             ORDER BY results.id DESC LIMIT 1",
-            params![workspace_id, run_id],
-            |row| row.get(0),
-        )?;
-        let delivery: VerifiedDelivery = serde_json::from_str(&result)?;
+        let delivery = self.verified_delivery(workspace_id, run_id)?;
         if delivery.verified_outputs.is_empty() {
             return Err(io::Error::other("No verified delivery files to export").into());
         }
