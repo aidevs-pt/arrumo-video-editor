@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { FormatDelivery } from "./format-delivery";
 import { outputCopy } from "./output-copy";
 
 type OutputFormat = { id: number; name: string; width: number; height: number; enabled: boolean };
@@ -20,6 +21,7 @@ export function WorkspaceOutputs({
   locale: keyof typeof outputCopy;
   onBack: () => void;
 }) {
+  const [deliveryFormat, setDeliveryFormat] = useState<OutputFormat | null>(null);
   const [formats, setFormats] = useState<OutputFormat[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -95,6 +97,15 @@ export function WorkspaceOutputs({
     }
   }
 
+  if (deliveryFormat) {
+    return <FormatDelivery
+      workspaceId={workspace.id}
+      format={deliveryFormat}
+      locale={locale}
+      onBack={() => setDeliveryFormat(null)}
+    />;
+  }
+
   return (
     <main className="workspace-shell profile-shell">
       <Button type="button" variant="ghost" onClick={onBack} disabled={pending}>
@@ -141,6 +152,8 @@ export function WorkspaceOutputs({
                       </div>
                     ) : (
                       <div className="profile-edit-actions">
+                        <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
+                          aria-label={`${copy.delivery} · ${format.name}`} onClick={() => setDeliveryFormat(format)}>{copy.delivery}</Button>
                         <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
                           aria-label={`${copy.edit} ${format.name}`} onClick={() => {
                             setFailure(null);
