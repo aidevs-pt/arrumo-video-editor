@@ -1,4 +1,8 @@
-use std::{collections::HashSet, error::Error, io};
+use std::{
+    collections::{BTreeMap, HashSet},
+    error::Error,
+    io,
+};
 
 use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
@@ -31,6 +35,12 @@ pub struct ProviderPreferences {
     source: PreferenceSource,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct CapturedProviderOrder {
+    effective: Vec<String>,
+    source: PreferenceSource,
+}
+
 impl WorkspaceStore {
     pub fn provider_preferences(
         &self,
@@ -40,6 +50,57 @@ impl WorkspaceStore {
         let _transaction = self.0.unchecked_transaction()?;
         self.check_preference_scope(capability, workspace_id)?;
         let available = self.capability_providers(capability)?;
+        self.resolve_provider_preferences(capability, workspace_id, available)
+    }
+
+    // Generation already holds the write transaction that freezes the run inputs.
+    pub(crate) fn capture_provider_orders(
+        &self,
+        workspace_id: i64,
+    ) -> Result<BTreeMap<String, CapturedProviderOrder>, Box<dyn Error>> {
+        let mut capabilities: BTreeMap<String, Vec<CapabilityProvider>> = BTreeMap::new();
+        for plugin in self.plugin_catalog()? {
+            for capability in plugin.manifest.capabilities.keys() {
+                capabilities
+                    .entry(capability.clone())
+                    .or_default()
+                    .push(CapabilityProvider {
+                        id: plugin.manifest.id.clone(),
+                        name: plugin.manifest.name.clone(),
+                        bundled: plugin.bundled,
+                    });
+            }
+        }
+        let mut query = self.0.prepare(
+            "SELECT DISTINCT capability FROM plugin_provider_preferences
+             WHERE workspace_id IS NULL OR workspace_id = ?1",
+        )?;
+        for stored in query.query_map([workspace_id], |row| row.get::<_, String>(0))? {
+            capabilities.entry(stored?).or_default();
+        }
+        capabilities
+            .into_iter()
+            .map(|(capability, available)| {
+                let order =
+                    self.resolve_provider_preferences(&capability, Some(workspace_id), available)?;
+                Ok((
+                    capability,
+                    CapturedProviderOrder {
+                        effective: order.effective,
+                        source: order.source,
+                    },
+                ))
+            })
+            .collect()
+    }
+
+    fn resolve_provider_preferences(
+        &self,
+        capability: &str,
+        workspace_id: Option<i64>,
+        mut available: Vec<CapabilityProvider>,
+    ) -> Result<ProviderPreferences, Box<dyn Error>> {
+        available.sort_by(|first, second| first.id.cmp(&second.id));
         let resolve_scope = |scope: Option<i64>| -> Result<Option<Vec<String>>, Box<dyn Error>> {
             let stored: Option<String> = self.0.query_row(
                 "SELECT plugin_ids FROM plugin_provider_preferences WHERE capability = ?1 AND workspace_id IS ?2",
@@ -120,7 +181,7 @@ impl WorkspaceStore {
         &self,
         capability: &str,
     ) -> Result<Vec<CapabilityProvider>, Box<dyn Error>> {
-        let mut available: Vec<_> = self
+        Ok(self
             .plugin_catalog()?
             .into_iter()
             .filter(|plugin| plugin.manifest.capabilities.contains_key(capability))
@@ -129,9 +190,7 @@ impl WorkspaceStore {
                 name: plugin.manifest.name,
                 bundled: plugin.bundled,
             })
-            .collect();
-        available.sort_by(|first, second| first.id.cmp(&second.id));
-        Ok(available)
+            .collect())
     }
 
     fn check_preference_scope(

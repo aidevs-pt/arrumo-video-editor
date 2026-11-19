@@ -196,12 +196,20 @@ impl WorkspaceStore {
         if formats.is_empty() {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let provider_orders = self
+            .capture_provider_orders(workspace_id)
+            .map_err(|error| {
+                rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
+                    error.to_string(),
+                )))
+            })?;
         Ok(json!({
             "schema_version": 1,
             "draft": draft,
             "options": options,
             "preview_settings": self.preview_settings()?,
             "agent_settings": self.agent_settings(Some(workspace_id))?,
+            "provider_orders": provider_orders,
             "workspace_context": self.workspace_context(workspace_id)?,
             "brand_colors": self.brand_colors(workspace_id)?,
             "brand_assets": self.list_brand_assets(workspace_id)?,
@@ -320,6 +328,14 @@ mod tests {
             .enqueue_video_draft(studio, draft.id, "attempt-one", &options)
             .unwrap();
         assert_eq!(run.state, "queued");
+        assert_eq!(
+            run.snapshot["provider_orders"]["transcription"],
+            json!({"effective": ["elevenlabs", "openai"], "source": "bundled_default"})
+        );
+        store
+            .set_provider_preferences("transcription", Some(studio), Some(&[]))
+            .unwrap();
+
         assert_eq!(run.snapshot["preview_settings"]["effective_max_edge"], 360);
         assert!(store.set_preview_max_edge(Some(0)).is_err());
         assert_eq!(store.preview_settings().unwrap().effective_max_edge, 360);
@@ -357,5 +373,12 @@ mod tests {
         );
         assert_eq!(store.list_generation_runs(studio).unwrap(), [run]);
         assert!(store.list_generation_runs(other).unwrap().is_empty());
+        let revised = store
+            .enqueue_video_draft(studio, draft.id, "with-override", &options)
+            .unwrap();
+        assert_eq!(
+            revised.snapshot["provider_orders"]["transcription"],
+            json!({"effective": [], "source": "workspace"})
+        );
     }
 }
