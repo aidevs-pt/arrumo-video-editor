@@ -49,6 +49,12 @@ fn generation_request_key(request_key: &str) -> rusqlite::Result<&str> {
     Ok(key)
 }
 
+#[derive(Debug, Serialize)]
+pub struct PendingReview {
+    pub run_id: i64,
+    pub title: String,
+}
+
 impl WorkspaceStore {
     pub fn enqueue_video_draft(
         &self,
@@ -199,6 +205,25 @@ impl WorkspaceStore {
             "profile": profile,
             "formats": formats,
         }))
+    }
+
+    pub fn pending_generation_reviews(
+        &self,
+        workspace_id: i64,
+    ) -> rusqlite::Result<Vec<PendingReview>> {
+        self.0
+            .prepare(
+                "SELECT id, json_extract(snapshot_json, '$.draft.title') FROM generation_runs
+             WHERE workspace_id = ?1 AND state = 'paused' AND pending_review_id IS NOT NULL
+             ORDER BY id DESC",
+            )?
+            .query_map([workspace_id], |row| {
+                Ok(PendingReview {
+                    run_id: row.get(0)?,
+                    title: row.get(1)?,
+                })
+            })?
+            .collect()
     }
 
     pub fn generation_run(

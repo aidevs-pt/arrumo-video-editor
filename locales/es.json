@@ -1,5 +1,8 @@
 {
   "studio": {
+    "closeNavigation": "Cerrar navegación",
+    "reviewInbox": "Bandeja de revisiones",
+    "noReviews": "Ningún proceso está esperando revisión.",
     "videoStudio": "Estudio de vídeo",
     "workspace": "Cambiar de espacio",
     "navigation": "Navegación del espacio",
@@ -8,7 +11,14 @@
     "formats": "Formatos",
     "workspaceSection": "Espacio de trabajo",
     "workspaceSettings": "Ajustes del espacio",
-    "generations": "Generaciones"
+    "generations": "Generaciones",
+    "production": "Producción",
+    "completedVideos": "Vídeos completados",
+    "location": "Ubicación actual",
+    "searchCompleted": "Buscar vídeos completados",
+    "noCompleted": "No hay vídeos completados",
+    "completedHint": "Las entregas verificadas aparecen aquí.",
+    "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
     "title": "Recursos",

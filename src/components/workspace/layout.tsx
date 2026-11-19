@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export function WorkspaceShell({ className, ...props }: ComponentProps<"main">) {
   return <main className={cn(
-    "mx-auto max-w-6xl px-4 py-6 sm:px-7 sm:py-7 [&>button]:mb-4",
+    "mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-7 [&>button]:mb-4",
     className,
   )} {...props} />;
 }
@@ -15,7 +15,7 @@ export function WorkspaceHeading({ className, icon: Icon, children, ...props }: 
       {Icon && <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-foreground text-background">
         <Icon className="size-5" aria-hidden="true" />
       </span>}
-      <div className="min-w-0 [&>h1]:wrap-anywhere [&>h1]:text-[clamp(1.65rem,3.5vw,2.15rem)] [&>h1]:leading-[1.1] [&>h1]:font-bold [&>h1]:tracking-[-0.035em] [&>h1]:outline-none [&>p]:mt-1.5 [&>p]:max-w-[65ch] [&>p]:text-sm [&>p]:text-muted-foreground">
+      <div className="min-w-0 [&>h1]:wrap-anywhere [&>h1]:text-[1.75rem] [&>h1]:leading-[1.1] [&>h1]:font-bold [&>h1]:tracking-[-0.035em] [&>h1]:outline-none [&>p]:mt-1.5 [&>p]:max-w-[65ch] [&>p]:text-sm [&>p]:text-muted-foreground">
         {children}
       </div>
     </div>

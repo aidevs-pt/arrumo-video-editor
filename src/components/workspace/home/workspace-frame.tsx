@@ -1,14 +1,24 @@
-import { ChevronRight, Clapperboard, FileText, FolderOpen, Images, Layers, ListVideo, Palette, Plus, SlidersHorizontal } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronDown, Clapperboard, FileText, Film, FolderOpen, Images, Layers, ListVideo, Palette, Plus, SlidersHorizontal, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import type { CSSProperties, ReactNode } from "react";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarSeparator, SidebarTrigger, useSidebar,
+} from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLocale } from "@/lib/locale-provider";
+import { ReviewInbox } from "./review-inbox";
 import { WorkspaceOverview } from "./workspace-overview";
+import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
+import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
 
-export type Workspace = { id: number; name: string };
-export type WorkspaceView = "profiles" | "context" | "brand" | "assets" | "outputs" | "drafts" | "generations";
+export type { Workspace, WorkspaceView } from "./workspace-links";
 
-export function WorkspaceFrame({ workspaces, workspace, view, onSelect, onNavigate, children }: {
+export function WorkspaceFrame(props: {
   workspaces: Workspace[];
   workspace: Workspace | null;
   view: WorkspaceView;
@@ -16,107 +26,177 @@ export function WorkspaceFrame({ workspaces, workspace, view, onSelect, onNaviga
   onNavigate: (view: WorkspaceView) => void;
   children: ReactNode;
 }) {
+  return (
+    <TooltipProvider delayDuration={250}>
+      <SidebarProvider style={{ "--sidebar-width": "13rem" } as CSSProperties}><StudioLayout {...props} /></SidebarProvider>
+    </TooltipProvider>
+  );
+}
+
+function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, children }: Parameters<typeof WorkspaceFrame>[0]) {
   const { messages } = useLocale();
+  const { setOpenMobile } = useSidebar();
+  const pathname = usePathname().replace(/\/$/, "");
+  const query = useSearchParams();
   const copy = messages.studio;
-  const sections = [
-    { view: "profiles", label: messages.profiles.title, icon: Layers },
+  const workspaceTabs = [
     { view: "context", label: messages.profiles.context, icon: FileText },
     { view: "brand", label: messages.brand.title, icon: Palette },
     { view: "assets", label: messages.assets.title, icon: Images },
     { view: "outputs", label: messages.outputs.title, icon: SlidersHorizontal },
-    { view: "drafts", label: messages.drafts.title, icon: Clapperboard },
-    { view: "generations", label: messages.queue.title, icon: ListVideo },
   ] as const;
-  const workspaceTabs = sections.filter(({ view: target }) =>
-    target === "context" || target === "brand" || target === "assets" || target === "outputs");
-  const workspaceSection = workspaceTabs.some(({ view: target }) => target === view);
-  const primarySections = sections.filter(({ view: target }) =>
-    target === "profiles" || target === "drafts" || target === "generations");
-  const current = sections.find((section) => section.view === view);
-  const Icon = current?.icon ?? FolderOpen;
+  const production = [
+    { view: "drafts", label: messages.drafts.title, icon: Clapperboard },
+    { view: "generations", label: copy.generations, icon: ListVideo },
+    { view: "videos", label: copy.completedVideos, icon: Film },
+  ] as const;
+  const workspaceSection = workspaceTabs.some((item) => item.view === view);
+  const sectionLabel = pathname === "/generation-run" ? messages.queue.runDetail
+    : pathname === "/completed-video" ? messages.completedVideo.details
+    : pathname === "/profile" ? messages.profileFormats.title
+    : [...workspaceTabs, ...production].find((item) => item.view === view)?.label ?? messages.profiles.title;
+
+  function choose(entry: Workspace | null) {
+    setOpenMobile(false);
+    onSelect(entry);
+  }
 
   return (
-    <div className="min-h-dvh min-[800px]:grid min-[800px]:grid-cols-[12rem_minmax(0,1fr)]">
-      <aside className="border-b bg-sidebar text-sidebar-foreground min-[800px]:sticky min-[800px]:top-0 min-[800px]:h-dvh min-[800px]:overflow-y-auto min-[800px]:border-r min-[800px]:border-b-0">
-        <div className="flex flex-col gap-4 px-4 py-3 min-[800px]:gap-6 min-[800px]:py-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 min-[800px]:flex-col min-[800px]:items-stretch min-[800px]:gap-6">
-            <Button variant="ghost" className="-mx-1 h-auto justify-start gap-2.5 p-1 text-start" onClick={() => onSelect(null)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/arrumo-icon.svg" alt="" width={32} height={32} />
-              <span className="flex flex-col">
-                <span className="text-lg leading-none font-bold tracking-tight">Arrumo</span>
-                <span className="mt-1 text-xs font-medium text-muted-foreground">{copy.videoStudio}</span>
-              </span>
-            </Button>
+    <>
+      <Sidebar collapsible="icon" mobileTitle={copy.navigation}>
+        <SidebarHeader className="relative gap-3 px-3 pt-3 pb-2">
+          <Button variant="ghost" size="icon" className="absolute end-2 top-3 md:hidden"
+            onClick={() => setOpenMobile(false)} aria-label={copy.closeNavigation}><X /></Button>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" tooltip="Arrumo" asChild>
+                <Link href="/" onClick={() => setOpenMobile(false)} aria-label="Arrumo">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="size-8 shrink-0 rounded-lg" src="/arrumo-icon.svg" alt="" width={32} height={32} />
+                  <span className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+                    <span className="text-base leading-none font-bold tracking-tight">Arrumo</span>
+                    <span className="mt-1 text-xs text-muted-foreground">{copy.videoStudio}</span>
+                  </span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             {workspaces.length > 0 && (
-              <NativeSelect aria-label={copy.workspace} value={workspace?.id ?? ""}
-                className="max-w-48 min-[800px]:w-full"
-                onChange={(event) => onSelect(workspaces.find(({ id }) => String(id) === event.target.value) ?? null)}>
-                <NativeSelectOption value="">{messages.workspaces.title}</NativeSelectOption>
-                {workspaces.map(({ id, name }) => <NativeSelectOption key={id} value={id}>{name}</NativeSelectOption>)}
-              </NativeSelect>
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton variant="outline" tooltip={copy.workspace} aria-label={copy.workspace}>
+                      <Layers /><span className="flex-1 truncate">{workspace?.name ?? messages.workspaces.title}</span>
+                      <ChevronDown className="ms-auto group-data-[collapsible=icon]:hidden" />
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="bottom" align="start" className="w-56">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>{messages.workspaces.list}</DropdownMenuLabel>
+                      {workspaces.map((entry) => (
+                        <DropdownMenuItem key={entry.id} onSelect={() => choose(entry)}>{entry.name}</DropdownMenuItem>
+                      ))}
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => choose(null)}>{messages.workspaces.title}</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
             )}
-          </div>
-          {workspace && (
-            <nav aria-label={copy.navigation} className="flex flex-wrap gap-1 min-[800px]:flex-col">
-              <Button type="button" variant={workspaceSection ? "default" : "ghost"}
-                aria-current={workspaceSection ? "true" : undefined}
-                className="min-h-9 justify-start gap-2.5" onClick={() => onNavigate("context")}>
-                <FolderOpen data-icon="inline-start" />{copy.workspaceSection}
-              </Button>
-              {primarySections.map(({ view: target, label, icon: SectionIcon }) => (
-                <Button key={target} type="button" variant={target === view ? "default" : "ghost"}
-                  aria-current={target === view ? "page" : undefined}
-                  className="h-auto min-h-9 justify-start gap-2.5 whitespace-normal text-start"
-                  onClick={() => onNavigate(target)}><SectionIcon data-icon="inline-start" />{target === "generations" ? copy.generations : label}</Button>
-              ))}
-            </nav>
-          )}
-        </div>
-      </aside>
+          </SidebarMenu>
+        </SidebarHeader>
+        {workspace && (
+          <SidebarContent>
+            <SidebarGroup className="px-3">
+              <SidebarGroupLabel>{copy.workspaceSection}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu aria-label={copy.workspaceSection}>
+                  <SidebarMenuItem>
+                    <NavLink href={workspaceHref("context", workspace.id)} active={workspaceSection} label={copy.workspaceSettings} icon={FolderOpen} />
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <NavLink href={workspaceHref("profiles", workspace.id)} active={view === "profiles"} label={messages.profiles.title} icon={Layers} />
+                    <WorkspaceProfileNavigation key={workspace.id} workspaceId={workspace.id}
+                      selected={pathname === "/profile" ? Number(query.get("profile")) : null} />
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarSeparator />
+            <SidebarGroup className="px-3">
+              <SidebarGroupLabel>{copy.production}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu aria-label={copy.production}>
+                  {production.map(({ view: section, label, icon }) => (
+                    <SidebarMenuItem key={section}>
+                      <NavLink href={workspaceHref(section, workspace.id)} active={view === section} label={label} icon={icon} />
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        )}
+      </Sidebar>
 
-      <div className="min-w-0">
-        <header className="flex min-h-14 items-center justify-between gap-3 border-b px-4 sm:px-7">
-          <div className="flex min-w-0 items-center gap-2 text-sm">
-            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            {workspace ? (
-              <>
-                <span className="truncate font-medium">{workspace.name}</span>
-                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="truncate text-muted-foreground">{current?.label}</span>
-              </>
-            ) : (
-              <span className="font-medium">{messages.workspaces.title}</span>
-            )}
-          </div>
-          {workspace && (
-            <Button onClick={() => onNavigate("drafts")} size="sm">
-              <Plus data-icon="inline-start" />{copy.newVideo}
-            </Button>
-          )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background px-3 sm:px-5">
+          <SidebarTrigger aria-label={copy.navigation} />
+          <Breadcrumb aria-label={copy.location} className="min-w-0 flex-1">
+            <BreadcrumbList className="flex-nowrap">
+              <BreadcrumbItem className="min-w-0">
+                {workspace ? <BreadcrumbLink asChild className="truncate font-medium">
+                  <Link href={workspaceHref("profiles", workspace.id)}>{workspace.name}</Link>
+                </BreadcrumbLink> : <BreadcrumbPage>{messages.workspaces.title}</BreadcrumbPage>}
+              </BreadcrumbItem>
+              {workspace && <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="truncate">{sectionLabel}</BreadcrumbPage></BreadcrumbItem>
+              </>}
+            </BreadcrumbList>
+          </Breadcrumb>
+          {workspace && <ReviewInbox key={workspace.id} workspaceId={workspace.id} />}
+          {workspace && !(view === "drafts" && query.get("compose") === "1") && <Button asChild size="sm">
+            <Link href={`${workspaceHref("drafts", workspace.id)}&compose=1`}><Plus data-icon="inline-start" />{copy.newVideo}</Link>
+          </Button>}
         </header>
-        <div className={workspace ? "grid min-h-[calc(100dvh-3.5rem)] min-[1200px]:grid-cols-[minmax(0,1fr)_15.5rem]" : undefined}>
-          <div className="min-w-0">
-            {workspace && workspaceSection && (
-              <nav aria-label={copy.workspaceSettings} className="flex flex-wrap gap-1 border-b px-4 py-2.5 sm:px-7">
-                {workspaceTabs.map(({ view: target, label, icon: TabIcon }) => (
-                  <Button key={target} type="button" variant={target === view ? "secondary" : "ghost"}
-                    aria-current={target === view ? "page" : undefined}
-                    onClick={() => onNavigate(target)}><TabIcon data-icon="inline-start" />{label}</Button>
-                ))}
-              </nav>
-            )}
-            {children}
-          </div>
-          {workspace && (
-            <aside className="hidden border-l bg-sidebar px-4 pt-7 min-[1200px]:block" aria-label={copy.overview}>
-              <div className="sticky top-7 flex flex-col gap-5">
+        {workspace && workspaceSection && (
+          <nav aria-label={copy.workspaceSettings} className="flex flex-wrap gap-1 border-b bg-sidebar/45 px-3 py-2 sm:px-5">
+            {workspaceTabs.map(({ view: section, label, icon: Icon }) => (
+              <Button asChild key={section} size="sm" variant={section === view ? "secondary" : "ghost"}>
+                <Link href={workspaceHref(section, workspace.id)} aria-current={section === view ? "page" : undefined}>
+                  <Icon data-icon="inline-start" />{label}
+                </Link>
+              </Button>
+            ))}
+          </nav>
+        )}
+        <div className={workspace && workspaceSection ? "grid flex-1 min-[1280px]:grid-cols-[minmax(0,1fr)_15rem]" : "flex-1"}>
+          <div className="min-w-0">{children}</div>
+          {workspace && workspaceSection && (
+            <aside className="hidden border-l bg-sidebar px-4 py-6 min-[1280px]:block" aria-label={copy.overview}>
+              <div className="sticky top-20 flex flex-col gap-4">
                 <WorkspaceOverview key={workspace.id} workspaceId={workspace.id} view={view} onNavigate={onNavigate} />
               </div>
             </aside>
           )}
         </div>
       </div>
-    </div>
+    </>
+  );
+}
+
+function NavLink({ href, label, active, icon: Icon }: {
+  href: string;
+  label: string;
+  active: boolean;
+  icon: typeof Layers;
+}) {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground">
+      <Link href={href} aria-current={active ? "page" : undefined} onClick={() => setOpenMobile(false)}>
+        <Icon /><span>{label}</span>
+      </Link>
+    </SidebarMenuButton>
   );
 }

@@ -251,6 +251,41 @@ async fn import_asset(
 }
 
 #[tauri::command]
+async fn preview_workspace_image(
+    workspace_id: i64,
+    asset_id: i64,
+    app: AppHandle,
+) -> Result<Option<String>, &'static str> {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "asset_preview_failed")?
+            .join("workspaces.sqlite");
+        let database = database
+            .canonicalize()
+            .map_err(|_| "asset_preview_failed")?;
+        let store = WorkspaceStore::open(&database).map_err(|_| "asset_preview_failed")?;
+        store
+            .image_preview(&asset_root(&database), workspace_id, asset_id)
+            .map(|preview| {
+                preview.map(|image| {
+                    format!(
+                        "data:{};base64,{}",
+                        image.mime,
+                        STANDARD.encode(image.bytes)
+                    )
+                })
+            })
+            .map_err(|_| "asset_preview_failed")
+    })
+    .await
+    .map_err(|_| "asset_preview_failed")?
+}
+
+#[tauri::command]
 async fn set_asset_notes(
     workspace_id: i64,
     asset_id: i64,
@@ -436,6 +471,18 @@ async fn enqueue_video_draft(
 }
 
 #[tauri::command]
+async fn pending_generation_reviews(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::PendingReview>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .pending_generation_reviews(workspace_id)
+        .map_err(|_| "generation_review_list_failed")
+}
+
+#[tauri::command]
 async fn get_generation_run(
     workspace_id: i64,
     run_id: i64,
@@ -559,6 +606,7 @@ fn main() {
             set_profile_delivery,
             list_assets,
             import_asset,
+            preview_workspace_image,
             set_asset_notes,
             get_workspace_context,
             set_workspace_context,
@@ -575,6 +623,7 @@ fn main() {
             enqueue_video_draft,
             list_generation_runs,
             get_generation_run,
+            pending_generation_reviews,
             control_generation,
             generation_activity,
             generation_plan,

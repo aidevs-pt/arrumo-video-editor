@@ -23,7 +23,7 @@ mod profile_formats;
 mod video_drafts;
 mod workspace_feedback;
 
-pub use assets::{WorkspaceAsset, asset_path, asset_root};
+pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
 pub use completed_video_feedback::CompletedVideoFeedback;
@@ -32,7 +32,7 @@ pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
-pub use generation_queue::{GenerationRun, ReplayMode, RunOptions};
+pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};

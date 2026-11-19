@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fs::{self, File},
-    io,
+    io::{self, Read},
     path::{Path, PathBuf},
 };
 
@@ -20,6 +20,12 @@ pub struct WorkspaceAsset {
     pub notes: String,
 }
 
+#[derive(Debug)]
+pub struct ImagePreview {
+    pub mime: &'static str,
+    pub bytes: Vec<u8>,
+}
+
 impl WorkspaceStore {
     pub fn list_assets(&self, workspace_id: i64) -> rusqlite::Result<Vec<WorkspaceAsset>> {
         self.0
@@ -29,6 +35,44 @@ impl WorkspaceStore {
             )?
             .query_map([workspace_id], read_asset)?
             .collect()
+    }
+
+    pub fn image_preview(
+        &self,
+        media_root: &Path,
+        workspace_id: i64,
+        asset_id: i64,
+    ) -> Result<Option<ImagePreview>, Box<dyn Error>> {
+        const MAX_BYTES: u64 = 4 * 1024 * 1024;
+        let size: i64 = self.0.query_row(
+            "SELECT byte_size FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2 AND kind = 'image'",
+            params![workspace_id, asset_id],
+            |row| row.get(0),
+        )?;
+        if size > MAX_BYTES as i64 {
+            return Ok(None);
+        }
+        let path = asset_path(media_root, workspace_id, asset_id);
+        if !path.symlink_metadata()?.is_file() || path.canonicalize()? != path {
+            return Err(io::Error::other("Image preview source is unavailable").into());
+        }
+        let mut bytes = Vec::new();
+        File::open(path)?
+            .take(MAX_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_BYTES {
+            return Ok(None);
+        }
+        let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+            "image/png"
+        } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+            "image/jpeg"
+        } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+            "image/webp"
+        } else {
+            return Ok(None);
+        };
+        Ok(Some(ImagePreview { mime, bytes }))
     }
 
     pub fn set_asset_notes(

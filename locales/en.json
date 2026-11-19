@@ -1,5 +1,8 @@
 {
   "studio": {
+    "closeNavigation": "Close navigation",
+    "reviewInbox": "Review inbox",
+    "noReviews": "No runs are waiting for review.",
     "videoStudio": "Video Studio",
     "workspace": "Switch workspace",
     "navigation": "Workspace navigation",
@@ -8,7 +11,14 @@
     "formats": "Formats",
     "workspaceSection": "Workspace",
     "workspaceSettings": "Workspace settings",
-    "generations": "Generations"
+    "generations": "Generations",
+    "production": "Production",
+    "completedVideos": "Completed videos",
+    "location": "Current location",
+    "searchCompleted": "Search completed videos",
+    "noCompleted": "No completed videos",
+    "completedHint": "Verified deliveries appear here.",
+    "noSearchMatches": "No titles match this search."
   },
   "assets": {
     "title": "Assets",

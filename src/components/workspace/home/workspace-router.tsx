@@ -7,10 +7,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceFrame, type Workspace, type WorkspaceView } from "./workspace-frame";
+import { WorkspaceFrame } from "./workspace-frame";
+import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
+export { workspaceHref, completedVideoHref } from "./workspace-links";
 
 type Status = "loading" | "ready" | "error" | "browser";
-const views: WorkspaceView[] = ["profiles", "context", "brand", "assets", "outputs", "drafts", "generations"];
+const views: WorkspaceView[] = ["profiles", "context", "brand", "assets", "outputs", "drafts", "generations", "videos"];
 
 type WorkspaceCatalog = {
   workspaces: Workspace[];
@@ -29,17 +31,6 @@ export function useWorkspaceCatalog() {
   return catalog;
 }
 
-export function workspaceHref(view: WorkspaceView, workspaceId: number, profile?: number) {
-  const query = new URLSearchParams({ workspace: String(workspaceId) });
-  if (profile !== undefined) query.set("profile", String(profile));
-  return `/${view}?${query}`;
-}
-
-export function completedVideoHref(workspaceId: number, runId: number) {
-  const query = new URLSearchParams({ workspace: String(workspaceId), run: String(runId) });
-  return `/completed-video?${query}`;
-}
-
 export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,7 +39,8 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const section = pathname.replace(/\/$/, "");
-  const view = (section === "/completed-video" || section === "/generation-run") ? "generations"
+  const view = section === "/completed-video" ? "videos"
+    : section === "/generation-run" ? "generations"
     : section === "/profile" ? "profiles"
     : views.find((view) => section === `/${view}`);
   const workspace = view ? workspaces.find((entry) => String(entry.id) === query.get("workspace")) : undefined;

@@ -16,7 +16,7 @@ export function WorkspaceOverview({ workspaceId, view, onNavigate }: {
 
   useEffect(() => {
     let active = true;
-    const viewport = window.matchMedia("(min-width: 1200px)");
+    const viewport = window.matchMedia("(min-width: 1280px)");
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       if (!viewport.matches || !active) return;
@@ -26,10 +26,10 @@ export function WorkspaceOverview({ workspaceId, view, onNavigate }: {
           invoke<unknown[]>("list_profiles", args),
           invoke<unknown[]>("list_assets", args),
           invoke<unknown[]>("list_output_formats", args),
-          invoke<{ pending_review_id: number | null }[]>("list_generation_runs", args),
+          invoke<unknown[]>("pending_generation_reviews", args),
         ]);
         if (active) setCounts({ profiles: profiles.length, assets: assets.length, formats: outputs.length,
-          reviews: runs.filter((run) => run.pending_review_id !== null).length });
+          reviews: runs.length });
       } catch {
         if (active) setCounts(undefined);
       } finally {
