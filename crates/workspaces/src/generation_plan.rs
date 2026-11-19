@@ -83,6 +83,18 @@ impl PlanningInput {
     }
 }
 
+pub(crate) fn plan_snapshot(snapshot: &str) -> rusqlite::Result<GenerationPlan> {
+    serde_json::from_str::<PlanningInput>(snapshot)
+        .map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                0,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })?
+        .into_plan()
+}
+
 impl WorkspaceStore {
     pub fn prepare_generation_plan(
         &self,
@@ -101,15 +113,7 @@ impl WorkspaceStore {
         let plan = if let Some(existing) = existing {
             read_settings(Some(existing), 1)?
         } else {
-            let plan = serde_json::from_str::<PlanningInput>(&snapshot)
-                .map_err(|error| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        0,
-                        rusqlite::types::Type::Text,
-                        Box::new(error),
-                    )
-                })?
-                .into_plan()?;
+            let plan = plan_snapshot(&snapshot)?;
             let json = serde_json::to_string(&plan)
                 .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
             tx.query_row(
@@ -192,13 +196,16 @@ mod tests {
             )
             .unwrap();
 
-        assert!(
-            store
-                .generation_plan(workspace, guided_run.id)
-                .unwrap()
-                .is_none()
-        );
+        let saved_plan = store
+            .generation_plan(workspace, guided_run.id)
+            .unwrap()
+            .unwrap();
+        let saved_auto = store
+            .generation_plan(workspace, auto_run.id)
+            .unwrap()
+            .unwrap();
         let guided = store.claim_generation(workspace).unwrap().unwrap();
+        assert_eq!(guided.current_step.as_ref(), saved_plan.steps.first());
         assert!(
             store
                 .prepare_generation_plan(workspace, guided_run.id, guided.attempt + 1)
@@ -207,6 +214,7 @@ mod tests {
         let plan = store
             .prepare_generation_plan(workspace, guided_run.id, guided.attempt)
             .unwrap();
+        assert_eq!(plan, saved_plan);
         assert_eq!(
             plan.steps.iter().map(|step| step.stage).collect::<Vec<_>>(),
             [
@@ -240,6 +248,7 @@ mod tests {
                 .is_err()
         );
         let auto = store.claim_generation(workspace).unwrap().unwrap();
+        assert_eq!(auto.current_step.as_ref(), saved_auto.steps.first());
         let plan = store
             .prepare_generation_plan(workspace, auto_run.id, auto.attempt)
             .unwrap();

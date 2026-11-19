@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::format_deliveries::read_settings;
 use crate::generation_queue::read_run;
-use crate::{GenerationRun, WorkspaceStore};
+use crate::{GenerationPlan, GenerationRun, PlanStep, WorkspaceStore};
 
 pub(crate) const LEASE_SECONDS: i64 = 60;
 
@@ -14,6 +14,7 @@ pub struct GenerationClaim {
     pub attempt: i64,
     pub lease_until: i64,
     pub checkpoint: Option<Value>,
+    pub current_step: Option<PlanStep>,
 }
 
 #[derive(Debug, Serialize)]
@@ -45,14 +46,17 @@ impl WorkspaceStore {
                  AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
                  ORDER BY id LIMIT 1
              )
-             RETURNING id, draft_id, state, snapshot_json, pending_review_id, attempt, lease_until, checkpoint_json, display_title",
+             RETURNING id, draft_id, state, snapshot_json, pending_review_id, attempt, lease_until, checkpoint_json, display_title, plan_json, stage_index",
                 params![workspace_id, LEASE_SECONDS],
                 |row| {
+                    let plan: Option<GenerationPlan> = read_settings(row.get("plan_json")?, 9)?;
+                    let index = row.get::<_, u32>("stage_index")? as usize;
                     Ok(GenerationClaim {
                         run: read_run(row)?,
                         attempt: row.get(5)?,
                         lease_until: row.get(6)?,
                         checkpoint: read_settings(row.get(7)?, 7)?,
+                        current_step: plan.and_then(|plan| plan.steps.into_iter().nth(index)),
                     })
                 },
             )

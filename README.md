@@ -132,7 +132,7 @@ Copy `locales/en.json` to a new file such as `locales/fr.json` and translate the
 
 A worker can report a terminal failure with `fail-generation <workspace-id> <run-id> <attempt> <detail>`. Supply a short, user-facing reason without credentials or raw provider logs. The desktop activity history shows the reason. Use Retry in the desktop queue or `control-generation <workspace-id> <run-id> retry` to return a failed run to the queue with its checkpoint intact.
 
-After claiming a run, use `prepare-generation-plan <workspace-id> <run-id> <attempt>` to persist its stage plan from the frozen snapshot. The operation requires an active lease and returns the same plan on repeat attempts. Use `generation-plan <workspace-id> <run-id>` to read it. Guided plans flag the stages that require review. Autopilot plans omit those review requirements.
+New runs save their production plan from the frozen snapshot at enqueue time. Use `generation-plan <workspace-id> <run-id>` to read it as soon as the run is queued. A worker receives the current step with its claim. For older runs with no saved plan, the worker can use `prepare-generation-plan <workspace-id> <run-id> <attempt>` under its active lease. Guided plans flag the stages that require review. Autopilot plans omit those review requirements.
 
 Workspace Context uses the editorcn rich-text toolbar with Tiptap Markdown. Use the Markdown source toggle to edit raw Markdown directly, including syntax outside the rich toolbar's formatting options. The workspace continues to store Markdown.
 

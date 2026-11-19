@@ -142,10 +142,14 @@ impl WorkspaceStore {
         replay: Option<ReplayOrigin>,
     ) -> rusqlite::Result<GenerationRun> {
         let (source, mode) = replay.unzip();
+        let snapshot = snapshot.to_string();
+        let plan = crate::generation_plan::plan_snapshot(&snapshot)?;
+        let plan_json = serde_json::to_string(&plan)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         self.0.query_row(
-            "INSERT INTO generation_runs (workspace_id, draft_id, request_key, snapshot_json, replay_of_run_id, replay_mode)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
-            params![workspace_id, draft_id, key, snapshot.to_string(), source, mode],
+            "INSERT INTO generation_runs (workspace_id, draft_id, request_key, snapshot_json, replay_of_run_id, replay_mode, plan_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
+            params![workspace_id, draft_id, key, snapshot, source, mode, plan_json],
             read_run,
         )
     }
