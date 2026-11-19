@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginPackageInfo, RegistryReleaseSource, WorkspaceStore};
 
+pub(crate) const PLUGIN_MANIFEST_SCHEMA_VERSION: u32 = 1;
+
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -65,7 +67,7 @@ impl PluginManifest {
             return Err(invalid_manifest("Plugin manifest exceeds 64 KiB").into());
         }
         let manifest: Self = serde_json::from_slice(bytes)?;
-        if manifest.schema_version != 1 {
+        if manifest.schema_version != PLUGIN_MANIFEST_SCHEMA_VERSION {
             return Err(invalid_manifest("Unsupported plugin manifest schema version").into());
         }
         if !identifier(&manifest.id) || blank(&manifest.name) || blank(&manifest.description) {
@@ -232,7 +234,7 @@ fn invalid_manifest(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
 }
 
-fn identifier(value: &str) -> bool {
+pub(crate) fn identifier(value: &str) -> bool {
     value.split('-').enumerate().all(|(index, part)| {
         !part.is_empty()
             && (index > 0 || part.starts_with(|c: char| c.is_ascii_lowercase()))

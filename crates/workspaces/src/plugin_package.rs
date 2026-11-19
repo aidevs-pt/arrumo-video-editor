@@ -44,9 +44,7 @@ impl WorkspaceStore {
         expected_sha256: Option<&str>,
         release: Option<RegistryReleaseSource>,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
-        if expected_sha256.is_some_and(|digest| {
-            digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit())
-        }) {
+        if expected_sha256.is_some_and(|digest| !valid_sha256(digest)) {
             return Err(
                 invalid_package("Expected SHA-256 must contain 64 hexadecimal digits").into(),
             );
@@ -125,6 +123,10 @@ fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         .take(MAX_PLUGIN_MANIFEST_BYTES as u64 + 1)
         .read_to_end(&mut manifest)?;
     Ok(manifest)
+}
+
+pub(crate) fn valid_sha256(digest: &str) -> bool {
+    digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn invalid_package(message: &str) -> io::Error {
