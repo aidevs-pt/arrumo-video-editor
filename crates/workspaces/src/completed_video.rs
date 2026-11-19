@@ -4,8 +4,8 @@ use serde::Serialize;
 use crate::format_deliveries::read_settings;
 use crate::generation_queue::read_run;
 use crate::{
-    GenerationActivity, GenerationPlan, GenerationRun, ProductionProgress, VerifiedDelivery,
-    WorkspaceStore,
+    CompletedVideoFeedback, GenerationActivity, GenerationPlan, GenerationRun, ProductionProgress,
+    VerifiedDelivery, WorkspaceStore,
 };
 
 #[derive(Debug, Serialize)]
@@ -16,6 +16,7 @@ pub struct CompletedVideo {
     pub plan: GenerationPlan,
     pub production: ProductionProgress,
     pub activity: Vec<GenerationActivity>,
+    pub feedback: Vec<CompletedVideoFeedback>,
 }
 
 impl WorkspaceStore {
@@ -38,6 +39,7 @@ impl WorkspaceStore {
             plan,
             production: self.production_progress(workspace_id, run_id)?,
             activity: self.generation_activity(workspace_id, run_id)?,
+            feedback: self.completed_video_feedback(workspace_id, run_id)?,
         })
     }
 

@@ -7,6 +7,7 @@ mod assets;
 mod brand_assets;
 mod clip_render;
 mod completed_video;
+mod completed_video_feedback;
 mod delivery_export;
 mod delivery_verification;
 mod format_deliveries;
@@ -25,6 +26,7 @@ mod workspace_feedback;
 pub use assets::{WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
+pub use completed_video_feedback::CompletedVideoFeedback;
 pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
@@ -86,6 +88,7 @@ impl WorkspaceStore {
             include_str!("../migrations/018-preview-settings.sql"),
             include_str!("../migrations/019-completed-video-title.sql"),
             include_str!("../migrations/020-generation-replay.sql"),
+            include_str!("../migrations/021-completed-video-feedback.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

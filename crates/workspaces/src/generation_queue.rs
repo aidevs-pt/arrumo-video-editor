@@ -194,6 +194,7 @@ impl WorkspaceStore {
             "brand_colors": self.brand_colors(workspace_id)?,
             "brand_assets": self.list_brand_assets(workspace_id)?,
             "feedback": self.list_workspace_feedback(workspace_id)?,
+            "delivery_feedback": self.draft_delivery_feedback(workspace_id, draft_id)?,
             "profile": profile,
             "formats": formats,
         }))

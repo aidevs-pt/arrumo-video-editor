@@ -393,6 +393,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .completed_video(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
             println!("{}", serde_json::to_string(&video)?);
         }
+        [database, command, workspace, run, target, markdown]
+            if command == "add-completed-video-feedback" =>
+        {
+            let result_id = match utf8(target)? {
+                "run" => None,
+                id => Some(id.parse()?),
+            };
+            let feedback = WorkspaceStore::open(Path::new(database))?
+                .add_completed_video_feedback(
+                    utf8(workspace)?.parse()?,
+                    utf8(run)?.parse()?,
+                    result_id,
+                    utf8(markdown)?,
+                )?;
+            println!("{}", serde_json::to_string(&feedback)?);
+        }
         [database, command, workspace, run, title] if command == "rename-completed-video" => {
             let title = WorkspaceStore::open(Path::new(database))?.rename_completed_video(
                 utf8(workspace)?.parse()?,
@@ -483,6 +499,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "completed-video <workspace-id> <run-id> | ",
+                "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "export-delivery <workspace-id> <run-id> <destination-zip> | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
