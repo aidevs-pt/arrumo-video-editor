@@ -273,3 +273,6 @@ body { font-family: system-ui, sans-serif; margin: 0; }
 .draft-order { list-style: decimal; padding-inline-start: 24px; }
 .workspace-rows .draft-order li { border: 0; padding-block: 3px; }
 .draft-order .profile-edit-actions { margin-block: 6px; }
+
+.run-actions { margin-top: 10px; }
+.run-actions summary { cursor: pointer; }

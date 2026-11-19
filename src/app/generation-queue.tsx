@@ -7,12 +7,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { GenerationRunRow, type Run, type RunAction } from "./generation-run-row";
 import { queueCopy } from "./queue-copy";
 
 type Draft = { id: number; title: string };
-type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
-type Run = { id: number; draft_id: number; state: RunState; snapshot: { draft: Draft } };
-
 export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, onBack }: {
   workspaceId: number;
   drafts: Draft[];
@@ -27,19 +25,46 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, o
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState(false);
   const [pending, setPending] = useState(false);
+  const [controlError, setControlError] = useState(false);
+  const hasRuns = useRef(false);
   const [submitError, setSubmitError] = useState(false);
   const copy = queueCopy[locale];
   const selected = drafts.find((draft) => draft.id === selectedId);
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
+    if (pending) return;
     let active = true;
-    invoke<Run[]>("list_generation_runs", { workspaceId }).then(
-      (items) => { if (active) setRuns(items); },
-      () => { if (active) setLoadError(true); },
-    );
-    return () => { active = false; };
-  }, [workspaceId, attempt]);
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      try {
+        const items = await invoke<Run[]>("list_generation_runs", { workspaceId });
+        if (!active) return;
+        hasRuns.current = true;
+        setRuns(items);
+        setLoadError(false);
+      } catch {
+        if (active && !hasRuns.current) setLoadError(true);
+      }
+      if (active) timer = setTimeout(refresh, 2000);
+    }
+    void refresh();
+    return () => { active = false; clearTimeout(timer); };
+  }, [workspaceId, attempt, pending]);
+
+  async function control(runId: number, action: RunAction) {
+    if (pending) return;
+    setPending(true);
+    setControlError(false);
+    try {
+      const updated = await invoke<Run>("control_generation", { workspaceId, runId, action });
+      setRuns((current) => current?.map((run) => run.id === runId ? updated : run));
+    } catch {
+      setControlError(true);
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,13 +111,12 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, o
         <div className="workspace-layout">
           <section aria-labelledby="generation-runs-title">
             <h2 id="generation-runs-title">{copy.runs}</h2>
+            {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}
             {runs.length === 0 ? <p>{copy.empty}</p> : (
               <ul className="workspace-rows" aria-live="polite">
                 {runs.map((run) => (
-                  <li key={run.id}>
-                    <h3 className="profile-name">{run.snapshot.draft.title}</h3>
-                    <p className="profile-guidance">{copy[run.state]}</p>
-                  </li>
+                  <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId} locale={locale}
+                    disabled={pending} onControl={control} />
                 ))}
               </ul>
             )}
