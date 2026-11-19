@@ -266,3 +266,5 @@ Completion events include a nullable `read_at` timestamp. To acknowledge a compl
 Use `get_generation_plan` to inspect a run's prepared steps. A worker can use `fail_generation` with its current attempt and a short diagnostic for the activity log. Once a run completes, `replay_generation` can queue a new run in `captured` or `current` mode. Reuse the same request key and mode when retrying a replay submission.
 
 Use `create_video_draft` and `update_video_draft` to save drafts before enqueueing. Pass the full `settings` object with a title and either an intent or an ordered `source_ids` list of managed video assets in the workspace. An optional `profile_id` selects a workspace profile. Keep the returned draft ID for updates and enqueueing.
+
+Use `import_workspace_asset` with a workspace ID and an absolute local `source` path to copy a media file into managed storage. Use `list_workspace_assets` to find asset IDs for draft sources.
