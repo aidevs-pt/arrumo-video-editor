@@ -8,6 +8,7 @@ mod format_deliveries;
 mod output_formats;
 mod profile_deliveries;
 mod profile_formats;
+mod workspace_feedback;
 
 pub use assets::{WorkspaceAsset, asset_path, asset_root};
 pub use format_deliveries::{
@@ -16,6 +17,7 @@ pub use format_deliveries::{
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
+pub use workspace_feedback::WorkspaceFeedback;
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Workspace {
@@ -50,6 +52,7 @@ impl WorkspaceStore {
             include_str!("006-profile-deliveries.sql"),
             include_str!("007-workspace-assets.sql"),
             include_str!("008-workspace-context.sql"),
+            include_str!("009-workspace-feedback.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

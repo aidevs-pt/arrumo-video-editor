@@ -94,3 +94,5 @@ The workspace Context view edits production guidance in Markdown. The editor sup
 cargo run --locked -- ./workspaces.sqlite set-context 1 '## Audience'
 cargo run --locked -- ./workspaces.sqlite context 1
 ```
+
+Agent feedback cards live in workspace Context. A tool can record an observation locally using `add-feedback <workspace-id> <title> <markdown>`. Use `feedback <workspace-id>` to list cards and `update-feedback <workspace-id> <feedback-id> <title> <markdown>` to revise one. Cards can also be expanded and edited in the desktop app.

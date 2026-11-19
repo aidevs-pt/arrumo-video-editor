@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
+import { WorkspaceFeedback } from "./workspace-feedback";
 
 const en = {
   title: "Context", back: "Back to profiles", label: "Production context (Markdown)",
@@ -103,6 +104,7 @@ export function WorkspaceContext({ workspace, locale, onBack }: {
           </FieldGroup>
         </form>
       )}
+      <WorkspaceFeedback workspaceId={workspace.id} locale={locale} />
     </main>
   );
 }

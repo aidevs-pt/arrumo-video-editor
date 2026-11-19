@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Mutex};
 use arrumo_workspaces::{
     DeliveryOverrides, DimensionOverrides, FormatDelivery, OutputFormat, OutputFormatSettings,
     Profile, ProfileDelivery, ProfileFormat, SupplementalOutputs, Workspace, WorkspaceAsset,
-    WorkspaceStore, asset_root,
+    WorkspaceFeedback, WorkspaceStore, asset_root,
 };
 use tauri::{AppHandle, Manager, State};
 
@@ -282,6 +282,33 @@ async fn set_workspace_context(
         .map_err(|_| "workspace_context_save_failed")
 }
 
+#[tauri::command]
+async fn list_workspace_feedback(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<WorkspaceFeedback>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_workspace_feedback(workspace_id)
+        .map_err(|_| "feedback_load_failed")
+}
+
+#[tauri::command]
+async fn update_workspace_feedback(
+    workspace_id: i64,
+    feedback_id: i64,
+    title: String,
+    markdown: String,
+    store: State<'_, Store>,
+) -> Result<WorkspaceFeedback, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .update_workspace_feedback(workspace_id, feedback_id, &title, &markdown)
+        .map_err(|_| "feedback_save_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -313,7 +340,9 @@ fn main() {
             import_asset,
             set_asset_notes,
             get_workspace_context,
-            set_workspace_context
+            set_workspace_context,
+            list_workspace_feedback,
+            update_workspace_feedback
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

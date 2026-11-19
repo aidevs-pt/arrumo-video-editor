@@ -168,6 +168,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .set_workspace_context(utf8(workspace)?.parse()?, utf8(markdown)?)?;
             println!("null");
         }
+        [database, command, workspace] if command == "feedback" => {
+            let cards = WorkspaceStore::open(Path::new(database))?
+                .list_workspace_feedback(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&cards)?);
+        }
+        [database, command, workspace, title, markdown] if command == "add-feedback" => {
+            let card = WorkspaceStore::open(Path::new(database))?.add_workspace_feedback(
+                utf8(workspace)?.parse()?,
+                utf8(title)?,
+                utf8(markdown)?,
+            )?;
+            println!("{}", serde_json::to_string(&card)?);
+        }
+        [database, command, workspace, id, title, markdown] if command == "update-feedback" => {
+            let card = WorkspaceStore::open(Path::new(database))?.update_workspace_feedback(
+                utf8(workspace)?.parse()?,
+                utf8(id)?.parse()?,
+                utf8(title)?,
+                utf8(markdown)?,
+            )?;
+            println!("{}", serde_json::to_string(&card)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -186,7 +208,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
                 "set-asset-notes <workspace-id> <asset-id> <notes> | ",
-                "context <workspace-id> | set-context <workspace-id> <markdown>"
+                "context <workspace-id> | set-context <workspace-id> <markdown> | ",
+                "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
+                "update-feedback <workspace-id> <feedback-id> <title> <markdown>"
             )
             .into());
         }
