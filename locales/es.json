@@ -151,6 +151,8 @@
   "studio": {
     "closeNavigation": "Cerrar navegación",
     "notifications": "Notificaciones",
+    "notificationAttention": "Actividad nueva",
+    "unreadCompletion": "Finalización sin leer",
     "recentCompletions": "Vídeos completados recientemente",
     "noNotifications": "No hay notificaciones de generación",
     "reviewInbox": "Bandeja de revisiones",

@@ -63,7 +63,13 @@ export function CompletedVideoDetail({ workspaceId, runId }: { workspaceId: numb
   useEffect(() => {
     let active = true;
     invoke<CompletedVideo>("get_completed_video", { workspaceId, runId }).then(
-      (result) => { if (active) setVideo(result); },
+      (result) => {
+        if (!active) return;
+        setVideo(result);
+        void invoke("read_completion_notification", { workspaceId, runId }).catch(() => {
+          // A failed acknowledgement leaves the notification unread.
+        });
+      },
       () => { if (active) setLoadError(true); },
     );
     return () => { active = false; };

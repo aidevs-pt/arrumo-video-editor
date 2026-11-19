@@ -18,6 +18,19 @@ pub async fn get_completed_video(
 }
 
 #[tauri::command]
+pub async fn read_completion_notification(
+    workspace_id: i64,
+    run_id: i64,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .read_completion_notification(workspace_id, run_id)
+        .map_err(|_| "notification_read_failed")
+}
+
+#[tauri::command]
 pub async fn rename_completed_video(
     workspace_id: i64,
     run_id: i64,

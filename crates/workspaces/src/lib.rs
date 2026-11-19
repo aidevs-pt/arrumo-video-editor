@@ -141,6 +141,7 @@ impl WorkspaceStore {
             include_str!("../migrations/029-provider-preferences.sql"),
             include_str!("../migrations/030-plugin-grants.sql"),
             include_str!("../migrations/031-generation-notifications.sql"),
+            include_str!("../migrations/032-generation-notification-reads.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

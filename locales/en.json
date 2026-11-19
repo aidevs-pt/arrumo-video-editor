@@ -151,6 +151,8 @@
   "studio": {
     "closeNavigation": "Close navigation",
     "notifications": "Notifications",
+    "notificationAttention": "New activity",
+    "unreadCompletion": "Unread completion",
     "recentCompletions": "Recently completed",
     "noNotifications": "No generation notifications",
     "reviewInbox": "Review inbox",
