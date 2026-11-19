@@ -351,6 +351,17 @@ impl WorkspaceStore {
         Ok(plugins)
     }
 
+    pub fn remove_reviewed_plugin_package(
+        &self,
+        id: &str,
+        package_sha256: &str,
+    ) -> rusqlite::Result<bool> {
+        self.0.execute(
+            "DELETE FROM installed_plugin_manifests WHERE plugin_id = ?1 AND package_sha256 = ?2",
+            [id, package_sha256],
+        ).map(|deleted| deleted != 0)
+    }
+
     pub fn remove_installed_plugin_manifest(&self, id: &str) -> rusqlite::Result<bool> {
         let removed = self.0.execute(
             "DELETE FROM installed_plugin_manifests WHERE plugin_id = ?1",

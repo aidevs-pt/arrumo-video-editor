@@ -90,7 +90,14 @@ struct ReviewedReleaseInput {
     release: RegistryRelease,
 }
 
-pub(super) fn definitions() -> [Value; 17] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RemovePackageInput {
+    plugin_id: String,
+    package_sha256: String,
+}
+
+pub(super) fn definitions() -> [Value; 18] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -173,6 +180,11 @@ pub(super) fn definitions() -> [Value; 17] {
             "inputSchema": reviewed_release}),
         json!({"name": "update_reviewed_plugin_release", "description": format!("Update an HTTPS-installed plugin to a newer reviewed release from the same registry and repository. {THIRD_PARTY_PLUGIN_NOTICE}"),
             "inputSchema": reviewed_release}),
+        json!({"name": "remove_reviewed_plugin_package", "description": "Uninstall the installed package only if its digest matches the reviewed revision. Its saved settings and grants are removed.",
+            "inputSchema": {"type": "object", "properties": {
+                "pluginId": id, "packageSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }, "required": ["pluginId", "packageSha256"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
     ]
 }
 
@@ -285,6 +297,12 @@ pub(super) fn call(
                     .map_err(|_| "Could not register reviewed release. Check the registry, repository, metadata and installed version")
             })
         }
+        "remove_reviewed_plugin_package" => parse(arguments).and_then(|args: RemovePackageInput| {
+            store
+                .remove_reviewed_plugin_package(&args.plugin_id, &args.package_sha256)
+                .map(|removed| json!({"removed": removed}))
+                .map_err(|_| "Could not remove plugin package")
+        }),
         _ => return None,
     })
 }

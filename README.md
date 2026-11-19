@@ -333,3 +333,5 @@ To submit a decision on a task waiting for review, send a follow-up message with
 Use `remove_output_format` with a workspace and format ID to remove that format from future runs. Captured generation settings retain their original formats.
 
 Use `list_brand_assets`, `attach_brand_asset`, and `detach_brand_asset` through MCP or A2A to manage which workspace images serve as identity assets or style references. Removing a role keeps the image in the workspace library.
+
+Use `remove_reviewed_plugin_package` through MCP or A2A with the plugin ID and its installed package SHA-256. A mismatched digest leaves the installed revision intact. Uninstalling removes that package's stored settings and grants.
