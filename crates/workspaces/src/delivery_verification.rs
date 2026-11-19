@@ -137,7 +137,7 @@ impl WorkspaceStore {
                     lease_until = NULL, checkpoint_json = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3 AND stage_index = ?4
                AND state = 'running' AND lease_until > unixepoch()
-             RETURNING id, draft_id, state, snapshot_json, pending_review_id",
+             RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
             params![workspace_id, run_id, attempt, index],
             read_run,
         )?;

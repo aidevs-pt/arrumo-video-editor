@@ -251,6 +251,19 @@
     "cancel": "Cancelar",
     "saveError": "Não foi possível guardar a observação."
   },
+  "completedVideo": {
+    "details": "Detalhes do vídeo concluído",
+    "title": "Título do vídeo",
+    "saveTitle": "Guardar título",
+    "files": "Ficheiros de entrega verificados",
+    "exportZip": "Exportar ZIP",
+    "loading": "A carregar o vídeo concluído…",
+    "saved": "Título guardado.",
+    "exported": "ZIP exportado.",
+    "loadError": "Não foi possível carregar o vídeo concluído. Fecha e volta a abrir os detalhes.",
+    "renameError": "Não foi possível guardar o título. Tenta novamente.",
+    "exportError": "Não foi possível exportar o ZIP. Verifica os ficheiros e escolhe outro destino."
+  },
   "productionPlan": {
     "title": "Plano de produção",
     "loading": "A carregar o plano de produção…",

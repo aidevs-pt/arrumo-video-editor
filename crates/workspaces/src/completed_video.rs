@@ -27,7 +27,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<CompletedVideo> {
         let (run, title, plan) = self.0.query_row(
             "SELECT id, draft_id, state, snapshot_json, pending_review_id,
-                    COALESCE(display_title, json_extract(snapshot_json, '$.draft.title')), plan_json
+                    COALESCE(display_title, json_extract(snapshot_json, '$.draft.title')), plan_json, display_title
              FROM generation_runs WHERE workspace_id = ?1 AND id = ?2 AND state = 'completed'",
             params![workspace_id, run_id],
             |row| Ok((read_run(row)?, row.get(5)?, read_settings(row.get(6)?, 6)?)),

@@ -251,6 +251,19 @@
     "cancel": "Cancel",
     "saveError": "Feedback couldn’t be saved."
   },
+  "completedVideo": {
+    "details": "Completed video details",
+    "title": "Video title",
+    "saveTitle": "Save title",
+    "files": "Verified delivery files",
+    "exportZip": "Export ZIP",
+    "loading": "Loading completed video…",
+    "saved": "Title saved.",
+    "exported": "ZIP exported.",
+    "loadError": "Could not load the completed video. Close and reopen the details to retry.",
+    "renameError": "Could not save the title. Try again.",
+    "exportError": "Could not export the ZIP. Check the delivery files and choose a new destination."
+  },
   "productionPlan": {
     "title": "Production plan",
     "loading": "Loading production plan…",

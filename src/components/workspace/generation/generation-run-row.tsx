@@ -4,10 +4,11 @@ import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CompletedVideoDetail } from "@/components/workspace/completed-videos/completed-video-detail";
 import { GenerationPlan } from "./generation-plan";
 
 type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
-export type Run = { id: number; draft_id: number; state: RunState; pending_review_id: number | null; snapshot: { draft: { id: number; title: string } } };
+export type Run = { id: number; draft_id: number; state: RunState; pending_review_id: number | null; display_title: string | null; snapshot: { draft: { id: number; title: string } } };
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
 type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
 
@@ -24,7 +25,9 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
   const [historyError, setHistoryError] = useState(false);
   const { locale, messages } = useLocale();
   const copy = messages.queue;
-  const title = run.snapshot.draft.title;
+  const [displayTitle, setDisplayTitle] = useState<string>();
+  useEffect(() => { setDisplayTitle(undefined); }, [run.display_title]);
+  const title = displayTitle ?? run.display_title ?? run.snapshot.draft.title;
   const canPause = run.state === "queued" || run.state === "running";
   const canResume = run.state === "paused" && run.pending_review_id === null;
 
@@ -79,6 +82,9 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
       {run.state === "failed" && (
         <Button type="button" size="sm" variant="outline" className="mt-2.5" disabled={disabled}
           aria-label={`${copy.retryRun} · ${title}`} onClick={() => void onControl(run.id, "retry")}>{copy.retryRun}</Button>
+      )}
+      {run.state === "completed" && (
+        <CompletedVideoDetail workspaceId={workspaceId} runId={run.id} onTitle={setDisplayTitle} />
       )}
       <GenerationPlan workspaceId={workspaceId} runId={run.id} pendingReviewId={run.state === "paused" ? run.pending_review_id : null} />
       <details className="mt-2.5 [&>summary]:cursor-pointer" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>

@@ -11,6 +11,8 @@ use arrumo_workspaces::{
 };
 use tauri::{AppHandle, Manager, State};
 
+mod completed_video;
+
 type Store = Mutex<WorkspaceStore>;
 
 #[tauri::command]
@@ -559,7 +561,10 @@ fn main() {
             generation_activity,
             generation_plan,
             production_progress,
-            review_production_result
+            review_production_result,
+            completed_video::get_completed_video,
+            completed_video::rename_completed_video,
+            completed_video::export_completed_video
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

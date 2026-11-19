@@ -20,6 +20,7 @@ pub struct GenerationRun {
     pub state: String,
     pub snapshot: Value,
     pub pending_review_id: Option<i64>,
+    pub display_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -82,7 +83,7 @@ impl WorkspaceStore {
         let key = generation_request_key(request_key)?;
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let source = self.0.query_row(
-            "SELECT id, draft_id, state, snapshot_json, pending_review_id FROM generation_runs
+            "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title FROM generation_runs
              WHERE workspace_id = ?1 AND id = ?2 AND state = 'completed'",
             params![workspace_id, source_run_id],
             read_run,
@@ -115,7 +116,7 @@ impl WorkspaceStore {
         key: &str,
     ) -> rusqlite::Result<Option<(GenerationRun, Option<ReplayOrigin>)>> {
         self.0.query_row(
-            "SELECT id, draft_id, state, snapshot_json, pending_review_id, replay_of_run_id, replay_mode
+            "SELECT id, draft_id, state, snapshot_json, pending_review_id, replay_of_run_id, replay_mode, display_title
              FROM generation_runs WHERE workspace_id = ?1 AND request_key = ?2",
             params![workspace_id, key],
             |row| {
@@ -137,7 +138,7 @@ impl WorkspaceStore {
         let (source, mode) = replay.unzip();
         self.0.query_row(
             "INSERT INTO generation_runs (workspace_id, draft_id, request_key, snapshot_json, replay_of_run_id, replay_mode)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id, draft_id, state, snapshot_json, pending_review_id",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
             params![workspace_id, draft_id, key, snapshot.to_string(), source, mode],
             read_run,
         )
@@ -203,7 +204,7 @@ impl WorkspaceStore {
     pub fn list_generation_runs(&self, workspace_id: i64) -> rusqlite::Result<Vec<GenerationRun>> {
         self.0
             .prepare(
-                "SELECT id, draft_id, state, snapshot_json, pending_review_id FROM generation_runs
+                "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title FROM generation_runs
              WHERE workspace_id = ?1 ORDER BY id",
             )?
             .query_map([workspace_id], read_run)?
@@ -218,6 +219,7 @@ pub(crate) fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
         state: row.get(2)?,
         snapshot: read_settings(row.get(3)?, 3)?,
         pending_review_id: row.get(4)?,
+        display_title: row.get("display_title")?,
     })
 }
 
