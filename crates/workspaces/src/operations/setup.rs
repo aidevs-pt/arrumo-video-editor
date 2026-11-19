@@ -123,7 +123,7 @@ struct BrandColorsInput {
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 20] {
+pub(super) fn definitions() -> [Value; 21] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -184,6 +184,9 @@ pub(super) fn definitions() -> [Value; 20] {
         json!({"name": "update_output_format", "description": "Replace a workspace output format's name, dimensions and enabled state.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "formatId": id, "settings": dimensions},
                 "required": ["workspaceId", "formatId", "settings"], "additionalProperties": false}}),
+        json!({"name": "remove_output_format", "description": "Remove a workspace output format and its overrides. Existing generation snapshots retain their captured formats.",
+            "inputSchema": format,
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "get_format_delivery", "description": "Read required and supplemental outputs for a workspace format.",
             "inputSchema": format, "annotations": {"readOnlyHint": true}}),
         json!({"name": "set_format_delivery", "description": "Replace a workspace format's supplemental outputs. Omitted settings reset to defaults.",
@@ -293,6 +296,12 @@ pub(super) fn call(
                 .update_output_format(args.workspace_id, args.format_id, &args.settings)
                 .map(|format| json!({"format": format}))
                 .map_err(|_| "Could not update output format")
+        }),
+        "remove_output_format" => parse(arguments).and_then(|args: FormatInput| {
+            store
+                .remove_output_format(args.workspace_id, args.format_id)
+                .map(|removed| json!({"removed": removed}))
+                .map_err(|_| "Could not remove output format")
         }),
         "get_format_delivery" => parse(arguments).and_then(|args: FormatInput| {
             store
