@@ -1,4 +1,15 @@
 {
+  "calendar": {
+    "title": "Calendário",
+    "previousMonth": "Mês anterior",
+    "nextMonth": "Mês seguinte",
+    "profileFilter": "Filtrar por perfil",
+    "allProfiles": "Todos os perfis",
+    "loadError": "Não foi possível carregar os vídeos agendados.",
+    "loading": "A carregar o calendário…",
+    "empty": "Sem vídeos agendados",
+    "emptyHint": "Define uma data num vídeo concluído para o adicionar ao calendário."
+  },
   "pluginActions": {
     "title": "Ações de plugins",
     "loadError": "Não foi possível carregar as ações dos plugins.",

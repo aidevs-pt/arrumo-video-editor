@@ -59,7 +59,7 @@ type CompletedVideo = {
   output_dates: Record<number, string>;
 };
 
-export function CompletedVideoDetail({ workspaceId, runId }: { workspaceId: number; runId: number }) {
+export function CompletedVideoDetail({ workspaceId, runId, initialFormatId }: { workspaceId: number; runId: number; initialFormatId: number }) {
   const { messages: { completedVideo: copy, queue } } = useLocale();
   const [video, setVideo] = useState<CompletedVideo>();
   const [loadError, setLoadError] = useState(false);
@@ -103,10 +103,10 @@ export function CompletedVideoDetail({ workspaceId, runId }: { workspaceId: numb
       </>
     );
   }
-  return <CompletedVideoContent workspaceId={workspaceId} video={video} />;
+  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} />;
 }
 
-function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; video: CompletedVideo }) {
+function CompletedVideoContent({ workspaceId, video, initialFormatId }: { workspaceId: number; video: CompletedVideo; initialFormatId: number }) {
   const { locale, messages: { completedVideo: copy, queue } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
@@ -116,7 +116,8 @@ function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; vi
   const [error, setError] = useState<"renameError" | "exportError">();
   const [notice, setNotice] = useState<"saved" | "exported">();
   const [outputDates, setOutputDates] = useState(video.output_dates);
-  const [formatId, setFormatId] = useState(video.delivery.verified_outputs[0]?.format_id);
+  const [formatId, setFormatId] = useState(video.delivery.verified_outputs.find((output) => output.format_id === initialFormatId)?.format_id
+    ?? video.delivery.verified_outputs[0]?.format_id);
   const selected = video.delivery.verified_outputs.find((output) => output.format_id === formatId);
   const formats = snapshot.formats ?? [];
   const format = formats.find(({ format }) => format.id === formatId)?.format;

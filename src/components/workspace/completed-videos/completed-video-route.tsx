@@ -16,6 +16,7 @@ export function CompletedVideoRoute() {
   const { messages } = useLocale();
   const rawRun = query.get("run") ?? "";
   const runId = Number(rawRun);
+  const formatId = Number(query.get("format"));
   if (!workspace) return null;
 
   return (
@@ -26,7 +27,7 @@ export function CompletedVideoRoute() {
         </Link>
       </Button>
       {/^[1-9]\d*$/.test(rawRun) && Number.isSafeInteger(runId) ? (
-        <CompletedVideoDetail key={`${workspace.id}-${runId}`} workspaceId={workspace.id} runId={runId} />
+        <CompletedVideoDetail key={`${workspace.id}-${runId}-${formatId}`} workspaceId={workspace.id} runId={runId} initialFormatId={formatId} />
       ) : (
         <>
           <WorkspaceHeading icon={Film}><h1>{messages.completedVideo.details}</h1></WorkspaceHeading>

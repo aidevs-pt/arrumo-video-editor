@@ -1,6 +1,6 @@
 export type Workspace = { id: number; name: string };
 export type WorkspaceView = "profiles" | "context" | "brand" | "assets" | "outputs"
-  | "drafts" | "generations" | "videos";
+  | "drafts" | "generations" | "videos" | "calendar";
 
 export function workspaceHref(view: WorkspaceView, workspaceId: number, profile?: number) {
   const query = new URLSearchParams({ workspace: String(workspaceId) });

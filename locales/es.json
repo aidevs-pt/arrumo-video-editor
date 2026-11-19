@@ -1,4 +1,15 @@
 {
+  "calendar": {
+    "title": "Calendario",
+    "previousMonth": "Mes anterior",
+    "nextMonth": "Mes siguiente",
+    "profileFilter": "Filtrar por perfil",
+    "allProfiles": "Todos los perfiles",
+    "loadError": "No se pudieron cargar los vídeos programados.",
+    "loading": "Cargando calendario…",
+    "empty": "No hay vídeos programados",
+    "emptyHint": "Indica una fecha en un vídeo completado para añadirlo al calendario."
+  },
   "pluginActions": {
     "title": "Acciones de complementos",
     "loadError": "No se pudieron cargar las acciones de complementos.",

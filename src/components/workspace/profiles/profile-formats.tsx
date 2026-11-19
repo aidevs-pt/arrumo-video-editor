@@ -1,6 +1,8 @@
 "use client";
 
 import { useLocale } from "@/lib/locale-provider";
+import Link from "next/link";
+import { workspaceHref } from "@/components/workspace/home/workspace-links";
 import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, Monitor, PanelsTopLeft } from "lucide-react";
@@ -99,6 +101,9 @@ export function ProfileFormats({
         {copy.back}
       </Button>
       <Button type="button" variant="outline" onClick={onOutputs} disabled={pending !== null}>{copy.manage}</Button>
+      <Button asChild variant="outline">
+        <Link href={workspaceHref("calendar", workspaceId, profile.id)}>{messages.calendar.title}</Link>
+      </Button>
       <WorkspaceHeading icon={PanelsTopLeft}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{profile.name}</p>

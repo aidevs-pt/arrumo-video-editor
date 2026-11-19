@@ -1,4 +1,4 @@
-import { ChevronDown, Clapperboard, FileText, Film, FolderOpen, Images, Layers, ListVideo, Palette, Plus, Settings2, SlidersHorizontal, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Clapperboard, FileText, Film, FolderOpen, Images, Layers, ListVideo, Palette, Plus, Settings2, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
@@ -52,6 +52,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
     { view: "drafts", label: messages.drafts.title, icon: Clapperboard },
     { view: "generations", label: copy.generations, icon: ListVideo },
     { view: "videos", label: copy.completedVideos, icon: Film },
+    { view: "calendar", label: messages.calendar.title, icon: CalendarDays },
   ] as const;
   const workspaceSection = workspaceTabs.some((item) => item.view === view);
   const sectionLabel = pathname === "/settings" ? messages.agentSettings.title

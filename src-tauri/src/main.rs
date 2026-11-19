@@ -524,6 +524,21 @@ async fn get_generation_run(
 }
 
 #[tauri::command]
+async fn list_scheduled_outputs(
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    start: String,
+    end: String,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::ScheduledOutput>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .scheduled_outputs(workspace_id, profile_id, &start, &end)
+        .map_err(|_| "calendar_list_failed")
+}
+
+#[tauri::command]
 async fn list_generation_runs(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -729,6 +744,7 @@ fn main() {
             delete_video_draft,
             enqueue_video_draft,
             list_generation_runs,
+            list_scheduled_outputs,
             get_generation_run,
             pending_generation_reviews,
             generation_inbox,

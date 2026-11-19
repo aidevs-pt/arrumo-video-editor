@@ -1,4 +1,15 @@
 {
+  "calendar": {
+    "title": "Calendar",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "profileFilter": "Filter by profile",
+    "allProfiles": "All profiles",
+    "loadError": "Could not load scheduled videos.",
+    "loading": "Loading calendar…",
+    "empty": "No videos scheduled",
+    "emptyHint": "Set a date on a completed output to add it to the calendar."
+  },
   "pluginActions": {
     "title": "Plugin actions",
     "loadError": "Could not load plugin actions.",
