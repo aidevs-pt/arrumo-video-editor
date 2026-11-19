@@ -22,7 +22,12 @@ struct Rpc {
     jsonrpc: String,
     id: Value,
     method: String,
+    #[serde(default = "empty_params")]
     params: Value,
+}
+
+fn empty_params() -> Value {
+    json!({})
 }
 
 #[derive(Deserialize)]
@@ -170,6 +175,9 @@ fn dispatch(
     }
     if version.is_some_and(|value| value != "1.0") {
         return rpc_error(request.id, -32009, "Unsupported A2A version");
+    }
+    if request.method == "ListTasks" {
+        return task_reply(request.id, tasks::list(store, request.params), false);
     }
     if matches!(request.method.as_str(), "GetTask" | "CancelTask") {
         return task_reply(
