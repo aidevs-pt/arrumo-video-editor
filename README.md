@@ -125,3 +125,7 @@ cargo run --locked -- ./workspaces.sqlite generation-runs 1
 ```
 
 A worker claims queued work with `claim-generation <workspace-id>`. The claim includes an attempt number and a 60-second lease. Use `checkpoint-generation <workspace-id> <run-id> <attempt> <json>` to save progress and renew the lease. Expired claims can be reclaimed with the last saved checkpoint. Use `control-generation <workspace-id> <run-id> <pause|resume|cancel>` to control runs and `generation-activity <workspace-id> <run-id>` to read their transition history.
+
+## Interface translations
+
+Copy `locales/en.json` to a new file such as `locales/fr.json` and translate the values. Keep the same keys. The desktop build discovers the file automatically and reports missing or unexpected keys. The app follows the system’s language preferences, tries the base language when a regional translation is unavailable, and falls back to English.

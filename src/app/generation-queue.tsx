@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -8,14 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { GenerationRunRow, type Run, type RunAction } from "./generation-run-row";
-import { queueCopy } from "./queue-copy";
 
 type Draft = { id: number; title: string };
-export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, onBack }: {
+export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }: {
   workspaceId: number;
   drafts: Draft[];
   initialDraftId: number | null;
-  locale: keyof typeof queueCopy;
+
   onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -28,7 +29,8 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, o
   const [controlError, setControlError] = useState(false);
   const hasRuns = useRef(false);
   const [submitError, setSubmitError] = useState(false);
-  const copy = queueCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.queue;
   const selected = drafts.find((draft) => draft.id === selectedId);
 
   useEffect(() => { heading.current?.focus(); }, []);
@@ -94,11 +96,11 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, o
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" disabled={pending} onClick={onBack}>
         <ArrowLeft data-icon="inline-start" />{copy.back}
       </Button>
-      <div className="workspace-heading"><h1 ref={heading} tabIndex={-1}>{copy.title}</h1></div>
+      <WorkspaceHeading><h1 ref={heading} tabIndex={-1}>{copy.title}</h1></WorkspaceHeading>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -108,21 +110,21 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, o
           }}>{copy.retry}</Button>
         </Alert>
       ) : !runs ? <p role="status">{copy.loading}</p> : (
-        <div className="workspace-layout">
+        <WorkspaceColumns>
           <section aria-labelledby="generation-runs-title">
             <h2 id="generation-runs-title">{copy.runs}</h2>
             {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}
             {runs.length === 0 ? <p>{copy.empty}</p> : (
-              <ul className="workspace-rows" aria-live="polite">
+              <WorkspaceRows  aria-live="polite">
                 {runs.map((run) => (
-                  <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId} locale={locale}
+                  <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId}
                     disabled={pending} onControl={control} />
                 ))}
-              </ul>
+              </WorkspaceRows>
             )}
           </section>
           {selected && (
-            <form key={selected.id} className="workspace-form" onSubmit={submit} aria-labelledby="run-options-title" aria-busy={pending}>
+            <WorkspaceForm key={selected.id}  onSubmit={submit} aria-labelledby="run-options-title" aria-busy={pending}>
               <h2 id="run-options-title">{copy.options} · {selected.title}</h2>
               <fieldset disabled={pending}>
                 <FieldGroup>
@@ -138,10 +140,10 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, locale, o
                   <Button type="submit">{pending ? copy.submitting : copy.submit}</Button>
                 </FieldGroup>
               </fieldset>
-            </form>
+            </WorkspaceForm>
           )}
-        </div>
+        </WorkspaceColumns>
       )}
-    </main>
+    </WorkspaceShell>
   );
 }

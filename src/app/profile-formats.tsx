@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -8,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FormatDelivery } from "./format-delivery";
-import { deliveryCopy } from "./delivery-copy";
-import { profileFormatCopy } from "./profile-format-copy";
 
 type ProfileFormat = {
   id: number;
@@ -22,11 +22,11 @@ type ProfileFormat = {
 };
 
 export function ProfileFormats({
-  workspaceId, profile, locale, onBack, onOutputs,
+  workspaceId, profile, onBack, onOutputs,
 }: {
   workspaceId: number;
   profile: { id: number; name: string };
-  locale: keyof typeof profileFormatCopy;
+
   onBack: () => void;
   onOutputs: () => void;
 }) {
@@ -37,7 +37,8 @@ export function ProfileFormats({
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState<number | null>(null);
   const [result, setResult] = useState<{ id: number; saved: boolean } | null>(null);
-  const copy = profileFormatCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.profileFormats;
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
@@ -77,22 +78,21 @@ export function ProfileFormats({
       workspaceId={workspaceId}
       profileId={profile.id}
       format={deliveryFormat}
-      locale={locale}
       onBack={() => setDeliveryFormat(null)}
     />;
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" onClick={onBack} disabled={pending !== null}>
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
       </Button>
       <Button type="button" variant="outline" onClick={onOutputs} disabled={pending !== null}>{copy.manage}</Button>
-      <div className="workspace-heading">
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{profile.name}</p>
-      </div>
+      </WorkspaceHeading>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -108,19 +108,19 @@ export function ProfileFormats({
       ) : (
         <>
           <p id="format-inheritance">{copy.inherit}</p>
-          <ul className="workspace-rows profile-format-rows">
+          <WorkspaceRows className="mt-[18px]">
             {formats.map((format) => (
               <li key={format.id}>
                 <form onSubmit={(event) => void save(event, format.id)} aria-labelledby={`profile-format-${format.id}`}
                   onChange={() => { if (result?.id === format.id) setResult(null); }}>
-                  <div className="profile-row-heading">
-                    <h2 id={`profile-format-${format.id}`} className="profile-name">{format.name}</h2>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2.5">
+                    <h2 id={`profile-format-${format.id}`} className="flex min-w-0 items-baseline gap-2.5 font-[680]">{format.name}</h2>
                     <Button type="button" size="sm" variant="outline" disabled={pending !== null}
-                      aria-label={`${deliveryCopy[locale].title} · ${format.name}`}
-                      onClick={() => setDeliveryFormat(format)}>{deliveryCopy[locale].title}</Button>
+                      aria-label={`${messages.delivery.title} · ${format.name}`}
+                      onClick={() => setDeliveryFormat(format)}>{messages.delivery.title}</Button>
                   </div>
                   <fieldset disabled={pending !== null}>
-                    <FieldGroup className="profile-format-fields">
+                    <FieldGroup className="my-3 grid grid-cols-2 items-end min-[681px]:grid-cols-[repeat(2,minmax(0,1fr))_auto] max-[680px]:[&>button]:col-span-full max-[680px]:[&>button]:justify-self-start">
                       <Field>
                         <FieldLabel htmlFor={`profile-format-width-${format.id}`}>{copy.width}</FieldLabel>
                         <Input id={`profile-format-width-${format.id}`} name="width" type="number" min={1} max={4294967295}
@@ -142,9 +142,9 @@ export function ProfileFormats({
                 </form>
               </li>
             ))}
-          </ul>
+          </WorkspaceRows>
         </>
       )}
-    </main>
+    </WorkspaceShell>
   );
 }

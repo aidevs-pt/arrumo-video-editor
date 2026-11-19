@@ -1,5 +1,8 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft } from "lucide-react";
@@ -10,17 +13,15 @@ import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GenerationQueue } from "./generation-queue";
-import { queueCopy } from "./queue-copy";
-import { draftCopy } from "./draft-copy";
 
 type CatalogEntry = { id: number; name: string };
 type Asset = CatalogEntry & { kind: string };
 type Draft = { id: number; title: string; intent: string; profile_id: number | null; source_ids: number[] };
 
-export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
+export function WorkspaceDrafts({ workspace, initialProfile, onBack }: {
   workspace: CatalogEntry;
   initialProfile: number | null;
-  locale: keyof typeof draftCopy;
+
   onBack: () => void;
 }) {
   const [queueView, setQueueView] = useState<{ draftId: number | null } | null>(null);
@@ -40,7 +41,8 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
   const [error, setError] = useState<"saveError" | "importError" | null>(null);
   const [pending, setPending] = useState<"saving" | "importing" | null>(null);
   const workspaceId = workspace.id;
-  const copy = draftCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.drafts;
   const names = new Map(assets.map((asset) => [asset.id, asset.name]));
 
   useEffect(() => { heading.current?.focus(); }, []);
@@ -144,21 +146,20 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
       workspaceId={workspaceId}
       drafts={drafts}
       initialDraftId={queueView.draftId}
-      locale={locale}
       onBack={() => setQueueView(null)}
     />;
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" disabled={pending !== null} onClick={onBack}>
         <ArrowLeft data-icon="inline-start" />{copy.back}
       </Button>
       <Button type="button" variant="outline" disabled={!drafts || pending !== null || editing !== null}
-        onClick={() => setQueueView({ draftId: null })}>{queueCopy[locale].title}</Button>
-      <div className="workspace-heading">
+        onClick={() => setQueueView({ draftId: null })}>{messages.queue.title}</Button>
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p>{workspace.name}</p>
-      </div>
+      </WorkspaceHeading>
       {loadError ? <Alert variant="destructive">
         <AlertDescription>{copy.loadError}</AlertDescription>
         <Button type="button" variant="outline" onClick={() => {
@@ -166,33 +167,33 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
           setAttempt((value) => value + 1);
         }}>{copy.retry}</Button>
       </Alert> : !drafts ? <p role="status">{copy.loading}</p> : (
-        <div className="workspace-layout">
+        <WorkspaceColumns>
           <section aria-label={copy.title}>
             {drafts.length === 0 ? <p>{copy.empty}</p> : (
-              <ul className="workspace-rows" aria-live="polite">
+              <WorkspaceRows  aria-live="polite">
                 {drafts.map((draft) => (
                   <li key={draft.id}>
-                    <div className="profile-row-heading">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2.5">
                       <h2>{draft.title}</h2>
-                      <div className="profile-edit-actions">
+                      <div className="flex flex-wrap items-baseline gap-2.5">
                         <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
                           aria-label={`${copy.edit} · ${draft.title}`} onClick={() => edit(draft)}>{copy.edit}</Button>
                         <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
-                          aria-label={`${queueCopy[locale].submit} · ${draft.title}`}
-                          onClick={() => setQueueView({ draftId: draft.id })}>{queueCopy[locale].submit}</Button>
+                          aria-label={`${messages.queue.submit} · ${draft.title}`}
+                          onClick={() => setQueueView({ draftId: draft.id })}>{messages.queue.submit}</Button>
                       </div>
                     </div>
                     {draft.profile_id !== null && <p>{profiles.find((entry) => entry.id === draft.profile_id)?.name}</p>}
-                    {draft.intent && <p className="profile-guidance">{draft.intent}</p>}
-                    {draft.source_ids.length > 0 && <ol className="draft-order">
+                    {draft.intent && <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{draft.intent}</p>}
+                    {draft.source_ids.length > 0 && <ol className="list-decimal ps-6 [&>li]:py-0.75">
                       {draft.source_ids.map((id) => <li key={id}>{names.get(id) ?? id}</li>)}
                     </ol>}
                   </li>
                 ))}
-              </ul>
+              </WorkspaceRows>
             )}
           </section>
-          <form className="workspace-form" onSubmit={save} aria-labelledby="new-draft-title" aria-busy={pending !== null}>
+          <WorkspaceForm  onSubmit={save} aria-labelledby="new-draft-title" aria-busy={pending !== null}>
             <h2 id="new-draft-title">{editing === null ? copy.newDraft : copy.edit}</h2>
             <fieldset disabled={pending !== null}>
               <FieldGroup>
@@ -202,11 +203,11 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="draft-profile">{copy.profile}</FieldLabel>
-                  <select id="draft-profile" className="rounded-md border border-input bg-background px-2 py-1.5"
+                  <NativeSelect id="draft-profile" className="w-full"
                     value={profile ?? ""} onChange={(event) => setProfile(event.target.value ? Number(event.target.value) : null)}>
-                    <option value="">{copy.noProfile}</option>
-                    {profiles.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-                  </select>
+                    <NativeSelectOption value="">{copy.noProfile}</NativeSelectOption>
+                    {profiles.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{entry.name}</NativeSelectOption>)}
+                  </NativeSelect>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="draft-intent">{copy.intent}</FieldLabel>
@@ -230,11 +231,11 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
                     ))}
                   </FieldGroup>
                 </FieldSet>
-                {sources.length > 0 && <ol className="draft-order" aria-label={copy.order}>
+                {sources.length > 0 && <ol className="list-decimal ps-6 [&>li]:py-0.75" aria-label={copy.order}>
                   {sources.map((id, index) => (
                     <li key={id}>
                       {names.get(id) ?? id}
-                      <div className="profile-edit-actions">
+                      <div className="flex flex-wrap items-baseline gap-2.5">
                         <Button type="button" size="sm" variant="outline" disabled={index === 0}
                           aria-label={`${copy.up} · ${names.get(id) ?? id}`} onClick={() => move(index, -1)}>{copy.up}</Button>
                         <Button type="button" size="sm" variant="outline" disabled={index === sources.length - 1}
@@ -244,7 +245,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
                   ))}
                 </ol>}
                 {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-                <div className="profile-edit-actions">
+                <div className="flex flex-wrap items-baseline gap-2.5">
                   <Button type="submit" disabled={!title.trim() || (!sources.length && !intent.trim())}>
                     {pending === "saving" ? copy.saving : copy.save}
                   </Button>
@@ -252,9 +253,9 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
                 </div>
               </FieldGroup>
             </fieldset>
-          </form>
-        </div>
+          </WorkspaceForm>
+        </WorkspaceColumns>
       )}
-    </main>
+    </WorkspaceShell>
   );
 }

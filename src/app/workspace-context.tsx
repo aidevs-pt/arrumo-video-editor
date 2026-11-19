@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -9,32 +11,9 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceFeedback } from "./workspace-feedback";
 
-const en = {
-  title: "Context", back: "Back to profiles", label: "Production context (Markdown)",
-  template: "## Company or channel\n\n## Author\n\n## Audience\n\n## Editorial guidance\n",
-  loading: "Loading context…", loadError: "Context couldn’t be loaded.", retry: "Retry",
-  save: "Save context", saved: "Context saved.", saveError: "Context couldn’t be saved. Try again.",
-};
-
-const copyByLocale: Record<"en" | "es" | "pt", typeof en> = {
-  en,
-  es: {
-    title: "Contexto", back: "Volver a los perfiles", label: "Contexto de producción (Markdown)",
-    template: "## Empresa o canal\n\n## Autoría\n\n## Audiencia\n\n## Pautas editoriales\n",
-    loading: "Cargando contexto…", loadError: "No se pudo cargar el contexto.", retry: "Reintentar",
-    save: "Guardar contexto", saved: "Contexto guardado.", saveError: "No se pudo guardar el contexto. Inténtalo de nuevo.",
-  },
-  pt: {
-    title: "Contexto", back: "Voltar aos perfis", label: "Contexto de produção (Markdown)",
-    template: "## Empresa ou canal\n\n## Autoria\n\n## Público\n\n## Orientações editoriais\n",
-    loading: "A carregar o contexto…", loadError: "Não foi possível carregar o contexto.", retry: "Tentar novamente",
-    save: "Guardar contexto", saved: "Contexto guardado.", saveError: "Não foi possível guardar o contexto. Tente novamente.",
-  },
-};
-
-export function WorkspaceContext({ workspace, locale, onBack }: {
+export function WorkspaceContext({ workspace, onBack }: {
   workspace: { id: number; name: string };
-  locale: keyof typeof copyByLocale;
+
   onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -43,7 +22,8 @@ export function WorkspaceContext({ workspace, locale, onBack }: {
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<"saved" | "saveError" | null>(null);
-  const copy = copyByLocale[locale];
+  const { messages } = useLocale();
+  const copy = messages.context;
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
@@ -71,15 +51,15 @@ export function WorkspaceContext({ workspace, locale, onBack }: {
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
       </Button>
-      <div className="workspace-heading">
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
-      </div>
+      </WorkspaceHeading>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -89,7 +69,7 @@ export function WorkspaceContext({ workspace, locale, onBack }: {
           }}>{copy.retry}</Button>
         </Alert>
       ) : markdown === undefined ? <p role="status">{copy.loading}</p> : (
-        <form className="workspace-form" onSubmit={save} aria-busy={saving}>
+        <WorkspaceForm  onSubmit={save} aria-busy={saving}>
           <FieldGroup>
             <Field data-disabled={saving}>
               <FieldLabel htmlFor="workspace-context">{copy.label}</FieldLabel>
@@ -102,9 +82,9 @@ export function WorkspaceContext({ workspace, locale, onBack }: {
             {result === "saveError" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
             <Button type="submit" className="self-start" disabled={saving}>{copy.save}</Button>
           </FieldGroup>
-        </form>
+        </WorkspaceForm>
       )}
-      <WorkspaceFeedback workspaceId={workspace.id} locale={locale} />
-    </main>
+      <WorkspaceFeedback workspaceId={workspace.id} />
+    </WorkspaceShell>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -10,7 +12,6 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ProfileFormats } from "./profile-formats";
-import { profileCopy } from "./profile-copy";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
 type Draft = { name: string; guidance: string; color: string };
@@ -18,7 +19,6 @@ const emptyDraft: Draft = { name: "", guidance: "", color: "" };
 
 export function WorkspaceProfiles({
   workspace,
-  locale,
   onBack,
   onOutputs,
   onAssets,
@@ -27,7 +27,7 @@ export function WorkspaceProfiles({
   onDrafts,
 }: {
   workspace: { id: number; name: string };
-  locale: keyof typeof profileCopy;
+
   onBack: () => void;
   onOutputs: () => void;
   onAssets: () => void;
@@ -49,7 +49,8 @@ export function WorkspaceProfiles({
   const { name, guidance, color } = draft;
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const copy = profileCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.profiles;
   const disabled = saving || status !== "ready";
 
   useEffect(() => {
@@ -120,7 +121,6 @@ export function WorkspaceProfiles({
       <ProfileFormats
         workspaceId={workspace.id}
         profile={formatProfile}
-        locale={locale}
         onBack={() => setFormatProfile(null)}
         onOutputs={onOutputs}
       />
@@ -128,7 +128,7 @@ export function WorkspaceProfiles({
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
@@ -138,11 +138,11 @@ export function WorkspaceProfiles({
       <Button type="button" variant="outline" onClick={onContext} disabled={saving || editing !== null}>{copy.context}</Button>
       <Button type="button" variant="outline" onClick={onBrand} disabled={saving || editing !== null}>{copy.brand}</Button>
       <Button type="button" variant="outline" onClick={() => onDrafts()} disabled={saving || editing !== null}>{copy.drafts}</Button>
-      <div className="workspace-heading">
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{workspace.name}</h1>
-      </div>
-      <div className="workspace-layout">
-        <section className="workspace-list" aria-labelledby="profile-list-title">
+      </WorkspaceHeading>
+      <WorkspaceColumns>
+        <section className="min-w-0 [&>p]:mt-3 [&>p]:max-w-[60ch] [&>p]:text-muted-foreground" aria-labelledby="profile-list-title">
           <h2 id="profile-list-title">{copy.title}</h2>
           {status === "loading" && <p role="status">{copy.loading}</p>}
           {status === "error" && (
@@ -155,15 +155,15 @@ export function WorkspaceProfiles({
             </Alert>
           )}
           {status === "ready" && (profiles.length ? (
-            <ul className="workspace-rows" aria-live="polite">
+            <WorkspaceRows  aria-live="polite">
               {profiles.map((profile) => (
                 <li key={profile.id}>
-                  <div className="profile-row-heading">
-                    <h3 className="profile-name">
-                      {profile.color && <span className="profile-color" style={{ backgroundColor: profile.color }} aria-hidden="true" />}
+                  <div className="flex flex-wrap items-baseline justify-between gap-2.5">
+                    <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">
+                      {profile.color && <span className="size-2.5 shrink-0 rounded-full outline-1 outline-border" style={{ backgroundColor: profile.color }} aria-hidden="true" />}
                       {profile.name}
                     </h3>
-                    <div className="profile-edit-actions">
+                    <div className="flex flex-wrap items-baseline gap-2.5">
                       <Button type="button" size="sm" variant="outline" disabled={saving || editing !== null}
                         aria-label={`${copy.drafts} · ${profile.name}`} onClick={() => onDrafts(profile.id)}>
                         {copy.drafts}
@@ -193,12 +193,12 @@ export function WorkspaceProfiles({
                       </Button>
                     </div>
                   </div>
-                  {profile.guidance && <p className="profile-guidance">{profile.guidance}</p>}
+                  {profile.guidance && <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{profile.guidance}</p>}
                 </li>
               ))}
-            </ul>
+            </WorkspaceRows>
           ) : (
-            <Empty className="workspace-empty">
+            <Empty className="min-h-44 border border-dashed">
               <EmptyHeader>
                 <EmptyTitle>{copy.empty}</EmptyTitle>
                 <EmptyDescription>{copy.emptyHint}</EmptyDescription>
@@ -206,7 +206,7 @@ export function WorkspaceProfiles({
             </Empty>
           ))}
         </section>
-        <form className="workspace-form" onSubmit={saveProfile} aria-labelledby="profile-form-title">
+        <WorkspaceForm  onSubmit={saveProfile} aria-labelledby="profile-form-title">
           <h2 id="profile-form-title">{editing ? copy.editTitle : copy.form}</h2>
           <FieldGroup>
             <Field data-disabled={disabled}>
@@ -225,7 +225,7 @@ export function WorkspaceProfiles({
             </Field>
             {saveError && <Alert variant="destructive" role="alert"><AlertDescription>{editing ? copy.updateError : copy.createError}</AlertDescription></Alert>}
             {editing ? (
-              <div className="profile-edit-actions">
+              <div className="flex flex-wrap items-baseline gap-2.5">
                 <Button type="submit" disabled={disabled || !name.trim()}>{copy.save}</Button>
                 <Button type="button" variant="outline" disabled={saving} onClick={() => {
                   setEditing(null);
@@ -238,8 +238,8 @@ export function WorkspaceProfiles({
               </Button>
             )}
           </FieldGroup>
-        </form>
-      </div>
-    </main>
+        </WorkspaceForm>
+      </WorkspaceColumns>
+    </WorkspaceShell>
   );
 }

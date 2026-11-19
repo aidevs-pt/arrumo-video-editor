@@ -1,5 +1,8 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, Upload } from "lucide-react";
@@ -8,15 +11,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { assetCopy } from "./asset-copy";
 
 const kinds = ["image", "audio", "video"] as const;
 type MediaKind = typeof kinds[number];
 type Asset = { id: number; name: string; kind: MediaKind; notes: string };
 
-export function WorkspaceAssets({ workspace, locale, onBack }: {
+export function WorkspaceAssets({ workspace, onBack }: {
   workspace: { id: number; name: string };
-  locale: keyof typeof assetCopy;
+
   onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -28,7 +30,8 @@ export function WorkspaceAssets({ workspace, locale, onBack }: {
   const [progress, setProgress] = useState<{ completed: number; total: number }>();
   const [error, setError] = useState<"importError" | "notesError" | null>(null);
   const [editing, setEditing] = useState<Asset | null>(null);
-  const copy = assetCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.assets;
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
@@ -86,18 +89,18 @@ export function WorkspaceAssets({ workspace, locale, onBack }: {
 
   const visible = assets?.filter((asset) => filter === "all" || asset.kind === filter);
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" onClick={onBack} disabled={busy !== null}>
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
       </Button>
-      <div className="workspace-heading">
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
-      </div>
+      </WorkspaceHeading>
       <section aria-labelledby="asset-list-title">
-        <div className="profile-row-heading asset-toolbar">
-          <h2 id="asset-list-title" className="profile-name">{copy.list}</h2>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2.5">
+          <h2 id="asset-list-title" className="flex min-w-0 items-baseline gap-2.5 font-[680]">{copy.list}</h2>
           <Button type="button" onClick={() => void importFiles()} disabled={!assets || busy !== null || editing !== null}>
             <Upload data-icon="inline-start" />
             {busy === "import" ? copy.picking : copy.pick}
@@ -114,51 +117,51 @@ export function WorkspaceAssets({ workspace, locale, onBack }: {
           </Alert>
         ) : !assets ? <p role="status">{copy.loading}</p> : (
           <>
-            <Field orientation="horizontal" className="asset-toolbar">
+            <Field orientation="horizontal" className="mb-4">
               <FieldLabel htmlFor="asset-filter">{copy.filter}</FieldLabel>
-              <select id="asset-filter" className="rounded-md border border-input bg-background px-2 py-1.5"
+              <NativeSelect id="asset-filter" className="w-full"
                 disabled={editing !== null} value={filter} onChange={(event) => setFilter(event.target.value)}>
-                <option value="all">{copy.all}</option>
-                {kinds.map((kind) => <option key={kind} value={kind}>{copy[kind]}</option>)}
-              </select>
+                <NativeSelectOption value="all">{copy.all}</NativeSelectOption>
+                {kinds.map((kind) => <NativeSelectOption key={kind} value={kind}>{copy[kind]}</NativeSelectOption>)}
+              </NativeSelect>
             </Field>
             {error === "importError" && <Alert variant="destructive"><AlertDescription>{copy.importError}</AlertDescription></Alert>}
             {visible?.length ? (
-              <ul className="workspace-rows">
+              <WorkspaceRows>
                 {visible.map((asset) => (
                   <li key={asset.id}>
-                    <div className="profile-row-heading">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2.5">
                       <div>
-                        <h3 className="profile-name">{asset.name}</h3>
-                        <p className="profile-guidance">{copy[asset.kind]}</p>
+                        <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">{asset.name}</h3>
+                        <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy[asset.kind]}</p>
                       </div>
                       <Button type="button" size="sm" variant="outline" disabled={busy !== null || editing !== null}
                         aria-label={`${copy.edit} · ${asset.name}`}
                         onClick={() => { setError(null); setEditing(asset); }}>{copy.edit}</Button>
                     </div>
                     {editing?.id === asset.id ? (
-                      <form onSubmit={saveNotes} className="asset-note-form">
+                      <form onSubmit={saveNotes} className="mt-3.5">
                         <FieldGroup>
                           <Field>
                             <FieldLabel htmlFor="asset-notes">{copy.notes}</FieldLabel>
                             <Textarea id="asset-notes" name="notes" defaultValue={asset.notes} disabled={busy !== null} />
                           </Field>
                           {error === "notesError" && <Alert variant="destructive"><AlertDescription>{copy.notesError}</AlertDescription></Alert>}
-                          <div className="profile-edit-actions">
+                          <div className="flex flex-wrap items-baseline gap-2.5">
                             <Button type="submit" disabled={busy !== null}>{copy.save}</Button>
                             <Button type="button" variant="outline" disabled={busy !== null}
                               onClick={() => { setError(null); setEditing(null); }}>{copy.cancel}</Button>
                           </div>
                         </FieldGroup>
                       </form>
-                    ) : <p className="profile-guidance">{asset.notes || copy.noNotes}</p>}
+                    ) : <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{asset.notes || copy.noNotes}</p>}
                   </li>
                 ))}
-              </ul>
+              </WorkspaceRows>
             ) : <p>{copy.empty}</p>}
           </>
         )}
       </section>
-    </main>
+    </WorkspaceShell>
   );
 }

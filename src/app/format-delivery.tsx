@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
@@ -11,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PortraitFields, type PortraitDerivatives, type SourceProfile } from "./portrait-fields";
 import { ThumbnailReferences, type ReferenceImage } from "./thumbnail-references";
-import { deliveryCopy } from "./delivery-copy";
 
 type Supplemental = {
   thumbnails: number;
@@ -39,12 +40,12 @@ const countFields = ["thumbnails", "titles", "descriptions"] as const;
 const textFields = ["thumbnail_guidance", "specifications"] as const;
 
 export function FormatDelivery({
-  workspaceId, profileId, format, locale, onBack,
+  workspaceId, profileId, format, onBack,
 }: {
   workspaceId: number;
   profileId?: number;
   format: { id: number; name: string; width: number; height: number };
-  locale: keyof typeof deliveryCopy;
+
   onBack: () => void;
 }) {
   const [delivery, setDelivery] = useState<Delivery>();
@@ -61,7 +62,8 @@ export function FormatDelivery({
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<"saved" | "saveError" | "importReferenceError" | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const copy = deliveryCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.delivery;
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
@@ -181,21 +183,21 @@ export function FormatDelivery({
             onChange={(event) => setOverrides({ ...overrides, [field]: event.target.checked })} />
           <FieldLabel htmlFor={`override-${field}`}>{copy.override}</FieldLabel>
         </Field>
-        <p className="profile-guidance">{copy.workspaceValue} · {display}</p>
+        <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy.workspaceValue} · {display}</p>
       </>
     );
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" onClick={onBack} disabled={pending}>
         <ArrowLeft data-icon="inline-start" />
         {isProfile ? copy.backProfile : copy.back}
       </Button>
-      <div className="workspace-heading">
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{format.name}</p>
-      </div>
+      </WorkspaceHeading>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -205,19 +207,19 @@ export function FormatDelivery({
           }}>{copy.retry}</Button>
         </Alert>
       ) : delivery ? (
-        <div className="workspace-layout delivery-layout">
+        <WorkspaceColumns wideForm>
           <section aria-labelledby="delivery-required">
             <h2 id="delivery-required">{copy.required}</h2>
-            <ul className="workspace-rows">
+            <WorkspaceRows>
               {delivery.required.map((output) => <li key={output}>{copy[output]}</li>)}
-            </ul>
+            </WorkspaceRows>
           </section>
-          <form className="workspace-form" aria-labelledby="delivery-supplemental" aria-busy={pending}
+          <WorkspaceForm  aria-labelledby="delivery-supplemental" aria-busy={pending}
             onSubmit={save} onChange={() => setResult(null)}>
             <h2 id="delivery-supplemental">{copy.supplemental}</h2>
             <fieldset disabled={pending}>
               <FieldGroup>
-                <div className="delivery-counts">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(115px,1fr))] gap-3">
                   {countFields.map((field) => (
                     <Field key={field}>
                       <FieldLabel htmlFor={field}>{copy[field]}</FieldLabel>
@@ -260,9 +262,9 @@ export function FormatDelivery({
                 <Button type="submit">{copy.save}</Button>
               </FieldGroup>
             </fieldset>
-          </form>
-        </div>
+          </WorkspaceForm>
+        </WorkspaceColumns>
       ) : <p role="status">{copy.loading}</p>}
-    </main>
+    </WorkspaceShell>
   );
 }

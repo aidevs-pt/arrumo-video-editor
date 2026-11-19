@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Desktop interface
+
+Use Tailwind utilities for component styles and compose shared shadcn primitives. Keep theme tokens and document-wide defaults in `src/app/globals.css`. Put recurring workspace layouts in `src/components/workspace`.
+
+Store user-facing strings in `locales/<language-tag>.json` and read them through the locale provider. Use the English catalog as the key reference.

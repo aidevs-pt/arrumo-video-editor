@@ -1,19 +1,19 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { queueCopy } from "./queue-copy";
 
 type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
 export type Run = { id: number; draft_id: number; state: RunState; snapshot: { draft: { id: number; title: string } } };
 export type RunAction = "pause" | "resume" | "cancel";
 type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number };
 
-export function GenerationRunRow({ run, workspaceId, locale, disabled, onControl }: {
+export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
   run: Run;
   workspaceId: number;
-  locale: keyof typeof queueCopy;
+
   disabled: boolean;
   onControl: (runId: number, action: RunAction) => Promise<void>;
 }) {
@@ -21,7 +21,8 @@ export function GenerationRunRow({ run, workspaceId, locale, disabled, onControl
   const [historyOpen, setHistoryOpen] = useState(false);
   const [activity, setActivity] = useState<Activity[]>();
   const [historyError, setHistoryError] = useState(false);
-  const copy = queueCopy[locale];
+  const { locale, messages } = useLocale();
+  const copy = messages.queue;
   const title = run.snapshot.draft.title;
   const canPause = run.state === "queued" || run.state === "running";
   const canResume = run.state === "paused";
@@ -47,14 +48,14 @@ export function GenerationRunRow({ run, workspaceId, locale, disabled, onControl
 
   return (
     <li>
-      <h3 className="profile-name">{title}</h3>
-      <p className="profile-guidance">{copy[run.state]}</p>
+      <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">{title}</h3>
+      <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy[run.state]}</p>
       {(canPause || canResume) && (
-        <div className="run-actions">
+        <div className="mt-2.5 [&>summary]:cursor-pointer">
           {confirm ? (
             <>
               <p>{copy.confirmCancel}</p>
-              <div className="profile-edit-actions">
+              <div className="flex flex-wrap items-baseline gap-2.5">
                 <Button type="button" size="sm" variant="destructive" disabled={disabled} onClick={() => {
                   setConfirm(false);
                   void onControl(run.id, "cancel");
@@ -63,7 +64,7 @@ export function GenerationRunRow({ run, workspaceId, locale, disabled, onControl
               </div>
             </>
           ) : (
-            <div className="profile-edit-actions">
+            <div className="flex flex-wrap items-baseline gap-2.5">
               {canPause && <Button type="button" size="sm" variant="outline" disabled={disabled}
                 aria-label={`${copy.pause} · ${title}`} onClick={() => void onControl(run.id, "pause")}>{copy.pause}</Button>}
               {canResume && <Button type="button" size="sm" variant="outline" disabled={disabled}
@@ -74,10 +75,10 @@ export function GenerationRunRow({ run, workspaceId, locale, disabled, onControl
           )}
         </div>
       )}
-      <details className="run-actions" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
+      <details className="mt-2.5 [&>summary]:cursor-pointer" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
         <summary>{copy.activity}</summary>
         {historyError ? <p role="alert">{copy.activityError}</p> : !activity ? <p role="status">{copy.loading}</p> : (
-          <ol className="draft-order">
+          <ol className="list-decimal ps-6 [&>li]:py-0.75">
             {activity.map((event, index) => (
               <li key={index}>
                 {copy[event.kind]} · {copy[event.state]} · <time dateTime={new Date(event.created_at * 1000).toISOString()}>

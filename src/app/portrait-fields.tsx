@@ -1,8 +1,9 @@
+import type { LocaleMessages } from "@/lib/locales";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ThumbnailReferences, type ReferenceImage } from "./thumbnail-references";
-import { deliveryCopy } from "./delivery-copy";
 
 type ManualSource = {
   type: "manual";
@@ -23,7 +24,7 @@ export function PortraitFields({ value, profiles, images, copy, onChange, onImpo
   value: PortraitDerivatives;
   profiles: SourceProfile[];
   images: ReferenceImage[];
-  copy: (typeof deliveryCopy)["en"];
+  copy: LocaleMessages["delivery"];
   onChange: (value: PortraitDerivatives) => void;
   onImportReference: () => void;
 }) {
@@ -40,7 +41,7 @@ export function PortraitFields({ value, profiles, images, copy, onChange, onImpo
         {count > 0 && (
           <Field>
             <FieldLabel htmlFor="portrait-source">{copy.portraitSource}</FieldLabel>
-            <select id="portrait-source" className="rounded-md border border-input bg-background px-2 py-1.5"
+            <NativeSelect id="portrait-source" className="w-full"
               value={source.type === "manual" ? "manual" : source.profile_id}
               onChange={(event) => onChange({
                 ...value,
@@ -48,9 +49,9 @@ export function PortraitFields({ value, profiles, images, copy, onChange, onImpo
                   type: "profile", profile_id: Number(event.target.value),
                 },
               })}>
-              <option value="manual">{copy.portraitManual}</option>
-              {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-            </select>
+              <NativeSelectOption value="manual">{copy.portraitManual}</NativeSelectOption>
+              {profiles.map((profile) => <NativeSelectOption key={profile.id} value={profile.id}>{profile.name}</NativeSelectOption>)}
+            </NativeSelect>
           </Field>
         )}
         {count > 0 && source.type === "manual" && (

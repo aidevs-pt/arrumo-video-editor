@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/locale-provider";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -8,17 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FormatDelivery } from "./format-delivery";
-import { outputCopy } from "./output-copy";
 
 type OutputFormat = { id: number; name: string; width: number; height: number; enabled: boolean };
 
 export function WorkspaceOutputs({
   workspace,
-  locale,
   onBack,
 }: {
   workspace: { id: number; name: string };
-  locale: keyof typeof outputCopy;
+
   onBack: () => void;
 }) {
   const [deliveryFormat, setDeliveryFormat] = useState<OutputFormat | null>(null);
@@ -31,7 +31,8 @@ export function WorkspaceOutputs({
   const [failure, setFailure] = useState<"save" | "remove" | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const formName = useRef<HTMLInputElement>(null);
-  const copy = outputCopy[locale];
+  const { messages } = useLocale();
+  const copy = messages.outputs;
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => { if (editing) formName.current?.focus(); }, [editing]);
@@ -101,23 +102,22 @@ export function WorkspaceOutputs({
     return <FormatDelivery
       workspaceId={workspace.id}
       format={deliveryFormat}
-      locale={locale}
       onBack={() => setDeliveryFormat(null)}
     />;
   }
 
   return (
-    <main className="workspace-shell profile-shell">
+    <WorkspaceShell>
       <Button type="button" variant="ghost" onClick={onBack} disabled={pending}>
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
       </Button>
-      <div className="workspace-heading">
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
-      </div>
-      <div className="workspace-layout">
-        <section className="workspace-list" aria-labelledby="format-list-title">
+      </WorkspaceHeading>
+      <WorkspaceColumns>
+        <section className="min-w-0 [&>p]:mt-3 [&>p]:max-w-[60ch] [&>p]:text-muted-foreground" aria-labelledby="format-list-title">
           <h2 id="format-list-title">{copy.list}</h2>
           {status === "loading" && <p role="status">{copy.loading}</p>}
           {status === "error" && (
@@ -130,18 +130,18 @@ export function WorkspaceOutputs({
             </Alert>
           )}
           {status === "ready" && (formats.length ? (
-            <ul className="workspace-rows" aria-live="polite">
+            <WorkspaceRows  aria-live="polite">
               {formats.map((format) => (
                 <li key={format.id}>
-                  <div className="profile-row-heading">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2.5">
                     <div>
-                      <h3 className="profile-name">{format.name}</h3>
-                      <p className="profile-guidance">{format.width} × {format.height} · {format.enabled ? copy.enabled : copy.disabled}</p>
+                      <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">{format.name}</h3>
+                      <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{format.width} × {format.height} · {format.enabled ? copy.enabled : copy.disabled}</p>
                     </div>
                     {removing === format.id ? (
                       <div>
                         <p>{copy.confirm}</p>
-                        <div className="profile-edit-actions">
+                        <div className="flex flex-wrap items-baseline gap-2.5">
                           <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => void remove(format.id)}>{copy.remove}</Button>
                           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => {
                             setRemoving(null);
@@ -151,7 +151,7 @@ export function WorkspaceOutputs({
                         {failure === "remove" && <p role="alert">{copy.removeError}</p>}
                       </div>
                     ) : (
-                      <div className="profile-edit-actions">
+                      <div className="flex flex-wrap items-baseline gap-2.5">
                         <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
                           aria-label={`${copy.delivery} · ${format.name}`} onClick={() => setDeliveryFormat(format)}>{copy.delivery}</Button>
                         <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
@@ -169,10 +169,10 @@ export function WorkspaceOutputs({
                   </div>
                 </li>
               ))}
-            </ul>
+            </WorkspaceRows>
           ) : <p>{copy.empty}</p>)}
         </section>
-        <form key={editing?.id ?? "new"} className="workspace-form" onSubmit={save} aria-labelledby="format-form-title" aria-busy={pending}>
+        <WorkspaceForm key={editing?.id ?? "new"}  onSubmit={save} aria-labelledby="format-form-title" aria-busy={pending}>
           <h2 id="format-form-title">{editing ? copy.editTitle : copy.create}</h2>
           <fieldset disabled={pending || status !== "ready" || removing !== null}>
             <FieldGroup>
@@ -193,7 +193,7 @@ export function WorkspaceOutputs({
                 <FieldLabel htmlFor="format-enabled">{copy.enabled}</FieldLabel>
               </Field>
               {failure === "save" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
-              <div className="profile-edit-actions">
+              <div className="flex flex-wrap items-baseline gap-2.5">
                 <Button type="submit">{editing ? copy.save : copy.create}</Button>
                 {editing && <Button type="button" variant="outline" onClick={() => {
                   setEditing(null);
@@ -202,8 +202,8 @@ export function WorkspaceOutputs({
               </div>
             </FieldGroup>
           </fieldset>
-        </form>
-      </div>
-    </main>
+        </WorkspaceForm>
+      </WorkspaceColumns>
+    </WorkspaceShell>
   );
 }

@@ -1,6 +1,6 @@
+import type { LocaleMessages } from "@/lib/locales";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { deliveryCopy } from "./delivery-copy";
 
 export type ReferenceImage = { id: number; name: string };
 
@@ -8,7 +8,7 @@ export function ThumbnailReferences({ id, images, selected, copy, onChange, onIm
   id: string;
   images: ReferenceImage[];
   selected: number[];
-  copy: (typeof deliveryCopy)["en"];
+  copy: LocaleMessages["delivery"];
   onChange: (selected: number[]) => void;
   onImport: () => void;
 }) {
