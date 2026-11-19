@@ -196,3 +196,51 @@ pub fn write_plugin_setting(
         .set_plugin_setting(&plugin_id, &setting_id, workspace_id, value.as_ref())
         .map_err(|_| "plugin_setting_save_failed")
 }
+
+#[tauri::command]
+pub async fn read_plugin_credential_status(
+    app: AppHandle,
+    plugin_id: String,
+    setting_id: String,
+    workspace_id: Option<i64>,
+) -> Result<arrumo_workspaces::PluginCredentialStatus, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = open_credential_workspace_store(&app)?;
+        store
+            .plugin_credential_status(&plugin_id, &setting_id, workspace_id)
+            .map_err(|_| "plugin_credential_status_failed")
+    })
+    .await
+    .map_err(|_| "plugin_credential_status_failed")?
+}
+
+#[tauri::command]
+pub async fn write_plugin_credential(
+    app: AppHandle,
+    plugin_id: String,
+    setting_id: String,
+    workspace_id: Option<i64>,
+    secret: Option<String>,
+) -> Result<arrumo_workspaces::PluginCredentialStatus, &'static str> {
+    let secret = secret.map(|value| zeroize::Zeroizing::new(value.into_bytes()));
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = open_credential_workspace_store(&app)?;
+        store
+            .set_plugin_credential(&plugin_id, &setting_id, workspace_id, secret)
+            .map_err(|_| "plugin_credential_save_failed")?;
+        store
+            .plugin_credential_status(&plugin_id, &setting_id, workspace_id)
+            .map_err(|_| "plugin_credential_status_failed")
+    })
+    .await
+    .map_err(|_| "plugin_credential_save_failed")?
+}
+
+fn open_credential_workspace_store(app: &AppHandle) -> Result<WorkspaceStore, &'static str> {
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "store_unavailable")?
+        .join("workspaces.sqlite");
+    WorkspaceStore::open(database).map_err(|_| "store_unavailable")
+}

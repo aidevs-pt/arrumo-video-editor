@@ -1,4 +1,16 @@
 {
+  "pluginCredentials": {
+    "unavailable": "El almacén de credenciales del sistema no está disponible. Desbloquéalo e inténtalo de nuevo.",
+    "saveError": "No se pudo actualizar la credencial. Comprueba el almacén del sistema e inténtalo de nuevo.",
+    "saved": "Credencial actualizada.",
+    "unset": "Sin credencial configurada",
+    "app": "Usa la credencial de la aplicación",
+    "workspace": "Usa una credencial del espacio de trabajo",
+    "save": "Guardar credencial",
+    "remove": "Eliminar credencial",
+    "removeApp": "Se eliminará la credencial de la aplicación para este complemento. Los espacios de trabajo con su propia credencial seguirán usándola.",
+    "removeWorkspace": "Se eliminará la credencial del espacio de trabajo. Se usará la credencial de la aplicación si está configurada."
+  },
   "pluginPreferences": {
     "title": "Configuración de complementos",
     "appIntro": "Establece los valores predeterminados de esta instalación de Arrumo.",

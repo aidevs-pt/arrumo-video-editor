@@ -1,4 +1,16 @@
 {
+  "pluginCredentials": {
+    "unavailable": "The system credential store is unavailable. Unlock it and try again.",
+    "saveError": "Could not update the credential. Check the system credential store and try again.",
+    "saved": "Credential updated.",
+    "unset": "No credential configured",
+    "app": "Using the app credential",
+    "workspace": "Using a workspace credential",
+    "save": "Save credential",
+    "remove": "Remove credential",
+    "removeApp": "This removes the app credential for this plugin. Workspaces with their own credential keep using it.",
+    "removeWorkspace": "This removes the workspace credential. The workspace will use the app credential if one is configured."
+  },
   "pluginPreferences": {
     "title": "Plugin settings",
     "appIntro": "Set defaults for this Arrumo installation.",

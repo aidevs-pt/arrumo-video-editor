@@ -12,16 +12,18 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
+import { PluginCredentialField } from "./plugin-credential-field";
 
 type Scope = "app" | "workspace";
-type Setting = {
+export type PluginSettingDeclaration = {
   id: string;
   label: string;
   description: string;
   kind: "string" | "integer" | "boolean" | "secret";
   scope: Scope;
 };
-export type PluginSettingsManifest = { id: string; name: string; settings?: Setting[] };
+export type PluginSettingsManifest = { id: string; name: string; settings?: PluginSettingDeclaration[] };
+type CatalogEntry = { bundled: boolean; manifest: PluginSettingsManifest };
 type Values = {
   app: string | null;
   workspaceOverride: string | null;
@@ -30,17 +32,17 @@ type Values = {
 };
 
 export function PluginPreferences({
-  manifests,
+  plugins,
   workspaceId,
 }: {
-  manifests: PluginSettingsManifest[];
+  plugins: CatalogEntry[];
   workspaceId: number | null;
 }) {
   const { messages: { pluginPreferences: copy } } = useLocale();
-  const entries = manifests.map((manifest) => ({
+  const entries = plugins.map(({ manifest, bundled }) => ({
     ...manifest,
     fields: manifest.settings?.filter(({ kind, scope }) =>
-      kind !== "secret" && (workspaceId === null || scope === "workspace"),
+      (kind !== "secret" || bundled) && (workspaceId === null || scope === "workspace"),
     ) ?? [],
   })).filter(({ fields }) => fields.length > 0);
   if (entries.length === 0) return null;
@@ -53,14 +55,21 @@ export function PluginPreferences({
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible>
-          {entries.map(({ id, name, fields }) => (
-            <AccordionItem key={id} value={id}>
-              <AccordionTrigger className="wrap-anywhere">{name}</AccordionTrigger>
-              <AccordionContent>
-                <PluginFields pluginId={id} fields={fields} workspaceId={workspaceId} />
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+          {entries.map(({ id, name, fields }) => {
+            const ordinary = fields.filter((field) => field.kind !== "secret");
+            const credentials = fields.filter((field) => field.kind === "secret");
+            return (
+              <AccordionItem key={id} value={id}>
+                <AccordionTrigger className="wrap-anywhere">{name}</AccordionTrigger>
+                <AccordionContent>
+                  <div className="flex flex-col gap-4">
+                    {ordinary.length > 0 && <PluginFields pluginId={id} fields={ordinary} workspaceId={workspaceId} />}
+                    {credentials.map((field) => <PluginCredentialField key={field.id} field={field} pluginId={id} workspaceId={workspaceId} />)}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
         </Accordion>
       </CardContent>
     </Card>
@@ -69,13 +78,13 @@ export function PluginPreferences({
 
 export function WorkspacePluginPreferences({ workspaceId }: { workspaceId: number }) {
   const { messages: { pluginPreferences: copy, workspaces } } = useLocale();
-  const [manifests, setManifests] = useState<PluginSettingsManifest[]>();
+  const [manifests, setManifests] = useState<CatalogEntry[]>();
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    invoke<{ manifest: PluginSettingsManifest }[]>("list_plugin_catalog").then(
-      (catalog) => { if (active) setManifests(catalog.map(({ manifest }) => manifest)); },
+    invoke<CatalogEntry[]>("list_plugin_catalog").then(
+      (catalog) => { if (active) setManifests(catalog); },
       () => { if (active) setError(true); },
     );
     return () => { active = false; };
@@ -86,12 +95,12 @@ export function WorkspacePluginPreferences({ workspaceId }: { workspaceId: numbe
     <Button variant="outline" onClick={() => { setError(false); setAttempt((value) => value + 1); }}>{workspaces.retry}</Button>
   </Alert>;
   if (!manifests) return <Skeleton className="h-12" aria-label={copy.loading} />;
-  return <PluginPreferences manifests={manifests} workspaceId={workspaceId} />;
+  return <PluginPreferences plugins={manifests} workspaceId={workspaceId} />;
 }
 
 function PluginFields({ pluginId, fields, workspaceId }: {
   pluginId: string;
-  fields: Setting[];
+  fields: PluginSettingDeclaration[];
   workspaceId: number | null;
 }) {
   const { messages: { pluginPreferences: copy, workspaces } } = useLocale();
@@ -134,7 +143,7 @@ function PluginFields({ pluginId, fields, workspaceId }: {
 }
 
 function PreferenceField({ field, values, workspace, saving, write }: {
-  field: Setting;
+  field: PluginSettingDeclaration;
   values: Values;
   workspace: boolean;
   saving: boolean;

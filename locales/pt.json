@@ -1,4 +1,16 @@
 {
+  "pluginCredentials": {
+    "unavailable": "O armazenamento de credenciais do sistema não está disponível. Desbloqueie-o e tente novamente.",
+    "saveError": "Não foi possível atualizar a credencial. Verifique o armazenamento do sistema e tente novamente.",
+    "saved": "Credencial atualizada.",
+    "unset": "Sem credencial configurada",
+    "app": "A usar a credencial da aplicação",
+    "workspace": "A usar uma credencial do espaço de trabalho",
+    "save": "Guardar credencial",
+    "remove": "Remover credencial",
+    "removeApp": "Remove a credencial da aplicação para este plugin. Os espaços de trabalho com credencial própria continuam a utilizá-la.",
+    "removeWorkspace": "Remove a credencial do espaço de trabalho. Se estiver configurada, será usada a credencial da aplicação."
+  },
   "pluginPreferences": {
     "title": "Definições dos plugins",
     "appIntro": "Defina os valores predefinidos desta instalação do Arrumo.",

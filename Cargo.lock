@@ -75,6 +75,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tiny_http",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

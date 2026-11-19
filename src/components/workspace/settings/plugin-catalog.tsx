@@ -76,7 +76,7 @@ export function PluginCatalog() {
 
   return (
     <>
-      {plugins && <PluginPreferences manifests={plugins.map(({ manifest }) => manifest)} workspaceId={null} />}
+      {plugins && <PluginPreferences plugins={plugins} workspaceId={null} />}
       <Card>
         <CardHeader>
           <CardTitle>{copy.title}</CardTitle>
