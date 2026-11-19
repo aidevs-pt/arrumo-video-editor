@@ -24,6 +24,7 @@ export function WorkspaceProfiles({
   onAssets,
   onContext,
   onBrand,
+  onDrafts,
 }: {
   workspace: { id: number; name: string };
   locale: keyof typeof profileCopy;
@@ -32,6 +33,7 @@ export function WorkspaceProfiles({
   onAssets: () => void;
   onContext: () => void;
   onBrand: () => void;
+  onDrafts: (profileId?: number) => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [attempt, setAttempt] = useState(0);
@@ -135,6 +137,7 @@ export function WorkspaceProfiles({
       <Button type="button" variant="outline" onClick={onAssets} disabled={saving || editing !== null}>{copy.assets}</Button>
       <Button type="button" variant="outline" onClick={onContext} disabled={saving || editing !== null}>{copy.context}</Button>
       <Button type="button" variant="outline" onClick={onBrand} disabled={saving || editing !== null}>{copy.brand}</Button>
+      <Button type="button" variant="outline" onClick={() => onDrafts()} disabled={saving || editing !== null}>{copy.drafts}</Button>
       <div className="workspace-heading">
         <h1 ref={heading} tabIndex={-1}>{workspace.name}</h1>
       </div>
@@ -161,6 +164,10 @@ export function WorkspaceProfiles({
                       {profile.name}
                     </h3>
                     <div className="profile-edit-actions">
+                      <Button type="button" size="sm" variant="outline" disabled={saving || editing !== null}
+                        aria-label={`${copy.drafts} · ${profile.name}`} onClick={() => onDrafts(profile.id)}>
+                        {copy.drafts}
+                      </Button>
                       <Button type="button" size="sm" variant="outline"
                         aria-label={`${copy.formats} · ${profile.name}`}
                         disabled={saving || editing !== null}

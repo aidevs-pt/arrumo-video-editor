@@ -4,6 +4,7 @@ export const profileCopy = {
     outputs: "Outputs",
     context: "Context",
     brand: "Brand",
+    drafts: "Drafts",
     assets: "Assets",
     formats: "Formats",
     title: "Profiles",
@@ -31,6 +32,7 @@ export const profileCopy = {
     outputs: "Salidas",
     context: "Contexto",
     brand: "Marca",
+    drafts: "Borradores",
     assets: "Recursos",
     formats: "Formatos",
     title: "Perfiles",
@@ -58,6 +60,7 @@ export const profileCopy = {
     outputs: "Saídas",
     context: "Contexto",
     brand: "Marca",
+    drafts: "Rascunhos",
     assets: "Recursos",
     formats: "Formatos",
     title: "Perfis",
@@ -85,6 +88,7 @@ export const profileCopy = {
   outputs: string;
   context: string;
   brand: string;
+  drafts: string;
   assets: string;
   formats: string;
   title: string;
