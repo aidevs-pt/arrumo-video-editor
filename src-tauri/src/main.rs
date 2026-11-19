@@ -587,6 +587,7 @@ fn main() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(delivery_stream::DeliveryStream::default())
         .setup(|app| {
             #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
@@ -608,6 +609,8 @@ fn main() {
             list_workspaces,
             agent_settings::get_agent_settings,
             agent_settings::set_agent_provider,
+            agent_settings::agent_cli_detected,
+            agent_settings::open_agent_setup_guide,
             create_workspace,
             list_profiles,
             create_profile,

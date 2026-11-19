@@ -1,5 +1,17 @@
 {
   "agentSettings": {
+    "setupTitle": "Configura o teu agente de produção",
+    "setupIntro": "Escolhe Codex ou Claude Code e segue o guia de configuração antes de executar tarefas do agente.",
+    "setupAction": "Configurar agente",
+    "continueSetup": "Continuar para o contexto",
+    "checkFailed": "Não foi possível verificar a CLI do agente",
+    "checking": "A procurar a CLI do agente…",
+    "detected": "CLI do agente encontrada",
+    "notDetected": "CLI do agente não encontrada",
+    "connectionHint": "A verificação procura a CLI no PATH do Arrumo. Segue o guia do fornecedor para instalar e autenticar.",
+    "guide": "Abrir guia de configuração",
+    "recheck": "Verificar novamente",
+    "guideError": "Não foi possível abrir o guia de configuração.",
     "title": "Definições",
     "intro": "Escolhe o agente para novas execuções de produção.",
     "scope": "Âmbito das definições",

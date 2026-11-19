@@ -179,3 +179,5 @@ Desktop deep links use `arrumo://open/<section>?workspace=<id>`. Profile and run
 Use `agent-settings <app|workspace-id>` to inspect the configured agent and where it came from. Use `set-agent-provider <app|workspace-id> <codex|claude_code|unset>` to change the choice. Unsetting a workspace override restores the app choice, if configured. New runs freeze the resolved selection and provenance. Selecting a provider is separate from connecting or running its agent.
 
 Open **Settings** in the desktop sidebar to choose the app's production agent. Use the settings scope picker to configure a workspace override or restore inheritance. The effective provider and its source appear under the selector.
+
+On a fresh install, creating the first workspace opens agent setup if no app provider is selected. Settings can check whether the selected CLI is on Arrumo's PATH and open the provider's installation guide in the system browser. This check reports local CLI availability. Authentication is handled through the provider's own setup.

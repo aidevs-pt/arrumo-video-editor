@@ -1,5 +1,17 @@
 {
   "agentSettings": {
+    "setupTitle": "Set up your production agent",
+    "setupIntro": "Choose Codex or Claude Code and follow its setup guide before running agent work.",
+    "setupAction": "Set up agent",
+    "continueSetup": "Continue to workspace context",
+    "checkFailed": "Couldn’t check for the agent CLI",
+    "checking": "Checking for the agent CLI…",
+    "detected": "Agent CLI found",
+    "notDetected": "Agent CLI not found",
+    "connectionHint": "The check looks for the CLI on Arrumo’s PATH. Follow the provider’s guide to install and authenticate it.",
+    "guide": "Open setup guide",
+    "recheck": "Check again",
+    "guideError": "Couldn’t open the setup guide.",
     "title": "Settings",
     "intro": "Choose the agent used for new production runs.",
     "scope": "Settings scope",
