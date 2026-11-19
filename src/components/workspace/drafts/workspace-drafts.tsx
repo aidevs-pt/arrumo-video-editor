@@ -1,11 +1,11 @@
 "use client";
 
+import { Clapperboard } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,14 @@ type CatalogEntry = { id: number; name: string };
 type Asset = CatalogEntry & { kind: string };
 type Draft = { id: number; title: string; intent: string; profile_id: number | null; source_ids: number[] };
 
-export function WorkspaceDrafts({ workspace, initialProfile, onBack }: {
+export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = false, onBack }: {
   workspace: CatalogEntry;
+  startInQueue?: boolean;
   initialProfile: number | null;
 
   onBack: () => void;
 }) {
-  const [queueView, setQueueView] = useState<{ draftId: number | null } | null>(null);
+  const [queueView, setQueueView] = useState<{ draftId: number | null } | null>(startInQueue ? { draftId: null } : null);
   const heading = useRef<HTMLHeadingElement>(null);
   const [drafts, setDrafts] = useState<Draft[]>();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -146,18 +147,13 @@ export function WorkspaceDrafts({ workspace, initialProfile, onBack }: {
       workspaceId={workspaceId}
       drafts={drafts}
       initialDraftId={queueView.draftId}
-      onBack={() => setQueueView(null)}
+      onBack={startInQueue ? onBack : () => setQueueView(null)}
     />;
   }
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" disabled={pending !== null} onClick={onBack}>
-        <ArrowLeft data-icon="inline-start" />{copy.back}
-      </Button>
-      <Button type="button" variant="outline" disabled={!drafts || pending !== null || editing !== null}
-        onClick={() => setQueueView({ draftId: null })}>{messages.queue.title}</Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={Clapperboard}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p>{workspace.name}</p>
       </WorkspaceHeading>
       {loadError ? <Alert variant="destructive">

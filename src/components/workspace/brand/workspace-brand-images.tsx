@@ -12,10 +12,9 @@ type Role = typeof roles[number];
 type Image = { id: number; name: string; kind: string };
 type Association = { asset_id: number; role: Role };
 
-export function WorkspaceBrandImages({ workspaceId, onSaving }: {
+export function WorkspaceBrandImages({ workspaceId }: {
   workspaceId: number;
 
-  onSaving: (saving: boolean) => void;
 }) {
   const [images, setImages] = useState<Image[]>();
   const [associations, setAssociations] = useState<Association[]>([]);
@@ -45,7 +44,6 @@ export function WorkspaceBrandImages({ workspaceId, onSaving }: {
   async function assign(assetId: number, role: Role, checked: boolean) {
     if (pending) return;
     setPending(true);
-    onSaving(true);
     setSaveError(false);
     try {
       await invoke(checked ? "attach_brand_asset" : "detach_brand_asset", { workspaceId, assetId, role });
@@ -56,12 +54,11 @@ export function WorkspaceBrandImages({ workspaceId, onSaving }: {
       setSaveError(true);
     } finally {
       setPending(false);
-      onSaving(false);
     }
   }
 
   return (
-    <section className="mt-8 [&>h2]:mb-3 [&_summary]:cursor-pointer [&_summary]:font-semibold" aria-labelledby="brand-images-title" aria-busy={pending}>
+    <section className="mt-6 rounded-xl border bg-card p-4 sm:p-5 [&>h2]:mb-3 [&_summary]:cursor-pointer [&_summary]:font-semibold" aria-labelledby="brand-images-title" aria-busy={pending}>
       <h2 id="brand-images-title" className="flex min-w-0 items-baseline gap-2.5 font-[680]">{copy.title}</h2>
       {loadError ? (
         <Alert variant="destructive">
@@ -71,7 +68,7 @@ export function WorkspaceBrandImages({ workspaceId, onSaving }: {
             setAttempt((value) => value + 1);
           }}>{copy.retry}</Button>
         </Alert>
-      ) : !images ? <p role="status">{copy.loading}</p> : images.length === 0 ? <p>{copy.empty}</p> : (
+      ) : !images ? <p role="status">{copy.loading}</p> : images.length === 0 ? <p className="text-sm text-muted-foreground">{copy.empty}</p> : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-6 border-t pt-4 [&_label]:wrap-anywhere">
           {roles.map((role) => (
             <FieldSet key={role} disabled={pending}>

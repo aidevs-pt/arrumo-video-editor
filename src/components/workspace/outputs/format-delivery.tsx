@@ -4,7 +4,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Package } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -194,7 +194,7 @@ export function FormatDelivery({
         <ArrowLeft data-icon="inline-start" />
         {isProfile ? copy.backProfile : copy.back}
       </Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={Package}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{format.name}</p>
       </WorkspaceHeading>

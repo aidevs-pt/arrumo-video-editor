@@ -1,9 +1,9 @@
 "use client";
 
+import { SlidersHorizontal } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,9 @@ type OutputFormat = { id: number; name: string; width: number; height: number; e
 
 export function WorkspaceOutputs({
   workspace,
-  onBack,
 }: {
   workspace: { id: number; name: string };
 
-  onBack: () => void;
 }) {
   const [deliveryFormat, setDeliveryFormat] = useState<OutputFormat | null>(null);
   const [formats, setFormats] = useState<OutputFormat[]>([]);
@@ -108,11 +106,7 @@ export function WorkspaceOutputs({
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" onClick={onBack} disabled={pending}>
-        <ArrowLeft data-icon="inline-start" />
-        {copy.back}
-      </Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={SlidersHorizontal}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
       </WorkspaceHeading>

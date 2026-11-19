@@ -1,9 +1,9 @@
 "use client";
 
+import { Palette } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,9 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { WorkspaceBrandImages } from "./workspace-brand-images";
 
-export function WorkspaceBrand({ workspace, onBack }: {
+export function WorkspaceBrand({ workspace }: {
   workspace: { id: number; name: string };
 
-  onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [colors, setColors] = useState<string[]>();
@@ -22,7 +21,6 @@ export function WorkspaceBrand({ workspace, onBack }: {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [savingImages, setSavingImages] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [result, setResult] = useState<"saved" | "saveError" | null>(null);
   const { messages } = useLocale();
@@ -62,11 +60,7 @@ export function WorkspaceBrand({ workspace, onBack }: {
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" onClick={onBack} disabled={saving || savingImages}>
-        <ArrowLeft data-icon="inline-start" />
-        {copy.back}
-      </Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={Palette}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
       </WorkspaceHeading>
@@ -79,14 +73,14 @@ export function WorkspaceBrand({ workspace, onBack }: {
           }}>{copy.retry}</Button>
         </Alert>
       ) : !colors ? <p role="status">{copy.loading}</p> : (
-        <section aria-labelledby="brand-colors">
+        <section className="rounded-xl border bg-card p-4 sm:p-5" aria-labelledby="brand-colors">
           <h2 id="brand-colors" className="flex min-w-0 items-baseline gap-2.5 font-[680]">{copy.colors}</h2>
           {colors.length ? (
-            <ul className="my-3.5 flex flex-wrap items-center gap-3 [&>li]:flex [&>li]:items-center [&>li]:gap-2 [&>li]:rounded-lg [&>li]:border [&>li]:p-1.5">
+            <ul className="my-4 flex flex-wrap items-start gap-3">
               {colors.map((color) => (
-                <li key={color}>
-                  <span className="size-6 rounded-sm border" style={{ backgroundColor: color }} aria-hidden="true" />
-                  <span>{color}</span>
+                <li key={color} className="flex min-w-20 flex-col items-center gap-1">
+                  <span className="size-14 rounded-lg border" style={{ backgroundColor: color }} aria-hidden="true" />
+                  <span className="text-xs font-medium tabular-nums">{color}</span>
                   <Button type="button" variant="ghost" size="sm" disabled={saving}
                     aria-label={`${copy.remove} ${color}`} onClick={() => update(colors.filter((item) => item !== color))}>{copy.remove}</Button>
                 </li>
@@ -107,7 +101,7 @@ export function WorkspaceBrand({ workspace, onBack }: {
           {result === "saveError" && <p role="alert">{copy.saveError}</p>}
         </section>
       )}
-      <WorkspaceBrandImages workspaceId={workspace.id} onSaving={setSavingImages} />
+      <WorkspaceBrandImages workspaceId={workspace.id} />
     </WorkspaceShell>
   );
 }

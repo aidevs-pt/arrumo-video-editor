@@ -1,4 +1,15 @@
 {
+  "studio": {
+    "videoStudio": "Video Studio",
+    "workspace": "Switch workspace",
+    "navigation": "Workspace navigation",
+    "newVideo": "New video",
+    "overview": "Workspace overview",
+    "formats": "Formats",
+    "workspaceSection": "Workspace",
+    "workspaceSettings": "Workspace settings",
+    "generations": "Generations"
+  },
   "assets": {
     "title": "Assets",
     "back": "Back to profiles",

@@ -1,5 +1,6 @@
 "use client";
 
+import { FolderOpen } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke, isTauri } from "@tauri-apps/api/core";
@@ -17,13 +18,13 @@ import { WorkspaceAssets } from "@/components/workspace/assets/workspace-assets"
 import { WorkspaceOutputs } from "@/components/workspace/outputs/workspace-outputs";
 import { WorkspaceProfiles } from "@/components/workspace/profiles/workspace-profiles";
 
-type Workspace = { id: number; name: string };
+import { WorkspaceFrame, type Workspace, type WorkspaceView } from "./workspace-frame";
 type Status = "loading" | "ready" | "error" | "browser";
 
 export function WorkspaceHome() {
   const [status, setStatus] = useState<Status>("loading");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceView, setWorkspaceView] = useState<"profiles" | "outputs" | "assets" | "context" | "brand" | "drafts">("profiles");
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("profiles");
   const [draftProfile, setDraftProfile] = useState<number | null>(null);
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [name, setName] = useState("");
@@ -67,38 +68,39 @@ export function WorkspaceHome() {
     }
   }
 
+  function selectWorkspace(workspace: Workspace | null) {
+    setSelected(workspace);
+    setWorkspaceView("profiles");
+    setDraftProfile(null);
+  }
+
+  function navigate(view: WorkspaceView) {
+    setDraftProfile(null);
+    setWorkspaceView(view);
+  }
+
   return (
-    <>
-      <header className="flex min-h-[60px] items-center gap-2.5 border-b px-[clamp(24px,5vw,64px)] text-base font-bold">
-        {/* The original SVG carries the supplied Arrumo identity. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/arrumo-icon.svg" alt="" width={28} height={28} />
-        <span>Arrumo</span>
-      </header>
-      {selected && workspaceView === "drafts" ? (
-        <WorkspaceDrafts workspace={selected} initialProfile={draftProfile}
-          onBack={() => setWorkspaceView("profiles")} />
+    <WorkspaceFrame workspaces={workspaces} workspace={selected} view={workspaceView}
+      onSelect={selectWorkspace} onNavigate={navigate}>
+      {selected && (workspaceView === "drafts" || workspaceView === "generations") ? (
+        <WorkspaceDrafts key={`${selected.id}-${workspaceView}`} workspace={selected} initialProfile={draftProfile}
+          startInQueue={workspaceView === "generations"} onBack={() => navigate("drafts")} />
       ) : selected && workspaceView === "brand" ? (
-        <WorkspaceBrand key={selected.id} workspace={selected} onBack={() => setWorkspaceView("profiles")} />
+        <WorkspaceBrand key={selected.id} workspace={selected} />
       ) : selected && workspaceView === "context" ? (
-        <WorkspaceContext key={selected.id} workspace={selected} onBack={() => setWorkspaceView("profiles")} />
+        <WorkspaceContext key={selected.id} workspace={selected} />
       ) : selected && workspaceView === "assets" ? (
-        <WorkspaceAssets key={selected.id} workspace={selected} onBack={() => setWorkspaceView("profiles")} />
+        <WorkspaceAssets key={selected.id} workspace={selected} />
       ) : selected && workspaceView === "outputs" ? (
         <WorkspaceOutputs
           key={selected.id}
           workspace={selected}
-          onBack={() => setWorkspaceView("profiles")}
         />
       ) : selected ? (
         <WorkspaceProfiles
           key={selected.id}
           workspace={selected}
-          onBack={() => setSelected(null)}
           onOutputs={() => setWorkspaceView("outputs")}
-          onAssets={() => setWorkspaceView("assets")}
-          onContext={() => setWorkspaceView("context")}
-          onBrand={() => setWorkspaceView("brand")}
           onDrafts={(profile) => {
             setDraftProfile(profile ?? null);
             setWorkspaceView("drafts");
@@ -106,7 +108,7 @@ export function WorkspaceHome() {
         />
       ) : (
         <WorkspaceShell>
-          <WorkspaceHeading>
+          <WorkspaceHeading icon={FolderOpen}>
             <h1>{copy.title}</h1>
             <p>{copy.intro}</p>
           </WorkspaceHeading>
@@ -130,7 +132,7 @@ export function WorkspaceHome() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.22, ease: "easeOut" }}
                     >
-                      <Button className="h-auto min-h-10 w-full justify-start text-start whitespace-normal wrap-anywhere" variant="ghost" onClick={() => setSelected(workspace)}>
+                      <Button className="h-auto min-h-10 w-full justify-start text-start whitespace-normal wrap-anywhere" variant="ghost" onClick={() => selectWorkspace(workspace)}>
                         {workspace.name}
                       </Button>
                     </motion.li>
@@ -167,6 +169,6 @@ export function WorkspaceHome() {
           </WorkspaceColumns>
         </WorkspaceShell>
       )}
-    </>
+    </WorkspaceFrame>
   );
 }

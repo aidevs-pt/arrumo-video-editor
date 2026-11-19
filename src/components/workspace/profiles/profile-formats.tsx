@@ -3,7 +3,7 @@
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PanelsTopLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -89,7 +89,7 @@ export function ProfileFormats({
         {copy.back}
       </Button>
       <Button type="button" variant="outline" onClick={onOutputs} disabled={pending !== null}>{copy.manage}</Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={PanelsTopLeft}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{profile.name}</p>
       </WorkspaceHeading>

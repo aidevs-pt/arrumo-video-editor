@@ -1,9 +1,9 @@
 "use client";
 
+import { Layers } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,20 +19,12 @@ const emptyDraft: Draft = { name: "", guidance: "", color: "" };
 
 export function WorkspaceProfiles({
   workspace,
-  onBack,
   onOutputs,
-  onAssets,
-  onContext,
-  onBrand,
   onDrafts,
 }: {
   workspace: { id: number; name: string };
 
-  onBack: () => void;
   onOutputs: () => void;
-  onAssets: () => void;
-  onContext: () => void;
-  onBrand: () => void;
   onDrafts: (profileId?: number) => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -129,17 +121,8 @@ export function WorkspaceProfiles({
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
-        <ArrowLeft data-icon="inline-start" />
-        {copy.back}
-      </Button>
-      <Button type="button" variant="outline" onClick={onOutputs} disabled={saving || editing !== null}>{copy.outputs}</Button>
-      <Button type="button" variant="outline" onClick={onAssets} disabled={saving || editing !== null}>{copy.assets}</Button>
-      <Button type="button" variant="outline" onClick={onContext} disabled={saving || editing !== null}>{copy.context}</Button>
-      <Button type="button" variant="outline" onClick={onBrand} disabled={saving || editing !== null}>{copy.brand}</Button>
-      <Button type="button" variant="outline" onClick={() => onDrafts()} disabled={saving || editing !== null}>{copy.drafts}</Button>
-      <WorkspaceHeading>
-        <h1 ref={heading} tabIndex={-1}>{workspace.name}</h1>
+      <WorkspaceHeading icon={Layers}>
+        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
       </WorkspaceHeading>
       <WorkspaceColumns>
         <section className="min-w-0 [&>p]:mt-3 [&>p]:max-w-[60ch] [&>p]:text-muted-foreground" aria-labelledby="profile-list-title">

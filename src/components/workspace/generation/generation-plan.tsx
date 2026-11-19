@@ -1,11 +1,12 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
@@ -95,15 +96,29 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
         : plan === null ? <p role="status" className="mt-2">{copy.waiting}</p>
         : (
           <>
-            <ol className="mt-2 list-decimal ps-6">
-              {plan.steps.map((step, index) => (
-                <li key={step.stage} className="py-1">
-                  <span>{copy[step.stage]}</span>
-                  {progress && index < progress.stage_index && <Badge className="ms-2" variant="secondary">{copy.stageComplete}</Badge>}
-                  {progress && index === progress.stage_index && <Badge className="ms-2">{copy.currentStage}</Badge>}
-                  {step.review_required && <Badge className="ms-2" variant="outline">{copy.reviewRequired}</Badge>}
-                </li>
-              ))}
+            <ol className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(7.5rem,100%),1fr))] gap-2">
+              {plan.steps.map((step, index) => {
+                const complete = progress !== undefined && index < progress.stage_index;
+                const current = index === progress?.stage_index;
+                return (
+                  <li key={step.stage} aria-current={current ? "step" : undefined} className={cn(
+                    "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm",
+                    current && "border-primary/35 bg-accent text-accent-foreground",
+                  )}>
+                    <span className={cn(
+                      "grid size-6 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold tabular-nums",
+                      current && "bg-primary text-primary-foreground",
+                    )}>
+                      {complete ? <Check className="size-3.5" aria-hidden="true" /> : index + 1}
+                    </span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="wrap-anywhere font-medium">{copy[step.stage]}</span>
+                      {complete && <span className="sr-only">{copy.stageComplete}</span>}
+                      {step.review_required && !complete && <span className="text-xs">{copy.reviewRequired}</span>}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
             {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
               <MediaStageAction key={mediaStage} workspaceId={workspaceId} runId={runId} stage={mediaStage}
@@ -124,9 +139,10 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                           <p className="wrap-anywhere whitespace-pre-wrap text-sm">{awaiting.result.markdown}</p>
                         )}
                       </div>
+                    ) : typeof awaiting.result.markdown === "string" ? (
+                      <p className="max-w-[65ch] wrap-anywhere whitespace-pre-wrap text-sm leading-relaxed">{awaiting.result.markdown}</p>
                     ) : (
-                      <pre className="wrap-anywhere whitespace-pre-wrap text-sm">{typeof awaiting.result.markdown === "string"
-                        ? awaiting.result.markdown : JSON.stringify(awaiting.result, null, 2)}</pre>
+                      <pre className="wrap-anywhere whitespace-pre-wrap text-sm">{JSON.stringify(awaiting.result, null, 2)}</pre>
                     )}
                     <Field>
                       <FieldLabel htmlFor={`review-notes-${runId}`}>{copy.reviewNotes}</FieldLabel>

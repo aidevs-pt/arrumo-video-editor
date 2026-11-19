@@ -1,9 +1,9 @@
 "use client";
 
+import { FileText } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,9 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { WorkspaceFeedback } from "./workspace-feedback";
 
-export function WorkspaceContext({ workspace, onBack }: {
+export function WorkspaceContext({ workspace }: {
   workspace: { id: number; name: string };
 
-  onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [markdown, setMarkdown] = useState<string>();
@@ -52,11 +51,7 @@ export function WorkspaceContext({ workspace, onBack }: {
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
-        <ArrowLeft data-icon="inline-start" />
-        {copy.back}
-      </Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={FileText}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
       </WorkspaceHeading>

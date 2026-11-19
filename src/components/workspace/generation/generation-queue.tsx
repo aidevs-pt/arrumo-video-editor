@@ -3,7 +3,7 @@
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ListVideo } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
       <Button type="button" variant="ghost" disabled={pending} onClick={onBack}>
         <ArrowLeft data-icon="inline-start" />{copy.back}
       </Button>
-      <WorkspaceHeading><h1 ref={heading} tabIndex={-1}>{copy.title}</h1></WorkspaceHeading>
+      <WorkspaceHeading icon={ListVideo}><h1 ref={heading} tabIndex={-1}>{copy.title}</h1></WorkspaceHeading>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -110,7 +110,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
           }}>{copy.retry}</Button>
         </Alert>
       ) : !runs ? <p role="status">{copy.loading}</p> : (
-        <WorkspaceColumns>
+        <WorkspaceColumns className={selected ? undefined : "min-[1080px]:grid-cols-1"}>
           <section aria-labelledby="generation-runs-title">
             <h2 id="generation-runs-title">{copy.runs}</h2>
             {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}

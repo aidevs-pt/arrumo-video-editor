@@ -5,7 +5,7 @@ import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/wo
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, Upload } from "lucide-react";
+import { Upload, Images } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,9 @@ const kinds = ["image", "audio", "video"] as const;
 type MediaKind = typeof kinds[number];
 type Asset = { id: number; name: string; kind: MediaKind; notes: string };
 
-export function WorkspaceAssets({ workspace, onBack }: {
+export function WorkspaceAssets({ workspace }: {
   workspace: { id: number; name: string };
 
-  onBack: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [assets, setAssets] = useState<Asset[]>();
@@ -90,11 +89,7 @@ export function WorkspaceAssets({ workspace, onBack }: {
   const visible = assets?.filter((asset) => filter === "all" || asset.kind === filter);
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" onClick={onBack} disabled={busy !== null}>
-        <ArrowLeft data-icon="inline-start" />
-        {copy.back}
-      </Button>
-      <WorkspaceHeading>
+      <WorkspaceHeading icon={Images}>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{workspace.name}</p>
       </WorkspaceHeading>

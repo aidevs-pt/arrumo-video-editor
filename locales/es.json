@@ -1,4 +1,15 @@
 {
+  "studio": {
+    "videoStudio": "Estudio de vídeo",
+    "workspace": "Cambiar de espacio",
+    "navigation": "Navegación del espacio",
+    "newVideo": "Nuevo vídeo",
+    "overview": "Resumen del espacio",
+    "formats": "Formatos",
+    "workspaceSection": "Espacio de trabajo",
+    "workspaceSettings": "Ajustes del espacio",
+    "generations": "Generaciones"
+  },
   "assets": {
     "title": "Recursos",
     "back": "Volver a los perfiles",
