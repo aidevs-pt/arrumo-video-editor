@@ -57,12 +57,40 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&profile)?);
         }
+        [database, command, workspace] if command == "formats" => {
+            let formats = WorkspaceStore::open(Path::new(database))?
+                .list_output_formats(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&formats)?);
+        }
+        [database, command, workspace, settings] if command == "create-format" => {
+            let format = WorkspaceStore::open(Path::new(database))?.create_output_format(
+                utf8(workspace)?.parse()?,
+                &serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&format)?);
+        }
+        [database, command, workspace, format, settings] if command == "update-format" => {
+            let format = WorkspaceStore::open(Path::new(database))?.update_output_format(
+                utf8(workspace)?.parse()?,
+                utf8(format)?.parse()?,
+                &serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&format)?);
+        }
+        [database, command, workspace, format] if command == "remove-format" => {
+            let removed = WorkspaceStore::open(Path::new(database))?
+                .remove_output_format(utf8(workspace)?.parse()?, utf8(format)?.parse()?)?;
+            println!("{}", serde_json::to_string(&removed)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
                 "list | create <name> | profiles <workspace-id> | ",
                 "create-profile <workspace-id> <name> [guidance] [color] | ",
-                "update-profile <workspace-id> <profile-id> <name> <guidance> [color]"
+                "update-profile <workspace-id> <profile-id> <name> <guidance> [color] | ",
+                "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
+                "update-format <workspace-id> <format-id> <settings-json> | ",
+                "remove-format <workspace-id> <format-id>"
             )
             .into());
         }

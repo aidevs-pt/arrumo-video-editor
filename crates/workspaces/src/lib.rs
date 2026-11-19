@@ -3,6 +3,10 @@ use std::{path::Path, time::Duration};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
+mod output_formats;
+
+pub use output_formats::{OutputFormat, OutputFormatSettings};
+
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Workspace {
     pub id: i64,
@@ -30,6 +34,7 @@ impl WorkspaceStore {
         let migrations = [
             include_str!("001-create-workspaces.sql"),
             include_str!("002-create-profiles.sql"),
+            include_str!("003-create-output-formats.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -157,6 +162,7 @@ mod tests {
         let store = WorkspaceStore::open(&path).unwrap();
         let existing = &store.list().unwrap()[0];
         assert_eq!(existing.name, "Existing studio");
+        assert_eq!(store.list_output_formats(existing.id).unwrap().len(), 2);
         let other = store.create("Other studio").unwrap();
         let profile = store
             .create_profile(existing.id, "  Reviews  ", "## Keep demos", Some("#532A9D"))
