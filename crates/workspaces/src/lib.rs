@@ -21,6 +21,7 @@ mod media_worker;
 mod output_formats;
 mod plugin_catalog;
 mod plugin_credentials;
+mod plugin_grants;
 mod plugin_package;
 mod plugin_registry;
 mod plugin_runtime;
@@ -126,6 +127,7 @@ impl WorkspaceStore {
             include_str!("../migrations/027-plugin-settings.sql"),
             include_str!("../migrations/028-credential-namespace.sql"),
             include_str!("../migrations/029-provider-preferences.sql"),
+            include_str!("../migrations/030-plugin-grants.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

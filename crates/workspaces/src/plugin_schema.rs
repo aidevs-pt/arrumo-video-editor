@@ -44,6 +44,14 @@ pub struct PluginCode {
 #[serde(deny_unknown_fields)]
 pub struct PluginBackend {
     pub component: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub permissions: Vec<PluginPermission>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PluginPermission {
+    WorkspaceContextRead,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

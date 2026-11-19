@@ -17,8 +17,29 @@ const GUEST_FUEL: u64 = 5_000_000;
 
 impl WorkspaceStore {
     pub fn invoke_plugin_component(&self, plugin_id: &str, input: &Value) -> io::Result<Value> {
-        let (manifest, package): (Vec<u8>, Vec<u8>) = self
+        self.invoke_plugin(plugin_id, None, input)
+    }
+
+    pub fn invoke_plugin_in_workspace(
+        &self,
+        plugin_id: &str,
+        workspace_id: i64,
+        input: &Value,
+    ) -> io::Result<Value> {
+        self.invoke_plugin(plugin_id, Some(workspace_id), input)
+    }
+
+    fn invoke_plugin(
+        &self,
+        plugin_id: &str,
+        workspace_id: Option<i64>,
+        input: &Value,
+    ) -> io::Result<Value> {
+        let tx = self
             .0
+            .unchecked_transaction()
+            .map_err(|_| io::Error::other("Could not read plugin invocation state"))?;
+        let (manifest, package): (Vec<u8>, Vec<u8>) = tx
             .query_row(
                 "SELECT manifest, package_bytes FROM installed_plugin_manifests
                  WHERE plugin_id = ?1 AND package_bytes IS NOT NULL",
@@ -31,6 +52,26 @@ impl WorkspaceStore {
         if manifest.id != plugin_id {
             return Err(io::Error::other("Installed plugin identity mismatch"));
         }
+        let context = if let Some(workspace_id) = workspace_id
+            && manifest.requests_workspace_context()
+            && self.plugin_context_granted(plugin_id, workspace_id)?
+        {
+            let value = self
+                .workspace_context(workspace_id)
+                .map_err(|_| io::Error::other("Could not read granted workspace context"))?;
+            let encoded = serde_json::to_string(&value)
+                .map_err(|_| io::Error::other("Could not encode granted workspace context"))?;
+            if encoded.len() > MAX_PLUGIN_IO_BYTES {
+                return Err(io::Error::other(
+                    "Workspace context exceeds the plugin transfer limit",
+                ));
+            }
+            Some(encoded)
+        } else {
+            None
+        };
+        tx.commit()
+            .map_err(|_| io::Error::other("Could not read plugin invocation state"))?;
         let backend = manifest
             .code
             .and_then(|code| code.backend)
@@ -52,11 +93,16 @@ impl WorkspaceStore {
             .map_err(|_| io::Error::other("Could not read plugin backend component"))?;
         let input = serde_json::to_string(input)
             .map_err(|_| io::Error::other("Could not encode plugin input"))?;
-        execute_component(&component, &input)
+        execute_component(&component, &input, context.as_deref())
     }
 }
 
-fn execute_component(binary: &[u8], input: &str) -> io::Result<Value> {
+struct GuestState {
+    limits: StoreLimits,
+    context: Option<String>,
+}
+
+fn execute_component(binary: &[u8], input: &str, context: Option<&str>) -> io::Result<Value> {
     if binary.len() as u64 > MAX_COMPONENT_BYTES || input.len() > MAX_PLUGIN_IO_BYTES {
         return Err(io::Error::other(
             "Plugin component or input exceeds the size limit",
@@ -72,12 +118,30 @@ fn execute_component(binary: &[u8], input: &str) -> io::Result<Value> {
         .memories(1)
         .tables(4)
         .build();
-    let mut store = Store::new(engine, limits);
-    store.limiter(|limits: &mut StoreLimits| limits);
+    let mut store = Store::new(
+        engine,
+        GuestState {
+            limits,
+            context: context.map(str::to_owned),
+        },
+    );
+    store.limiter(|state| &mut state.limits);
     store
         .set_fuel(GUEST_FUEL)
         .map_err(|_| io::Error::other("Could not enforce plugin execution budget"))?;
-    let instance = Linker::new(engine)
+    let mut linker = Linker::<GuestState>::new(engine);
+    if context.is_some() {
+        linker
+            .root()
+            .func_wrap("read-workspace-context", |mut store, (): ()| {
+                let context = store.data_mut().context.take().ok_or_else(|| {
+                    wasmtime::Error::msg("Workspace context can be read once per invocation")
+                })?;
+                Ok((context,))
+            })
+            .map_err(|_| io::Error::other("Could not link the granted plugin API"))?;
+    }
+    let instance = linker
         .instantiate(&mut store, &component)
         .map_err(|_| io::Error::other("Plugin could not start in the isolated runtime"))?;
     let invoke = instance
@@ -127,15 +191,96 @@ mod tests {
           (canon lift (core func $i "echo") (memory $mem) (realloc $alloc))))
     "#;
 
+    const READ_CONTEXT: &str = r#"
+      (component
+        (import "read-workspace-context" (func $read (result string)))
+        (core module $memory
+          (memory (export "mem") 2)
+          (func (export "alloc") (param i32 i32 i32 i32) (result i32) i32.const 64))
+        (core instance $shared (instantiate $memory))
+        (alias core export $shared "mem" (core memory $mem))
+        (alias core export $shared "alloc" (core func $alloc))
+        (core func $lower (canon lower (func $read) (memory $mem) (realloc $alloc)))
+        (core module $reader
+          (import "host" "read" (func $read (param i32)))
+          (func (export "invoke") (param i32 i32) (result i32)
+            i32.const 0 call $read i32.const 0))
+        (core instance $imports (export "read" (func $lower)))
+        (core instance $guest (instantiate $reader (with "host" (instance $imports))))
+        (func (export "invoke") (param "input" string) (result string)
+          (canon lift (core func $guest "invoke") (memory $mem) (realloc $alloc))))
+    "#;
+
+    #[test]
+    fn reads_only_the_granted_workspace_and_revokes_after_package_change() {
+        use std::io::Write;
+
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let allowed = store.create("Allowed").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        store.set_workspace_context(allowed, "Shared").unwrap();
+        store.set_workspace_context(other, "Private").unwrap();
+        let mut package = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default();
+        package.start_file("manifest.json", options).unwrap();
+        package.write_all(br#"{
+            "schemaVersion": 4, "id": "fixture-reader", "name": "Fixture", "description": "Fixture",
+            "capabilities": {"reader": {"name": "Read context", "description": "Fixture"}},
+            "code": {"backend": {"component": "reader.wasm", "permissions": ["workspace-context-read"]}}
+        }"#).unwrap();
+        package.start_file("reader.wasm", options).unwrap();
+        package
+            .write_all(&wat::parse_str(READ_CONTEXT).unwrap())
+            .unwrap();
+        let bytes = package.finish().unwrap().into_inner();
+        store.install_plugin_zip(bytes.as_slice()).unwrap();
+        let input = Value::Null;
+        let invoke =
+            |workspace| store.invoke_plugin_in_workspace("fixture-reader", workspace, &input);
+        assert!(invoke(allowed).is_err());
+        assert!(
+            store
+                .set_plugin_context_grant("fixture-reader", 999, true)
+                .is_err()
+        );
+        store
+            .set_plugin_context_grant("fixture-reader", allowed, true)
+            .unwrap();
+        assert_eq!(invoke(allowed).unwrap(), "Shared");
+        assert!(invoke(other).is_err());
+        assert!(
+            store
+                .invoke_plugin_component("fixture-reader", &input)
+                .is_err()
+        );
+        store
+            .set_plugin_context_grant("fixture-reader", allowed, false)
+            .unwrap();
+        assert!(invoke(allowed).is_err());
+        store
+            .set_plugin_context_grant("fixture-reader", allowed, true)
+            .unwrap();
+        store.0.execute(
+            "UPDATE installed_plugin_manifests SET package_sha256 = ?1 WHERE plugin_id = 'fixture-reader'",
+            ["0".repeat(64)],
+        ).unwrap();
+        assert!(
+            !store
+                .plugin_context_granted("fixture-reader", allowed)
+                .unwrap()
+        );
+        assert!(invoke(allowed).is_err());
+    }
+
     #[test]
     fn executes_component_with_bounded_json() {
         let binary = wat::parse_str(ECHO).unwrap();
         assert_eq!(
-            execute_component(&binary, r#"{"hello":"world"}"#).unwrap(),
+            execute_component(&binary, r#"{"hello":"world"}"#, None).unwrap(),
             serde_json::json!({"hello": "world"})
         );
-        assert!(execute_component(&binary, &"0".repeat(MAX_PLUGIN_IO_BYTES + 1)).is_err());
-        assert!(execute_component(&binary, "invalid").is_err());
+        assert!(execute_component(&binary, &"0".repeat(MAX_PLUGIN_IO_BYTES + 1), None).is_err());
+        assert!(execute_component(&binary, "invalid", None).is_err());
     }
 
     #[test]
@@ -188,7 +333,7 @@ mod tests {
         let imports = ECHO.replace("(component", "(component (import \"host-read\" (func))");
         let binary = wat::parse_str(imports).unwrap();
         assert!(
-            execute_component(&binary, "null")
+            execute_component(&binary, "null", None)
                 .unwrap_err()
                 .to_string()
                 .contains("isolated runtime")
@@ -196,7 +341,7 @@ mod tests {
         let looping = ECHO.replace("i32.const 0))", "(loop $spin (br $spin)) i32.const 0))");
         let binary = wat::parse_str(looping).unwrap();
         assert!(
-            execute_component(&binary, "null")
+            execute_component(&binary, "null", None)
                 .unwrap_err()
                 .to_string()
                 .contains("resource budget")

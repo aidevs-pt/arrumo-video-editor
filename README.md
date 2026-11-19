@@ -193,7 +193,7 @@ Use **Check sign-in** in Settings or `agent-login-status <plugin-id>` in the CLI
 
 Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. Builds import the registry defaults from their separate plugin checkouts. Runtime installation and trust grants are separate host features.
 
-The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 through v3 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
+The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 through v4 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
 
 Use `install-plugin-zip <package.zip>` to register a local ZIP containing a root SDK `manifest.json`. The catalog reports the package size and SHA-256 digest and retains the original ZIP in the app database. Removing the local entry removes its stored ZIP. The CLI displays the third-party plugin notice on registration. ZIP contents remain inert.
 
@@ -203,7 +203,7 @@ Use `install-plugin-release <catalog.json> <plugin-id> <version> <package.zip>` 
 
 Use `download-plugin-release <catalog-url> <plugin-id> <version>` to fetch an exact release from an HTTPS registry and register it locally. Arrumo verifies the release using the same checks as local snapshot registration and records the registry URL. The command expects a registry and package that can be fetched without authentication.
 
-List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 and 2. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
+List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 through 4. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
 
 In desktop Settings, open **Browse registry** under **Plugins** and load an HTTPS catalog URL. Expand a plugin to review its source repository and available versions. Arrumo checks the reviewed release again before downloading. If its source or checksum changed, reload the catalog and review the release again.
 
@@ -234,3 +234,5 @@ Use `transcribe-wav <workspace-id> [plugin-id] <audio.wav>` to submit a WAV to a
 The bundled plugin index is generated from the official registry defaults and local plugin checkouts. Provider-specific transcription settings live in the plugin's SDK descriptor. Manifest schema v3 accepts ZIPs with declared WebAssembly backend and HTML frontend entrypoints, validates their presence, and retains the code. Installed backend components support explicit CLI invocation. Frontend rendering and the host capability bridge are pending.
 
 Use `invoke-plugin <plugin-id>` with JSON on standard input to invoke an installed package's declared WebAssembly backend. The runtime instantiates the component with no host imports or WASI and limits its size, execution fuel, linear memory and JSON payloads. The result is JSON on standard output.
+
+A plugin that declares workspace context access needs a separate grant. Use `grant-plugin-context <plugin-id> <workspace-id>`, `plugin-context-grant <plugin-id> <workspace-id>`, and `revoke-plugin-context <plugin-id> <workspace-id>` to grant, check, or revoke access. Pass the workspace ID to `invoke-plugin <plugin-id> <workspace-id>` to use the grant. Revocation and package updates affect subsequent invocations. Each invocation sees only the context selected at its start.

@@ -135,7 +135,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
             )?;
         }
-        [database, command, plugin_id] if command == "invoke-plugin" => {
+        [database, command, plugin_id, scope @ ..]
+            if command == "invoke-plugin" && scope.len() <= 1 =>
+        {
             let limit = arrumo_workspaces::MAX_PLUGIN_IO_BYTES;
             let mut input = Vec::new();
             io::stdin().take(limit as u64 + 1).read_to_end(&mut input)?;
@@ -149,9 +151,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             let input = serde_json::from_slice(&input).map_err(|_| {
                 io::Error::new(io::ErrorKind::InvalidInput, "Expected JSON plugin input")
             })?;
-            let result = WorkspaceStore::open(Path::new(database))?
-                .invoke_plugin_component(utf8(plugin_id)?, &input)?;
+            let store = WorkspaceStore::open(Path::new(database))?;
+            let result = if let Some(workspace) = scope.first() {
+                store.invoke_plugin_in_workspace(
+                    utf8(plugin_id)?,
+                    utf8(workspace)?.parse()?,
+                    &input,
+                )?
+            } else {
+                store.invoke_plugin_component(utf8(plugin_id)?, &input)?
+            };
             println!("{}", serde_json::to_string(&result)?);
+        }
+        [database, command, plugin_id, workspace] if command == "plugin-context-grant" => {
+            let allowed = WorkspaceStore::open(Path::new(database))?
+                .plugin_context_granted(utf8(plugin_id)?, utf8(workspace)?.parse()?)?;
+            println!("{allowed}");
+        }
+        [database, command, plugin_id, workspace]
+            if command == "grant-plugin-context" || command == "revoke-plugin-context" =>
+        {
+            WorkspaceStore::open(Path::new(database))?.set_plugin_context_grant(
+                utf8(plugin_id)?,
+                utf8(workspace)?.parse()?,
+                command == "grant-plugin-context",
+            )?;
         }
         [database, command, manifest] if command == "install-plugin-manifest" => {
             eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
@@ -771,7 +795,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
-                "invoke-plugin <plugin-id> (JSON on stdin) | ",
+                "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",

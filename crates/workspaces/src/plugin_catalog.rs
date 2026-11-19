@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 3] = [1, 2, 3];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 4] = [1, 2, 3, 4];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -79,6 +79,17 @@ pub struct CatalogPlugin {
 }
 
 impl PluginManifest {
+    pub(crate) fn requests_workspace_context(&self) -> bool {
+        self.code
+            .as_ref()
+            .and_then(|code| code.backend.as_ref())
+            .is_some_and(|backend| {
+                backend
+                    .permissions
+                    .contains(&crate::plugin_schema::PluginPermission::WorkspaceContextRead)
+            })
+    }
+
     pub(crate) fn parse(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
         if bytes.len() > MAX_PLUGIN_MANIFEST_BYTES {
             return Err(invalid_manifest("Plugin manifest exceeds 64 KiB").into());
@@ -115,10 +126,11 @@ impl PluginManifest {
             let mut surfaces = HashSet::new();
             if manifest.schema_version < 3
                 || (code.backend.is_none() && code.frontend.is_empty())
-                || code
-                    .backend
-                    .as_ref()
-                    .is_some_and(|entry| !valid_code_path(&entry.component, ".wasm"))
+                || code.backend.as_ref().is_some_and(|entry| {
+                    !valid_code_path(&entry.component, ".wasm")
+                        || entry.permissions.len() > 1
+                        || (manifest.schema_version < 4 && !entry.permissions.is_empty())
+                })
                 || code.frontend.len() > 16
                 || code.frontend.iter().any(|surface| {
                     !identifier(&surface.id)
