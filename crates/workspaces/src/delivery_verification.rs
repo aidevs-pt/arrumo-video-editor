@@ -254,20 +254,26 @@ impl WorkspaceStore {
             .into_iter()
             .find(|output| output.format_id == format_id)
             .ok_or_else(|| io::Error::other("Output format is not in the verified delivery"))?;
-        let directory = delivery_directory(&database.canonicalize()?, workspace_id, run_id);
-        let resolve = |name: String, extension: &str| -> io::Result<PathBuf> {
+        let file = |name: String, extension: &str| -> io::Result<PathBuf> {
             if name != format!("{format_id}.{extension}") {
                 return Err(io::Error::other("Unexpected filename in verified delivery"));
             }
-            let path = directory.join(name);
-            if !path.symlink_metadata()?.is_file() || path.canonicalize()? != path {
-                return Err(io::Error::other("Invalid verified delivery file"));
-            }
-            Ok(path)
+            managed_delivery_file(database, workspace_id, run_id, &name)
         };
-        Ok((
-            resolve(output.video, "mp4")?,
-            resolve(output.subtitles, "srt")?,
-        ))
+        Ok((file(output.video, "mp4")?, file(output.subtitles, "srt")?))
     }
+}
+
+pub(crate) fn managed_delivery_file(
+    database: &Path,
+    workspace_id: i64,
+    run_id: i64,
+    filename: &str,
+) -> io::Result<PathBuf> {
+    let path = delivery_directory(&database.canonicalize()?, workspace_id, run_id).join(filename);
+    let metadata = path.symlink_metadata()?;
+    if !metadata.is_file() || metadata.len() == 0 || path.canonicalize()? != path {
+        return Err(io::Error::other("Invalid managed delivery file"));
+    }
+    Ok(path)
 }

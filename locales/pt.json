@@ -284,6 +284,9 @@
     "subtitleText": "Texto das legendas"
   },
   "productionPlan": {
+    "watchPreview": "Ver pré-visualização",
+    "playPreviewError": "Não foi possível reproduzir a pré-visualização. Confirma que o ficheiro está disponível e que o sistema reproduz MP4.",
+    "loadingPreview": "A carregar a pré-visualização do vídeo…",
     "title": "Plano de produção",
     "loading": "A carregar o plano de produção…",
     "waiting": "A aguardar que um processo prepare o plano.",

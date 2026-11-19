@@ -284,6 +284,9 @@
     "subtitleText": "Subtitle text"
   },
   "productionPlan": {
+    "watchPreview": "Watch preview",
+    "playPreviewError": "Could not play this preview. Check that the file is available and your system supports MP4 playback.",
+    "loadingPreview": "Loading video preview…",
     "title": "Production plan",
     "loading": "Loading production plan…",
     "waiting": "Waiting for a worker to prepare the plan.",

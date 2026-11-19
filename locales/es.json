@@ -284,6 +284,9 @@
     "subtitleText": "Texto de los subtítulos"
   },
   "productionPlan": {
+    "watchPreview": "Ver vista previa",
+    "playPreviewError": "No se pudo reproducir la vista previa. Comprueba que el archivo esté disponible y que el sistema pueda reproducir MP4.",
+    "loadingPreview": "Cargando vista previa del vídeo…",
     "title": "Plan de producción",
     "loading": "Cargando el plan de producción…",
     "waiting": "Esperando a que un proceso prepare el plan.",

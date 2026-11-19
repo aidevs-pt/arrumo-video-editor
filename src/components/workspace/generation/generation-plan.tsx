@@ -7,6 +7,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/lib/locale-provider";
+import { GuidedPreview, previewFiles } from "./guided-preview";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
@@ -55,6 +56,9 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId }: {
     return () => { active = false; clearTimeout(timer); };
   }, [open, workspaceId, runId, pendingReviewId, reviewing]);
 
+  const previews = progress && plan?.steps[progress.stage_index]?.stage === "preview"
+    ? previewFiles(awaiting?.result.preview_videos) : [];
+
   async function review(event: FormEvent<HTMLFormElement>, resultId: number) {
     event.preventDefault();
     if (reviewing) return;
@@ -98,8 +102,20 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId }: {
                 onSubmit={(event) => void review(event, awaiting.id)}>
                 <fieldset disabled={reviewing}>
                   <FieldGroup>
-                    <pre className="wrap-anywhere whitespace-pre-wrap text-sm">{typeof awaiting.result.markdown === "string"
-                      ? awaiting.result.markdown : JSON.stringify(awaiting.result, null, 2)}</pre>
+                    {previews.length > 0 ? (
+                      <div className="flex flex-col gap-3">
+                        {previews.map(({ filename, formatId }) => (
+                          <GuidedPreview key={filename} workspaceId={workspaceId} runId={runId}
+                            resultId={awaiting.id} filename={filename} formatId={formatId} />
+                        ))}
+                        {typeof awaiting.result.markdown === "string" && (
+                          <p className="wrap-anywhere whitespace-pre-wrap text-sm">{awaiting.result.markdown}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <pre className="wrap-anywhere whitespace-pre-wrap text-sm">{typeof awaiting.result.markdown === "string"
+                        ? awaiting.result.markdown : JSON.stringify(awaiting.result, null, 2)}</pre>
+                    )}
                     <Field>
                       <FieldLabel htmlFor={`review-notes-${runId}`}>{copy.reviewNotes}</FieldLabel>
                       <Textarea id={`review-notes-${runId}`} name="notes" />
