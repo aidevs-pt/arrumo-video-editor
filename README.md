@@ -337,3 +337,5 @@ Use `list_brand_assets`, `attach_brand_asset`, and `detach_brand_asset` through 
 Use `remove_reviewed_plugin_package` through MCP or A2A with the plugin ID and its installed package SHA-256. A mismatched digest leaves the installed revision intact. Uninstalling removes that package's stored settings and grants.
 
 Use `get_agent_login_status` through MCP or A2A with the bundled agent plugin ID to check local sign-in readiness. The host returns a status and discards the probe's output.
+
+Delete an unqueued draft with `delete-draft <workspace-id> <draft-id> <confirmed-title>` in the CLI or `delete_video_draft` through MCP and A2A. Pass the exact saved title. A draft referenced by a run stays available for that run and its replays. Managed sources remain in the workspace library.

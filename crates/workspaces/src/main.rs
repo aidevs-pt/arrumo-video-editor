@@ -580,6 +580,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&draft)?);
         }
+        [database, command, workspace, draft, title] if command == "delete-draft" => {
+            let deleted = WorkspaceStore::open(Path::new(database))?.delete_video_draft(
+                utf8(workspace)?.parse()?,
+                utf8(draft)?.parse()?,
+                utf8(title)?,
+            )?;
+            println!("{deleted}");
+        }
         [database, command, workspace] if command == "generation-runs" => {
             let runs = WorkspaceStore::open(Path::new(database))?
                 .list_generation_runs(utf8(workspace)?.parse()?)?;
@@ -829,7 +837,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "detach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
                 "drafts <workspace-id> | create-draft <workspace-id> <settings-json> | ",
                 "update-draft <workspace-id> <draft-id> <settings-json> | ",
-                "generation-runs <workspace-id> | ",
+                "delete-draft <workspace-id> <draft-id> <confirmed-title> | generation-runs <workspace-id> | ",
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",

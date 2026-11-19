@@ -160,7 +160,15 @@ struct SubtitleInput {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 25] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DeleteDraftInput {
+    workspace_id: i64,
+    draft_id: i64,
+    confirmed_title: String,
+}
+
+pub(super) fn definitions() -> [Value; 26] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -179,6 +187,11 @@ pub(super) fn definitions() -> [Value; 25] {
         json!({"name": "update_video_draft", "description": "Replace a saved draft's title, brief, profile, and ordered sources. Send the full draft settings.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "draftId": id, "settings": draft},
                 "required": ["workspaceId", "draftId", "settings"], "additionalProperties": false}}),
+        json!({"name": "delete_video_draft", "description": "Delete a draft that has never been queued. Confirm its exact saved title. Managed source assets remain in the library.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "draftId": id, "confirmedTitle": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "draftId", "confirmedTitle"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "list_video_drafts", "description": "List drafts in the selected workspace.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "list_generation_runs", "description": "List runs and their current states in a workspace.",
@@ -286,6 +299,12 @@ pub(super) fn call(
                 .update_video_draft(args.workspace_id, args.draft_id, args.settings)
                 .map(|draft| json!({"draft": draft}))
                 .map_err(|_| "Could not update draft. Check the draft, workspace and settings")
+        }),
+        "delete_video_draft" => parse(arguments).and_then(|args: DeleteDraftInput| {
+            store
+                .delete_video_draft(args.workspace_id, args.draft_id, &args.confirmed_title)
+                .map(|deleted| json!({"deleted": deleted}))
+                .map_err(|_| "Could not delete video draft")
         }),
         "list_video_drafts" => parse(arguments).and_then(|args: WorkspaceInput| {
             store

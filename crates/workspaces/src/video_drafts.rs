@@ -101,6 +101,23 @@ impl WorkspaceStore {
         Ok(VideoDraft { id, settings })
     }
 
+    pub fn delete_video_draft(
+        &self,
+        workspace_id: i64,
+        draft_id: i64,
+        confirmed_title: &str,
+    ) -> rusqlite::Result<bool> {
+        self.0
+            .execute(
+                "DELETE FROM video_drafts
+             WHERE workspace_id = ?1 AND id = ?2 AND title = ?3
+               AND NOT EXISTS (SELECT 1 FROM generation_runs
+                               WHERE workspace_id = ?1 AND draft_id = ?2)",
+                params![workspace_id, draft_id, confirmed_title],
+            )
+            .map(|deleted| deleted != 0)
+    }
+
     pub fn list_video_drafts(&self, workspace_id: i64) -> rusqlite::Result<Vec<VideoDraft>> {
         self.0
             .prepare(
