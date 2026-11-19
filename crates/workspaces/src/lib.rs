@@ -17,6 +17,7 @@ mod format_deliveries;
 mod generation_plan;
 mod generation_queue;
 mod generation_worker;
+mod mcp;
 mod media_worker;
 mod output_formats;
 mod plugin_actions;
@@ -52,6 +53,7 @@ pub use format_deliveries::{
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
+pub use mcp::serve_mcp;
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use plugin_actions::InstalledPluginAction;

@@ -42,6 +42,10 @@ fn read_plugin_invocation_input() -> Result<serde_json::Value, Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
     match arguments.as_slice() {
+        [database, command] if command == "mcp" => {
+            let store = WorkspaceStore::open(Path::new(database))?;
+            arrumo_workspaces::serve_mcp(&store, io::stdin().lock(), io::stdout().lock())?;
+        }
         [database, command] if command == "list" => {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
             println!("{}", serde_json::to_string(&workspaces)?);
@@ -811,7 +815,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
-                "plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
+                "mcp | plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",

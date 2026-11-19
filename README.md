@@ -246,3 +246,7 @@ Workspace and completed video plugin panels can request the host’s selected wo
 Use `plugin-actions` to discover named backend actions. Invoke an action with `invoke-plugin-action <plugin-id> <action-id> <app|workspace-id>` and pass JSON on standard input. The host validates the action's declared scope before running the component.
 
 In desktop Settings, expand an action under **Plugin actions**. The Settings scope determines which actions are shown. Enter JSON, select **Run action**, and review the result. The editor checks that the package matches the version shown when the form was opened.
+
+### Local MCP
+
+Configure a local MCP client to launch `arrumo-workspaces <database-path> mcp` over stdio. This server supports MCP `2025-11-25` and exposes `list_workspaces`, `list_plugin_actions`, and `invoke_plugin_action`. Pass the package digest returned by the action listing, and pass a workspace ID for a workspace action. The client process has the same workspace access as an operator running the local CLI. Action execution applies the existing sandbox and plugin grants. Pass an absolute database path when configuring the client.
