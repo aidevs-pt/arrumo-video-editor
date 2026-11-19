@@ -187,3 +187,27 @@ body { font-family: system-ui, sans-serif; margin: 0; }
   .workspace-layout { grid-template-columns: minmax(0, 1fr); }
   .workspace-form { grid-row: 1; }
 }
+
+.workspace-rows li:has(.workspace-open) { padding-block: 6px; }
+.workspace-open {
+  width: 100%;
+  justify-content: flex-start;
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.profile-shell > button { margin-bottom: 18px; }
+.profile-name { display: flex; align-items: baseline; gap: 10px; font-weight: 680; }
+.profile-color {
+  flex: 0 0 10px;
+  height: 10px;
+  border-radius: 50%;
+  outline: 1px solid var(--border);
+}
+.profile-guidance {
+  margin-top: 5px;
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+}
