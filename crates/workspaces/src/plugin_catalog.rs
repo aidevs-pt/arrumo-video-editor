@@ -147,6 +147,18 @@ pub(crate) fn bundled_manifests() -> &'static [PluginManifest] {
 }
 
 impl WorkspaceStore {
+    pub(crate) fn plugin_manifest(&self, id: &str) -> Result<PluginManifest, Box<dyn Error>> {
+        if let Some(plugin) = bundled_manifests().iter().find(|plugin| plugin.id == id) {
+            return Ok(plugin.clone());
+        }
+        let bytes: Vec<u8> = self.0.query_row(
+            "SELECT manifest FROM installed_plugin_manifests WHERE plugin_id = ?1",
+            [id],
+            |row| row.get(0),
+        )?;
+        PluginManifest::parse(&bytes)
+    }
+
     pub fn install_plugin_manifest(&self, bytes: &[u8]) -> Result<CatalogPlugin, Box<dyn Error>> {
         self.register_plugin(bytes, None, None)
     }

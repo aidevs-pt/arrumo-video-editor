@@ -18,6 +18,13 @@ fn utf8(value: &OsStr) -> io::Result<&str> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Arguments must be valid UTF-8"))
 }
 
+fn plugin_workspace(value: &OsStr) -> Result<Option<i64>, Box<dyn Error>> {
+    match utf8(value)? {
+        "app" => Ok(None),
+        id => Ok(Some(id.parse()?)),
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
     match arguments.as_slice() {
@@ -28,6 +35,31 @@ fn main() -> Result<(), Box<dyn Error>> {
         [database, command] if command == "plugin-catalog" => {
             let plugins = WorkspaceStore::open(Path::new(database))?.plugin_catalog()?;
             println!("{}", serde_json::to_string(&plugins)?);
+        }
+        [database, command, id, scope] if command == "plugin-settings" => {
+            let workspace_id = plugin_workspace(scope)?;
+            let settings = WorkspaceStore::open(Path::new(database))?
+                .plugin_settings(utf8(id)?, workspace_id)?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
+        [database, command, id, scope, setting, value] if command == "set-plugin-setting" => {
+            let value = serde_json::from_str(utf8(value)?).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "Expected a JSON setting value")
+            })?;
+            WorkspaceStore::open(Path::new(database))?.set_plugin_setting(
+                utf8(id)?,
+                utf8(setting)?,
+                plugin_workspace(scope)?,
+                Some(&value),
+            )?;
+        }
+        [database, command, id, scope, setting] if command == "clear-plugin-setting" => {
+            WorkspaceStore::open(Path::new(database))?.set_plugin_setting(
+                utf8(id)?,
+                utf8(setting)?,
+                plugin_workspace(scope)?,
+                None,
+            )?;
         }
         [database, command, manifest] if command == "install-plugin-manifest" => {
             eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
@@ -643,6 +675,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",
                 "update-plugin-release-from-snapshot <catalog.json> <plugin-id> <version> <package.zip> | ",
+                "plugin-settings <plugin-id> <app|workspace-id> | set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json> | clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",

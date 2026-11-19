@@ -23,6 +23,7 @@ mod plugin_catalog;
 mod plugin_package;
 mod plugin_registry;
 mod plugin_schema;
+mod plugin_settings;
 mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
@@ -55,6 +56,7 @@ pub use plugin_registry::{
     read_plugin_registry, validate_registry_url,
 };
 pub use plugin_schema::{PluginSetting, PluginSettingKind, PluginSettingScope};
+pub use plugin_settings::ResolvedPluginSetting;
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
@@ -113,6 +115,7 @@ impl WorkspaceStore {
             include_str!("../migrations/024-plugin-catalog.sql"),
             include_str!("../migrations/025-plugin-packages.sql"),
             include_str!("../migrations/026-plugin-release-source.sql"),
+            include_str!("../migrations/027-plugin-settings.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
