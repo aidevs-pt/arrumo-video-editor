@@ -379,6 +379,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&work)?);
         }
+        [database, command, workspace, run, destination] if command == "export-delivery" => {
+            let database = Path::new(database);
+            WorkspaceStore::open(database)?.export_generation_delivery(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                Path::new(destination),
+            )?;
+            println!("null");
+        }
         [database, command, workspace, run, attempt] if command == "verify-delivery" => {
             let path = Path::new(database);
             let run = WorkspaceStore::open(path)?.verify_generation_delivery(
@@ -449,6 +459,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
+                "export-delivery <workspace-id> <run-id> <destination-zip> | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"
             )

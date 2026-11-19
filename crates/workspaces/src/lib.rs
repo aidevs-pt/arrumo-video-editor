@@ -6,6 +6,7 @@ use serde::Serialize;
 mod assets;
 mod brand_assets;
 mod clip_render;
+mod delivery_export;
 mod delivery_verification;
 mod format_deliveries;
 mod generation_plan;

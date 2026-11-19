@@ -57,11 +57,16 @@ struct Cue {
     duration_time: String,
 }
 
-#[derive(Serialize)]
-struct VerifiedOutput {
-    format_id: i64,
-    video: String,
-    subtitles: String,
+#[derive(Deserialize, Serialize)]
+pub(crate) struct VerifiedDelivery {
+    pub verified_outputs: Vec<VerifiedOutput>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub(crate) struct VerifiedOutput {
+    pub format_id: i64,
+    pub video: String,
+    pub subtitles: String,
     duration_seconds: f64,
     subtitle_cues: usize,
 }
@@ -104,7 +109,9 @@ impl WorkspaceStore {
             .into_iter()
             .map(|entry| verify_output(&directory, entry.format))
             .collect::<Result<Vec<_>, _>>()?;
-        let result = serde_json::json!({ "verified_outputs": outputs }).to_string();
+        let result = serde_json::to_string(&VerifiedDelivery {
+            verified_outputs: outputs,
+        })?;
 
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let completed = tx.query_row(
