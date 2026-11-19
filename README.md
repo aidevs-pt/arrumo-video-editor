@@ -326,4 +326,4 @@ Read `/.well-known/agent-card.json` at the printed origin for the [A2A 1.0 JSON-
 }
 ```
 
-Use the same message format with a listed operation name and arguments. The reply contains a data part with `result` or an operation `error`. The endpoint currently returns direct messages. Generation runs can be polled with the shared run operations. Native A2A task lifecycle and streaming are pending.
+Use the same message format with a listed operation name and arguments. The reply contains a data part with `result` or an operation `error`. Most operations return direct messages. Enqueue and replay return a task. Use its ID with `GetTask` or `CancelTask`. Task status reflects the generation queue, and completed tasks include verified output metadata. Listing tasks and streaming are pending.

@@ -13,6 +13,8 @@ use zeroize::Zeroizing;
 
 use crate::{WorkspaceStore, operations};
 
+mod tasks;
+
 const MAX_BODY: u64 = 128 * 1024;
 
 #[derive(Deserialize)]
@@ -169,6 +171,13 @@ fn dispatch(
     if version.is_some_and(|value| value != "1.0") {
         return rpc_error(request.id, -32009, "Unsupported A2A version");
     }
+    if matches!(request.method.as_str(), "GetTask" | "CancelTask") {
+        return task_reply(
+            request.id,
+            tasks::handle(store, &request.method, &request.params),
+            false,
+        );
+    }
     if request.method != "SendMessage" {
         return rpc_error(request.id, -32601, "Method not found");
     }
@@ -195,8 +204,24 @@ fn dispatch(
     let data = if data.operation == "list_operations" && data.arguments.is_empty() {
         json!({"result": {"operations": operations::definitions()}})
     } else {
+        let workspace_id = data.arguments.get("workspaceId").and_then(Value::as_i64);
+        let queues_run = matches!(
+            data.operation.as_str(),
+            "enqueue_video_draft" | "replay_generation"
+        );
         match operations::invoke(store, database, &data.operation, data.arguments) {
-            Some(Ok(result)) => json!({"result": result}),
+            Some(Ok(result)) => {
+                if let (true, Some(workspace_id), Some(run_id)) =
+                    (queues_run, workspace_id, result["run"]["id"].as_i64())
+                {
+                    return task_reply(
+                        request.id,
+                        tasks::task_for_run(store, workspace_id, run_id),
+                        true,
+                    );
+                }
+                json!({"result": result})
+            }
             Some(Err(message)) => json!({"error": message}),
             None => return rpc_error(request.id, -32602, "Unknown operation"),
         }
@@ -204,6 +229,16 @@ fn dispatch(
     json!({"jsonrpc": "2.0", "id": request.id, "result": {"message": {
         "role": "ROLE_AGENT", "messageId": Uuid::new_v4().to_string(), "parts": [{"data": data}]
     }}})
+}
+
+fn task_reply(id: Value, task: tasks::TaskResult, wrap: bool) -> Value {
+    match task {
+        Ok(task) => {
+            let result = if wrap { json!({"task": task}) } else { task };
+            json!({"jsonrpc": "2.0", "id": id, "result": result})
+        }
+        Err((code, message)) => rpc_error(id, code, message),
+    }
 }
 
 fn rpc_error(id: Value, code: i64, message: &str) -> Value {
