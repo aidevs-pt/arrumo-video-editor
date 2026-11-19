@@ -170,13 +170,13 @@ struct DeleteDraftInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct DeleteCompletedInput {
+struct DeleteRunInput {
     workspace_id: i64,
     run_id: i64,
     confirmed_title: String,
 }
 
-pub(super) fn definitions() -> [Value; 28] {
+pub(super) fn definitions() -> [Value; 29] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -249,6 +249,11 @@ pub(super) fn definitions() -> [Value; 28] {
             }, "required": ["workspaceId", "runId", "markdown"], "additionalProperties": false}}),
         json!({"name": "recover_delivery_cleanup", "description": "Retry cleanup of managed delivery files for runs already deleted in this workspace.",
             "inputSchema": workspace, "annotations": {"idempotentHint": true}}),
+        json!({"name": "delete_generation", "description": "Stop and delete a generation run and its managed files after confirming the exact display title. Runs referenced by replays are protected.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "confirmedTitle"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "delete_completed_video", "description": "Delete a completed run and its managed delivery files after confirming the exact display title. Runs referenced by replays are protected.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
@@ -416,7 +421,13 @@ pub(super) fn call(
                 .map(|report| json!({"cleanup": report}))
                 .map_err(|_| "Could not recover delivery cleanup")
         }),
-        "delete_completed_video" => parse(arguments).and_then(|args: DeleteCompletedInput| {
+        "delete_generation" => parse(arguments).and_then(|args: DeleteRunInput| {
+            store
+                .delete_generation(database, args.workspace_id, args.run_id, &args.confirmed_title)
+                .map(|deleted| json!({"deleted": deleted}))
+                .map_err(|_| "Could not finish run deletion. Retry with the same IDs and title")
+        }),
+        "delete_completed_video" => parse(arguments).and_then(|args: DeleteRunInput| {
             store
                 .delete_completed_generation(database, args.workspace_id, args.run_id, &args.confirmed_title)
                 .map(|deleted| json!({"deleted": deleted}))

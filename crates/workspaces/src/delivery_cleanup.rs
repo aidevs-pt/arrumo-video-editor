@@ -20,6 +20,27 @@ impl WorkspaceStore {
         run_id: i64,
         confirmed_title: &str,
     ) -> Result<bool, Box<dyn Error>> {
+        self.delete_run_and_delivery(database, workspace_id, run_id, confirmed_title, true)
+    }
+
+    pub fn delete_generation(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        confirmed_title: &str,
+    ) -> Result<bool, Box<dyn Error>> {
+        self.delete_run_and_delivery(database, workspace_id, run_id, confirmed_title, false)
+    }
+
+    fn delete_run_and_delivery(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        confirmed_title: &str,
+        completed_only: bool,
+    ) -> Result<bool, Box<dyn Error>> {
         let database = database.canonicalize()?;
         let directory = delivery_directory(&database, workspace_id, run_id);
         let transaction = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
@@ -35,10 +56,10 @@ impl WorkspaceStore {
         if !already_pending {
             let deleted = transaction.execute(
                 "DELETE FROM generation_runs
-                 WHERE workspace_id = ?1 AND id = ?2 AND state = 'completed'
+                 WHERE workspace_id = ?1 AND id = ?2 AND (NOT ?4 OR state = 'completed')
                    AND COALESCE(display_title, json_extract(snapshot_json, '$.draft.title')) = ?3
                    AND NOT EXISTS (SELECT 1 FROM generation_runs WHERE replay_of_run_id = ?2)",
-                params![workspace_id, run_id, confirmed_title],
+                params![workspace_id, run_id, confirmed_title, completed_only],
             )?;
             if deleted == 0 {
                 return Ok(false);
@@ -138,5 +159,61 @@ fn check_delivery_directory(directory: &Path) -> io::Result<bool> {
         Ok(_) => Err(io::Error::other("Invalid managed delivery directory")),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
         Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{DraftSettings, RunOptions};
+    use serde_json::json;
+
+    #[test]
+    fn active_deletion_revokes_the_lease_and_preserves_the_draft() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspaces.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Run to remove".into(),
+                    intent: "An example".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "test", &RunOptions::default())
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        let delivery = delivery_directory(&database, workspace, run.id);
+        fs::create_dir_all(&delivery).unwrap();
+        fs::write(delivery.join("partial.mp4"), b"fixture").unwrap();
+        assert!(
+            !store
+                .delete_completed_generation(&database, workspace, run.id, &draft.settings.title)
+                .unwrap()
+        );
+        assert!(
+            !store
+                .delete_generation(&database, workspace, run.id, "Wrong title")
+                .unwrap()
+        );
+        assert!(
+            store
+                .delete_generation(&database, workspace, run.id, &draft.settings.title)
+                .unwrap()
+        );
+        assert!(!delivery.exists());
+        assert!(
+            store
+                .checkpoint_generation(workspace, run.id, claim.attempt, &json!({}))
+                .is_err()
+        );
+        assert!(store.generation_run(workspace, run.id).unwrap().is_none());
+        assert_eq!(store.list_video_drafts(workspace).unwrap(), vec![draft]);
     }
 }

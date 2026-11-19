@@ -345,3 +345,5 @@ Use `delete-completed-video <workspace-id> <run-id> <confirmed-title>` in the CL
 Through MCP or A2A, use `delete_completed_video` with `workspaceId`, `runId`, and the exact `confirmedTitle`. It uses the same deletion and resumable file cleanup as the CLI command.
 
 Use `recover-delivery-cleanup <workspace-id>` in the CLI or `recover_delivery_cleanup` in MCP and A2A to retry pending cleanup for previously deleted runs. The report lists completed cleanup and entries that still require attention.
+
+Use `delete-generation <workspace-id> <run-id> <confirmed-title>` or the shared `delete_generation` operation to delete a queued, active, or terminal run. A successful deletion invalidates any worker lease and removes the managed delivery directory. The draft and shared assets remain available. External workers must stop using run paths when their lease becomes invalid.

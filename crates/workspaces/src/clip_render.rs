@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rusqlite::params;
+use rusqlite::{Transaction, TransactionBehavior, params};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -228,11 +228,23 @@ impl WorkspaceStore {
             crate::preview_settings::LEGACY_PREVIEW_MAX_EDGE,
             |settings| settings.effective_max_edge,
         );
-        let delivery = delivery_directory(database, workspace_id, run_id);
-        fs::create_dir_all(&delivery)?;
-        let delivery = delivery.canonicalize()?;
-        let scratch = delivery.join(format!("render-attempt-{attempt}"));
-        fs::create_dir(&scratch)?;
+        let (delivery, scratch) = {
+            // Serialize directory creation with deletion and recheck the lease before touching disk.
+            let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+            tx.query_row(
+                "SELECT 1 FROM generation_runs WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
+                 AND state = 'running' AND lease_until > unixepoch()",
+                params![workspace_id, run_id, attempt],
+                |_| Ok(()),
+            )?;
+            let delivery = delivery_directory(database, workspace_id, run_id);
+            fs::create_dir_all(&delivery)?;
+            let delivery = delivery.canonicalize()?;
+            let scratch = delivery.join(format!("render-attempt-{attempt}"));
+            fs::create_dir(&scratch)?;
+            tx.commit()?;
+            (delivery, scratch)
+        };
         let rendered = (|| -> Result<i64, Box<dyn Error>> {
             let root = asset_root(database);
             let mut clips = Vec::new();
@@ -289,7 +301,9 @@ impl WorkspaceStore {
             )
             .map_err(Into::into)
         })();
-        if let Err(error) = fs::remove_dir_all(&scratch) {
+        if let Err(error) = fs::remove_dir_all(&scratch)
+            && error.kind() != io::ErrorKind::NotFound
+        {
             eprintln!("Temporary render files could not be cleaned up: {error}");
         }
         rendered
