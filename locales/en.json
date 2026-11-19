@@ -46,6 +46,7 @@
     "pickTitle": "Select media files"
   },
   "delivery": {
+    "inherited": "Inherited",
     "title": "Delivery settings",
     "back": "Back to outputs",
     "backProfile": "Back to profile formats",
@@ -144,6 +145,7 @@
     "disabled": "Disabled"
   },
   "profiles": {
+    "list": "Workspace profiles",
     "back": "Back to workspaces",
     "outputs": "Outputs",
     "context": "Context",

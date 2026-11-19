@@ -1,15 +1,16 @@
 "use client";
 
-import { Layers } from "lucide-react";
+import { Layers, Plus, Settings2 } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceCatalog } from "../home/workspace-router";
 import Link from "next/link";
@@ -99,6 +100,7 @@ export function WorkspaceProfiles({
         setProfiles((current) => [...current, profile]);
         setNewDraft(emptyDraft);
       }
+      window.dispatchEvent(new Event("arrumo:profiles-changed"));
     } catch {
       setSaveError(true);
     } finally {
@@ -113,8 +115,8 @@ export function WorkspaceProfiles({
       </WorkspaceHeading>
       <WorkspaceColumns>
         <section className="min-w-0 [&>p]:mt-3 [&>p]:max-w-[60ch] [&>p]:text-muted-foreground" aria-labelledby="profile-list-title">
-          <h2 id="profile-list-title">{copy.title}</h2>
-          {status === "loading" && <p role="status">{copy.loading}</p>}
+          <h2 id="profile-list-title">{copy.list}</h2>
+          {status === "loading" && <Skeleton className="h-32 w-full" role="status" aria-label={copy.loading} />}
           {status === "error" && (
             <Alert variant="destructive">
               <AlertDescription>{copy.loadError}</AlertDescription>
@@ -143,7 +145,7 @@ export function WorkspaceProfiles({
                       ) : (
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/profile?workspace=${workspace.id}&profile=${profile.id}`}
-                            aria-label={`${copy.formats} · ${profile.name}`}>{copy.formats}</Link>
+                            aria-label={`${copy.formats} · ${profile.name}`}><Settings2 data-icon="inline-start" />{copy.formats}</Link>
                         </Button>
                       )}
                       <Button
@@ -172,6 +174,7 @@ export function WorkspaceProfiles({
           ) : (
             <Empty className="min-h-44 border border-dashed">
               <EmptyHeader>
+                <EmptyMedia variant="icon"><Layers /></EmptyMedia>
                 <EmptyTitle>{copy.empty}</EmptyTitle>
                 <EmptyDescription>{copy.emptyHint}</EmptyDescription>
               </EmptyHeader>
@@ -206,7 +209,7 @@ export function WorkspaceProfiles({
               </div>
             ) : (
               <Button type="submit" disabled={disabled || !name.trim()}>
-                {saving ? copy.saving : copy.submit}
+                <Plus data-icon="inline-start" />{saving ? copy.saving : copy.submit}
               </Button>
             )}
           </FieldGroup>

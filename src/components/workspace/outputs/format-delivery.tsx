@@ -1,12 +1,18 @@
 "use client";
 
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, Package } from "lucide-react";
+import { ArrowLeft, FileText, Film, Package } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -176,15 +182,23 @@ export function FormatDelivery({
       : typeof value === "object" ? String(value.count)
       : String(value) || copy.empty;
     return (
-      <>
-        <Field orientation="horizontal">
-          <input id={`override-${field}`} type="checkbox" checked={overridden(field)}
+      <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2">
+        <div className="grid min-w-0 gap-1">
+          <Badge variant="outline" className="w-fit">{overridden(field) ? copy.override : copy.inherited}</Badge>
+          <p className="max-h-24 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+            {copy.workspaceValue} · {display}
+          </p>
+        </div>
+        <Field orientation="horizontal" className="w-fit">
+          <Switch id={`override-${field}`} checked={overridden(field)}
             aria-label={`${copy.override} · ${copy[field]}`}
-            onChange={(event) => setOverrides({ ...overrides, [field]: event.target.checked })} />
+            onCheckedChange={(checked) => {
+              setResult(null);
+              setOverrides((current) => ({ ...current, [field]: checked }));
+            }} />
           <FieldLabel htmlFor={`override-${field}`}>{copy.override}</FieldLabel>
         </Field>
-        <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy.workspaceValue} · {display}</p>
-      </>
+      </div>
     );
   }
 
@@ -208,12 +222,17 @@ export function FormatDelivery({
         </Alert>
       ) : delivery ? (
         <WorkspaceColumns wideForm>
-          <section aria-labelledby="delivery-required">
-            <h2 id="delivery-required">{copy.required}</h2>
-            <WorkspaceRows>
-              {delivery.required.map((output) => <li key={output}>{copy[output]}</li>)}
-            </WorkspaceRows>
-          </section>
+          <Card aria-labelledby="delivery-required">
+            <CardHeader><CardTitle><h2 id="delivery-required">{copy.required}</h2></CardTitle></CardHeader>
+            <CardContent>
+              <ul className="flex flex-col gap-3 text-sm">
+                {delivery.required.map((output) => {
+                  const Icon = output === "final_video" ? Film : FileText;
+                  return <li key={output} className="flex items-center gap-2"><Icon className="size-4 text-muted-foreground" aria-hidden="true" />{copy[output]}</li>;
+                })}
+              </ul>
+            </CardContent>
+          </Card>
           <WorkspaceForm  aria-labelledby="delivery-supplemental" aria-busy={pending}
             onSubmit={save} onChange={() => setResult(null)}>
             <h2 id="delivery-supplemental">{copy.supplemental}</h2>
@@ -229,12 +248,15 @@ export function FormatDelivery({
                     </Field>
                   ))}
                 </div>
-                <Field orientation="horizontal">
-                  <input id="tags" name="tags" type="checkbox" hidden={isProfile && !overridden("tags")} disabled={isProfile && !overridden("tags")}
-                    defaultChecked={delivery.supplemental.tags} />
-                  <FieldLabel htmlFor="tags">{copy.tags}</FieldLabel>
+                <Field>
+                  <Field orientation="horizontal">
+                    <Checkbox id="tags" name="tags" disabled={isProfile && !overridden("tags")}
+                      defaultChecked={delivery.supplemental.tags} />
+                    <FieldLabel htmlFor="tags">{copy.tags}</FieldLabel>
+                  </Field>
+                  {overrideControl("tags")}
                 </Field>
-                {overrideControl("tags")}
+                <Separator />
                 {textFields.map((field) => (
                   <Field key={field}>
                     <FieldLabel htmlFor={field}>{copy[field]}</FieldLabel>
@@ -264,7 +286,7 @@ export function FormatDelivery({
             </fieldset>
           </WorkspaceForm>
         </WorkspaceColumns>
-      ) : <p role="status">{copy.loading}</p>}
+      ) : <Skeleton className="h-52 w-full" role="status" aria-label={copy.loading} />}
     </WorkspaceShell>
   );
 }

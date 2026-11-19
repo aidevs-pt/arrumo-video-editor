@@ -1,5 +1,5 @@
 import type { LocaleMessages } from "@/lib/locales";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,17 +41,19 @@ export function PortraitFields({ value, profiles, images, copy, onChange, onImpo
         {count > 0 && (
           <Field>
             <FieldLabel htmlFor="portrait-source">{copy.portraitSource}</FieldLabel>
-            <NativeSelect id="portrait-source" className="w-full"
-              value={source.type === "manual" ? "manual" : source.profile_id}
-              onChange={(event) => onChange({
+            <Select value={source.type === "manual" ? "manual" : String(source.profile_id)}
+              onValueChange={(selected) => onChange({
                 ...value,
-                source: event.target.value === "manual" ? emptyManual : {
-                  type: "profile", profile_id: Number(event.target.value),
-                },
+                source: selected === "manual" ? emptyManual : { type: "profile", profile_id: Number(selected) },
               })}>
-              <NativeSelectOption value="manual">{copy.portraitManual}</NativeSelectOption>
-              {profiles.map((profile) => <NativeSelectOption key={profile.id} value={profile.id}>{profile.name}</NativeSelectOption>)}
-            </NativeSelect>
+              <SelectTrigger id="portrait-source" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="manual">{copy.portraitManual}</SelectItem>
+                  {profiles.map((profile) => <SelectItem key={profile.id} value={String(profile.id)}>{profile.name}</SelectItem>)}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </Field>
         )}
         {count > 0 && source.type === "manual" && (

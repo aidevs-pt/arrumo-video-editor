@@ -46,6 +46,7 @@
     "pickTitle": "Selecionar ficheiros multimédia"
   },
   "delivery": {
+    "inherited": "Herdado",
     "title": "Definições de entrega",
     "back": "Voltar às saídas",
     "backProfile": "Voltar aos formatos do perfil",
@@ -144,6 +145,7 @@
     "disabled": "Desativado"
   },
   "profiles": {
+    "list": "Perfis do espaço de trabalho",
     "back": "Voltar aos espaços de trabalho",
     "outputs": "Saídas",
     "context": "Contexto",

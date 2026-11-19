@@ -1,11 +1,16 @@
 "use client";
 
-import { SlidersHorizontal } from "lucide-react";
+import { Monitor, SlidersHorizontal } from "lucide-react";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -113,7 +118,7 @@ export function WorkspaceOutputs({
       <WorkspaceColumns>
         <section className="min-w-0 [&>p]:mt-3 [&>p]:max-w-[60ch] [&>p]:text-muted-foreground" aria-labelledby="format-list-title">
           <h2 id="format-list-title">{copy.list}</h2>
-          {status === "loading" && <p role="status">{copy.loading}</p>}
+          {status === "loading" && <Skeleton className="h-32 w-full" role="status" aria-label={copy.loading} />}
           {status === "error" && (
             <Alert variant="destructive">
               <AlertDescription>{copy.loadError}</AlertDescription>
@@ -128,43 +133,58 @@ export function WorkspaceOutputs({
               {formats.map((format) => (
                 <li key={format.id}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-                    <div>
-                      <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">{format.name}</h3>
-                      <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{format.width} × {format.height} · {format.enabled ? copy.enabled : copy.disabled}</p>
+                    <div className="grid min-w-0 gap-1.5">
+                      <h3 className="wrap-anywhere font-semibold">{format.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground tabular-nums">{format.width} × {format.height}</span>
+                        <Badge variant={format.enabled ? "secondary" : "outline"}>{format.enabled ? copy.enabled : copy.disabled}</Badge>
+                      </div>
                     </div>
-                    {removing === format.id ? (
-                      <div>
-                        <p>{copy.confirm}</p>
-                        <div className="flex flex-wrap items-baseline gap-2.5">
-                          <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => void remove(format.id)}>{copy.remove}</Button>
-                          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => {
-                            setRemoving(null);
-                            setFailure(null);
-                          }}>{copy.cancel}</Button>
-                        </div>
-                        {failure === "remove" && <p role="alert">{copy.removeError}</p>}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap items-baseline gap-2.5">
-                        <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
-                          aria-label={`${copy.delivery} · ${format.name}`} onClick={() => setDeliveryFormat(format)}>{copy.delivery}</Button>
-                        <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
-                          aria-label={`${copy.edit} ${format.name}`} onClick={() => {
-                            setFailure(null);
-                            setEditing(format);
-                          }}>{copy.edit}</Button>
-                        <Button type="button" size="sm" variant="ghost" disabled={pending || editing !== null || removing !== null}
-                          aria-label={`${copy.remove} ${format.name}`} onClick={() => {
-                            setFailure(null);
-                            setRemoving(format.id);
-                          }}>{copy.remove}</Button>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
+                        aria-label={`${copy.delivery} · ${format.name}`} onClick={() => setDeliveryFormat(format)}>{copy.delivery}</Button>
+                      <Button type="button" size="sm" variant="outline" disabled={pending || editing !== null || removing !== null}
+                        aria-label={`${copy.edit} ${format.name}`} onClick={() => {
+                          setFailure(null);
+                          setEditing(format);
+                        }}>{copy.edit}</Button>
+                      <AlertDialog open={removing === format.id} onOpenChange={(open) => {
+                        if (pending) return;
+                        setFailure(null);
+                        setRemoving(open ? format.id : null);
+                      }}>
+                        <AlertDialogTrigger asChild>
+                          <Button type="button" size="sm" variant="ghost" disabled={pending || editing !== null || removing !== null}
+                            aria-label={`${copy.remove} ${format.name}`}>{copy.remove}</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{copy.remove} · {format.name}</AlertDialogTitle>
+                            <AlertDialogDescription>{copy.confirm}</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          {failure === "remove" && <Alert variant="destructive"><AlertDescription>{copy.removeError}</AlertDescription></Alert>}
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={pending}>{copy.cancel}</AlertDialogCancel>
+                            <AlertDialogAction variant="destructive" disabled={pending} onClick={(event) => {
+                              event.preventDefault();
+                              void remove(format.id);
+                            }}>{copy.remove}</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </li>
               ))}
             </WorkspaceRows>
-          ) : <p>{copy.empty}</p>)}
+          ) : (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><Monitor /></EmptyMedia>
+                <EmptyTitle>{copy.empty}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          ))}
         </section>
         <WorkspaceForm key={editing?.id ?? "new"}  onSubmit={save} aria-labelledby="format-form-title" aria-busy={pending}>
           <h2 id="format-form-title">{editing ? copy.editTitle : copy.create}</h2>
@@ -183,7 +203,7 @@ export function WorkspaceOutputs({
                 <Input id="format-height" name="height" type="number" min={1} max={4294967295} defaultValue={editing?.height} required />
               </Field>
               <Field orientation="horizontal">
-                <input id="format-enabled" name="enabled" type="checkbox" defaultChecked={editing?.enabled ?? true} />
+                <Switch id="format-enabled" name="enabled" defaultChecked={editing?.enabled ?? true} />
                 <FieldLabel htmlFor="format-enabled">{copy.enabled}</FieldLabel>
               </Field>
               {failure === "save" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
