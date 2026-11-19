@@ -263,5 +263,17 @@
     "supplemental_outputs": "Supplemental outputs",
     "final_render": "Final render",
     "verify_delivery": "Verify delivery"
+  },
+  "markdownEditor": {
+    "source": "Markdown source",
+    "loading": "Loading rich text editor…",
+    "toolbar": {
+      "boldControlLabel": "Bold",
+      "italicControlLabel": "Italic",
+      "h2ControlLabel": "Heading",
+      "bulletListControlLabel": "Bulleted list",
+      "orderedListControlLabel": "Numbered list",
+      "blockquoteControlLabel": "Block quote"
+    }
   }
 }

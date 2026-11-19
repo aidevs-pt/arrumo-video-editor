@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/markdown/editor";
 import { WorkspaceFeedback } from "./workspace-feedback";
 
 export function WorkspaceContext({ workspace, onBack }: {
@@ -73,8 +73,8 @@ export function WorkspaceContext({ workspace, onBack }: {
           <FieldGroup>
             <Field data-disabled={saving}>
               <FieldLabel htmlFor="workspace-context">{copy.label}</FieldLabel>
-              <Textarea id="workspace-context" rows={10} value={markdown} disabled={saving} onChange={(event) => {
-                setMarkdown(event.target.value);
+              <MarkdownEditor id="workspace-context" label={copy.label} value={markdown} disabled={saving} onChange={(value) => {
+                setMarkdown(value);
                 setResult(null);
               }} />
             </Field>

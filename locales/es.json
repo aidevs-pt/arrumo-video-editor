@@ -263,5 +263,17 @@
     "supplemental_outputs": "Salidas adicionales",
     "final_render": "Renderizado final",
     "verify_delivery": "Verificar la entrega"
+  },
+  "markdownEditor": {
+    "source": "Código Markdown",
+    "loading": "Cargando el editor de texto enriquecido…",
+    "toolbar": {
+      "boldControlLabel": "Negrita",
+      "italicControlLabel": "Cursiva",
+      "h2ControlLabel": "Encabezado",
+      "bulletListControlLabel": "Lista con viñetas",
+      "orderedListControlLabel": "Lista numerada",
+      "blockquoteControlLabel": "Cita"
+    }
   }
 }
