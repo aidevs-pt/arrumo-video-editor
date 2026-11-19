@@ -222,3 +222,5 @@ New generation runs capture the effective provider order and its source for each
 The `enqueue-draft` options JSON can include `provider_overrides`, a map from capability ID to an ordered array of provider plugin IDs. An omitted capability inherits the workspace or app order. An empty array disables providers for that capability for this run. Both replay modes preserve the requested per-run overrides. A replay with current settings revalidates the requested providers. Agent selection uses the agent settings.
 
 In the desktop generation form, expand **Providers for this run** to include or exclude individual providers. **Use saved order** clears a capability override. Closing the disclosure preserves your selections for that draft. Submitting the run leaves the workspace preferences unchanged.
+
+Use `transcribe-wav <workspace-id> elevenlabs <audio.wav>` to send a WAV of up to 32 MiB to the bundled ElevenLabs transcription adapter. It uses the workspace credential or app default and returns normalized transcript text and word timings as JSON. This is an explicit cloud upload. The generation queue and provider fallback do not yet call this adapter.

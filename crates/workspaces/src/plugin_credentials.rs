@@ -68,6 +68,21 @@ impl WorkspaceStore {
         )
     }
 
+    pub(crate) fn provider_secret(
+        &self,
+        plugin_id: &str,
+        setting_id: &str,
+        workspace_id: i64,
+    ) -> io::Result<Option<Zeroizing<Vec<u8>>>> {
+        let keys = self.plugin_credential_keys(plugin_id, setting_id, Some(workspace_id))?;
+        if let Some(workspace) = keys.workspace
+            && let Some(secret) = read_credential(&workspace)?
+        {
+            return Ok(Some(secret));
+        }
+        read_credential(&keys.app)
+    }
+
     fn plugin_credential_keys(
         &self,
         plugin_id: &str,
@@ -118,11 +133,15 @@ fn credential_entry(key: &str) -> io::Result<keyring::Entry> {
         .map_err(|_| io::Error::other("System credential store unavailable"))
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 fn credential_exists(key: &str) -> io::Result<bool> {
+    Ok(read_credential(key)?.is_some())
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+fn read_credential(key: &str) -> io::Result<Option<Zeroizing<Vec<u8>>>> {
     match credential_entry(key)?.get_secret() {
-        Ok(secret) => Ok(!Zeroizing::new(secret).is_empty()),
-        Err(keyring::Error::NoEntry) => Ok(false),
+        Ok(secret) => Ok(Some(Zeroizing::new(secret)).filter(|value| !value.is_empty())),
+        Err(keyring::Error::NoEntry) => Ok(None),
         Err(_) => Err(io::Error::other("Could not access system credential store")),
     }
 }
@@ -142,7 +161,7 @@ fn save_credential(key: &str, secret: Option<&[u8]>) -> io::Result<()> {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-fn credential_exists(_: &str) -> io::Result<bool> {
+fn read_credential(_: &str) -> io::Result<Option<Zeroizing<Vec<u8>>>> {
     Err(io::Error::other("System credential store unavailable"))
 }
 
