@@ -85,3 +85,5 @@ cargo run --locked -- ./workspaces.sqlite import-asset 1 ./reference.png
 cargo run --locked -- ./workspaces.sqlite assets 1
 cargo run --locked -- ./workspaces.sqlite set-asset-notes 1 1 "Keep the product centered"
 ```
+
+Use `thumbnail_reference_ids` to select existing image assets in a delivery configuration, including within a manual portrait source. IDs are scoped to the workspace. In profile deliveries, omit the top-level field to inherit the workspace selection or pass an empty list to clear it.

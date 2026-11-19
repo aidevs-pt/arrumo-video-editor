@@ -1,6 +1,7 @@
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ThumbnailReferences, type ReferenceImage } from "./thumbnail-references";
 import { deliveryCopy } from "./delivery-copy";
 
 type ManualSource = {
@@ -8,18 +9,20 @@ type ManualSource = {
   guidance: string;
   thumbnails_per_video: number;
   thumbnail_guidance: string;
+  thumbnail_reference_ids: number[];
 };
 type ProfileSource = { type: "profile"; profile_id: number };
 export type PortraitDerivatives = { count: number; source: ManualSource | ProfileSource };
 export type SourceProfile = { id: number; name: string };
 
 const emptyManual: ManualSource = {
-  type: "manual", guidance: "", thumbnails_per_video: 0, thumbnail_guidance: "",
+  type: "manual", guidance: "", thumbnails_per_video: 0, thumbnail_guidance: "", thumbnail_reference_ids: [],
 };
 
-export function PortraitFields({ value, profiles, copy, onChange }: {
+export function PortraitFields({ value, profiles, images, copy, onChange }: {
   value: PortraitDerivatives;
   profiles: SourceProfile[];
+  images: ReferenceImage[];
   copy: (typeof deliveryCopy)["en"];
   onChange: (value: PortraitDerivatives) => void;
 }) {
@@ -66,6 +69,8 @@ export function PortraitFields({ value, profiles, copy, onChange }: {
               <Textarea id="portrait-thumbnail-guidance" value={source.thumbnail_guidance}
                 onChange={(event) => onChange({ ...value, source: { ...source, thumbnail_guidance: event.target.value } })} />
             </Field>
+            <ThumbnailReferences id="portrait-reference" images={images} selected={source.thumbnail_reference_ids} copy={copy}
+              onChange={(ids) => onChange({ ...value, source: { ...source, thumbnail_reference_ids: ids } })} />
           </>
         )}
       </FieldGroup>

@@ -12,6 +12,7 @@ pub struct DeliveryOverrides {
     pub descriptions: Option<u16>,
     pub tags: Option<bool>,
     pub thumbnail_guidance: Option<String>,
+    pub thumbnail_reference_ids: Option<Vec<i64>>,
     pub specifications: Option<String>,
     pub portrait_derivatives: Option<PortraitDerivatives>,
 }
@@ -34,6 +35,11 @@ impl DeliveryOverrides {
                 .thumbnail_guidance
                 .as_ref()
                 .unwrap_or(&workspace.thumbnail_guidance)
+                .clone(),
+            thumbnail_reference_ids: self
+                .thumbnail_reference_ids
+                .as_ref()
+                .unwrap_or(&workspace.thumbnail_reference_ids)
                 .clone(),
             specifications: self
                 .specifications
@@ -99,6 +105,17 @@ impl WorkspaceStore {
                AND (?5 IS NULL OR EXISTS (
                    SELECT 1 FROM profiles WHERE workspace_id = ?1 AND id = ?5
                ))
+             AND NOT EXISTS (
+                 SELECT 1 FROM (
+                     SELECT value FROM json_each(?4, '$.thumbnail_reference_ids')
+                     UNION ALL
+                     SELECT value FROM json_each(?4, '$.portrait_derivatives.source.thumbnail_reference_ids')
+                 ) AS ref
+                 WHERE ref.value IS NOT NULL AND NOT EXISTS (
+                     SELECT 1 FROM workspace_assets AS image
+                     WHERE image.id = ref.value AND image.workspace_id = ?1 AND image.kind = 'image'
+                   )
+             )
              ON CONFLICT (workspace_id, profile_id, format_id)
              DO UPDATE SET settings_json = excluded.settings_json
              RETURNING format_id",

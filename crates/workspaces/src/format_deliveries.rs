@@ -11,6 +11,7 @@ pub struct SupplementalOutputs {
     pub descriptions: u16,
     pub tags: bool,
     pub thumbnail_guidance: String,
+    pub thumbnail_reference_ids: Vec<i64>,
     pub specifications: String,
     pub portrait_derivatives: PortraitDerivatives,
 }
@@ -32,6 +33,8 @@ pub enum PortraitSource {
         thumbnails_per_video: u16,
         #[serde(default)]
         thumbnail_guidance: String,
+        #[serde(default)]
+        thumbnail_reference_ids: Vec<i64>,
     },
     Profile {
         profile_id: i64,
@@ -44,6 +47,7 @@ impl Default for PortraitSource {
             guidance: String::new(),
             thumbnails_per_video: 0,
             thumbnail_guidance: String::new(),
+            thumbnail_reference_ids: Vec::new(),
         }
     }
 }
@@ -100,6 +104,17 @@ impl WorkspaceStore {
              AND (?4 IS NULL OR EXISTS (
                  SELECT 1 FROM profiles WHERE workspace_id = ?1 AND id = ?4
              ))
+             AND NOT EXISTS (
+                 SELECT 1 FROM (
+                     SELECT value FROM json_each(?3, '$.thumbnail_reference_ids')
+                     UNION ALL
+                     SELECT value FROM json_each(?3, '$.portrait_derivatives.source.thumbnail_reference_ids')
+                 ) AS ref
+                 WHERE ref.value IS NOT NULL AND NOT EXISTS (
+                     SELECT 1 FROM workspace_assets AS image
+                     WHERE image.id = ref.value AND image.workspace_id = ?1 AND image.kind = 'image'
+                   )
+             )
              ON CONFLICT (format_id) DO UPDATE SET settings_json = excluded.settings_json
              RETURNING format_id",
             params![
@@ -179,5 +194,97 @@ mod tests {
             })
             .unwrap();
         assert_eq!(delivery_rows, 0);
+    }
+
+    #[test]
+    fn references_require_workspace_images_and_can_be_cleared_by_profiles() {
+        use crate::DeliveryOverrides;
+
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        let profile = store
+            .create_profile(workspace, "Reviews", "", None)
+            .unwrap()
+            .id;
+        let format = store.list_output_formats(workspace).unwrap()[0].id;
+        let create_asset = |workspace_id, kind| {
+            store
+                .0
+                .query_row(
+                    "INSERT INTO workspace_assets (workspace_id, name, kind, byte_size)
+                 VALUES (?1, 'Test asset', ?2, 10) RETURNING id",
+                    params![workspace_id, kind],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap()
+        };
+        let image = create_asset(workspace, "image");
+        let audio = create_asset(workspace, "audio");
+        let foreign = create_asset(other, "image");
+        for bad in [audio, foreign, i64::MAX] {
+            let settings = SupplementalOutputs {
+                thumbnail_reference_ids: vec![bad],
+                ..Default::default()
+            };
+            assert!(
+                store
+                    .set_format_delivery(workspace, format, &settings)
+                    .is_err()
+            );
+            let overrides = DeliveryOverrides {
+                portrait_derivatives: Some(PortraitDerivatives {
+                    count: 1,
+                    source: PortraitSource::Manual {
+                        guidance: String::new(),
+                        thumbnails_per_video: 1,
+                        thumbnail_guidance: String::new(),
+                        thumbnail_reference_ids: vec![bad],
+                    },
+                }),
+                ..Default::default()
+            };
+            assert!(
+                store
+                    .set_profile_delivery(workspace, profile, format, &overrides)
+                    .is_err()
+            );
+        }
+        let settings = SupplementalOutputs {
+            thumbnail_reference_ids: vec![image],
+            ..Default::default()
+        };
+        store
+            .set_format_delivery(workspace, format, &settings)
+            .unwrap();
+        assert_eq!(
+            store
+                .profile_delivery(workspace, profile, format)
+                .unwrap()
+                .effective
+                .supplemental
+                .thumbnail_reference_ids,
+            vec![image]
+        );
+        store
+            .set_profile_delivery(
+                workspace,
+                profile,
+                format,
+                &DeliveryOverrides {
+                    thumbnail_reference_ids: Some(vec![]),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert!(
+            store
+                .profile_delivery(workspace, profile, format)
+                .unwrap()
+                .effective
+                .supplemental
+                .thumbnail_reference_ids
+                .is_empty()
+        );
     }
 }

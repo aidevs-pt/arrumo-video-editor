@@ -9,6 +9,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PortraitFields, type PortraitDerivatives, type SourceProfile } from "./portrait-fields";
+import { ThumbnailReferences, type ReferenceImage } from "./thumbnail-references";
 import { deliveryCopy } from "./delivery-copy";
 
 type Supplemental = {
@@ -17,6 +18,7 @@ type Supplemental = {
   descriptions: number;
   tags: boolean;
   thumbnail_guidance: string;
+  thumbnail_reference_ids: number[];
   specifications: string;
   portrait_derivatives: PortraitDerivatives;
 };
@@ -48,6 +50,8 @@ export function FormatDelivery({
   const [profileDelivery, setProfileDelivery] = useState<ProfileDelivery>();
   const [overrides, setOverrides] = useState<Partial<Record<keyof Supplemental, boolean>>>({});
   const isProfile = profileId !== undefined;
+  const [images, setImages] = useState<ReferenceImage[]>([]);
+  const [references, setReferences] = useState<number[]>([]);
   const [profiles, setProfiles] = useState<SourceProfile[]>([]);
   const [portrait, setPortrait] = useState<PortraitDerivatives>();
   const showPortrait = format.width > format.height;
@@ -63,6 +67,9 @@ export function FormatDelivery({
     let active = true;
     async function load() {
       try {
+        const assets = await invoke<(ReferenceImage & { kind: string })[]>("list_assets", { workspaceId });
+        if (!active) return;
+        setImages(assets.filter((asset) => asset.kind === "image"));
         if (showPortrait) {
           const rows = await invoke<SourceProfile[]>("list_profiles", { workspaceId });
           if (!active) return;
@@ -71,12 +78,14 @@ export function FormatDelivery({
         if (profileId === undefined) {
           const value = await invoke<Delivery>("get_format_delivery", { workspaceId, formatId: format.id });
           if (!active) return;
+          setReferences(value.supplemental.thumbnail_reference_ids);
           setPortrait(value.supplemental.portrait_derivatives);
           setDelivery(value);
         } else {
           const value = await invoke<ProfileDelivery>("get_profile_delivery", { workspaceId, profileId, formatId: format.id });
           if (!active) return;
           setProfileDelivery(value);
+          setReferences(value.effective.supplemental.thumbnail_reference_ids);
           setPortrait(value.effective.supplemental.portrait_derivatives);
           setDelivery(value.effective);
         }
@@ -103,6 +112,7 @@ export function FormatDelivery({
       tags: fields.has("tags"),
       thumbnail_guidance: String(fields.get("thumbnail_guidance") ?? ""),
       specifications: String(fields.get("specifications") ?? ""),
+      thumbnail_reference_ids: references,
       portrait_derivatives: portrait,
     };
     setPending(true);
@@ -127,6 +137,7 @@ export function FormatDelivery({
     if (!profileDelivery) return null;
     const value = profileDelivery.workspace[field];
     const display = typeof value === "boolean" ? (value ? copy.on : copy.off)
+      : Array.isArray(value) ? value.map((id) => images.find((image) => image.id === id)?.name ?? id).join(", ") || copy.empty
       : typeof value === "object" ? String(value.count)
       : String(value) || copy.empty;
     return (
@@ -197,11 +208,15 @@ export function FormatDelivery({
                     {overrideControl(field)}
                   </Field>
                 ))}
+                {isProfile && overrideControl("thumbnail_reference_ids")}
+                {(!isProfile || overridden("thumbnail_reference_ids")) && (
+                  <ThumbnailReferences id="delivery-reference" images={images} selected={references} copy={copy} onChange={setReferences} />
+                )}
                 {showPortrait && portrait && (
                   <FieldGroup>
                     {isProfile && overrideControl("portrait_derivatives")}
                     {(!isProfile || overridden("portrait_derivatives")) && (
-                      <PortraitFields value={portrait} profiles={profiles} copy={copy} onChange={setPortrait} />
+                      <PortraitFields value={portrait} profiles={profiles} images={images} copy={copy} onChange={setPortrait} />
                     )}
                   </FieldGroup>
                 )}
