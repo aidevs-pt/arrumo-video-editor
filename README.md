@@ -238,3 +238,5 @@ Use `invoke-plugin <plugin-id>` with JSON on standard input to invoke an install
 A plugin that declares workspace context access needs a separate grant. Use `grant-plugin-context <plugin-id> <workspace-id>`, `plugin-context-grant <plugin-id> <workspace-id>`, and `revoke-plugin-context <plugin-id> <workspace-id>` to grant, check, or revoke access. Pass the workspace ID to `invoke-plugin <plugin-id> <workspace-id>` to use the grant. Revocation and package updates affect subsequent invocations. Each invocation sees only the context selected at its start.
 
 Desktop Settings, workspace Context, and completed video details can show **Plugin panels** from installed ZIPs. Opening a panel loads its declared HTML from a dedicated local protocol and checks the package revision. A sandbox isolates the panel from the editor and its native commands.
+
+In desktop Settings, choose a workspace and open **Plugin permissions** to grant or revoke context access for a requesting plugin. The confirmation names the plugin and workspace, and the host verifies the package revision before applying your choice.

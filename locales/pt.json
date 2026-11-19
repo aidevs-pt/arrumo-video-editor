@@ -1,4 +1,18 @@
 {
+  "pluginGrants": {
+    "title": "Permissões de plugins",
+    "description": "Gira os plugins instalados que podem ler o contexto deste espaço de trabalho.",
+    "denied": "Acesso negado",
+    "allowed": "Acesso permitido",
+    "grant": "Conceder acesso",
+    "revoke": "Revogar acesso",
+    "allow": "Permitir",
+    "confirm": "Permitir que {plugin} leia o contexto guardado de {workspace}? Uma atualização do pacote revoga esta permissão.",
+    "loadError": "Não foi possível carregar as permissões.",
+    "writeError": "Não foi possível alterar esta permissão. Volte a carregar a lista e tente novamente.",
+    "grantedNotice": "Acesso concedido.",
+    "revokedNotice": "Acesso revogado."
+  },
   "pluginSurfaces": {
     "title": "Painéis de plugins",
     "listError": "Não foi possível carregar os painéis dos plugins.",

@@ -1,4 +1,18 @@
 {
+  "pluginGrants": {
+    "title": "Plugin permissions",
+    "description": "Manage which installed plugins can read this workspace’s context.",
+    "denied": "Access denied",
+    "allowed": "Access allowed",
+    "grant": "Grant access",
+    "revoke": "Revoke access",
+    "allow": "Allow",
+    "confirm": "Allow {plugin} to read the saved context for {workspace}? A package update revokes this permission.",
+    "loadError": "Could not load plugin permissions.",
+    "writeError": "Could not change this permission. Reload the list and try again.",
+    "grantedNotice": "Access granted.",
+    "revokedNotice": "Access revoked."
+  },
   "pluginSurfaces": {
     "title": "Plugin panels",
     "listError": "Could not load plugin panels.",

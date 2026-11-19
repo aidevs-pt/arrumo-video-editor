@@ -1,20 +1,86 @@
 use std::io;
 
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
+use serde::Serialize;
 
 use crate::{PluginManifest, WorkspaceStore};
 
 const CONTEXT_PERMISSION: &str = "workspace-context-read";
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginContextRequest {
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub package_sha256: String,
+    pub granted: bool,
+}
+
 impl WorkspaceStore {
+    pub fn plugin_context_requests(
+        &self,
+        workspace_id: i64,
+    ) -> io::Result<Vec<PluginContextRequest>> {
+        let tx = self.0.unchecked_transaction().map_err(|_| grant_error())?;
+        tx.query_row(
+            "SELECT id FROM workspaces WHERE id = ?1",
+            [workspace_id],
+            |_| Ok(()),
+        )
+        .map_err(|_| io::Error::other("Workspace unavailable"))?;
+        let mut requests = Vec::new();
+        for plugin in self.plugin_catalog().map_err(|_| grant_error())? {
+            if !plugin.manifest.requests_workspace_context() {
+                continue;
+            }
+            if let Some(package) = plugin.package {
+                requests.push(PluginContextRequest {
+                    granted: self.plugin_context_granted(&plugin.manifest.id, workspace_id)?,
+                    plugin_id: plugin.manifest.id,
+                    plugin_name: plugin.manifest.name,
+                    package_sha256: package.sha256,
+                });
+            }
+        }
+        tx.commit().map_err(|_| grant_error())?;
+        Ok(requests)
+    }
+
+    pub fn apply_reviewed_plugin_context_grant(
+        &self,
+        plugin_id: &str,
+        workspace_id: i64,
+        package_sha256: &str,
+        allowed: bool,
+    ) -> io::Result<()> {
+        self.write_plugin_context_grant(plugin_id, workspace_id, Some(package_sha256), allowed)
+    }
+
     pub fn set_plugin_context_grant(
         &self,
         plugin_id: &str,
         workspace_id: i64,
         allowed: bool,
     ) -> io::Result<()> {
+        self.write_plugin_context_grant(plugin_id, workspace_id, None, allowed)
+    }
+
+    fn write_plugin_context_grant(
+        &self,
+        plugin_id: &str,
+        workspace_id: i64,
+        expected_sha256: Option<&str>,
+        allowed: bool,
+    ) -> io::Result<()> {
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)
             .map_err(|_| grant_error())?;
+        if let Some(expected) = expected_sha256 {
+            tx.query_row(
+                "SELECT 1 FROM installed_plugin_manifests WHERE plugin_id = ?1 AND package_sha256 = ?2",
+                params![plugin_id, expected],
+                |_| Ok(()),
+            ).map_err(|_| io::Error::other("Plugin package changed after review"))?;
+        }
         if allowed {
             let (manifest, digest): (Vec<u8>, String) = tx
                 .query_row(

@@ -237,6 +237,34 @@ mod tests {
         let input = Value::Null;
         let invoke =
             |workspace| store.invoke_plugin_in_workspace("fixture-reader", workspace, &input);
+        let reviewed = store
+            .plugin_context_requests(allowed)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!reviewed.granted);
+        assert!(
+            store
+                .apply_reviewed_plugin_context_grant("fixture-reader", allowed, "stale", true)
+                .is_err()
+        );
+        store
+            .apply_reviewed_plugin_context_grant(
+                "fixture-reader",
+                allowed,
+                &reviewed.package_sha256,
+                true,
+            )
+            .unwrap();
+        assert_eq!(invoke(allowed).unwrap(), "Shared");
+        store
+            .apply_reviewed_plugin_context_grant(
+                "fixture-reader",
+                allowed,
+                &reviewed.package_sha256,
+                false,
+            )
+            .unwrap();
         assert!(invoke(allowed).is_err());
         assert!(
             store

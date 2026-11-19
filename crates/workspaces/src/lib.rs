@@ -57,6 +57,7 @@ pub use plugin_catalog::{
     CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
 };
 pub use plugin_credentials::{MAX_PLUGIN_SECRET_BYTES, PluginCredentialStatus};
+pub use plugin_grants::PluginContextRequest;
 pub use plugin_package::{PluginPackageInfo, THIRD_PARTY_PLUGIN_NOTICE};
 pub use plugin_registry::{
     PluginRegistry, RegistryPlugin, RegistryRelease, RegistryReleaseSource, fetch_plugin_registry,

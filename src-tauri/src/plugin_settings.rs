@@ -318,3 +318,30 @@ pub fn serve_plugin_surface(
         .body(body)
         .expect("valid fixed plugin response headers")
 }
+
+#[tauri::command]
+pub fn list_plugin_context_requests(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::PluginContextRequest>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .plugin_context_requests(workspace_id)
+        .map_err(|_| "plugin_grants_load_failed")
+}
+
+#[tauri::command]
+pub fn apply_plugin_context_grant(
+    plugin_id: String,
+    workspace_id: i64,
+    package_sha256: String,
+    allowed: bool,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .apply_reviewed_plugin_context_grant(&plugin_id, workspace_id, &package_sha256, allowed)
+        .map_err(|_| "plugin_grant_write_failed")
+}

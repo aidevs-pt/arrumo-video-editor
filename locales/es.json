@@ -1,4 +1,18 @@
 {
+  "pluginGrants": {
+    "title": "Permisos de complementos",
+    "description": "Gestiona qué complementos instalados pueden leer el contexto de este espacio de trabajo.",
+    "denied": "Acceso denegado",
+    "allowed": "Acceso permitido",
+    "grant": "Conceder acceso",
+    "revoke": "Revocar acceso",
+    "allow": "Permitir",
+    "confirm": "¿Permitir que {plugin} lea el contexto guardado de {workspace}? Una actualización del paquete revoca este permiso.",
+    "loadError": "No se pudieron cargar los permisos.",
+    "writeError": "No se pudo cambiar este permiso. Vuelve a cargar la lista e inténtalo de nuevo.",
+    "grantedNotice": "Acceso concedido.",
+    "revokedNotice": "Acceso revocado."
+  },
   "pluginSurfaces": {
     "title": "Paneles de complementos",
     "listError": "No se pudieron cargar los paneles de complementos.",
