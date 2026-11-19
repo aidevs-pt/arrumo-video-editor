@@ -126,7 +126,24 @@ struct UpdateDraftInput {
     settings: DraftSettings,
 }
 
-pub(super) fn definitions() -> [Value; 21] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RenameCompletedInput {
+    workspace_id: i64,
+    run_id: i64,
+    title: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CompletedFeedbackInput {
+    workspace_id: i64,
+    run_id: i64,
+    result_id: Option<i64>,
+    markdown: String,
+}
+
+pub(super) fn definitions() -> [Value; 23] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -175,6 +192,15 @@ pub(super) fn definitions() -> [Value; 21] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "destination": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "destination"], "additionalProperties": false}}),
+        json!({"name": "rename_completed_video", "description": "Change the display title of a completed video.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "title": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "title"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "add_completed_video_feedback", "description": "Save Markdown feedback for the completed run or for one of its production results.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "resultId": id, "markdown": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "markdown"], "additionalProperties": false}}),
         json!({"name": "get_completed_video", "description": "Read the verified outputs and production history for a completed video.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "list_generation_notifications", "description": "Read up to 100 review and completion events in ascending order. Pass the last event ID to continue polling.",
@@ -296,6 +322,18 @@ pub(super) fn call(
                 .export_generation_delivery(database, args.workspace_id, args.run_id, destination)
                 .map(|()| json!({"destination": args.destination}))
                 .map_err(|_| "Could not export delivery. Check the verified files and choose a new destination")
+        }),
+        "rename_completed_video" => parse(arguments).and_then(|args: RenameCompletedInput| {
+            store
+                .rename_completed_video(args.workspace_id, args.run_id, &args.title)
+                .map(|title| json!({"title": title}))
+                .map_err(|_| "Could not rename completed video. Check the workspace, run and title")
+        }),
+        "add_completed_video_feedback" => parse(arguments).and_then(|args: CompletedFeedbackInput| {
+            store
+                .add_completed_video_feedback(args.workspace_id, args.run_id, args.result_id, &args.markdown)
+                .map(|feedback| json!({"feedback": feedback}))
+                .map_err(|_| "Could not save feedback. Check the completed run, result and Markdown")
         }),
         "get_completed_video" => parse(arguments).and_then(|args: RunInput| {
             store
