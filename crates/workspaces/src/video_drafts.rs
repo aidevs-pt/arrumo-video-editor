@@ -25,6 +25,24 @@ impl WorkspaceStore {
     pub fn create_video_draft(
         &mut self,
         workspace_id: i64,
+        settings: DraftSettings,
+    ) -> rusqlite::Result<VideoDraft> {
+        self.save_video_draft(workspace_id, None, settings)
+    }
+
+    pub fn update_video_draft(
+        &mut self,
+        workspace_id: i64,
+        draft_id: i64,
+        settings: DraftSettings,
+    ) -> rusqlite::Result<VideoDraft> {
+        self.save_video_draft(workspace_id, Some(draft_id), settings)
+    }
+
+    fn save_video_draft(
+        &mut self,
+        workspace_id: i64,
+        draft_id: Option<i64>,
         mut settings: DraftSettings,
     ) -> rusqlite::Result<VideoDraft> {
         settings.title = settings.title.trim().to_owned();
@@ -38,17 +56,37 @@ impl WorkspaceStore {
         let tx = self
             .0
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let id = tx.query_row(
-            "INSERT INTO video_drafts (workspace_id, profile_id, title, intent)
-             VALUES (?1, ?2, ?3, ?4) RETURNING id",
-            params![
-                workspace_id,
-                settings.profile_id,
-                settings.title,
-                settings.intent
-            ],
-            |row| row.get(0),
-        )?;
+        let id = if let Some(id) = draft_id {
+            tx.query_row(
+                "UPDATE video_drafts SET profile_id = ?3, title = ?4, intent = ?5
+                 WHERE workspace_id = ?1 AND id = ?2 RETURNING id",
+                params![
+                    workspace_id,
+                    id,
+                    settings.profile_id,
+                    settings.title,
+                    settings.intent
+                ],
+                |row| row.get::<_, i64>(0),
+            )?;
+            tx.execute(
+                "DELETE FROM video_draft_sources WHERE workspace_id = ?1 AND draft_id = ?2",
+                params![workspace_id, id],
+            )?;
+            id
+        } else {
+            tx.query_row(
+                "INSERT INTO video_drafts (workspace_id, profile_id, title, intent)
+                 VALUES (?1, ?2, ?3, ?4) RETURNING id",
+                params![
+                    workspace_id,
+                    settings.profile_id,
+                    settings.title,
+                    settings.intent
+                ],
+                |row| row.get(0),
+            )?
+        };
         for (position, asset_id) in settings.source_ids.iter().enumerate() {
             tx.query_row(
                 "INSERT INTO video_draft_sources (workspace_id, draft_id, asset_id, position)
@@ -145,6 +183,27 @@ mod tests {
             .create_video_draft(studio, settings(Some(profile), vec![second, first], ""))
             .unwrap();
         assert_eq!(recorded.settings.title, "Review");
+        assert!(
+            store
+                .update_video_draft(other, recorded.id, settings(None, vec![], "Wrong"))
+                .is_err()
+        );
+        assert!(
+            store
+                .update_video_draft(
+                    studio,
+                    recorded.id,
+                    settings(None, vec![first, foreign], "Invalid")
+                )
+                .is_err()
+        );
+        assert_eq!(store.list_video_drafts(studio).unwrap(), [recorded]);
+        let id = store.list_video_drafts(studio).unwrap()[0].id;
+        let recorded = store
+            .update_video_draft(studio, id, settings(None, vec![first, second], "Revised"))
+            .unwrap();
+        assert_eq!(recorded.id, id);
+        assert_eq!(recorded.settings.source_ids, vec![first, second]);
         let scratch = store
             .create_video_draft(studio, settings(None, vec![], "Explain the cube"))
             .unwrap();

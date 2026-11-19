@@ -239,6 +239,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&draft)?);
         }
+        [database, command, workspace, draft, settings] if command == "update-draft" => {
+            let draft = WorkspaceStore::open(Path::new(database))?.update_video_draft(
+                utf8(workspace)?.parse()?,
+                utf8(draft)?.parse()?,
+                serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&draft)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -264,7 +272,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "brand-assets <workspace-id> | ",
                 "attach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
                 "detach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
-                "drafts <workspace-id> | create-draft <workspace-id> <settings-json>"
+                "drafts <workspace-id> | create-draft <workspace-id> <settings-json> | ",
+                "update-draft <workspace-id> <draft-id> <settings-json>"
             )
             .into());
         }

@@ -400,6 +400,20 @@ async fn create_video_draft(
         .map_err(|_| "draft_create_failed")
 }
 
+#[tauri::command]
+async fn update_video_draft(
+    workspace_id: i64,
+    draft_id: i64,
+    settings: DraftSettings,
+    store: State<'_, Store>,
+) -> Result<VideoDraft, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .update_video_draft(workspace_id, draft_id, settings)
+        .map_err(|_| "draft_update_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -440,7 +454,8 @@ fn main() {
             attach_brand_asset,
             detach_brand_asset,
             list_video_drafts,
-            create_video_draft
+            create_video_draft,
+            update_video_draft
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

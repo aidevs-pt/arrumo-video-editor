@@ -1,5 +1,6 @@
 const en = {
   title: "Drafts", back: "Back to profiles", newDraft: "New video draft", empty: "No video drafts yet.",
+  edit: "Edit draft", cancel: "Cancel edit",
   name: "Video title", profile: "Profile", noProfile: "No profile", intent: "Intent and guidance",
   sources: "Source clips", order: "Playback order", import: "Import clips", up: "Move up", down: "Move down",
   save: "Save draft", saving: "Saving…", loading: "Loading drafts…", retry: "Retry",
@@ -10,6 +11,7 @@ export const draftCopy: Record<"en" | "es" | "pt", typeof en> = {
   en,
   es: {
     title: "Borradores", back: "Volver a los perfiles", newDraft: "Nuevo borrador", empty: "Aún no hay borradores.",
+    edit: "Editar borrador", cancel: "Cancelar edición",
     name: "Título del vídeo", profile: "Perfil", noProfile: "Sin perfil", intent: "Intención e indicaciones",
     sources: "Clips de origen", order: "Orden de reproducción", import: "Importar clips", up: "Subir", down: "Bajar",
     save: "Guardar borrador", saving: "Guardando…", loading: "Cargando borradores…", retry: "Reintentar",
@@ -18,6 +20,7 @@ export const draftCopy: Record<"en" | "es" | "pt", typeof en> = {
   },
   pt: {
     title: "Rascunhos", back: "Voltar aos perfis", newDraft: "Novo rascunho", empty: "Ainda não há rascunhos.",
+    edit: "Editar rascunho", cancel: "Cancelar edição",
     name: "Título do vídeo", profile: "Perfil", noProfile: "Sem perfil", intent: "Intenção e orientações",
     sources: "Clipes de origem", order: "Ordem de reprodução", import: "Importar clipes", up: "Mover para cima", down: "Mover para baixo",
     save: "Guardar rascunho", saving: "A guardar…", loading: "A carregar rascunhos…", retry: "Tentar novamente",

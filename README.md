@@ -114,3 +114,5 @@ cargo run --locked -- ./workspaces.sqlite create-draft 1 '{"title":"Review","sou
 cargo run --locked -- ./workspaces.sqlite create-draft 1 '{"title":"Explainer","intent":"Show how a cube works"}'
 cargo run --locked -- ./workspaces.sqlite drafts 1
 ```
+
+Use `update-draft <workspace-id> <draft-id> <settings-json>` to replace the saved draft settings and source order. The desktop Drafts view also supports editing and cancelling. An invalid source group leaves the original draft intact.

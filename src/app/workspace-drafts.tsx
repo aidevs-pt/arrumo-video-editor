@@ -25,6 +25,10 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
   const [drafts, setDrafts] = useState<Draft[]>();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [profiles, setProfiles] = useState<CatalogEntry[]>([]);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [title, setTitle] = useState("");
+  const titleInput = useRef<HTMLInputElement>(null);
+  const newDraft = useRef<Omit<Draft, "id"> | null>(null);
   const [profile, setProfile] = useState(initialProfile);
   const [intent, setIntent] = useState("");
   const [sources, setSources] = useState<number[]>([]);
@@ -87,22 +91,44 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
     });
   }
 
+  function edit(draft: Draft) {
+    newDraft.current = { title, intent, profile_id: profile, source_ids: sources };
+    setEditing(draft.id);
+    setTitle(draft.title);
+    setProfile(draft.profile_id);
+    setIntent(draft.intent);
+    setSources(draft.source_ids);
+    setError(null);
+    titleInput.current?.focus();
+  }
+
+  function reset() {
+    setEditing(null);
+    const previous = newDraft.current;
+    newDraft.current = null;
+    setTitle(previous?.title ?? "");
+    setProfile(previous ? previous.profile_id : initialProfile);
+    setIntent(previous?.intent ?? "");
+    setSources(previous?.source_ids ?? []);
+    setError(null);
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending || (!sources.length && !intent.trim())) return;
-    const form = event.currentTarget;
-    const title = String(new FormData(form).get("title") ?? "");
+    if (pending || !title.trim() || (!sources.length && !intent.trim())) return;
     setPending("saving");
     setError(null);
     try {
-      const draft = await invoke<Draft>("create_video_draft", {
-        workspaceId, settings: { title, intent, profile_id: profile, source_ids: sources },
+      const draft = await invoke<Draft>(editing === null ? "create_video_draft" : "update_video_draft", {
+        workspaceId,
+        ...(editing !== null && { draftId: editing }),
+        settings: { title, intent, profile_id: profile, source_ids: sources },
       });
-      setDrafts((current) => [...(current ?? []), draft]);
-      form.reset();
-      setProfile(initialProfile);
-      setIntent("");
-      setSources([]);
+      setDrafts((current) => {
+        const rows = current ?? [];
+        return editing === null ? [...rows, draft] : rows.map((row) => row.id === draft.id ? draft : row);
+      });
+      reset();
     } catch {
       setError("saveError");
     } finally {
@@ -131,7 +157,11 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
               <ul className="workspace-rows" aria-live="polite">
                 {drafts.map((draft) => (
                   <li key={draft.id}>
-                    <h2>{draft.title}</h2>
+                    <div className="profile-row-heading">
+                      <h2>{draft.title}</h2>
+                      <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
+                        aria-label={`${copy.edit} · ${draft.title}`} onClick={() => edit(draft)}>{copy.edit}</Button>
+                    </div>
                     {draft.profile_id !== null && <p>{profiles.find((entry) => entry.id === draft.profile_id)?.name}</p>}
                     {draft.intent && <p className="profile-guidance">{draft.intent}</p>}
                     {draft.source_ids.length > 0 && <ol className="draft-order">
@@ -143,12 +173,12 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
             )}
           </section>
           <form className="workspace-form" onSubmit={save} aria-labelledby="new-draft-title" aria-busy={pending !== null}>
-            <h2 id="new-draft-title">{copy.newDraft}</h2>
+            <h2 id="new-draft-title">{editing === null ? copy.newDraft : copy.edit}</h2>
             <fieldset disabled={pending !== null}>
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="draft-title">{copy.name}</FieldLabel>
-                  <Input id="draft-title" name="title" required />
+                  <Input ref={titleInput} id="draft-title" name="title" required value={title} onChange={(event) => setTitle(event.target.value)} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="draft-profile">{copy.profile}</FieldLabel>
@@ -194,7 +224,12 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
                   ))}
                 </ol>}
                 {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-                <Button type="submit" disabled={!sources.length && !intent.trim()}>{pending === "saving" ? copy.saving : copy.save}</Button>
+                <div className="profile-edit-actions">
+                  <Button type="submit" disabled={!title.trim() || (!sources.length && !intent.trim())}>
+                    {pending === "saving" ? copy.saving : copy.save}
+                  </Button>
+                  {editing !== null && <Button type="button" variant="outline" onClick={reset}>{copy.cancel}</Button>}
+                </div>
               </FieldGroup>
             </fieldset>
           </form>
