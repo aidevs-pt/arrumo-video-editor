@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, error::Error, io, sync::OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::WorkspaceStore;
+use crate::{PluginPackageInfo, WorkspaceStore};
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -55,6 +55,8 @@ pub(crate) struct AgentCli {
 pub struct CatalogPlugin {
     pub bundled: bool,
     pub manifest: PluginManifest,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package: Option<PluginPackageInfo>,
 }
 
 impl PluginManifest {
@@ -120,6 +122,14 @@ pub(crate) fn bundled_manifests() -> &'static [PluginManifest] {
 
 impl WorkspaceStore {
     pub fn install_plugin_manifest(&self, bytes: &[u8]) -> Result<CatalogPlugin, Box<dyn Error>> {
+        self.register_plugin(bytes, None)
+    }
+
+    pub(crate) fn register_plugin(
+        &self,
+        bytes: &[u8],
+        package: Option<(&PluginPackageInfo, &[u8])>,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
         let manifest = PluginManifest::parse(bytes)?;
         if bundled_manifests()
             .iter()
@@ -127,10 +137,12 @@ impl WorkspaceStore {
         {
             return Err(invalid_manifest("Plugin ID belongs to a bundled plugin").into());
         }
+        let (info, archive) = package.unzip();
         let added = self.0.execute(
-            "INSERT INTO installed_plugin_manifests (plugin_id, manifest) VALUES (?1, ?2)
+            "INSERT INTO installed_plugin_manifests (plugin_id, manifest, package_sha256, package_bytes)
+             VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT(plugin_id) DO NOTHING",
-            rusqlite::params![manifest.id, bytes],
+            rusqlite::params![manifest.id, bytes, info.map(|info| &info.sha256), archive],
         )?;
         if added == 0 {
             return Err(invalid_manifest("Plugin ID is already installed").into());
@@ -138,6 +150,7 @@ impl WorkspaceStore {
         Ok(CatalogPlugin {
             bundled: false,
             manifest,
+            package: info.cloned(),
         })
     }
 
@@ -148,15 +161,32 @@ impl WorkspaceStore {
             .map(|manifest| CatalogPlugin {
                 bundled: true,
                 manifest,
+                package: None,
             })
             .collect();
-        let mut query = self
-            .0
-            .prepare("SELECT manifest FROM installed_plugin_manifests ORDER BY plugin_id")?;
-        for stored in query.query_map([], |row| row.get::<_, Vec<u8>>(0))? {
+        let mut query = self.0.prepare(
+            "SELECT manifest, package_sha256, length(package_bytes)
+             FROM installed_plugin_manifests ORDER BY plugin_id",
+        )?;
+        let rows = query.query_map([], |row| {
+            let manifest = row.get::<_, Vec<u8>>(0)?;
+            let sha256 = row.get::<_, Option<String>>(1)?;
+            let package = sha256
+                .map(|sha256| {
+                    Ok::<_, rusqlite::Error>(PluginPackageInfo {
+                        sha256,
+                        byte_length: row.get(2)?,
+                    })
+                })
+                .transpose()?;
+            Ok((manifest, package))
+        })?;
+        for stored in rows {
+            let (manifest, package) = stored?;
             plugins.push(CatalogPlugin {
                 bundled: false,
-                manifest: PluginManifest::parse(&stored?)?,
+                manifest: PluginManifest::parse(&manifest)?,
+                package,
             });
         }
         Ok(plugins)
