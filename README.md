@@ -353,3 +353,5 @@ Schedule a verified output with `set-output-schedule <workspace-id> <run-id> <fo
 Through MCP or A2A, use `set_output_schedule` with a workspace, run, and format ID. Pass an ISO calendar `date` or null to clear it. Use `list_scheduled_outputs` with `start` and `end` dates and an optional `profileId` to browse the schedule.
 
 Open the desktop calendar at a specific month and profile with a link such as `arrumo://open/calendar?workspace=1&profile=2&month=2028-02`. Omit the profile for all workspace outputs. Completed-video links can include a `format` ID to select a specific delivered output.
+
+Use `set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown>` in the CLI, or `set_batch_asset_notes` in MCP and A2A, to replace notes for multiple workspace assets together. A missing or foreign asset rolls back the entire update.

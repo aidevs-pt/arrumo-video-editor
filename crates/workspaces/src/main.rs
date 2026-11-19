@@ -483,6 +483,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(io::Error::other)?;
             println!("{}", serde_json::to_string(&asset)?);
         }
+        [database, command, workspace, ids, notes] if command == "set-batch-asset-notes" => {
+            let ids: Vec<i64> = serde_json::from_str(utf8(ids)?)?;
+            let assets = WorkspaceStore::open(Path::new(database))?.set_batch_asset_notes(
+                utf8(workspace)?.parse()?,
+                &ids,
+                utf8(notes)?,
+            )?;
+            println!("{}", serde_json::to_string(&assets)?);
+        }
         [database, command, workspace, asset, notes] if command == "set-asset-notes" => {
             let asset = WorkspaceStore::open(Path::new(database))?.set_asset_notes(
                 utf8(workspace)?.parse()?,
@@ -878,7 +887,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
-                "set-asset-notes <workspace-id> <asset-id> <notes> | ",
+                "set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown> | set-asset-notes <workspace-id> <asset-id> <notes> | ",
                 "context <workspace-id> | set-context <workspace-id> <markdown> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
                 "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",

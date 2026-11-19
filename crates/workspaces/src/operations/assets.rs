@@ -34,7 +34,15 @@ struct BrandAssetInput {
     role: BrandAssetRole,
 }
 
-pub(super) fn definitions() -> [Value; 7] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BatchNotesInput {
+    workspace_id: i64,
+    asset_ids: Vec<i64>,
+    notes: String,
+}
+
+pub(super) fn definitions() -> [Value; 8] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -56,6 +64,12 @@ pub(super) fn definitions() -> [Value; 7] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "notes": {"type": "string"}
             }, "required": ["workspaceId", "assetId", "notes"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "set_batch_asset_notes", "description": "Replace usage notes on multiple assets in one workspace. All changes are applied together. Pass empty notes to clear them.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "assetIds": {"type": "array", "items": id, "minItems": 1, "uniqueItems": true},
+                "notes": {"type": "string"}
+            }, "required": ["workspaceId", "assetIds", "notes"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
         json!({"name": "list_brand_assets", "description": "List image assets assigned to workspace identity and style.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
@@ -109,6 +123,14 @@ pub(super) fn call(
                     .set_asset_notes(args.workspace_id, args.asset_id, &args.notes)
                     .map(|asset| json!({"asset": asset}))
                     .map_err(|_| "Could not update usage notes for this asset")
+            }),
+        "set_batch_asset_notes" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid batch asset notes arguments")
+            .and_then(|args: BatchNotesInput| {
+                store
+                    .set_batch_asset_notes(args.workspace_id, &args.asset_ids, &args.notes)
+                    .map(|assets| json!({"assets": assets}))
+                    .map_err(|_| "Could not save notes for all selected workspace assets")
             }),
         "list_brand_assets" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid workspace asset arguments")

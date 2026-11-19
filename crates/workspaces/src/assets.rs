@@ -1,11 +1,12 @@
 use std::{
+    collections::HashSet,
     error::Error,
     fs::{self, File},
     io::{self, Read},
     path::{Path, PathBuf},
 };
 
-use rusqlite::{Row, TransactionBehavior, params};
+use rusqlite::{Row, Transaction, TransactionBehavior, params};
 use serde::Serialize;
 
 use crate::WorkspaceStore;
@@ -87,6 +88,25 @@ impl WorkspaceStore {
             params![workspace_id, asset_id, notes],
             read_asset,
         )
+    }
+
+    pub fn set_batch_asset_notes(
+        &self,
+        workspace_id: i64,
+        asset_ids: &[i64],
+        notes: &str,
+    ) -> rusqlite::Result<Vec<WorkspaceAsset>> {
+        let distinct: HashSet<_> = asset_ids.iter().collect();
+        if distinct.is_empty() || distinct.len() != asset_ids.len() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let assets = asset_ids
+            .iter()
+            .map(|&asset_id| self.set_asset_notes(workspace_id, asset_id, notes))
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        tx.commit()?;
+        Ok(assets)
     }
 
     pub fn import_asset(
