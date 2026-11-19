@@ -258,3 +258,5 @@ Workers can call `claim_generation` for the next run and use the returned attemp
 At the `verify_delivery` step, call `verify_generation_delivery` with the workspace ID, run ID, and current attempt. The server checks the managed MP4 and SRT files with `ffprobe` using the database path configured at launch. After a successful verification, call `get_completed_video` for verified output metadata and production history.
 
 Call `export_generation_delivery` with the workspace ID, completed run ID, and an absolute local `destination` path in an existing directory. The shared exporter writes a ZIP of the verified video and subtitle files and refuses to replace an existing path.
+
+Poll for review and completion events with `list_generation_notifications` and a workspace ID, or with CLI `generation-notifications <workspace-id> <after-id>`. Start with a cursor of zero and pass the last returned event ID when polling again. Each response contains at most 100 events in ascending ID order. Events include the run ID and describe transitions that may have been acted on already.

@@ -14,6 +14,7 @@ mod completed_video_feedback;
 mod delivery_export;
 mod delivery_verification;
 mod format_deliveries;
+mod generation_notifications;
 mod generation_plan;
 mod generation_queue;
 mod generation_worker;
@@ -50,6 +51,7 @@ pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_direc
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
+pub use generation_notifications::GenerationNotification;
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
@@ -138,6 +140,7 @@ impl WorkspaceStore {
             include_str!("../migrations/028-credential-namespace.sql"),
             include_str!("../migrations/029-provider-preferences.sql"),
             include_str!("../migrations/030-plugin-grants.sql"),
+            include_str!("../migrations/031-generation-notifications.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

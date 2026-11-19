@@ -616,6 +616,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&run)?);
         }
+        [database, command, workspace, after] if command == "generation-notifications" => {
+            let after = i64::try_from(utf8(after)?.parse::<u64>()?)?;
+            let notifications = WorkspaceStore::open(Path::new(database))?
+                .generation_notifications(utf8(workspace)?.parse()?, after)?;
+            println!("{}", serde_json::to_string(&notifications)?);
+        }
         [database, command, workspace, run] if command == "generation-activity" => {
             let events = WorkspaceStore::open(Path::new(database))?
                 .generation_activity(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
@@ -805,7 +811,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
-                "generation-activity <workspace-id> <run-id> | ",
+                "generation-activity <workspace-id> <run-id> | generation-notifications <workspace-id> <after-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
                 "production-progress <workspace-id> <run-id> | ",

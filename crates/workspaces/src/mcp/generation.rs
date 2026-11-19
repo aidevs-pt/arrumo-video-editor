@@ -84,7 +84,15 @@ struct ExportDeliveryInput {
     destination: String,
 }
 
-pub(super) fn definitions() -> [Value; 14] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NotificationInput {
+    workspace_id: i64,
+    #[serde(default)]
+    after_id: u64,
+}
+
+pub(super) fn definitions() -> [Value; 15] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -123,6 +131,11 @@ pub(super) fn definitions() -> [Value; 14] {
             }, "required": ["workspaceId", "runId", "destination"], "additionalProperties": false}}),
         json!({"name": "get_completed_video", "description": "Read the verified outputs and production history for a completed video.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "list_generation_notifications", "description": "Read up to 100 review and completion events in ascending order. Pass the last event ID to continue polling.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "afterId": {"type": "integer", "minimum": 0}
+            }, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, and current step.",
@@ -218,6 +231,13 @@ pub(super) fn call(
                 .completed_video(args.workspace_id, args.run_id)
                 .map(|video| json!({"video": video}))
                 .map_err(|_| "Could not read completed video")
+        }),
+        "list_generation_notifications" => parse(arguments).and_then(|args: NotificationInput| {
+            let cursor = i64::try_from(args.after_id).map_err(|_| "Invalid notification cursor")?;
+            store
+                .generation_notifications(args.workspace_id, cursor)
+                .map(|notifications| json!({"notifications": notifications}))
+                .map_err(|_| "Could not read generation notifications")
         }),
         "get_generation_activity" => parse(arguments).and_then(|args: RunInput| {
             store
