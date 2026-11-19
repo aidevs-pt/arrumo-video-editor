@@ -306,6 +306,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&run)?);
         }
+        [database, command, workspace, run, attempt] if command == "prepare-generation-plan" => {
+            let plan = WorkspaceStore::open(Path::new(database))?.prepare_generation_plan(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(attempt)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&plan)?);
+        }
+        [database, command, workspace, run] if command == "generation-plan" => {
+            let plan = WorkspaceStore::open(Path::new(database))?
+                .generation_plan(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            println!("{}", serde_json::to_string(&plan)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -338,7 +351,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
                 "generation-activity <workspace-id> <run-id> | ",
-                "fail-generation <workspace-id> <run-id> <attempt> <detail>"
+                "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
+                "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id>"
             )
             .into());
         }

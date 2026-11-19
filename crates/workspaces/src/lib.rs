@@ -6,6 +6,7 @@ use serde::Serialize;
 mod assets;
 mod brand_assets;
 mod format_deliveries;
+mod generation_plan;
 mod generation_queue;
 mod generation_worker;
 mod output_formats;
@@ -19,6 +20,7 @@ pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
+pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{GenerationRun, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
@@ -67,6 +69,7 @@ impl WorkspaceStore {
             include_str!("013-generation-queue.sql"),
             include_str!("014-generation-activity.sql"),
             include_str!("015-generation-failures.sql"),
+            include_str!("016-generation-plan.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
