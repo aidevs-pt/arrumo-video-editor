@@ -1,7 +1,9 @@
+use std::{fs::File, path::Path};
+
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
-use crate::WorkspaceStore;
+use crate::{THIRD_PARTY_PLUGIN_NOTICE, WorkspaceStore};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -48,7 +50,14 @@ struct ContextGrantInput {
     allowed: bool,
 }
 
-pub(super) fn definitions() -> [Value; 10] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PackageInput {
+    source: String,
+    package_sha256: String,
+}
+
+pub(super) fn definitions() -> [Value; 11] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -95,6 +104,11 @@ pub(super) fn definitions() -> [Value; 10] {
                 "allowed": {"type": "boolean"}
             }, "required": ["workspaceId", "pluginId", "packageSha256", "allowed"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "install_plugin_zip", "description": format!("Install a reviewed local ZIP using its expected SHA-256 digest. {THIRD_PARTY_PLUGIN_NOTICE}"),
+            "inputSchema": {"type": "object", "properties": {
+                "source": {"type": "string", "minLength": 1},
+                "packageSha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+            }, "required": ["source", "packageSha256"], "additionalProperties": false}}),
     ]
 }
 
@@ -163,6 +177,20 @@ pub(super) fn call(
                 .apply_reviewed_plugin_context_grant(&args.plugin_id, args.workspace_id, &args.package_sha256, args.allowed)
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not change context grant. Check workspace, package digest and requested permission")
+        }),
+        "install_plugin_zip" => parse(arguments).and_then(|args: PackageInput| {
+            let path = Path::new(&args.source);
+            if !path.is_absolute() {
+                return Err("Plugin ZIP source must be an absolute local path");
+            }
+            if !path.metadata().is_ok_and(|metadata| metadata.is_file()) {
+                return Err("Plugin ZIP source must be a regular file");
+            }
+            let archive = File::open(path).map_err(|_| "Could not open plugin ZIP")?;
+            store
+                .install_verified_plugin_zip(archive, &args.package_sha256)
+                .map(|plugin| json!({"plugin": plugin, "notice": THIRD_PARTY_PLUGIN_NOTICE}))
+                .map_err(|_| "Could not install plugin ZIP. Check the package and expected digest")
         }),
         _ => return None,
     })

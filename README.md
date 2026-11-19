@@ -296,3 +296,5 @@ Use `list_plugin_catalog` to discover plugin IDs and declared settings. Use `get
 Use `clear_plugin_credential` with a plugin and setting ID to remove an app credential. Include `workspaceId` to clear only that workspace's credential and restore inheritance.
 
 Use `list_plugin_context_requests` with a workspace ID to inspect packages that request workspace context access. After reviewing a package, call `apply_reviewed_plugin_context_grant` with the workspace ID, plugin ID, the listed package SHA-256, and the desired `allowed` value. The host rejects a digest that no longer matches the installed package.
+
+Use `install_plugin_zip` with an absolute local source path and the expected `packageSha256` to install a reviewed package. The digest must match the archive before registration. The response includes the installed catalog entry and the third-party plugin notice. Workspace context access requires a separate grant.
