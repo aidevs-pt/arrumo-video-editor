@@ -188,6 +188,13 @@
     "saveError": "No se pudieron guardar los ajustes. Si el formato cambió, vuelve a abrir esta vista e inténtalo de nuevo."
   },
   "queue": {
+    "reviewRun": "Revisar proceso",
+    "reviewFilter": "Por revisar",
+    "filterRuns": "Filtrar procesos de generación",
+    "filterEmpty": "No hay procesos en esta vista.",
+    "emptyDescription": "Pon un borrador en cola para iniciar la producción.",
+    "emptyActivity": "No hay actividad registrada.",
+    "autopilotHint": "Avanza automáticamente por las etapas de revisión.",
     "runDetail": "Proceso de generación",
     "openRun": "Abrir proceso",
     "missingRun": "Este proceso no está disponible en el espacio de trabajo seleccionado.",
@@ -326,6 +333,10 @@
     "subtitleText": "Texto de los subtítulos"
   },
   "productionPlan": {
+    "resultDetails": "Datos del resultado",
+    "decision": "Decisión",
+    "selectDecision": "Elige una decisión",
+    "submitDecision": "Enviar decisión",
     "importSubtitles": "Importar SRT",
     "subtitlesImported": "Subtítulos importados.",
     "subtitleImportError": "No se pudieron importar los subtítulos. Elige un SRT válido en UTF-8 con tiempos dentro de la duración del vídeo.",

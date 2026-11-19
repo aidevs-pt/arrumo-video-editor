@@ -1,15 +1,20 @@
 "use client";
 
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ListVideo } from "lucide-react";
+import { ArrowLeft, ListVideo, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { GenerationRunRow, type Run, type RunAction } from "./generation-run-row";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GenerationRunRow, runNeedsReview, type Run } from "./generation-run-row";
 
 type Draft = { id: number; title: string };
 export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }: {
@@ -26,8 +31,6 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState(false);
   const [pending, setPending] = useState(false);
-  const [controlError, setControlError] = useState(false);
-  const hasRuns = useRef(false);
   const [submitError, setSubmitError] = useState(false);
   const { messages } = useLocale();
   const copy = messages.queue;
@@ -42,31 +45,16 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
       try {
         const items = await invoke<Run[]>("list_generation_runs", { workspaceId });
         if (!active) return;
-        hasRuns.current = true;
         setRuns(items);
         setLoadError(false);
       } catch {
-        if (active && !hasRuns.current) setLoadError(true);
+        if (active) setLoadError(true);
       }
       if (active) timer = setTimeout(refresh, 2000);
     }
     void refresh();
     return () => { active = false; clearTimeout(timer); };
   }, [workspaceId, attempt, pending]);
-
-  async function control(runId: number, action: RunAction) {
-    if (pending) return;
-    setPending(true);
-    setControlError(false);
-    try {
-      const updated = await invoke<Run>("control_generation", { workspaceId, runId, action });
-      setRuns((current) => current?.map((run) => run.id === runId ? updated : run));
-    } catch {
-      setControlError(true);
-    } finally {
-      setPending(false);
-    }
-  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,55 +83,86 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
     }
   }
 
+  const groups = runs ? [
+    { id: "all", label: copy.runs, runs: [...runs].reverse() },
+    { id: "review", label: copy.reviewFilter, runs: runs.filter(runNeedsReview).reverse() },
+    { id: "completed", label: copy.completed, runs: runs.filter((run) => run.state === "completed").reverse() },
+  ] : [];
+
   return (
     <WorkspaceShell>
       <Button type="button" variant="ghost" disabled={pending} onClick={onBack}>
         <ArrowLeft data-icon="inline-start" />{copy.back}
       </Button>
       <WorkspaceHeading icon={ListVideo}><h1 ref={heading} tabIndex={-1}>{copy.title}</h1></WorkspaceHeading>
-      {loadError ? (
-        <Alert variant="destructive">
-          <AlertDescription>{copy.loadError}</AlertDescription>
-          <Button type="button" variant="outline" onClick={() => {
-            setLoadError(false);
-            setAttempt((value) => value + 1);
-          }}>{copy.retry}</Button>
-        </Alert>
-      ) : !runs ? <p role="status">{copy.loading}</p> : (
-        <WorkspaceColumns className={selected ? undefined : "min-[1080px]:grid-cols-1"}>
-          <section aria-labelledby="generation-runs-title">
-            <h2 id="generation-runs-title">{copy.runs}</h2>
-            {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}
-            {runs.length === 0 ? <p>{copy.empty}</p> : (
-              <WorkspaceRows  aria-live="polite">
-                {runs.map((run) => (
-                  <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId}
-                    disabled={pending} onControl={control} />
-                ))}
-              </WorkspaceRows>
-            )}
-          </section>
-          {selected && (
-            <WorkspaceForm key={selected.id}  onSubmit={submit} aria-labelledby="run-options-title" aria-busy={pending}>
-              <h2 id="run-options-title">{copy.options} · {selected.title}</h2>
-              <fieldset disabled={pending}>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="run-platform">{copy.platform}</FieldLabel>
-                    <Input id="run-platform" name="platform" />
-                  </Field>
-                  <Field orientation="horizontal">
-                    <input id="run-autopilot" name="autopilot" type="checkbox" />
-                    <FieldLabel htmlFor="run-autopilot">{copy.autopilot}</FieldLabel>
-                  </Field>
-                  {submitError && <Alert variant="destructive"><AlertDescription>{copy.submitError}</AlertDescription></Alert>}
-                  <Button type="submit">{pending ? copy.submitting : copy.submit}</Button>
-                </FieldGroup>
-              </fieldset>
-            </WorkspaceForm>
-          )}
-        </WorkspaceColumns>
-      )}
+      <div className="flex flex-col gap-4">
+        {loadError && (
+          <Alert variant="destructive">
+            <AlertDescription>{copy.loadError}</AlertDescription>
+            <Button type="button" variant="outline" onClick={() => {
+              setLoadError(false);
+              setAttempt((value) => value + 1);
+            }}>{copy.retry}</Button>
+          </Alert>
+        )}
+        {selected && runs && (
+          <Card size="sm">
+            <CardHeader><CardTitle>{copy.options} · {selected.title}</CardTitle></CardHeader>
+            <CardContent>
+              <form key={selected.id} onSubmit={submit} aria-busy={pending}>
+                <fieldset disabled={pending}>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="run-platform">{copy.platform}</FieldLabel>
+                      <Input id="run-platform" name="platform" />
+                    </Field>
+                    <Field orientation="horizontal">
+                      <Switch id="run-autopilot" name="autopilot" disabled={pending} aria-describedby="run-autopilot-description" />
+                      <div className="flex flex-col gap-1">
+                        <FieldLabel htmlFor="run-autopilot">{copy.autopilot}</FieldLabel>
+                        <FieldDescription id="run-autopilot-description">{copy.autopilotHint}</FieldDescription>
+                      </div>
+                    </Field>
+                    {submitError && <Alert variant="destructive"><AlertDescription>{copy.submitError}</AlertDescription></Alert>}
+                    <Button className="self-start" type="submit" disabled={pending}>
+                      <Plus data-icon="inline-start" />{pending ? copy.submitting : copy.submit}
+                    </Button>
+                  </FieldGroup>
+                </fieldset>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+        {runs ? (
+          <Tabs defaultValue="all" className="min-w-0 gap-4">
+            <TabsList variant="line" className="max-w-full justify-start overflow-x-auto" aria-label={copy.filterRuns}>
+              {groups.map(({ id, label, runs: group }) => (
+                <TabsTrigger value={id} key={id}>{label} <span className="tabular-nums text-muted-foreground">{group.length}</span></TabsTrigger>
+              ))}
+            </TabsList>
+            {groups.map(({ id, runs: group }) => (
+              <TabsContent value={id} key={id}>
+                {group.length ? (
+                  <WorkspaceRows compact>
+                    {group.map((run) => <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId} />)}
+                  </WorkspaceRows>
+                ) : (
+                  <Empty className="border">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon"><ListVideo aria-hidden="true" /></EmptyMedia>
+                      <EmptyTitle>{id === "all" ? copy.empty : copy.filterEmpty}</EmptyTitle>
+                      {id === "all" && <EmptyDescription>{copy.emptyDescription}</EmptyDescription>}
+                    </EmptyHeader>
+                    {id === "all" && !selected && <EmptyContent>
+                      <Button type="button" variant="outline" onClick={onBack}>{copy.back}</Button>
+                    </EmptyContent>}
+                  </Empty>
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+        ) : !loadError && <Skeleton className="min-h-36" aria-label={copy.loading} />}
+      </div>
     </WorkspaceShell>
   );
 }

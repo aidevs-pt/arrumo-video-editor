@@ -188,6 +188,13 @@
     "saveError": "Não foi possível guardar as definições. Se o formato mudou, volte a abrir esta vista e tente novamente."
   },
   "queue": {
+    "reviewRun": "Rever execução",
+    "reviewFilter": "Por rever",
+    "filterRuns": "Filtrar execuções de geração",
+    "filterEmpty": "Não há execuções nesta vista.",
+    "emptyDescription": "Coloca um rascunho na fila para iniciar uma execução.",
+    "emptyActivity": "Ainda não há atividade registada.",
+    "autopilotHint": "Avança automaticamente pelas etapas de revisão.",
     "runDetail": "Execução de geração",
     "openRun": "Abrir execução",
     "missingRun": "Esta execução não está disponível no espaço de trabalho selecionado.",
@@ -326,6 +333,10 @@
     "subtitleText": "Texto das legendas"
   },
   "productionPlan": {
+    "resultDetails": "Dados do resultado",
+    "decision": "Decisão",
+    "selectDecision": "Escolhe uma decisão",
+    "submitDecision": "Enviar decisão",
     "importSubtitles": "Importar SRT",
     "subtitlesImported": "Legendas importadas.",
     "subtitleImportError": "Não foi possível importar as legendas. Escolhe um SRT válido em UTF-8 com tempos dentro da duração do vídeo.",

@@ -1,4 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocale } from "@/lib/locale-provider";
@@ -25,24 +28,25 @@ export function GuidedPreview({ workspaceId, runId, resultId, filename, formatId
   }, [formatId, open, resultId, runId, workspaceId]);
 
   return (
-    <details onToggle={(event) => {
-      const expanded = event.currentTarget.open;
+    <Collapsible open={open} onOpenChange={(expanded) => {
       setOpen(expanded);
       if (!expanded) {
         setUrl(undefined);
         setError(false);
       }
     }}>
-      <summary className="w-fit cursor-pointer text-sm font-medium">{copy.watchPreview} · {filename}</summary>
-      {open && (
-        <div className="mt-2">
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="outline" className="h-auto min-h-8 max-w-full whitespace-normal">
+          <Play data-icon="inline-start" />{copy.watchPreview} · {filename}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
           {error ? <Alert variant="destructive"><AlertDescription>{copy.playPreviewError}</AlertDescription></Alert>
             : url ? <video aria-label={filename} className="max-h-80 w-full rounded-lg bg-black"
                 controls preload="metadata" src={url} onError={() => setError(true)} />
             : <p role="status" className="text-sm text-muted-foreground">{copy.loadingPreview}</p>}
-        </div>
-      )}
-    </details>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

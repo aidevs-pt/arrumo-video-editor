@@ -8,9 +8,10 @@ import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
-import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
-import { GenerationRunRow, type Run, type RunAction } from "./generation-run-row";
+import { GenerationRunControls, GenerationRunPanels, runTitle, type Run, type RunAction } from "./generation-run-row";
 
 export function GenerationRunRoute() {
   const { workspace } = useWorkspaceCatalog();
@@ -69,13 +70,15 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
           <ArrowLeft data-icon="inline-start" />{copy.title}
         </Link>
       </Button>
-      <WorkspaceHeading icon={ListVideo}><h1>{copy.runDetail}</h1></WorkspaceHeading>
+      <WorkspaceHeading icon={ListVideo}><h1>{run ? runTitle(run) : copy.runDetail}</h1></WorkspaceHeading>
       {problem && <Alert variant="destructive"><AlertDescription>{problem}</AlertDescription></Alert>}
       {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}
       {run ? (
-        <WorkspaceRows><GenerationRunRow run={run} workspaceId={workspaceId} disabled={pending}
-          onControl={control} detail /></WorkspaceRows>
-      ) : !problem && <p role="status">{copy.loading}</p>}
+        <div className="flex flex-col gap-5">
+          <GenerationRunControls run={run} workspaceId={workspaceId} disabled={pending} onControl={control} />
+          <GenerationRunPanels run={run} workspaceId={workspaceId} />
+        </div>
+      ) : !problem && <Skeleton className="min-h-40" aria-label={copy.loading} />}
     </WorkspaceShell>
   );
 }

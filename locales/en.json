@@ -188,6 +188,13 @@
     "saveError": "Overrides couldn’t be saved. If the workspace format changed, reopen this view and try again."
   },
   "queue": {
+    "reviewRun": "Review run",
+    "reviewFilter": "Needs review",
+    "filterRuns": "Filter generation runs",
+    "filterEmpty": "No runs in this view.",
+    "emptyDescription": "Queue a draft to start a production run.",
+    "emptyActivity": "No activity has been recorded.",
+    "autopilotHint": "Automatically proceed through review stages.",
     "runDetail": "Generation run",
     "openRun": "Open run",
     "missingRun": "This run is unavailable in the selected workspace.",
@@ -326,6 +333,10 @@
     "subtitleText": "Subtitle text"
   },
   "productionPlan": {
+    "resultDetails": "Result data",
+    "decision": "Decision",
+    "selectDecision": "Choose a decision",
+    "submitDecision": "Submit decision",
     "importSubtitles": "Import SRT",
     "subtitlesImported": "Subtitles imported.",
     "subtitleImportError": "Could not import subtitles. Choose a valid UTF-8 SRT with timings within the rendered video.",
