@@ -137,7 +137,7 @@ pub(super) fn list(store: &WorkspaceStore, params: Value) -> TaskResult {
     Ok(json!({"tasks": tasks, "nextPageToken": token, "pageSize": page_size, "totalSize": total}))
 }
 
-fn parse_id(id: &str) -> Option<(i64, i64)> {
+pub(super) fn parse_id(id: &str) -> Option<(i64, i64)> {
     let (workspace, run) = id.strip_prefix("generation-")?.split_once('-')?;
     let workspace: i64 = workspace.parse().ok()?;
     let run: i64 = run.parse().ok()?;

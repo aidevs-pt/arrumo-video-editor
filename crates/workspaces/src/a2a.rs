@@ -42,6 +42,7 @@ struct Message {
     role: String,
     message_id: String,
     task_id: Option<String>,
+    context_id: Option<String>,
     parts: [Part; 1],
 }
 
@@ -235,13 +236,21 @@ fn send_message(store: &mut WorkspaceStore, database: &Path, request: Rpc) -> Va
         role,
         message_id,
         task_id,
+        context_id,
         parts: [Part { data }],
     } = input.message;
-    if role != "ROLE_USER" || message_id.is_empty() || task_id.is_some() {
+    if role != "ROLE_USER" || message_id.is_empty() {
         return rpc_error(
             request.id,
             -32602,
-            "Expected a new user message with a message ID",
+            "Expected a user message with a message ID",
+        );
+    }
+    if let Some(task_id) = task_id {
+        return task_reply(
+            request.id,
+            review_task(store, database, &task_id, context_id.as_deref(), data),
+            true,
         );
     }
     let data = if data.operation == "list_operations" && data.arguments.is_empty() {
@@ -272,6 +281,41 @@ fn send_message(store: &mut WorkspaceStore, database: &Path, request: Rpc) -> Va
     json!({"jsonrpc": "2.0", "id": request.id, "result": {"message": {
         "role": "ROLE_AGENT", "messageId": Uuid::new_v4().to_string(), "parts": [{"data": data}]
     }}})
+}
+
+fn review_task(
+    store: &mut WorkspaceStore,
+    database: &Path,
+    task_id: &str,
+    context_id: Option<&str>,
+    mut data: Operation,
+) -> tasks::TaskResult {
+    let (workspace_id, run_id) = tasks::parse_id(task_id).ok_or((-32001, "Task not found"))?;
+    if context_id.is_some_and(|id| id != format!("workspace-{workspace_id}")) {
+        return Err((-32602, "Context does not match task"));
+    }
+    if data.operation != "review_production_result" {
+        return Err((-32004, "Task messages support review decisions"));
+    }
+    for (key, value) in [("workspaceId", workspace_id), ("runId", run_id)] {
+        if data
+            .arguments
+            .get(key)
+            .is_some_and(|id| id.as_i64() != Some(value))
+        {
+            return Err((-32602, "Review scope does not match task"));
+        }
+        data.arguments.insert(key.to_owned(), json!(value));
+    }
+    let task = tasks::task_for_run(store, workspace_id, run_id)?;
+    if task["status"]["state"] != "TASK_STATE_INPUT_REQUIRED" {
+        return Err((-32004, "Task is not waiting for review"));
+    }
+    match operations::invoke(store, database, &data.operation, data.arguments) {
+        Some(Ok(_)) => tasks::task_for_run(store, workspace_id, run_id),
+        Some(Err(message)) => Err((-32602, message)),
+        None => Err((-32603, "Review operation unavailable")),
+    }
 }
 
 fn task_reply(id: Value, task: tasks::TaskResult, wrap: bool) -> Value {
