@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod assets;
 mod brand_assets;
+mod delivery_verification;
 mod format_deliveries;
 mod generation_plan;
 mod generation_queue;
@@ -18,6 +19,7 @@ mod workspace_feedback;
 
 pub use assets::{WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
+pub use delivery_verification::delivery_directory;
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };

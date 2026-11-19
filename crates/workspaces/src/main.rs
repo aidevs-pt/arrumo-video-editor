@@ -350,6 +350,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run, attempt] if command == "verify-delivery" => {
+            let path = Path::new(database);
+            let run = WorkspaceStore::open(path)?.verify_generation_delivery(
+                path,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(attempt)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -386,7 +396,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
-                "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes>"
+                "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
+                "verify-delivery <workspace-id> <run-id> <attempt>"
             )
             .into());
         }

@@ -11,3 +11,5 @@
 /src-tauri/gen
 
 *.sqlite.media/
+
+*.sqlite.deliveries/
