@@ -4,7 +4,8 @@ use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    THIRD_PARTY_PLUGIN_NOTICE, WorkspaceStore, fetch_plugin_registry, read_plugin_registry,
+    RegistryRelease, THIRD_PARTY_PLUGIN_NOTICE, WorkspaceStore, fetch_plugin_registry,
+    read_plugin_registry,
 };
 
 #[derive(Deserialize)]
@@ -80,7 +81,16 @@ struct RegistryFileInput {
     catalog: String,
 }
 
-pub(super) fn definitions() -> [Value; 15] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReviewedReleaseInput {
+    catalog_url: String,
+    plugin_id: String,
+    repository: String,
+    release: RegistryRelease,
+}
+
+pub(super) fn definitions() -> [Value; 17] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -89,6 +99,16 @@ pub(super) fn definitions() -> [Value; 15] {
         "source": {"type": "string", "minLength": 1},
         "pluginId": id, "version": {"type": "string", "minLength": 1}
     }, "required": ["catalog", "source", "pluginId", "version"], "additionalProperties": false});
+    let reviewed_release = json!({"type": "object", "properties": {
+        "catalogUrl": {"type": "string", "minLength": 1}, "pluginId": id,
+        "repository": {"type": "string", "minLength": 1},
+        "release": {"type": "object", "properties": {
+            "version": {"type": "string", "minLength": 1},
+            "manifestSchemaVersion": {"type": "integer", "minimum": 1},
+            "packageUrl": {"type": "string", "minLength": 1},
+            "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+        }, "required": ["version", "manifestSchemaVersion", "packageUrl", "sha256"], "additionalProperties": false}
+    }, "required": ["catalogUrl", "pluginId", "repository", "release"], "additionalProperties": false});
     [
         json!({"name": "get_plugin_settings", "description": "Read non-secret settings and their effective sources for a plugin.",
             "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace},
@@ -149,6 +169,10 @@ pub(super) fn definitions() -> [Value; 15] {
             "inputSchema": {"type": "object", "properties": {"catalog": {"type": "string", "minLength": 1}},
                 "required": ["catalog"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
+        json!({"name": "install_reviewed_plugin_release", "description": format!("Install an exact HTTPS release after reviewing its repository and release metadata. {THIRD_PARTY_PLUGIN_NOTICE}"),
+            "inputSchema": reviewed_release}),
+        json!({"name": "update_reviewed_plugin_release", "description": format!("Update an HTTPS-installed plugin to a newer reviewed release from the same registry and repository. {THIRD_PARTY_PLUGIN_NOTICE}"),
+            "inputSchema": reviewed_release}),
     ]
 }
 
@@ -249,6 +273,18 @@ pub(super) fn call(
                 .map(|registry| json!({"registry": registry}))
                 .map_err(|_| "Could not read plugin registry snapshot")
         }),
+        "install_reviewed_plugin_release" | "update_reviewed_plugin_release" => {
+            parse(arguments).and_then(|args: ReviewedReleaseInput| {
+                let result = if name == "update_reviewed_plugin_release" {
+                    store.update_reviewed_plugin_release(&args.catalog_url, &args.plugin_id, &args.repository, &args.release)
+                } else {
+                    store.download_reviewed_plugin_release(&args.catalog_url, &args.plugin_id, &args.release.version, &args.repository, &args.release)
+                };
+                result
+                    .map(|plugin| json!({"plugin": plugin, "notice": THIRD_PARTY_PLUGIN_NOTICE}))
+                    .map_err(|_| "Could not register reviewed release. Check the registry, repository, metadata and installed version")
+            })
+        }
         _ => return None,
     })
 }

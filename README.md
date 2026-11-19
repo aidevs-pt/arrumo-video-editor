@@ -302,3 +302,5 @@ Use `install_plugin_zip` with an absolute local source path and the expected `pa
 Use `install_plugin_release_from_snapshot` or `update_plugin_release_from_snapshot` with absolute local `catalog` and ZIP `source` paths, the plugin ID, and an exact version. The host verifies the archive against the catalog and records release provenance. Offline updates require a newer release from the same repository.
 
 Use `fetch_plugin_registry` to inspect an HTTPS registry catalog, or `read_plugin_registry_snapshot` to validate a catalog at an absolute local path. Both return release metadata for review before installation.
+
+Use `install_reviewed_plugin_release` and `update_reviewed_plugin_release` with the catalog URL, plugin ID, repository, and exact release object returned by registry discovery. The host checks the metadata again before downloading the package and verifies the archive digest before registration. Updates require a newer release from the original registry and repository.
