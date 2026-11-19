@@ -91,6 +91,7 @@ impl WorkspaceStore {
                 "schema_version": 1,
                 "draft": draft,
                 "options": options,
+                "preview_settings": self.preview_settings()?,
                 "workspace_context": self.workspace_context(workspace_id)?,
                 "brand_colors": self.brand_colors(workspace_id)?,
                 "brand_assets": self.list_brand_assets(workspace_id)?,
@@ -170,6 +171,7 @@ mod tests {
         store
             .set_workspace_context(studio, "Original context")
             .unwrap();
+        store.set_preview_max_edge(Some(360)).unwrap();
         let options = RunOptions {
             autopilot: false,
             platform: Some("YouTube".into()),
@@ -183,6 +185,13 @@ mod tests {
             .enqueue_video_draft(studio, draft.id, "attempt-one", &options)
             .unwrap();
         assert_eq!(run.state, "queued");
+        assert_eq!(run.snapshot["preview_settings"]["effective_max_edge"], 360);
+        assert!(store.set_preview_max_edge(Some(0)).is_err());
+        assert_eq!(store.preview_settings().unwrap().effective_max_edge, 360);
+        store.set_preview_max_edge(None).unwrap();
+        let automatic = store.preview_settings().unwrap();
+        assert_eq!(automatic.override_max_edge, None);
+        assert_eq!(automatic.effective_max_edge, automatic.recommended_max_edge);
         assert_eq!(run.snapshot["formats"][0]["format"]["width"], 1280);
         assert_eq!(
             run.snapshot["formats"][0]["delivery"]["required"],

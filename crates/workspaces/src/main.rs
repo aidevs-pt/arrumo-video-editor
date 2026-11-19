@@ -15,6 +15,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
             println!("{}", serde_json::to_string(&workspaces)?);
         }
+        [database, command] if command == "preview-settings" => {
+            let settings = WorkspaceStore::open(Path::new(database))?.preview_settings()?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
+        [database, command, value] if command == "set-preview-max-edge" => {
+            let store = WorkspaceStore::open(Path::new(database))?;
+            let max_edge = match utf8(value)? {
+                "auto" => None,
+                value => Some(value.parse()?),
+            };
+            store.set_preview_max_edge(max_edge)?;
+            println!("{}", serde_json::to_string(&store.preview_settings()?)?);
+        }
         [database, command, name] if command == "create" => {
             let name = utf8(name)?;
             let workspace = WorkspaceStore::open(Path::new(database))?.create(name)?;
@@ -418,6 +431,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
+                "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"
             )

@@ -20,6 +20,12 @@ use crate::{
 struct RenderInputs {
     draft: DraftInputs,
     formats: Vec<RenderOutput>,
+    preview_settings: Option<FrozenPreviewSettings>,
+}
+
+#[derive(Deserialize)]
+struct FrozenPreviewSettings {
+    effective_max_edge: u32,
 }
 
 #[derive(Deserialize)]
@@ -40,11 +46,11 @@ struct Dimensions {
 }
 
 impl Dimensions {
-    fn scale_preview(&mut self) {
-        // Keep the output aspect ratio while limiting the longest edge to 480 pixels.
+    fn scale_preview(&mut self, max_edge: u32) {
         let longest = self.width.max(self.height);
-        if longest > 480 {
-            let scale = |edge| (u64::from(edge) * 480 / u64::from(longest)).max(1) as u32;
+        if longest > max_edge {
+            let scale =
+                |edge| (u64::from(edge) * u64::from(max_edge) / u64::from(longest)).max(1) as u32;
             self.width = scale(self.width);
             self.height = scale(self.height);
         }
@@ -185,6 +191,10 @@ impl WorkspaceStore {
                 .collect::<Vec<_>>(),
         };
 
+        let preview_max_edge = inputs.preview_settings.map_or(
+            crate::preview_settings::LEGACY_PREVIEW_MAX_EDGE,
+            |settings| settings.effective_max_edge,
+        );
         let delivery = delivery_directory(database, workspace_id, run_id);
         fs::create_dir_all(&delivery)?;
         let delivery = delivery.canonicalize()?;
@@ -210,7 +220,7 @@ impl WorkspaceStore {
             for output in inputs.formats {
                 let mut format = output.format;
                 if stage == ProductionStage::Preview {
-                    format.scale_preview();
+                    format.scale_preview(preview_max_edge);
                 }
                 renderer.render_format(&scratch, &clips, &format)?;
                 let filename = if stage == ProductionStage::Preview {

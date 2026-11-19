@@ -12,6 +12,7 @@ mod generation_plan;
 mod generation_queue;
 mod generation_worker;
 mod output_formats;
+mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
 mod profile_formats;
@@ -28,6 +29,7 @@ pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{GenerationRun, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
+pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
@@ -76,6 +78,7 @@ impl WorkspaceStore {
             include_str!("../migrations/015-generation-failures.sql"),
             include_str!("../migrations/016-generation-plan.sql"),
             include_str!("../migrations/017-production-progress.sql"),
+            include_str!("../migrations/018-preview-settings.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
