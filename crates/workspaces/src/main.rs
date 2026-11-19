@@ -15,6 +15,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
             println!("{}", serde_json::to_string(&workspaces)?);
         }
+        [database, command, scope] if command == "agent-settings" => {
+            let workspace_id = match utf8(scope)? {
+                "app" => None,
+                workspace => Some(workspace.parse()?),
+            };
+            let settings =
+                WorkspaceStore::open(Path::new(database))?.agent_settings(workspace_id)?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
+        [database, command, scope, provider] if command == "set-agent-provider" => {
+            let workspace_id = match utf8(scope)? {
+                "app" => None,
+                workspace => Some(workspace.parse()?),
+            };
+            let provider = match utf8(provider)? {
+                "unset" => None,
+                provider => Some(serde_json::from_value(serde_json::json!(provider))?),
+            };
+            let store = WorkspaceStore::open(Path::new(database))?;
+            store.set_agent_provider(workspace_id, provider)?;
+            println!(
+                "{}",
+                serde_json::to_string(&store.agent_settings(workspace_id)?)?
+            );
+        }
         [database, command] if command == "preview-settings" => {
             let settings = WorkspaceStore::open(Path::new(database))?.preview_settings()?;
             println!("{}", serde_json::to_string(&settings)?);
@@ -509,6 +534,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
+                "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <codex|claude_code|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "completed-video <workspace-id> <run-id> | ",

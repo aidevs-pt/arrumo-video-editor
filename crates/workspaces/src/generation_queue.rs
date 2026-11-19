@@ -201,6 +201,7 @@ impl WorkspaceStore {
             "draft": draft,
             "options": options,
             "preview_settings": self.preview_settings()?,
+            "agent_settings": self.agent_settings(Some(workspace_id))?,
             "workspace_context": self.workspace_context(workspace_id)?,
             "brand_colors": self.brand_colors(workspace_id)?,
             "brand_assets": self.list_brand_assets(workspace_id)?,
