@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { FormatDelivery } from "./format-delivery";
+import { FormatDelivery } from "@/components/workspace/outputs/format-delivery";
 
 type ProfileFormat = {
   id: number;

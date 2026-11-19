@@ -13,3 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Use Tailwind utilities for component styles and compose shared shadcn primitives. Keep theme tokens and document-wide defaults in `src/app/globals.css`. Put recurring workspace layouts in `src/components/workspace`.
 
 Store user-facing strings in `locales/<language-tag>.json` and read them through the locale provider. Use the English catalog as the key reference.
+
+## Domain organization
+
+Keep `src/app` for Next.js routes, layouts, and application-wide configuration. Put workspace features in named domain folders under `src/components/workspace`, with layout primitives shared at the workspace level. Keep UI state and components close to the workflow they support. Use descriptive feature boundaries in Rust as well, with application rules in shared domain modules and transport adapters calling those modules.

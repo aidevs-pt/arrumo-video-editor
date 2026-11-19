@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { GenerationQueue } from "./generation-queue";
+import { GenerationQueue } from "@/components/workspace/generation/generation-queue";
 
 type CatalogEntry = { id: number; name: string };
 type Asset = CatalogEntry & { kind: string };
