@@ -464,6 +464,12 @@
     "saveError": "Não foi possível guardar a observação."
   },
   "completedVideo": {
+    "deleteTitle": "Eliminar vídeo",
+    "deleting": "A eliminar vídeo…",
+    "deleteDescription": "Escreve o título exato para eliminar este vídeo concluído e os seus ficheiros de entrega.",
+    "confirmTitle": "Confirma o título do vídeo",
+    "deleteError": "Não foi possível eliminar completamente o vídeo. Verifica se tem novas gerações ou tenta novamente.",
+    "cancelDelete": "Cancelar",
     "details": "Detalhes do vídeo concluído",
     "title": "Título do vídeo",
     "saveTitle": "Guardar título",

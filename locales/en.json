@@ -464,6 +464,12 @@
     "saveError": "Feedback couldn’t be saved."
   },
   "completedVideo": {
+    "deleteTitle": "Delete video",
+    "deleting": "Deleting video…",
+    "deleteDescription": "Type the exact title to delete this completed video and its managed delivery files.",
+    "confirmTitle": "Confirm video title",
+    "deleteError": "The video could not be fully deleted. Check for replays or try again.",
+    "cancelDelete": "Cancel",
     "details": "Completed video details",
     "title": "Video title",
     "saveTitle": "Save title",

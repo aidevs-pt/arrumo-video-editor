@@ -46,6 +46,28 @@ pub async fn rename_completed_video(
 }
 
 #[tauri::command]
+pub async fn delete_completed_video(
+    workspace_id: i64,
+    run_id: i64,
+    confirmed_title: String,
+    app: AppHandle,
+) -> Result<bool, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
+        store
+            .delete_completed_generation(&database, workspace_id, run_id, &confirmed_title)
+            .map_err(|_| "completed_video_delete_failed")
+    })
+    .await
+    .map_err(|_| "completed_video_delete_failed")?
+}
+
+#[tauri::command]
 pub async fn export_completed_video(
     workspace_id: i64,
     run_id: i64,

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { Trash2 } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,16 +8,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { useLocale } from "@/lib/locale-provider";
 
-export function DeleteDraftDialog({ workspaceId, draftId, title, disabled, onDelete }: {
-  workspaceId: number;
-  draftId: number;
+export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete }: {
   title: string;
   disabled: boolean;
+  copy: {
+    deleteTitle: string;
+    deleteDescription: string;
+    confirmTitle: string;
+    deleteError: string;
+    cancelDelete: string;
+    deleting: string;
+  };
+  onConfirm: (title: string) => Promise<boolean>;
   onDelete: () => void;
 }) {
-  const { messages: { drafts: copy } } = useLocale();
   const inputId = useId();
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -31,7 +35,7 @@ export function DeleteDraftDialog({ workspaceId, draftId, title, disabled, onDel
     setPending(true);
     setFailed(false);
     try {
-      if (await invoke<boolean>("delete_video_draft", { workspaceId, draftId, confirmedTitle: confirmation })) {
+      if (await onConfirm(confirmation)) {
         setOpen(false);
         onDelete();
       } else {
@@ -54,13 +58,13 @@ export function DeleteDraftDialog({ workspaceId, draftId, title, disabled, onDel
       }
     }}>
       <AlertDialogTrigger asChild>
-        <Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label={`${copy.deleteDraft} · ${title}`}>
-          <Trash2 data-icon="inline-start" />{copy.deleteDraft}
+        <Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label={`${copy.deleteTitle} · ${title}`}>
+          <Trash2 data-icon="inline-start" />{copy.deleteTitle}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{copy.deleteDraft}</AlertDialogTitle>
+          <AlertDialogTitle>{copy.deleteTitle}</AlertDialogTitle>
           <AlertDialogDescription>{copy.deleteDescription}</AlertDialogDescription>
         </AlertDialogHeader>
         <form className="flex flex-col gap-4" onSubmit={remove}>
@@ -74,7 +78,7 @@ export function DeleteDraftDialog({ workspaceId, draftId, title, disabled, onDel
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>{copy.cancelDelete}</AlertDialogCancel>
             <Button type="submit" variant="destructive" disabled={pending || confirmation !== title}>
-              {pending ? copy.deletingDraft : copy.deleteDraft}
+              {pending ? copy.deleting : copy.deleteTitle}
             </Button>
           </AlertDialogFooter>
         </form>

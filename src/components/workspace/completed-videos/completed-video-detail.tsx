@@ -3,6 +3,7 @@
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
 import { Archive, CheckCircle2, ClipboardList, Film, FileText, MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
+import { ConfirmTitleDelete } from "../confirm-title-delete";
+import { workspaceHref } from "../home/workspace-links";
 import type { Stage } from "../generation/generation-plan";
 import { CompletedOutputPreview } from "./completed-output-preview";
 import { CompletedVideoFeedback, type FeedbackResult, type VideoFeedback } from "./completed-video-feedback";
@@ -103,6 +106,7 @@ export function CompletedVideoDetail({ workspaceId, runId }: { workspaceId: numb
 
 function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; video: CompletedVideo }) {
   const { locale, messages: { completedVideo: copy, queue } } = useLocale();
+  const router = useRouter();
   const { id: runId, snapshot } = video.run;
   const [savedTitle, setSavedTitle] = useState(video.title);
   const [title, setTitle] = useState(video.title);
@@ -159,6 +163,11 @@ function CompletedVideoContent({ workspaceId, video }: { workspaceId: number; vi
           <Button disabled={Boolean(action)} onClick={() => void exportZip()}>
             <Archive data-icon="inline-start" />{action === "export" ? copy.exporting : copy.exportZip}
           </Button>
+          <ConfirmTitleDelete title={savedTitle} disabled={Boolean(action)} copy={copy}
+            onConfirm={(confirmedTitle) => invoke<boolean>("delete_completed_video", {
+              workspaceId, runId, confirmedTitle,
+            })}
+            onDelete={() => router.replace(workspaceHref("videos", workspaceId))} />
         </div>
       </div>
       {error === "exportError" && <Alert variant="destructive" className="mb-4"><AlertDescription>{copy[error]}</AlertDescription></Alert>}

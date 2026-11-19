@@ -20,7 +20,7 @@ import { GenerationQueue } from "@/components/workspace/generation/generation-qu
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { useWorkspaceCatalog } from "../home/workspace-router";
-import { DeleteDraftDialog } from "./delete-draft-dialog";
+import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { DraftSourceClips } from "./draft-source-clips";
 
 type CatalogEntry = { id: number; name: string };
@@ -275,7 +275,11 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                           <Button type="button" size="sm" disabled={pending !== null || editing !== null}
                             aria-label={`${messages.queue.submit} · ${draft.title}`}
                             onClick={() => setQueueView({ draftId: draft.id })}>{messages.queue.submit}</Button>
-                          <DeleteDraftDialog workspaceId={workspaceId} draftId={draft.id} title={draft.title}
+                          <ConfirmTitleDelete title={draft.title}
+                            copy={{ ...copy, deleteTitle: copy.deleteDraft, deleting: copy.deletingDraft }}
+                            onConfirm={(confirmedTitle) => invoke<boolean>("delete_video_draft", {
+                              workspaceId, draftId: draft.id, confirmedTitle,
+                            })}
                             disabled={pending !== null || editing !== null}
                             onDelete={() => {
                               setDrafts((current) => current?.filter((entry) => entry.id !== draft.id));
