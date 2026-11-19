@@ -57,10 +57,24 @@ struct PackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 11] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RegistryPackageInput {
+    catalog: String,
+    source: String,
+    plugin_id: String,
+    version: String,
+}
+
+pub(super) fn definitions() -> [Value; 13] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
+    let registry_package = json!({"type": "object", "properties": {
+        "catalog": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "pluginId": id, "version": {"type": "string", "minLength": 1}
+    }, "required": ["catalog", "source", "pluginId", "version"], "additionalProperties": false});
     [
         json!({"name": "get_plugin_settings", "description": "Read non-secret settings and their effective sources for a plugin.",
             "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace},
@@ -109,6 +123,10 @@ pub(super) fn definitions() -> [Value; 11] {
                 "source": {"type": "string", "minLength": 1},
                 "packageSha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
             }, "required": ["source", "packageSha256"], "additionalProperties": false}}),
+        json!({"name": "install_plugin_release_from_snapshot", "description": format!("Install an exact plugin release using absolute paths to a reviewed local registry catalog and its ZIP. {THIRD_PARTY_PLUGIN_NOTICE}"),
+            "inputSchema": registry_package}),
+        json!({"name": "update_plugin_release_from_snapshot", "description": format!("Update an offline-installed plugin to a newer exact release using absolute paths to a reviewed local registry catalog and its ZIP. {THIRD_PARTY_PLUGIN_NOTICE}"),
+            "inputSchema": registry_package}),
     ]
 }
 
@@ -179,19 +197,26 @@ pub(super) fn call(
                 .map_err(|_| "Could not change context grant. Check workspace, package digest and requested permission")
         }),
         "install_plugin_zip" => parse(arguments).and_then(|args: PackageInput| {
-            let path = Path::new(&args.source);
-            if !path.is_absolute() {
-                return Err("Plugin ZIP source must be an absolute local path");
-            }
-            if !path.metadata().is_ok_and(|metadata| metadata.is_file()) {
-                return Err("Plugin ZIP source must be a regular file");
-            }
-            let archive = File::open(path).map_err(|_| "Could not open plugin ZIP")?;
+            let archive = open_local_file(&args.source)?;
             store
                 .install_verified_plugin_zip(archive, &args.package_sha256)
                 .map(|plugin| json!({"plugin": plugin, "notice": THIRD_PARTY_PLUGIN_NOTICE}))
                 .map_err(|_| "Could not install plugin ZIP. Check the package and expected digest")
         }),
+        "install_plugin_release_from_snapshot" | "update_plugin_release_from_snapshot" => {
+            parse(arguments).and_then(|args: RegistryPackageInput| {
+                let catalog = open_local_file(&args.catalog)?;
+                let archive = open_local_file(&args.source)?;
+                let result = if name == "update_plugin_release_from_snapshot" {
+                    store.update_plugin_release_from_snapshot(catalog, &args.plugin_id, &args.version, archive)
+                } else {
+                    store.install_plugin_release(catalog, &args.plugin_id, &args.version, archive)
+                };
+                result
+                    .map(|plugin| json!({"plugin": plugin, "notice": THIRD_PARTY_PLUGIN_NOTICE}))
+                    .map_err(|_| "Could not register plugin release. Check the registry, version, and package")
+            })
+        }
         _ => return None,
     })
 }
@@ -199,4 +224,15 @@ pub(super) fn call(
 fn parse<T: DeserializeOwned>(arguments: &Map<String, Value>) -> Result<T, &'static str> {
     serde_json::from_value(Value::Object(arguments.clone()))
         .map_err(|_| "Invalid settings arguments")
+}
+
+fn open_local_file(source: &str) -> Result<File, &'static str> {
+    let path = Path::new(source);
+    if !path.is_absolute() {
+        return Err("Source must be an absolute local path");
+    }
+    if !path.metadata().is_ok_and(|metadata| metadata.is_file()) {
+        return Err("Source must be a regular file");
+    }
+    File::open(path).map_err(|_| "Could not open local source")
 }
