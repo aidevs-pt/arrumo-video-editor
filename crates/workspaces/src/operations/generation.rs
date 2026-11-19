@@ -168,7 +168,15 @@ struct DeleteDraftInput {
     confirmed_title: String,
 }
 
-pub(super) fn definitions() -> [Value; 26] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DeleteCompletedInput {
+    workspace_id: i64,
+    run_id: i64,
+    confirmed_title: String,
+}
+
+pub(super) fn definitions() -> [Value; 27] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -239,6 +247,11 @@ pub(super) fn definitions() -> [Value; 26] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "resultId": id, "markdown": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "markdown"], "additionalProperties": false}}),
+        json!({"name": "delete_completed_video", "description": "Delete a completed run and its managed delivery files after confirming the exact display title. Runs referenced by replays are protected.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "confirmedTitle"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "get_completed_video", "description": "Read the verified outputs and production history for a completed video.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "list_generation_notifications", "description": "Read up to 100 review and completion events in ascending order. Pass the last event ID to continue polling.",
@@ -394,6 +407,12 @@ pub(super) fn call(
                 .add_completed_video_feedback(args.workspace_id, args.run_id, args.result_id, &args.markdown)
                 .map(|feedback| json!({"feedback": feedback}))
                 .map_err(|_| "Could not save feedback. Check the completed run, result and Markdown")
+        }),
+        "delete_completed_video" => parse(arguments).and_then(|args: DeleteCompletedInput| {
+            store
+                .delete_completed_generation(database, args.workspace_id, args.run_id, &args.confirmed_title)
+                .map(|deleted| json!({"deleted": deleted}))
+                .map_err(|_| "Could not finish completed video deletion. Retry with the same IDs and title")
         }),
         "get_completed_video" => parse(arguments).and_then(|args: RunInput| {
             store
