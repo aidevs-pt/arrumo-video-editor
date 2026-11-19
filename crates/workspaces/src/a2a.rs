@@ -13,6 +13,7 @@ use zeroize::Zeroizing;
 
 use crate::{WorkspaceStore, operations};
 
+mod stream;
 mod tasks;
 
 const MAX_BODY: u64 = 128 * 1024;
@@ -78,8 +79,43 @@ pub fn serve_a2a(
     writeln!(ready, "{endpoint}")?;
     ready.flush()?;
     drop(ready);
+    let mut streams = Vec::new();
     for mut request in server.incoming_requests() {
-        let (status, body) = handle(store, database, &token, &host, &endpoint, &mut request);
+        let version = header(&request, "A2A-Version").map(str::to_owned);
+        let (status, body) = match read_request(&token, &host, &endpoint, &mut request) {
+            Err(response) => response,
+            Ok(body) => {
+                let rpc = serde_json::from_slice::<Rpc>(&body).ok();
+                if let Some(rpc) = rpc.filter(|rpc| {
+                    matches!(
+                        rpc.method.as_str(),
+                        "SubscribeToTask" | "SendStreamingMessage"
+                    )
+                }) {
+                    streams.retain(|worker: &std::thread::JoinHandle<()>| !worker.is_finished());
+                    if streams.len() >= 8 {
+                        (503, json!({"error": "Too many active A2A streams"}))
+                    } else if rpc.jsonrpc != "2.0" || !(rpc.id.is_string() || rpc.id.is_number()) {
+                        (200, rpc_error(Value::Null, -32600, "Invalid request"))
+                    } else if version.as_deref().is_some_and(|version| version != "1.0") {
+                        (200, rpc_error(rpc.id, -32009, "Unsupported A2A version"))
+                    } else {
+                        match stream::prepare(store, database, rpc) {
+                            Ok(subscription) => {
+                                let path = database.to_path_buf();
+                                streams.push(std::thread::spawn(move || {
+                                    subscription.send(request, &path)
+                                }));
+                                continue;
+                            }
+                            Err(response) => (200, response),
+                        }
+                    }
+                } else {
+                    (200, dispatch(store, database, version.as_deref(), &body))
+                }
+            }
+        };
         let mut response = Response::from_string(body.to_string())
             .with_status_code(status)
             .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
@@ -92,30 +128,28 @@ pub fn serve_a2a(
     Ok(())
 }
 
-fn handle(
-    store: &mut WorkspaceStore,
-    database: &Path,
+fn read_request(
     token: &[u8],
     host: &str,
     endpoint: &str,
     request: &mut Request,
-) -> (u16, Value) {
+) -> Result<Vec<u8>, (u16, Value)> {
     if header(request, "Host") != Some(host) || header(request, "Origin").is_some() {
-        return (403, json!({"error": "Invalid local request origin"}));
+        return Err((403, json!({"error": "Invalid local request origin"})));
     }
     match (request.method(), request.url()) {
-        (&Method::Get, "/.well-known/agent-card.json") => return (200, card(endpoint)),
+        (&Method::Get, "/.well-known/agent-card.json") => return Err((200, card(endpoint))),
         (&Method::Post, "/a2a") => {}
-        _ => return (404, json!({"error": "Not found"})),
+        _ => return Err((404, json!({"error": "Not found"}))),
     }
     let provided = header(request, "Authorization").and_then(|value| value.strip_prefix("Bearer "));
     if !provided.is_some_and(|value| bool::from(token.ct_eq(value.as_bytes()))) {
-        return (401, json!({"error": "Authentication required"}));
+        return Err((401, json!({"error": "Authentication required"})));
     }
     if header(request, "Content-Type").and_then(|value| value.split(';').next())
         != Some("application/json")
     {
-        return (415, json!({"error": "Expected application/json"}));
+        return Err((415, json!({"error": "Expected application/json"})));
     }
     let mut body = Vec::new();
     if request
@@ -124,15 +158,12 @@ fn handle(
         .read_to_end(&mut body)
         .is_err()
     {
-        return (400, json!({"error": "Could not read request"}));
+        return Err((400, json!({"error": "Could not read request"})));
     }
     if body.len() as u64 > MAX_BODY {
-        return (413, json!({"error": "Request exceeds 128 KiB"}));
+        return Err((413, json!({"error": "Request exceeds 128 KiB"})));
     }
-    (
-        200,
-        dispatch(store, database, header(request, "A2A-Version"), &body),
-    )
+    Ok(body)
 }
 
 fn header<'a>(request: &'a Request, name: &'static str) -> Option<&'a str> {
@@ -148,7 +179,7 @@ fn card(endpoint: &str) -> Value {
         "name": "Arrumo Video Editor", "description": "Local workspace and video production operations.",
         "version": env!("CARGO_PKG_VERSION"),
         "supportedInterfaces": [{"url": endpoint, "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}],
-        "capabilities": {"streaming": false, "pushNotifications": false},
+        "capabilities": {"streaming": true, "pushNotifications": false},
         "securitySchemes": {"localBearer": {"httpAuthSecurityScheme": {"scheme": "Bearer"}}},
         "securityRequirements": [{"schemes": {"localBearer": {"list": []}}}],
         "defaultInputModes": ["application/json"], "defaultOutputModes": ["application/json"],
@@ -189,6 +220,10 @@ fn dispatch(
     if request.method != "SendMessage" {
         return rpc_error(request.id, -32601, "Method not found");
     }
+    send_message(store, database, request)
+}
+
+fn send_message(store: &mut WorkspaceStore, database: &Path, request: Rpc) -> Value {
     let Ok(input) = serde_json::from_value::<SendMessage>(request.params) else {
         return rpc_error(
             request.id,
