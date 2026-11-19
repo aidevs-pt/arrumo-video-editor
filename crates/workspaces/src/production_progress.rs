@@ -49,6 +49,18 @@ impl WorkspaceStore {
         stage: ProductionStage,
         result: &Value,
     ) -> rusqlite::Result<i64> {
+        self.submit_production_result_with(workspace_id, run_id, attempt, stage, result, || Ok(()))
+    }
+
+    pub(crate) fn submit_production_result_with(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        stage: ProductionStage,
+        result: &Value,
+        publish: impl FnOnce() -> rusqlite::Result<()>,
+    ) -> rusqlite::Result<i64> {
         if !result.is_object() || stage == ProductionStage::VerifyDelivery {
             return Err(rusqlite::Error::InvalidQuery);
         }
@@ -87,6 +99,7 @@ impl WorkspaceStore {
             params![workspace_id, run_id, next_state, advance, pending],
             |_| Ok(()),
         )?;
+        publish()?;
         tx.commit()?;
         Ok(id)
     }

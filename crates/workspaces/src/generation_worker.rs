@@ -59,6 +59,21 @@ impl WorkspaceStore {
             .optional()
     }
 
+    pub(crate) fn renew_generation_lease(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+    ) -> rusqlite::Result<i64> {
+        self.0.query_row(
+            "UPDATE generation_runs SET lease_until = unixepoch() + ?4
+             WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
+             AND state = 'running' AND lease_until > unixepoch() RETURNING lease_until",
+            params![workspace_id, run_id, attempt, LEASE_SECONDS],
+            |row| row.get(0),
+        )
+    }
+
     pub fn checkpoint_generation(
         &self,
         workspace_id: i64,
