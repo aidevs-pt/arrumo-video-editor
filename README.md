@@ -347,3 +347,5 @@ Through MCP or A2A, use `delete_completed_video` with `workspaceId`, `runId`, an
 Use `recover-delivery-cleanup <workspace-id>` in the CLI or `recover_delivery_cleanup` in MCP and A2A to retry pending cleanup for previously deleted runs. The report lists completed cleanup and entries that still require attention.
 
 Use `delete-generation <workspace-id> <run-id> <confirmed-title>` or the shared `delete_generation` operation to delete a queued, active, or terminal run. A successful deletion invalidates any worker lease and removes the managed delivery directory. The draft and shared assets remain available. External workers must stop using run paths when their lease becomes invalid.
+
+Schedule a verified output with `set-output-schedule <workspace-id> <run-id> <format-id> <YYYY-MM-DD|clear>`. Each output format can have its own calendar date. Use `scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id]` to list an inclusive range. Calendar entries include the saved profile color and output dimensions.

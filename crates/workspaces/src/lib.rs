@@ -24,6 +24,7 @@ mod mcp;
 mod media_worker;
 mod operations;
 mod output_formats;
+mod output_schedule;
 mod plugin_actions;
 mod plugin_catalog;
 mod plugin_credentials;
@@ -63,6 +64,7 @@ pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use mcp::serve_mcp;
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
+pub use output_schedule::ScheduledOutput;
 pub use plugin_actions::InstalledPluginAction;
 pub use plugin_catalog::{
     CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
@@ -148,6 +150,7 @@ impl WorkspaceStore {
             include_str!("../migrations/031-generation-notifications.sql"),
             include_str!("../migrations/032-generation-notification-reads.sql"),
             include_str!("../migrations/033-delivery-cleanup.sql"),
+            include_str!("../migrations/034-output-schedules.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

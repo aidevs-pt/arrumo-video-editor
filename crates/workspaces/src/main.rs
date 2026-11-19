@@ -727,6 +727,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&work)?);
         }
+        [database, command, workspace, run, format, date] if command == "set-output-schedule" => {
+            let date = utf8(date)?;
+            WorkspaceStore::open(Path::new(database))?.set_output_schedule(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(format)?.parse()?,
+                (date != "clear").then_some(date),
+            )?;
+            println!("null");
+        }
+        [database, command, workspace, start, end, profile @ ..]
+            if command == "scheduled-outputs" && profile.len() <= 1 =>
+        {
+            let profile = profile
+                .first()
+                .map(|value| -> Result<i64, Box<dyn Error>> { Ok(utf8(value)?.parse()?) })
+                .transpose()?;
+            let outputs = WorkspaceStore::open(Path::new(database))?.scheduled_outputs(
+                utf8(workspace)?.parse()?,
+                profile,
+                utf8(start)?,
+                utf8(end)?,
+            )?;
+            println!("{}", serde_json::to_string(&outputs)?);
+        }
         [database, command, workspace] if command == "recover-delivery-cleanup" => {
             let database = Path::new(database);
             let report = WorkspaceStore::open(database)?
@@ -890,6 +915,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
+                "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
                 "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
