@@ -87,3 +87,10 @@ cargo run --locked -- ./workspaces.sqlite set-asset-notes 1 1 "Keep the product 
 ```
 
 Use `thumbnail_reference_ids` to select existing image assets in a delivery configuration, including within a manual portrait source. IDs are scoped to the workspace. In profile deliveries, omit the top-level field to inherit the workspace selection or pass an empty list to clear it.
+
+The workspace Context view edits production guidance in Markdown. The editor supplies a localized template until the first save. The CLI returns JSON `null` for unset context and an empty string for context explicitly cleared by a user.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite set-context 1 '## Audience'
+cargo run --locked -- ./workspaces.sqlite context 1
+```

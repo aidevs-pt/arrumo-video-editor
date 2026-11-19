@@ -158,6 +158,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&asset)?);
         }
+        [database, command, workspace] if command == "context" => {
+            let context = WorkspaceStore::open(Path::new(database))?
+                .workspace_context(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&context)?);
+        }
+        [database, command, workspace, markdown] if command == "set-context" => {
+            WorkspaceStore::open(Path::new(database))?
+                .set_workspace_context(utf8(workspace)?.parse()?, utf8(markdown)?)?;
+            println!("null");
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -175,7 +185,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
-                "set-asset-notes <workspace-id> <asset-id> <notes>"
+                "set-asset-notes <workspace-id> <asset-id> <notes> | ",
+                "context <workspace-id> | set-context <workspace-id> <markdown>"
             )
             .into());
         }

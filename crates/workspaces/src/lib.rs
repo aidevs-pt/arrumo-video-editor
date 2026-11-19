@@ -49,6 +49,7 @@ impl WorkspaceStore {
             include_str!("005-format-deliveries.sql"),
             include_str!("006-profile-deliveries.sql"),
             include_str!("007-workspace-assets.sql"),
+            include_str!("008-workspace-context.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -75,6 +76,22 @@ impl WorkspaceStore {
             .prepare("SELECT id, name FROM workspaces ORDER BY id")?
             .query_map([], Self::read_workspace)?
             .collect()
+    }
+
+    pub fn workspace_context(&self, workspace_id: i64) -> rusqlite::Result<Option<String>> {
+        self.0.query_row(
+            "SELECT context_markdown FROM workspaces WHERE id = ?1",
+            [workspace_id],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn set_workspace_context(&self, workspace_id: i64, markdown: &str) -> rusqlite::Result<()> {
+        self.0.query_row(
+            "UPDATE workspaces SET context_markdown = ?2 WHERE id = ?1 RETURNING id",
+            rusqlite::params![workspace_id, markdown],
+            |_| Ok(()),
+        )
     }
 
     pub fn create_profile(
@@ -229,5 +246,24 @@ mod tests {
         assert_eq!(updated.guidance, "## New");
         assert_eq!(updated.color, None);
         assert_eq!(store.list_profiles(first.id).unwrap(), vec![updated]);
+    }
+
+    #[test]
+    fn context_preserves_explicit_empty_and_stays_in_its_workspace() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let first = store.create("Studio").unwrap().id;
+        let second = store.create("Other").unwrap().id;
+        assert_eq!(store.workspace_context(first).unwrap(), None);
+        store
+            .set_workspace_context(first, "## Audience\nCreators")
+            .unwrap();
+        assert_eq!(
+            store.workspace_context(first).unwrap().as_deref(),
+            Some("## Audience\nCreators")
+        );
+        assert_eq!(store.workspace_context(second).unwrap(), None);
+        store.set_workspace_context(first, "").unwrap();
+        assert_eq!(store.workspace_context(first).unwrap().as_deref(), Some(""));
+        assert!(store.set_workspace_context(i64::MAX, "").is_err());
     }
 }

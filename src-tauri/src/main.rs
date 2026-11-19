@@ -257,6 +257,31 @@ async fn set_asset_notes(
         .map_err(|_| "asset_notes_failed")
 }
 
+#[tauri::command]
+async fn get_workspace_context(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Option<String>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .workspace_context(workspace_id)
+        .map_err(|_| "workspace_context_load_failed")
+}
+
+#[tauri::command]
+async fn set_workspace_context(
+    workspace_id: i64,
+    markdown: String,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_workspace_context(workspace_id, &markdown)
+        .map_err(|_| "workspace_context_save_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -286,7 +311,9 @@ fn main() {
             set_profile_delivery,
             list_assets,
             import_asset,
-            set_asset_notes
+            set_asset_notes,
+            get_workspace_context,
+            set_workspace_context
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");
