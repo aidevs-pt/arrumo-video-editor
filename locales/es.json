@@ -186,6 +186,11 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "selectAsset": "Seleccionar recurso",
+    "selectionCount": "{count} seleccionados",
+    "editSelected": "Editar notas seleccionadas",
+    "clearSelection": "Limpiar selección",
+    "batchDescription": "Sustituye las notas de {count} recursos. Deja el campo vacío para borrarlas.",
     "intro": "Importa y organiza archivos reutilizables para este espacio.",
     "title": "Recursos",
     "back": "Volver a los perfiles",

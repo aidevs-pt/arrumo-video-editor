@@ -288,6 +288,20 @@ async fn preview_workspace_image(
 }
 
 #[tauri::command]
+async fn set_batch_asset_notes(
+    workspace_id: i64,
+    asset_ids: Vec<i64>,
+    notes: String,
+    store: State<'_, Store>,
+) -> Result<Vec<WorkspaceAsset>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_batch_asset_notes(workspace_id, &asset_ids, &notes)
+        .map_err(|_| "asset_notes_failed")
+}
+
+#[tauri::command]
 async fn set_asset_notes(
     workspace_id: i64,
     asset_id: i64,
@@ -729,6 +743,7 @@ fn main() {
             import_asset,
             preview_workspace_image,
             set_asset_notes,
+            set_batch_asset_notes,
             get_workspace_context,
             set_workspace_context,
             list_workspace_feedback,

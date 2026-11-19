@@ -8,8 +8,9 @@ import { Upload, Images } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
+import { FieldGroup } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MarkdownEditor } from "@/components/markdown/editor";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -36,7 +37,9 @@ export function WorkspaceAssets({ workspace }: {
   const [busy, setBusy] = useState<"import" | "save" | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number }>();
   const [error, setError] = useState<"importError" | "notesError" | null>(null);
-  const [editing, setEditing] = useState<Asset | null>(null);
+  const [editing, setEditing] = useState<Asset[] | null>(null);
+  const [notes, setNotes] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const { messages } = useLocale();
   const copy = messages.assets;
 
@@ -80,12 +83,14 @@ export function WorkspaceAssets({ workspace }: {
   async function saveNotes(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editing || busy) return;
-    const notes = String(new FormData(event.currentTarget).get("notes") ?? "");
     setBusy("save");
     setError(null);
     try {
-      const asset = await invoke<Asset>("set_asset_notes", { workspaceId: workspace.id, assetId: editing.id, notes });
-      setAssets((rows) => rows?.map((row) => row.id === asset.id ? asset : row));
+      const updated = await invoke<Asset[]>("set_batch_asset_notes", {
+        workspaceId: workspace.id, assetIds: editing.map(({ id }) => id), notes,
+      });
+      const changes = new Map(updated.map((asset) => [asset.id, asset]));
+      setAssets((rows) => rows?.map((row) => changes.get(row.id) ?? row));
       setEditing(null);
     } catch {
       setError("notesError");
@@ -94,6 +99,15 @@ export function WorkspaceAssets({ workspace }: {
     }
   }
 
+  function edit(items: Asset[]) {
+    if (items.length === 0) return;
+    setError(null);
+    setNotes(items.length === 1 ? items[0].notes : "");
+    setEditing(items);
+  }
+
+  const selectedAssets = assets?.filter(({ id }) => selected.has(id)) ?? [];
+  const selectedLabel = copy.selectionCount.replace("{count}", String(selectedAssets.length));
   const visible = assets?.filter((asset) => filter === "all" || asset.kind === filter);
   return (
     <WorkspaceShell>
@@ -114,6 +128,13 @@ export function WorkspaceAssets({ workspace }: {
             <Upload data-icon="inline-start" />{busy === "import" ? copy.picking : copy.pick}
           </Button>
         </div>
+        {selectedAssets.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2">
+          <p role="status" className="me-auto px-1 text-sm tabular-nums">{selectedLabel}</p>
+          <Button type="button" size="sm" variant="outline" disabled={busy !== null}
+            onClick={() => edit(selectedAssets)}>{copy.editSelected}</Button>
+          <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
+            onClick={() => setSelected(new Set())}>{copy.clearSelection}</Button>
+        </div>}
         {progress && <div role="status" className="flex flex-col gap-2 text-sm">
           {copy.picking} {progress.completed}/{progress.total}
           <Progress aria-label={copy.picking} value={progress.completed / progress.total * 100} />
@@ -145,10 +166,18 @@ export function WorkspaceAssets({ workspace }: {
                     </div>
                     {asset.notes.trim() && <p className="line-clamp-2 wrap-anywhere text-sm text-muted-foreground">{asset.notes}</p>}
                   </CardContent>
-                  <CardFooter className="py-2">
+                  <CardFooter className="justify-between gap-3 py-2">
+                    <Checkbox aria-label={`${copy.selectAsset} · ${asset.name}`}
+                      checked={selected.has(asset.id)} disabled={busy !== null}
+                      onCheckedChange={(checked) => setSelected((current) => {
+                        const next = new Set(current);
+                        if (checked === true) next.add(asset.id);
+                        else next.delete(asset.id);
+                        return next;
+                      })} />
                     <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
                       aria-label={`${copy.edit} · ${asset.name}`}
-                      onClick={() => { setError(null); setEditing(asset); }}>{copy.edit}</Button>
+                      onClick={() => edit([asset])}>{copy.edit}</Button>
                   </CardFooter>
                 </Card>
               </li>
@@ -165,13 +194,15 @@ export function WorkspaceAssets({ workspace }: {
         if (!open && busy === null) { setEditing(null); setError(null); }
       }}>
         {editing && <DialogContent showCloseButton={busy === null}>
-          <DialogHeader><DialogTitle>{copy.edit}</DialogTitle><DialogDescription>{editing.name}</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editing.length === 1 ? copy.edit : copy.editSelected}</DialogTitle>
+            <DialogDescription>{editing.length === 1 ? editing[0].name :
+              copy.batchDescription.replace("{count}", String(editing.length))}</DialogDescription>
+          </DialogHeader>
           <form onSubmit={saveNotes}>
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="asset-notes">{copy.notes}</FieldLabel>
-                <Textarea id="asset-notes" name="notes" defaultValue={editing.notes} disabled={busy !== null} />
-              </Field>
+              <MarkdownEditor id="asset-notes" label={copy.notes} value={notes}
+                disabled={busy !== null} onChange={setNotes} />
               {error === "notesError" && <Alert variant="destructive"><AlertDescription>{copy.notesError}</AlertDescription></Alert>}
               <DialogFooter>
                 <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setEditing(null)}>{copy.cancel}</Button>

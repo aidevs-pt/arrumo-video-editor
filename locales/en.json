@@ -186,6 +186,11 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "selectAsset": "Select asset",
+    "selectionCount": "{count} selected",
+    "editSelected": "Edit selected notes",
+    "clearSelection": "Clear selection",
+    "batchDescription": "Replace notes on {count} assets. Leave the field empty to clear their notes.",
     "intro": "Import and organize reusable media for this workspace.",
     "title": "Assets",
     "back": "Back to profiles",
