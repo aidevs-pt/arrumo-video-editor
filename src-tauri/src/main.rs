@@ -578,9 +578,24 @@ async fn review_production_result(
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(delivery_stream::DeliveryStream::default())
         .setup(|app| {
+            #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(error) = app.deep_link().register_all() {
+                    eprintln!("Arrumo deep-link registration failed: {error}");
+                }
+            }
+
             let data_dir: PathBuf = app.path().app_local_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             app.manage(Mutex::new(WorkspaceStore::open(

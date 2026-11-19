@@ -173,3 +173,5 @@ At delivery verification, use **Import SRT** beside an output format or run `imp
 The desktop frontend exports separate App Router pages for Profiles, Context, Brand, Assets, Outputs, Drafts, Generations, and Completed videos. Workspace IDs are created in the local database after the app is built, so an exported page takes the ID as a query parameter, for example `/brand?workspace=2`. Profile-to-draft navigation also carries the profile ID in the URL. The studio layout resolves those IDs through Tauri.
 
 Completed runs open at `/completed-video?workspace=<workspace-id>&run=<run-id>`. The app resolves the video from the selected local workspace, so the link works with the matching Arrumo database.
+
+Desktop deep links use `arrumo://open/<section>?workspace=<id>`. Profile and run pages also take `profile=<id>` or `run=<id>`, respectively. For example, `arrumo://open/generation-run?workspace=2&run=8` opens the matching run in the local database. Linux registers the scheme on launch, and Windows debug builds register it for testing. Installed package registration follows Tauri's desktop scheme configuration.

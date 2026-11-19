@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
+import { useDesktopDeepLinks } from "./use-desktop-deep-links";
 import { WorkspaceFrame } from "./workspace-frame";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
 export { workspaceHref, completedVideoHref } from "./workspace-links";
@@ -33,6 +34,7 @@ export function useWorkspaceCatalog() {
 
 export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const router = useRouter();
+  useDesktopDeepLinks(router);
   const pathname = usePathname();
   const query = useSearchParams();
   const { messages: { workspaces: copy } } = useLocale();
