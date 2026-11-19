@@ -15,6 +15,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
             println!("{}", serde_json::to_string(&workspaces)?);
         }
+        [_database, command, provider] if command == "agent-login-status" => {
+            let provider = serde_json::from_value(serde_json::json!(utf8(provider)?))?;
+            println!(
+                "{}",
+                serde_json::to_string(&arrumo_workspaces::check_agent_login(provider))?
+            );
+        }
         [database, command, scope] if command == "agent-settings" => {
             let workspace_id = match utf8(scope)? {
                 "app" => None,
@@ -534,6 +541,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
+                "agent-login-status <codex|claude_code> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <codex|claude_code|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",

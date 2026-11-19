@@ -1,5 +1,11 @@
 {
   "agentSettings": {
+    "checkLogin": "Check sign-in",
+    "checkingLogin": "Checking sign-in…",
+    "loginConfirmed": "The CLI reports a local sign-in.",
+    "loginUnconfirmed": "The CLI did not confirm a sign-in. Follow the setup guide and try again.",
+    "loginTimedOut": "The sign-in check timed out.",
+    "loginCheckFailed": "The sign-in check could not run.",
     "setupTitle": "Set up your production agent",
     "setupIntro": "Choose Codex or Claude Code and follow its setup guide before running agent work.",
     "setupAction": "Set up agent",

@@ -1,5 +1,11 @@
 {
   "agentSettings": {
+    "checkLogin": "Verificar sessão",
+    "checkingLogin": "A verificar a sessão…",
+    "loginConfirmed": "A CLI indica uma sessão local.",
+    "loginUnconfirmed": "A CLI não confirmou a sessão. Segue o guia e tenta novamente.",
+    "loginTimedOut": "A verificação da sessão excedeu o tempo limite.",
+    "loginCheckFailed": "Não foi possível verificar a sessão.",
     "setupTitle": "Configura o teu agente de produção",
     "setupIntro": "Escolhe Codex ou Claude Code e segue o guia de configuração antes de executar tarefas do agente.",
     "setupAction": "Configurar agente",

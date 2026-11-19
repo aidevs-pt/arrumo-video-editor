@@ -3,6 +3,7 @@ use std::{path::Path, time::Duration};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
+mod agent_cli;
 mod agent_settings;
 mod assets;
 mod brand_assets;
@@ -24,6 +25,7 @@ mod profile_formats;
 mod video_drafts;
 mod workspace_feedback;
 
+pub use agent_cli::{AgentLoginStatus, agent_cli_detected, check_agent_login};
 pub use agent_settings::{AgentProvider, AgentProviderSource, AgentSettings};
 pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};

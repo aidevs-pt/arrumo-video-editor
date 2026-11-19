@@ -610,6 +610,7 @@ fn main() {
             agent_settings::get_agent_settings,
             agent_settings::set_agent_provider,
             agent_settings::agent_cli_detected,
+            agent_settings::agent_login_status,
             agent_settings::open_agent_setup_guide,
             create_workspace,
             list_profiles,

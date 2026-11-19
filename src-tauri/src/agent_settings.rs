@@ -32,35 +32,16 @@ pub fn set_agent_provider(
 
 #[tauri::command]
 pub fn agent_cli_detected(provider: AgentProvider) -> bool {
-    use std::env;
+    arrumo_workspaces::agent_cli_detected(provider)
+}
 
-    let executable = match provider {
-        AgentProvider::Codex => "codex",
-        AgentProvider::ClaudeCode => "claude",
-    };
-    let Some(path) = env::var_os("PATH") else {
-        return false;
-    };
-    env::split_paths(&path)
-        .filter(|directory| directory.is_absolute())
-        .any(|directory| {
-            #[cfg(windows)]
-            {
-                ["exe", "cmd", "bat"].iter().any(|extension| {
-                    directory
-                        .join(executable)
-                        .with_extension(extension)
-                        .is_file()
-                })
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                directory.join(executable).metadata().is_ok_and(|metadata| {
-                    metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
-                })
-            }
-        })
+#[tauri::command]
+pub async fn agent_login_status(
+    provider: AgentProvider,
+) -> Result<arrumo_workspaces::AgentLoginStatus, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || arrumo_workspaces::check_agent_login(provider))
+        .await
+        .map_err(|_| "agent_login_check_failed")
 }
 
 #[tauri::command]

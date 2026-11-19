@@ -181,3 +181,5 @@ Use `agent-settings <app|workspace-id>` to inspect the configured agent and wher
 Open **Settings** in the desktop sidebar to choose the app's production agent. Use the settings scope picker to configure a workspace override or restore inheritance. The effective provider and its source appear under the selector.
 
 On a fresh install, creating the first workspace opens agent setup if no app provider is selected. Settings can check whether the selected CLI is on Arrumo's PATH and open the provider's installation guide in the system browser. This check reports local CLI availability. Authentication is handled through the provider's own setup.
+
+Use **Check sign-in** in Settings or `agent-login-status <codex|claude_code>` in the CLI to ask the installed provider about its local authentication state. The check makes no generation request and returns only a status category. It times out after five seconds. Windows detection and sign-in checks use a native executable on PATH.

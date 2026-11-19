@@ -24,6 +24,7 @@ type Settings = {
   source: "app" | "workspace" | null;
 };
 type Choice = Provider | "unset";
+type LoginStatus = "confirmed" | "unconfirmed" | "unavailable" | "timed_out" | "failed";
 const providerNames = { codex: "Codex", claude_code: "Claude Code" };
 
 export function AgentSettingsPage() {
@@ -167,6 +168,8 @@ function AgentSetupHelp({ provider }: { provider: Provider }) {
   const [detected, setDetected] = useState<boolean>();
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [loginStatus, setLoginStatus] = useState<LoginStatus>();
+  const [checkingLogin, setCheckingLogin] = useState(false);
   const [guideError, setGuideError] = useState(false);
 
   useEffect(() => {
@@ -177,6 +180,18 @@ function AgentSetupHelp({ provider }: { provider: Provider }) {
     );
     return () => { active = false; };
   }, [attempt, provider]);
+
+  async function checkLogin() {
+    setCheckingLogin(true);
+    setLoginStatus(undefined);
+    try {
+      setLoginStatus(await invoke<LoginStatus>("agent_login_status", { provider }));
+    } catch {
+      setLoginStatus("failed");
+    } finally {
+      setCheckingLogin(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/30 p-3">
@@ -198,7 +213,17 @@ function AgentSetupHelp({ provider }: { provider: Provider }) {
           setDetected(undefined);
           setAttempt((value) => value + 1);
         }}>{copy.recheck}</Button>
+        {detected && <Button type="button" size="sm" variant="outline"
+          disabled={checkingLogin} onClick={() => void checkLogin()}>
+          {checkingLogin ? copy.checkingLogin : copy.checkLogin}
+        </Button>}
       </div>
+      <p role="status" className="text-sm text-muted-foreground">
+        {loginStatus && ({
+          confirmed: copy.loginConfirmed, unconfirmed: copy.loginUnconfirmed,
+          unavailable: copy.notDetected, timed_out: copy.loginTimedOut, failed: copy.loginCheckFailed,
+        })[loginStatus]}
+      </p>
       {guideError && <p role="alert" className="text-sm text-destructive">{copy.guideError}</p>}
     </div>
   );
