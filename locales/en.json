@@ -284,6 +284,13 @@
     "subtitleText": "Subtitle text"
   },
   "productionPlan": {
+    "renderWholePreview": "Render whole-clip preview",
+    "renderFinalVideo": "Render final video",
+    "verifyFiles": "Verify delivery files",
+    "processingMedia": "Processing media…",
+    "verifyHint": "Delivery verification requires an SRT file for every output format.",
+    "mediaUnavailable": "This stage is no longer available. Check the current production step.",
+    "mediaFailed": "Media processing did not finish. Check the run activity for details.",
     "watchPreview": "Watch preview",
     "playPreviewError": "Could not play this preview. Check that the file is available and your system supports MP4 playback.",
     "loadingPreview": "Loading video preview…",

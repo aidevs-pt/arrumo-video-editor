@@ -284,6 +284,13 @@
     "subtitleText": "Texto das legendas"
   },
   "productionPlan": {
+    "renderWholePreview": "Gerar pré-visualização com clipes completos",
+    "renderFinalVideo": "Gerar vídeo final",
+    "verifyFiles": "Verificar ficheiros de entrega",
+    "processingMedia": "A processar ficheiros…",
+    "verifyHint": "A verificação requer um ficheiro SRT para cada formato de saída.",
+    "mediaUnavailable": "Esta etapa já não está disponível. Confirma o passo atual.",
+    "mediaFailed": "O processamento não terminou. Consulta a atividade da execução.",
     "watchPreview": "Ver pré-visualização",
     "playPreviewError": "Não foi possível reproduzir a pré-visualização. Confirma que o ficheiro está disponível e que o sistema reproduz MP4.",
     "loadingPreview": "A carregar a pré-visualização do vídeo…",

@@ -14,6 +14,7 @@ use tauri::{AppHandle, Manager, State};
 mod completed_video;
 mod delivery_stream;
 mod guided_preview;
+mod media_worker;
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -571,7 +572,8 @@ fn main() {
             completed_video::replay_completed_video,
             completed_video::add_completed_video_feedback,
             completed_video::preview_completed_output,
-            guided_preview::open_guided_preview
+            guided_preview::open_guided_preview,
+            media_worker::process_desktop_media_stage
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

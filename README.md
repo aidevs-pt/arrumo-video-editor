@@ -165,3 +165,5 @@ The completed-video panel also queues a replay with captured or current settings
 Use **Preview delivery** beside a verified output to play its MP4 and inspect the SRT text. Arrumo streams the selected file through its local loopback interface. Playback uses the desktop WebView's codecs. On Linux, WebKitGTK needs GStreamer H.264 and AAC decoders, such as those provided by `gstreamer1.0-libav` on Ubuntu.
 
 In a guided run's production plan, open **Watch preview** to play a rendered MP4 before submitting the stage decision. Each replacement preview appears with its own attempt number.
+
+The desktop production plan can render a whole-clip preview for recorded-source runs, render the accepted edit at final resolution, and verify delivery after the SRT files are present. Each action claims only the stage shown in the plan.

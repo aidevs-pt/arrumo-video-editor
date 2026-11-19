@@ -4,8 +4,8 @@ use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::WorkspaceStore;
 use crate::generation_worker::LEASE_SECONDS;
+use crate::{ProductionStage, WorkspaceStore};
 
 #[derive(Debug, Serialize)]
 pub struct MediaWork {
@@ -21,6 +21,39 @@ impl WorkspaceStore {
         run_id: i64,
         preview_edit: Option<&Value>,
     ) -> Result<Option<MediaWork>, Box<dyn Error>> {
+        self.execute_media_stage(database, workspace_id, run_id, preview_edit, None)
+    }
+
+    pub fn process_media_stage_at(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        stage: ProductionStage,
+    ) -> Result<Option<MediaWork>, Box<dyn Error>> {
+        let (stage_name, edit) = match stage {
+            ProductionStage::Preview => ("preview", Some(serde_json::json!({}))),
+            ProductionStage::FinalRender => ("final_render", None),
+            ProductionStage::VerifyDelivery => ("verify_delivery", None),
+            _ => return Err(io::Error::other("This stage has no media worker").into()),
+        };
+        self.execute_media_stage(
+            database,
+            workspace_id,
+            run_id,
+            edit.as_ref(),
+            Some(stage_name),
+        )
+    }
+
+    fn execute_media_stage(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        preview_edit: Option<&Value>,
+        expected_stage: Option<&str>,
+    ) -> Result<Option<MediaWork>, Box<dyn Error>> {
         if preview_edit.is_some_and(|edit| !edit.is_object()) {
             return Err(io::Error::other("Preview edit must be an object").into());
         }
@@ -31,6 +64,7 @@ impl WorkspaceStore {
                  SET state = 'running', attempt = attempt + 1, lease_until = unixepoch() + ?3
                  WHERE workspace_id = ?1 AND id = ?2
                    AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
+                   AND (?5 IS NULL OR json_extract(plan_json, '$.steps[' || stage_index || '].stage') = ?5)
                    AND CASE json_extract(plan_json, '$.steps[' || stage_index || '].stage')
                        WHEN 'preview' THEN ?4 AND json_array_length(snapshot_json, '$.draft.source_ids') > 0
                        WHEN 'final_render' THEN NOT ?4 AND json_array_length(snapshot_json, '$.draft.source_ids') > 0
@@ -38,7 +72,7 @@ impl WorkspaceStore {
                        ELSE 0
                    END
                  RETURNING json_extract(plan_json, '$.steps[' || stage_index || '].stage'), attempt",
-                params![workspace_id, run_id, LEASE_SECONDS, preview_edit.is_some()],
+                params![workspace_id, run_id, LEASE_SECONDS, preview_edit.is_some(), expected_stage],
                 |row| Ok(MediaWork { stage: row.get(0)?, attempt: row.get(1)? }),
             )
             .optional()?;

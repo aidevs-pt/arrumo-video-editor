@@ -8,7 +8,7 @@ import { CompletedVideoDetail } from "@/components/workspace/completed-videos/co
 import { GenerationPlan } from "./generation-plan";
 
 type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
-export type Run = { id: number; draft_id: number; state: RunState; pending_review_id: number | null; display_title: string | null; snapshot: { draft: { id: number; title: string } } };
+export type Run = { id: number; draft_id: number; state: RunState; pending_review_id: number | null; display_title: string | null; snapshot: { draft: { id: number; title: string; source_ids?: number[] } } };
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
 type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
 
@@ -86,7 +86,9 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
       {run.state === "completed" && (
         <CompletedVideoDetail workspaceId={workspaceId} runId={run.id} onTitle={setDisplayTitle} />
       )}
-      <GenerationPlan workspaceId={workspaceId} runId={run.id} pendingReviewId={run.state === "paused" ? run.pending_review_id : null} />
+      <GenerationPlan workspaceId={workspaceId} runId={run.id}
+        pendingReviewId={run.state === "paused" ? run.pending_review_id : null}
+        runState={run.state} hasSources={Boolean(run.snapshot.draft.source_ids?.length)} />
       <details className="mt-2.5 [&>summary]:cursor-pointer" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
         <summary>{copy.activity}</summary>
         {historyError ? <p role="alert">{copy.activityError}</p> : !activity ? <p role="status">{copy.loading}</p> : (

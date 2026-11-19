@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
+import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
@@ -15,10 +16,12 @@ type Plan = { steps: { stage: Stage; review_required: boolean }[] };
 type StageResult = { id: number; result: Record<string, unknown> };
 type Progress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
 
-export function GenerationPlan({ workspaceId, runId, pendingReviewId }: {
+export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, hasSources }: {
   workspaceId: number;
   runId: number;
   pendingReviewId: number | null;
+  runState: string;
+  hasSources: boolean;
 }) {
   const { messages: { productionPlan: copy } } = useLocale();
   const [open, setOpen] = useState(pendingReviewId !== null);
@@ -56,8 +59,11 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId }: {
     return () => { active = false; clearTimeout(timer); };
   }, [open, workspaceId, runId, pendingReviewId, reviewing]);
 
-  const previews = progress && plan?.steps[progress.stage_index]?.stage === "preview"
-    ? previewFiles(awaiting?.result.preview_videos) : [];
+  const currentStage = progress && plan?.steps[progress.stage_index]?.stage;
+  const previews = currentStage === "preview" ? previewFiles(awaiting?.result.preview_videos) : [];
+  const mediaStage = currentStage === "verify_delivery"
+    || (hasSources && (currentStage === "preview" || currentStage === "final_render"))
+    ? currentStage : undefined;
 
   async function review(event: FormEvent<HTMLFormElement>, resultId: number) {
     event.preventDefault();
@@ -97,6 +103,10 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId }: {
                 </li>
               ))}
             </ol>
+            {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
+              <MediaStageAction key={mediaStage} workspaceId={workspaceId} runId={runId} stage={mediaStage}
+                available={runState === "queued"} />
+            )}
             {awaiting && (
               <form key={awaiting.id} className="mt-4 rounded-lg border p-4"
                 onSubmit={(event) => void review(event, awaiting.id)}>
