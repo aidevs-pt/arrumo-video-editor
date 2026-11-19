@@ -64,3 +64,34 @@ pub async fn export_completed_video(
     .await
     .map_err(|_| "export_completed_video_failed")?
 }
+
+#[tauri::command]
+pub async fn replay_completed_video(
+    workspace_id: i64,
+    run_id: i64,
+    request_key: String,
+    mode: arrumo_workspaces::ReplayMode,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .replay_generation(workspace_id, run_id, &request_key, mode)
+        .map(|_| ())
+        .map_err(|_| "replay_completed_video_failed")
+}
+
+#[tauri::command]
+pub async fn add_completed_video_feedback(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: Option<i64>,
+    markdown: String,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::CompletedVideoFeedback, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .add_completed_video_feedback(workspace_id, run_id, result_id, &markdown)
+        .map_err(|_| "add_completed_video_feedback_failed")
+}

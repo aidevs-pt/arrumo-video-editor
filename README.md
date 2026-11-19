@@ -159,3 +159,5 @@ Use `replay-generation <workspace-id> <source-run-id> <request-key> <captured|cu
 Use `add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown>` to comment on a completed video or one of its production results. The comments appear in the completed-video detail. New runs and current-settings replays of the same draft capture those comments as delivery feedback. Captured replays reuse the feedback in the original snapshot.
 
 In the desktop Generation queue, open **Completed video details** to review the verified file list, save a display title, or export the delivery through the native ZIP save dialog.
+
+The completed-video panel also queues a replay with captured or current settings and saves Markdown feedback against the whole video or a selected production result.

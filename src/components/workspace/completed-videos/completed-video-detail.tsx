@@ -8,7 +8,14 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/lib/locale-provider";
 
+import type { Stage } from "../generation/generation-plan";
+import { CompletedVideoFeedback, type FeedbackResult, type VideoFeedback } from "./completed-video-feedback";
+import { CompletedVideoReplay } from "./completed-video-replay";
+
 type CompletedVideo = {
+  plan: { steps: { stage: Stage }[] };
+  production: { results: FeedbackResult[] };
+  feedback: VideoFeedback[];
   title: string;
   delivery: {
     verified_outputs: {
@@ -123,6 +130,9 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
             </Button>
             {notice && <p role="status" className="text-sm text-muted-foreground">{copy[notice]}</p>}
           </div>
+          <CompletedVideoReplay workspaceId={workspaceId} runId={runId} />
+          <CompletedVideoFeedback workspaceId={workspaceId} runId={runId} initialFeedback={video.feedback}
+            results={video.production.results} stages={video.plan.steps} />
         </div>
       )}
     </details>

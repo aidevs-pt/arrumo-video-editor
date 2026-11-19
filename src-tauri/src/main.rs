@@ -564,7 +564,9 @@ fn main() {
             review_production_result,
             completed_video::get_completed_video,
             completed_video::rename_completed_video,
-            completed_video::export_completed_video
+            completed_video::export_completed_video,
+            completed_video::replay_completed_video,
+            completed_video::add_completed_video_feedback
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

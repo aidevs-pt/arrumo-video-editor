@@ -262,7 +262,21 @@
     "exported": "ZIP exported.",
     "loadError": "Could not load the completed video. Close and reopen the details to retry.",
     "renameError": "Could not save the title. Try again.",
-    "exportError": "Could not export the ZIP. Check the delivery files and choose a new destination."
+    "exportError": "Could not export the ZIP. Check the delivery files and choose a new destination.",
+    "replaySettings": "Replay settings",
+    "replayCaptured": "Captured settings",
+    "replayCurrent": "Current settings",
+    "queueReplay": "Queue replay",
+    "replayQueued": "Replay queued.",
+    "replayError": "Could not queue the replay. Try again.",
+    "feedback": "Video feedback",
+    "feedbackTarget": "Feedback applies to",
+    "wholeVideo": "Whole video",
+    "attempt": "Attempt",
+    "feedbackNote": "Feedback note (Markdown)",
+    "addFeedback": "Add feedback",
+    "feedbackSaved": "Feedback saved.",
+    "feedbackError": "Could not save the feedback. Try again."
   },
   "productionPlan": {
     "title": "Production plan",

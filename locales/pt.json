@@ -262,7 +262,21 @@
     "exported": "ZIP exportado.",
     "loadError": "Não foi possível carregar o vídeo concluído. Fecha e volta a abrir os detalhes.",
     "renameError": "Não foi possível guardar o título. Tenta novamente.",
-    "exportError": "Não foi possível exportar o ZIP. Verifica os ficheiros e escolhe outro destino."
+    "exportError": "Não foi possível exportar o ZIP. Verifica os ficheiros e escolhe outro destino.",
+    "replaySettings": "Definições de repetição",
+    "replayCaptured": "Definições guardadas",
+    "replayCurrent": "Definições atuais",
+    "queueReplay": "Colocar repetição na fila",
+    "replayQueued": "Repetição colocada na fila.",
+    "replayError": "Não foi possível colocar a repetição na fila. Tenta novamente.",
+    "feedback": "Comentários do vídeo",
+    "feedbackTarget": "O comentário aplica-se a",
+    "wholeVideo": "Vídeo completo",
+    "attempt": "Tentativa",
+    "feedbackNote": "Comentário (Markdown)",
+    "addFeedback": "Adicionar comentário",
+    "feedbackSaved": "Comentário guardado.",
+    "feedbackError": "Não foi possível guardar o comentário. Tenta novamente."
   },
   "productionPlan": {
     "title": "Plano de produção",
