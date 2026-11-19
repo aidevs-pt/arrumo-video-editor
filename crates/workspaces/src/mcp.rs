@@ -9,6 +9,7 @@ use crate::WorkspaceStore;
 mod assets;
 mod generation;
 mod providers;
+mod settings;
 mod setup;
 
 const VERSION: &str = "2025-11-25";
@@ -171,6 +172,7 @@ fn tool_definitions() -> Value {
     tools.extend(assets::definitions());
     tools.extend(setup::definitions());
     tools.extend(providers::definitions());
+    tools.extend(settings::definitions());
     json!({"tools": tools})
 }
 
@@ -203,6 +205,7 @@ fn call_tool(store: &mut WorkspaceStore, database: &Path, call: ToolCall) -> Opt
         _ => assets::call(store, database, &call.name, &call.arguments)
             .or_else(|| setup::call(store, &call.name, &call.arguments))
             .or_else(|| providers::call(store, &call.name, &call.arguments))
+            .or_else(|| settings::call(store, &call.name, &call.arguments))
             .or_else(|| generation::call(store, database, &call.name, call.arguments))?,
     };
     Some(match result {
@@ -257,7 +260,7 @@ mod tests {
         assert_eq!(responses[2]["id"], "list");
         assert_eq!(
             responses[2]["result"]["tools"].as_array().unwrap().len(),
-            56
+            59
         );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],

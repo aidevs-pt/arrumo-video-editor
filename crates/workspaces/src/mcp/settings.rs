@@ -1,0 +1,80 @@
+use serde::{Deserialize, de::DeserializeOwned};
+use serde_json::{Map, Value, json};
+
+use crate::WorkspaceStore;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PluginInput {
+    plugin_id: String,
+    workspace_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SettingInput {
+    plugin_id: String,
+    workspace_id: Option<i64>,
+    setting_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ValueInput {
+    plugin_id: String,
+    workspace_id: Option<i64>,
+    setting_id: String,
+    value: Value,
+}
+
+pub(super) fn definitions() -> [Value; 3] {
+    let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
+    let id = json!({"type": "string", "minLength": 1});
+    [
+        json!({"name": "get_plugin_settings", "description": "Read non-secret settings and their effective sources for a plugin.",
+            "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace},
+                "required": ["pluginId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_plugin_setting", "description": "Save a non-secret setting using the value type declared by the plugin.",
+            "inputSchema": {"type": "object", "properties": {
+                "pluginId": id, "workspaceId": workspace, "settingId": id,
+                "value": {"type": ["boolean", "integer", "string"]}
+            }, "required": ["pluginId", "settingId", "value"], "additionalProperties": false}}),
+        json!({"name": "clear_plugin_setting", "description": "Clear a non-secret setting at this scope so it can inherit.",
+            "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
+                "required": ["pluginId", "settingId"], "additionalProperties": false}}),
+    ]
+}
+
+pub(super) fn call(
+    store: &WorkspaceStore,
+    name: &str,
+    arguments: &Map<String, Value>,
+) -> Option<Result<Value, &'static str>> {
+    Some(match name {
+        "get_plugin_settings" => parse(arguments).and_then(|args: PluginInput| {
+            store
+                .plugin_settings(&args.plugin_id, args.workspace_id)
+                .map(|settings| json!({"settings": settings}))
+                .map_err(|_| "Could not read plugin settings")
+        }),
+        "set_plugin_setting" => parse(arguments).and_then(|args: ValueInput| {
+            store
+                .set_plugin_setting(&args.plugin_id, &args.setting_id, args.workspace_id, Some(&args.value))
+                .map(|()| json!({"saved": true}))
+                .map_err(|_| "Could not save plugin setting. Check its declaration, scope and value type")
+        }),
+        "clear_plugin_setting" => parse(arguments).and_then(|args: SettingInput| {
+            store
+                .set_plugin_setting(&args.plugin_id, &args.setting_id, args.workspace_id, None)
+                .map(|()| json!({"saved": true}))
+                .map_err(|_| "Could not clear plugin setting")
+        }),
+        _ => return None,
+    })
+}
+
+fn parse<T: DeserializeOwned>(arguments: &Map<String, Value>) -> Result<T, &'static str> {
+    serde_json::from_value(Value::Object(arguments.clone()))
+        .map_err(|_| "Invalid plugin setting arguments")
+}
