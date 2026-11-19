@@ -204,3 +204,5 @@ In desktop Settings, open **Browse registry** under **Plugins** and load an HTTP
 Use `update-plugin-release <plugin-id> <version>` to replace a remotely installed package with a newer SemVer release from its recorded HTTPS catalog and source repository. Arrumo validates the replacement before saving it and checks that the installed release did not change during the download. Updates to bundled plugins ship with Arrumo.
 
 For packages installed from a local registry snapshot, use `update-plugin-release-from-snapshot <catalog.json> <plugin-id> <version> <package.zip>`. Use a catalog snapshot obtained independently of the ZIP. Arrumo requires the recorded source repository and a newer compatible release and verifies the ZIP before replacing the installed package. Remotely installed packages continue to use their recorded HTTPS catalog.
+
+When you load the same registry in desktop Settings, installed packages show **Update** for newer compatible releases from their recorded repository. Review the release and confirm the update. Local-snapshot packages use the offline CLI update command.

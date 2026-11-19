@@ -114,6 +114,29 @@ impl WorkspaceStore {
         )
     }
 
+    pub fn update_reviewed_plugin_release(
+        &self,
+        catalog_url: &str,
+        id: &str,
+        repository: &str,
+        release: &RegistryRelease,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        let (previous, source) = self.installed_release_for_update(id, &release.version)?;
+        if source.catalog_url.as_deref() != Some(catalog_url) || source.repository != repository {
+            return Err(invalid_registry(
+                "Update must use the installed plugin's registry and repository",
+            )
+            .into());
+        }
+        self.download_registry_release(
+            catalog_url,
+            id,
+            &release.version,
+            Some((repository, release)),
+            Some((&previous, &source.repository)),
+        )
+    }
+
     pub fn update_plugin_release_from_snapshot(
         &self,
         catalog: impl Read,
@@ -284,6 +307,36 @@ pub fn read_plugin_registry(catalog: impl Read) -> Result<PluginRegistry, Box<dy
 }
 
 impl PluginRegistry {
+    pub fn update_versions(
+        &self,
+        catalog_url: &str,
+        source: &RegistryReleaseSource,
+    ) -> Vec<String> {
+        if source.catalog_url.as_deref() != Some(catalog_url) {
+            return Vec::new();
+        }
+        let Some(plugin) = self
+            .plugins
+            .iter()
+            .find(|plugin| plugin.id == source.plugin_id && plugin.repository == source.repository)
+        else {
+            return Vec::new();
+        };
+        let Ok(installed) = semver::Version::parse(&source.version) else {
+            return Vec::new();
+        };
+        plugin
+            .releases
+            .iter()
+            .filter(|release| {
+                release.compatible()
+                    && semver::Version::parse(&release.version)
+                        .is_ok_and(|version| version.cmp_precedence(&installed).is_gt())
+            })
+            .map(|release| release.version.clone())
+            .collect()
+    }
+
     fn select_release(
         self,
         id: &str,

@@ -1,5 +1,7 @@
 {
   "pluginRegistry": {
+    "update": "Actualizar",
+    "updated": "Complemento actualizado.",
     "browse": "Explorar registro",
     "url": "URL del catálogo del registro",
     "load": "Cargar registro",

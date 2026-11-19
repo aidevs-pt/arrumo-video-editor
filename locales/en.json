@@ -1,5 +1,7 @@
 {
   "pluginRegistry": {
+    "update": "Update",
+    "updated": "Plugin updated.",
     "browse": "Browse registry",
     "url": "Registry catalog URL",
     "load": "Load registry",

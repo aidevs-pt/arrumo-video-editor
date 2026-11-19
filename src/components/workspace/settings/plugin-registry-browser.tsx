@@ -28,6 +28,7 @@ type RegistryPlugin = { id: string; repository: string; releases: Release[] };
 type Listing = {
   registry: { plugins: RegistryPlugin[] };
   supportedManifestSchemaVersion: number;
+  updateVersions: Record<string, string[]>;
 };
 
 export function PluginRegistryBrowser({
@@ -42,14 +43,14 @@ export function PluginRegistryBrowser({
   const [listing, setListing] = useState<(Listing & { url: string })>();
   const [pending, setPending] = useState<"loading" | "installing">();
   const [error, setError] = useState<"loadError" | "installError" | "sourceError">();
-  const [installed, setInstalled] = useState(false);
+  const [success, setSuccess] = useState<"installed" | "updated">();
 
   async function browse(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const catalogUrl = url.trim();
     setListing(undefined);
     setError(undefined);
-    setInstalled(false);
+    setSuccess(undefined);
     setPending("loading");
     try {
       const index = await invoke<Listing>("browse_plugin_registry", { catalogUrl });
@@ -61,14 +62,15 @@ export function PluginRegistryBrowser({
     }
   }
 
-  async function install(plugin: RegistryPlugin, release: Release, catalogUrl: string) {
+  async function install(plugin: RegistryPlugin, release: Release, catalogUrl: string, update: boolean) {
     setError(undefined);
-    setInstalled(false);
+    setSuccess(undefined);
     setPending("installing");
     try {
-      await invoke("install_registry_plugin", { catalogUrl, id: plugin.id, repository: plugin.repository, release });
+      await invoke("install_registry_plugin", { catalogUrl, id: plugin.id, repository: plugin.repository, release, update });
       await onInstalled();
-      setInstalled(true);
+      if (update) setListing(undefined);
+      setSuccess(update ? "updated" : "installed");
     } catch {
       setError("installError");
     } finally {
@@ -100,62 +102,70 @@ export function PluginRegistryBrowser({
             <Field>
               <FieldLabel htmlFor="plugin-registry-url">{copy.url}</FieldLabel>
               <Input id="plugin-registry-url" type="url" value={url} maxLength={2048} required
-                onChange={(event) => { setUrl(event.target.value); setListing(undefined); setError(undefined); setInstalled(false); }}
+                onChange={(event) => { setUrl(event.target.value); setListing(undefined); setError(undefined); setSuccess(undefined); }}
                 disabled={Boolean(pending)} />
             </Field>
             <Button type="submit" disabled={Boolean(pending)}>{copy.load}</Button>
           </form>
           {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-          <div role="status" className={pending || installed ? "text-sm text-muted-foreground" : "sr-only"}>
-            {pending ? copy[pending] : installed && pluginCatalog.imported}
+          <div role="status" className={pending || success ? "text-sm text-muted-foreground" : "sr-only"}>
+            {pending ? copy[pending] : success === "updated" ? copy.updated : success === "installed" && pluginCatalog.imported}
           </div>
           {pending === "loading" && <Skeleton className="h-16" />}
           {listing && (listing.registry.plugins.length === 0 ? (
             <p className="text-sm text-muted-foreground">{copy.empty}</p>
           ) : (
             <Accordion type="single" collapsible>
-              {listing.registry.plugins.map((plugin) => (
-                <AccordionItem key={plugin.id} value={plugin.id}>
-                  <AccordionTrigger className="wrap-anywhere">{plugin.id}</AccordionTrigger>
-                  <AccordionContent>
-                    <Button variant="link" size="sm" className="mb-1 px-0" onClick={() => void openRepository(plugin.repository)}>
-                      {copy.source}<ArrowUpRight data-icon="inline-end" />
-                    </Button>
-                    {installedIds.includes(plugin.id) ? <p className="text-sm text-muted-foreground">{copy.installed}</p>
-                      : plugin.releases.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noReleases}</p>
-                      : (
-                        <ul className="divide-y">
-                          {plugin.releases.map((release) => (
-                            <li key={release.version} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                              <span className="min-w-0 wrap-anywhere">{release.version}</span>
-                              {release.manifestSchemaVersion !== listing.supportedManifestSchemaVersion
-                                ? <span className="text-xs text-muted-foreground">{copy.incompatible}</span>
-                                : (
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="outline" size="sm" disabled={Boolean(pending)}>{copy.install}</Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle className="wrap-anywhere">{plugin.id} {release.version}</AlertDialogTitle>
-                                        <AlertDialogDescription>{pluginCatalog.warning}</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>{pluginCatalog.cancel}</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => void install(plugin, release, listing.url)}>
-                                          {copy.install}
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                )}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
+              {listing.registry.plugins.map((plugin) => {
+                const update = installedIds.includes(plugin.id);
+                const versions = listing.updateVersions[plugin.id] ?? [];
+                const releases = update
+                  ? plugin.releases.filter((release) => versions.includes(release.version))
+                  : plugin.releases;
+                const action = update ? copy.update : copy.install;
+                return (
+                  <AccordionItem key={plugin.id} value={plugin.id}>
+                    <AccordionTrigger className="wrap-anywhere">{plugin.id}</AccordionTrigger>
+                    <AccordionContent>
+                      <Button variant="link" size="sm" className="mb-1 px-0" onClick={() => void openRepository(plugin.repository)}>
+                        {copy.source}<ArrowUpRight data-icon="inline-end" />
+                      </Button>
+                      {update && releases.length === 0 ? <p className="text-sm text-muted-foreground">{copy.installed}</p>
+                        : releases.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noReleases}</p>
+                        : (
+                          <ul className="divide-y">
+                            {releases.map((release) => (
+                              <li key={release.version} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                                <span className="min-w-0 wrap-anywhere">{release.version}</span>
+                                {release.manifestSchemaVersion !== listing.supportedManifestSchemaVersion
+                                  ? <span className="text-xs text-muted-foreground">{copy.incompatible}</span>
+                                  : (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="outline" size="sm" disabled={Boolean(pending)}>{action}</Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle className="wrap-anywhere">{plugin.id} {release.version}</AlertDialogTitle>
+                                          <AlertDialogDescription>{pluginCatalog.warning}</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>{pluginCatalog.cancel}</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => void install(plugin, release, listing.url, update)}>
+                                            {action}
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
             </Accordion>
           ))}
         </CollapsibleContent>

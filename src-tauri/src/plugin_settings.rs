@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{collections::BTreeMap, fs::File};
 
 use arrumo_workspaces::{CatalogPlugin, WorkspaceStore};
 use tauri::{AppHandle, Manager, State};
@@ -61,14 +61,33 @@ pub fn remove_plugin_package(id: String, store: State<'_, Store>) -> Result<bool
 pub struct RegistryListing {
     registry: arrumo_workspaces::PluginRegistry,
     supported_manifest_schema_version: u32,
+    update_versions: BTreeMap<String, Vec<String>>,
 }
 
 #[tauri::command]
-pub async fn browse_plugin_registry(catalog_url: String) -> Result<RegistryListing, &'static str> {
+pub async fn browse_plugin_registry(
+    app: AppHandle,
+    catalog_url: String,
+) -> Result<RegistryListing, &'static str> {
     tauri::async_runtime::spawn_blocking(move || {
         let registry = arrumo_workspaces::fetch_plugin_registry(&catalog_url)
             .map_err(|_| "plugin_registry_failed")?;
+        let installed = app
+            .state::<Store>()
+            .lock()
+            .map_err(|_| "store_unavailable")?
+            .plugin_catalog()
+            .map_err(|_| "plugin_catalog_failed")?;
+        let update_versions = installed
+            .into_iter()
+            .filter_map(|plugin| {
+                let source = plugin.package?.release?;
+                let versions = registry.update_versions(&catalog_url, &source);
+                (!versions.is_empty()).then_some((source.plugin_id, versions))
+            })
+            .collect();
         Ok(RegistryListing {
+            update_versions,
             registry,
             supported_manifest_schema_version: arrumo_workspaces::PLUGIN_MANIFEST_SCHEMA_VERSION,
         })
@@ -84,6 +103,7 @@ pub async fn install_registry_plugin(
     id: String,
     repository: String,
     release: arrumo_workspaces::RegistryRelease,
+    update: bool,
 ) -> Result<CatalogPlugin, &'static str> {
     tauri::async_runtime::spawn_blocking(move || {
         let database = app
@@ -91,16 +111,19 @@ pub async fn install_registry_plugin(
             .app_local_data_dir()
             .map_err(|_| "store_unavailable")?
             .join("workspaces.sqlite");
-        WorkspaceStore::open(database)
-            .map_err(|_| "store_unavailable")?
-            .download_reviewed_plugin_release(
+        let store = WorkspaceStore::open(database).map_err(|_| "store_unavailable")?;
+        if update {
+            store.update_reviewed_plugin_release(&catalog_url, &id, &repository, &release)
+        } else {
+            store.download_reviewed_plugin_release(
                 &catalog_url,
                 &id,
                 &release.version,
                 &repository,
                 &release,
             )
-            .map_err(|_| "plugin_registry_install_failed")
+        }
+        .map_err(|_| "plugin_registry_install_failed")
     })
     .await
     .map_err(|_| "plugin_registry_install_failed")?
