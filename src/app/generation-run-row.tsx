@@ -4,6 +4,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { GenerationPlan } from "./generation-plan";
 
 type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
 export type Run = { id: number; draft_id: number; state: RunState; snapshot: { draft: { id: number; title: string } } };
@@ -79,6 +80,7 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
         <Button type="button" size="sm" variant="outline" className="mt-2.5" disabled={disabled}
           aria-label={`${copy.retryRun} · ${title}`} onClick={() => void onControl(run.id, "retry")}>{copy.retryRun}</Button>
       )}
+      <GenerationPlan workspaceId={workspaceId} runId={run.id} />
       <details className="mt-2.5 [&>summary]:cursor-pointer" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
         <summary>{copy.activity}</summary>
         {historyError ? <p role="alert">{copy.activityError}</p> : !activity ? <p role="status">{copy.loading}</p> : (

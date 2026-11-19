@@ -250,5 +250,18 @@
     "save": "Save feedback",
     "cancel": "Cancel",
     "saveError": "Feedback couldn’t be saved."
+  },
+  "productionPlan": {
+    "title": "Production plan",
+    "loading": "Loading production plan…",
+    "waiting": "Waiting for a worker to prepare the plan.",
+    "loadError": "The production plan couldn’t be loaded.",
+    "reviewRequired": "Review required",
+    "script": "Script",
+    "assets": "Assets and animations",
+    "preview": "Video previews",
+    "supplemental_outputs": "Supplemental outputs",
+    "final_render": "Final render",
+    "verify_delivery": "Verify delivery"
   }
 }

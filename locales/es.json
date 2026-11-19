@@ -250,5 +250,18 @@
     "save": "Guardar observación",
     "cancel": "Cancelar",
     "saveError": "No se pudo guardar la observación."
+  },
+  "productionPlan": {
+    "title": "Plan de producción",
+    "loading": "Cargando el plan de producción…",
+    "waiting": "Esperando a que un proceso prepare el plan.",
+    "loadError": "No se pudo cargar el plan de producción.",
+    "reviewRequired": "Requiere revisión",
+    "script": "Guion",
+    "assets": "Recursos y animaciones",
+    "preview": "Vistas previas de vídeo",
+    "supplemental_outputs": "Salidas adicionales",
+    "final_render": "Renderizado final",
+    "verify_delivery": "Verificar la entrega"
   }
 }
