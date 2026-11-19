@@ -1,0 +1,165 @@
+"use client";
+
+import { invoke } from "@tauri-apps/api/core";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
+import { useState, type FormEvent } from "react";
+
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useLocale } from "@/lib/locale-provider";
+
+type Release = {
+  version: string;
+  manifestSchemaVersion: number;
+  packageUrl: string;
+  sha256: string;
+};
+type RegistryPlugin = { id: string; repository: string; releases: Release[] };
+type Listing = {
+  registry: { plugins: RegistryPlugin[] };
+  supportedManifestSchemaVersion: number;
+};
+
+export function PluginRegistryBrowser({
+  installedIds,
+  onInstalled,
+}: {
+  installedIds: string[];
+  onInstalled: () => Promise<void>;
+}) {
+  const { messages: { pluginRegistry: copy, pluginCatalog } } = useLocale();
+  const [url, setUrl] = useState("");
+  const [listing, setListing] = useState<(Listing & { url: string })>();
+  const [pending, setPending] = useState<"loading" | "installing">();
+  const [error, setError] = useState<"loadError" | "installError" | "sourceError">();
+  const [installed, setInstalled] = useState(false);
+
+  async function browse(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const catalogUrl = url.trim();
+    setListing(undefined);
+    setError(undefined);
+    setInstalled(false);
+    setPending("loading");
+    try {
+      const index = await invoke<Listing>("browse_plugin_registry", { catalogUrl });
+      setListing({ ...index, url: catalogUrl });
+    } catch {
+      setError("loadError");
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  async function install(plugin: RegistryPlugin, release: Release, catalogUrl: string) {
+    setError(undefined);
+    setInstalled(false);
+    setPending("installing");
+    try {
+      await invoke("install_registry_plugin", { catalogUrl, id: plugin.id, repository: plugin.repository, release });
+      await onInstalled();
+      setInstalled(true);
+    } catch {
+      setError("installError");
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  async function openRepository(repository: string) {
+    setError(undefined);
+    try {
+      await invoke("open_plugin_repository", { url: repository });
+    } catch {
+      setError("sourceError");
+    }
+  }
+
+  return (
+    <>
+      <Separator />
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline">
+            {copy.browse}
+            <ChevronDown data-icon="inline-end" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="flex flex-col gap-4 data-closed:hidden">
+          <form className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:items-end" onSubmit={browse}>
+            <Field>
+              <FieldLabel htmlFor="plugin-registry-url">{copy.url}</FieldLabel>
+              <Input id="plugin-registry-url" type="url" value={url} maxLength={2048} required
+                onChange={(event) => { setUrl(event.target.value); setListing(undefined); setError(undefined); setInstalled(false); }}
+                disabled={Boolean(pending)} />
+            </Field>
+            <Button type="submit" disabled={Boolean(pending)}>{copy.load}</Button>
+          </form>
+          {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
+          <div role="status" className={pending || installed ? "text-sm text-muted-foreground" : "sr-only"}>
+            {pending ? copy[pending] : installed && pluginCatalog.imported}
+          </div>
+          {pending === "loading" && <Skeleton className="h-16" />}
+          {listing && (listing.registry.plugins.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{copy.empty}</p>
+          ) : (
+            <Accordion type="single" collapsible>
+              {listing.registry.plugins.map((plugin) => (
+                <AccordionItem key={plugin.id} value={plugin.id}>
+                  <AccordionTrigger className="wrap-anywhere">{plugin.id}</AccordionTrigger>
+                  <AccordionContent>
+                    <Button variant="link" size="sm" className="mb-1 px-0" onClick={() => void openRepository(plugin.repository)}>
+                      {copy.source}<ArrowUpRight data-icon="inline-end" />
+                    </Button>
+                    {installedIds.includes(plugin.id) ? <p className="text-sm text-muted-foreground">{copy.installed}</p>
+                      : plugin.releases.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noReleases}</p>
+                      : (
+                        <ul className="divide-y">
+                          {plugin.releases.map((release) => (
+                            <li key={release.version} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                              <span className="min-w-0 wrap-anywhere">{release.version}</span>
+                              {release.manifestSchemaVersion !== listing.supportedManifestSchemaVersion
+                                ? <span className="text-xs text-muted-foreground">{copy.incompatible}</span>
+                                : (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="outline" size="sm" disabled={Boolean(pending)}>{copy.install}</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle className="wrap-anywhere">{plugin.id} {release.version}</AlertDialogTitle>
+                                        <AlertDialogDescription>{pluginCatalog.warning}</AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>{pluginCatalog.cancel}</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => void install(plugin, release, listing.url)}>
+                                          {copy.install}
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+    </>
+  );
+}

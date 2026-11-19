@@ -55,3 +55,63 @@ pub fn remove_plugin_package(id: String, store: State<'_, Store>) -> Result<bool
         .remove_installed_plugin_manifest(&id)
         .map_err(|_| "plugin_remove_failed")
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryListing {
+    registry: arrumo_workspaces::PluginRegistry,
+    supported_manifest_schema_version: u32,
+}
+
+#[tauri::command]
+pub async fn browse_plugin_registry(catalog_url: String) -> Result<RegistryListing, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let registry = arrumo_workspaces::fetch_plugin_registry(&catalog_url)
+            .map_err(|_| "plugin_registry_failed")?;
+        Ok(RegistryListing {
+            registry,
+            supported_manifest_schema_version: arrumo_workspaces::PLUGIN_MANIFEST_SCHEMA_VERSION,
+        })
+    })
+    .await
+    .map_err(|_| "plugin_registry_failed")?
+}
+
+#[tauri::command]
+pub async fn install_registry_plugin(
+    app: AppHandle,
+    catalog_url: String,
+    id: String,
+    repository: String,
+    release: arrumo_workspaces::RegistryRelease,
+) -> Result<CatalogPlugin, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(database)
+            .map_err(|_| "store_unavailable")?
+            .download_reviewed_plugin_release(
+                &catalog_url,
+                &id,
+                &release.version,
+                &repository,
+                &release,
+            )
+            .map_err(|_| "plugin_registry_install_failed")
+    })
+    .await
+    .map_err(|_| "plugin_registry_install_failed")?
+}
+
+#[tauri::command]
+pub fn open_plugin_repository(app: AppHandle, url: String) -> Result<(), &'static str> {
+    use tauri_plugin_opener::OpenerExt;
+
+    arrumo_workspaces::validate_registry_url(&url).map_err(|_| "plugin_repository_failed")?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|_| "plugin_repository_failed")
+}

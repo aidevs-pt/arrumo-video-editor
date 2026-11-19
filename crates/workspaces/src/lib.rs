@@ -45,11 +45,13 @@ pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions}
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
-pub use plugin_catalog::{CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest};
+pub use plugin_catalog::{
+    CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PLUGIN_MANIFEST_SCHEMA_VERSION, PluginManifest,
+};
 pub use plugin_package::{PluginPackageInfo, THIRD_PARTY_PLUGIN_NOTICE};
 pub use plugin_registry::{
     PluginRegistry, RegistryPlugin, RegistryRelease, RegistryReleaseSource, fetch_plugin_registry,
-    read_plugin_registry,
+    read_plugin_registry, validate_registry_url,
 };
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};

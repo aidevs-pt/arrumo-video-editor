@@ -1,4 +1,20 @@
 {
+  "pluginRegistry": {
+    "browse": "Browse registry",
+    "url": "Registry catalog URL",
+    "load": "Load registry",
+    "loading": "Loading registry…",
+    "installing": "Installing release…",
+    "empty": "This registry has no plugins.",
+    "installed": "Already in your plugin catalog.",
+    "noReleases": "No releases published.",
+    "incompatible": "Requires a newer manifest schema.",
+    "install": "Install",
+    "source": "Open source repository",
+    "loadError": "Could not load the registry. Check the HTTPS catalog URL and try again.",
+    "installError": "Could not install this release. Reload the registry to check for changes, then try again.",
+    "sourceError": "Could not open the source repository."
+  },
   "pluginCatalog": {
     "title": "Plugins",
     "description": "Manage plugin packages for this Arrumo installation.",

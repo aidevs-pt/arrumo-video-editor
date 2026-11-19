@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
+import { PluginRegistryBrowser } from "./plugin-registry-browser";
 
 type Plugin = {
   bundled: boolean;
@@ -141,6 +142,7 @@ export function PluginCatalog() {
             ))}
           </ul>
         )}
+        {plugins && <PluginRegistryBrowser installedIds={plugins.map(({ manifest }) => manifest.id)} onInstalled={load} />}
       </CardContent>
     </Card>
   );

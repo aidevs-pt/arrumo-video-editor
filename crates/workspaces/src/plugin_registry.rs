@@ -76,10 +76,40 @@ impl WorkspaceStore {
         id: &str,
         version: &str,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
-        validate_https_url(catalog_url)?;
+        self.download_registry_release(catalog_url, id, version, None)
+    }
+
+    pub fn download_reviewed_plugin_release(
+        &self,
+        catalog_url: &str,
+        id: &str,
+        version: &str,
+        repository: &str,
+        release: &RegistryRelease,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        self.download_registry_release(catalog_url, id, version, Some((repository, release)))
+    }
+
+    fn download_registry_release(
+        &self,
+        catalog_url: &str,
+        id: &str,
+        version: &str,
+        reviewed: Option<(&str, &RegistryRelease)>,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        validate_registry_url(catalog_url)?;
         let client = registry_client()?;
         let catalog = get_release_response(&client, catalog_url)?;
         let (mut source, digest) = read_plugin_registry(catalog)?.select_release(id, version)?;
+        if let Some((repository, release)) = reviewed
+            && (repository != source.repository
+                || release.version != source.version
+                || release.package_url != source.package_url
+                || release.manifest_schema_version != source.manifest_schema_version
+                || !release.sha256.eq_ignore_ascii_case(&digest))
+        {
+            return Err(invalid_registry("Plugin release changed since review").into());
+        }
         let archive = get_release_response(&client, &source.package_url)?;
         source.catalog_url = Some(catalog_url.to_owned());
         self.register_plugin_zip(archive, Some(&digest), Some(source))
@@ -122,7 +152,7 @@ fn get_release_response(
 }
 
 pub fn fetch_plugin_registry(catalog_url: &str) -> Result<PluginRegistry, Box<dyn Error>> {
-    validate_https_url(catalog_url)?;
+    validate_registry_url(catalog_url)?;
     let client = registry_client()?;
     read_plugin_registry(get_release_response(&client, catalog_url)?)
 }
@@ -145,7 +175,7 @@ pub fn read_plugin_registry(catalog: impl Read) -> Result<PluginRegistry, Box<dy
         if !identifier(&plugin.id) || !plugin_ids.insert(&plugin.id) {
             return Err(invalid_registry("Invalid or duplicate plugin ID in registry").into());
         }
-        validate_https_url(&plugin.repository)?;
+        validate_registry_url(&plugin.repository)?;
         let mut versions = HashSet::new();
         for release in &plugin.releases {
             semver::Version::parse(&release.version)?;
@@ -159,7 +189,7 @@ pub fn read_plugin_registry(catalog: impl Read) -> Result<PluginRegistry, Box<dy
                     invalid_registry("Invalid plugin release schema version or SHA-256").into(),
                 );
             }
-            validate_https_url(&release.package_url)?;
+            validate_registry_url(&release.package_url)?;
         }
     }
     Ok(registry)
@@ -198,7 +228,7 @@ impl PluginRegistry {
     }
 }
 
-fn validate_https_url(value: &str) -> Result<(), Box<dyn Error>> {
+pub fn validate_registry_url(value: &str) -> Result<(), Box<dyn Error>> {
     let url = url::Url::parse(value)?;
     if !value.starts_with("https://")
         || value.chars().any(|c| c.is_whitespace() || c.is_control())

@@ -1,4 +1,20 @@
 {
+  "pluginRegistry": {
+    "browse": "Explorar registo",
+    "url": "URL do catálogo do registo",
+    "load": "Carregar registo",
+    "loading": "A carregar o registo…",
+    "installing": "A instalar a versão…",
+    "empty": "Este registo não contém plugins.",
+    "installed": "Já está no catálogo de plugins.",
+    "noReleases": "Não há versões publicadas.",
+    "incompatible": "Requer um esquema de manifesto mais recente.",
+    "install": "Instalar",
+    "source": "Abrir repositório de origem",
+    "loadError": "Não foi possível carregar o registo. Verifique o URL HTTPS do catálogo e tente novamente.",
+    "installError": "Não foi possível instalar esta versão. Volte a carregar o registo para verificar se houve alterações e tente novamente.",
+    "sourceError": "Não foi possível abrir o repositório de origem."
+  },
   "pluginCatalog": {
     "title": "Plugins",
     "description": "Gira os pacotes de plugins desta instalação do Arrumo.",

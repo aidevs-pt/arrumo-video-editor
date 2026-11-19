@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginPackageInfo, RegistryReleaseSource, WorkspaceStore};
 
-pub(crate) const PLUGIN_MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const PLUGIN_MANIFEST_SCHEMA_VERSION: u32 = 1;
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
