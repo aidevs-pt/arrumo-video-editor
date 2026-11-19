@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { GenerationQueue } from "./generation-queue";
+import { queueCopy } from "./queue-copy";
 import { draftCopy } from "./draft-copy";
 
 type CatalogEntry = { id: number; name: string };
@@ -21,6 +23,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
   locale: keyof typeof draftCopy;
   onBack: () => void;
 }) {
+  const [queueView, setQueueView] = useState<{ draftId: number | null } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const [drafts, setDrafts] = useState<Draft[]>();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -136,11 +139,23 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
     }
   }
 
+  if (queueView && drafts) {
+    return <GenerationQueue
+      workspaceId={workspaceId}
+      drafts={drafts}
+      initialDraftId={queueView.draftId}
+      locale={locale}
+      onBack={() => setQueueView(null)}
+    />;
+  }
+
   return (
     <main className="workspace-shell profile-shell">
       <Button type="button" variant="ghost" disabled={pending !== null} onClick={onBack}>
         <ArrowLeft data-icon="inline-start" />{copy.back}
       </Button>
+      <Button type="button" variant="outline" disabled={!drafts || pending !== null || editing !== null}
+        onClick={() => setQueueView({ draftId: null })}>{queueCopy[locale].title}</Button>
       <div className="workspace-heading">
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1><p>{workspace.name}</p>
       </div>
@@ -159,8 +174,13 @@ export function WorkspaceDrafts({ workspace, initialProfile, locale, onBack }: {
                   <li key={draft.id}>
                     <div className="profile-row-heading">
                       <h2>{draft.title}</h2>
-                      <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
-                        aria-label={`${copy.edit} · ${draft.title}`} onClick={() => edit(draft)}>{copy.edit}</Button>
+                      <div className="profile-edit-actions">
+                        <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
+                          aria-label={`${copy.edit} · ${draft.title}`} onClick={() => edit(draft)}>{copy.edit}</Button>
+                        <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
+                          aria-label={`${queueCopy[locale].submit} · ${draft.title}`}
+                          onClick={() => setQueueView({ draftId: draft.id })}>{queueCopy[locale].submit}</Button>
+                      </div>
                     </div>
                     {draft.profile_id !== null && <p>{profiles.find((entry) => entry.id === draft.profile_id)?.name}</p>}
                     {draft.intent && <p className="profile-guidance">{draft.intent}</p>}
