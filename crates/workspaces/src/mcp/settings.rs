@@ -27,7 +27,13 @@ struct ValueInput {
     value: Value,
 }
 
-pub(super) fn definitions() -> [Value; 3] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PreviewInput {
+    max_edge: Value,
+}
+
+pub(super) fn definitions() -> [Value; 5] {
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
     [
@@ -43,6 +49,14 @@ pub(super) fn definitions() -> [Value; 3] {
         json!({"name": "clear_plugin_setting", "description": "Clear a non-secret setting at this scope so it can inherit.",
             "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
                 "required": ["pluginId", "settingId"], "additionalProperties": false}}),
+        json!({"name": "get_preview_settings", "description": "Read the app's recommended, overridden, and effective preview resolution limits.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_preview_max_edge", "description": "Set the app-wide preview long edge in pixels. Pass null to restore the recommendation.",
+            "inputSchema": {"type": "object", "properties": {
+                "maxEdge": {"type": ["integer", "null"], "minimum": 144, "maximum": 2160}
+            }, "required": ["maxEdge"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
     ]
 }
 
@@ -70,11 +84,24 @@ pub(super) fn call(
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not clear plugin setting")
         }),
+        "get_preview_settings" if arguments.is_empty() => store
+            .preview_settings()
+            .map(|settings| json!({"settings": settings}))
+            .map_err(|_| "Could not read preview settings"),
+        "get_preview_settings" => Err("Unexpected preview settings arguments"),
+        "set_preview_max_edge" => parse(arguments).and_then(|args: PreviewInput| {
+            let max_edge = serde_json::from_value::<Option<u32>>(args.max_edge)
+                .map_err(|_| "Expected an integer preview edge or null")?;
+            store
+                .set_preview_max_edge(max_edge)
+                .map(|()| json!({"saved": true}))
+                .map_err(|_| "Could not save preview edge. Use 144 to 2160 pixels or null")
+        }),
         _ => return None,
     })
 }
 
 fn parse<T: DeserializeOwned>(arguments: &Map<String, Value>) -> Result<T, &'static str> {
     serde_json::from_value(Value::Object(arguments.clone()))
-        .map_err(|_| "Invalid plugin setting arguments")
+        .map_err(|_| "Invalid settings arguments")
 }

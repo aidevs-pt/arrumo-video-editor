@@ -288,3 +288,5 @@ Use `list_provider_preferences` or `get_provider_preferences` to inspect provide
 Use `get_plugin_settings`, `set_plugin_setting`, and `clear_plugin_setting` to manage SDK-declared non-secret settings. Omit `workspaceId` for app scope. Clearing a workspace override restores inheritance. Stored credentials are excluded from these tools.
 
 Use `list_agent_plugins` to discover bundled production agents and `get_agent_settings` to read the effective choice. Use `set_agent_provider` or `clear_agent_provider` at app or workspace scope. Omit `workspaceId` for app scope. Changes affect future run snapshots.
+
+Use `get_preview_settings` to inspect preview resolution. Set `maxEdge` with `set_preview_max_edge` to a value between 144 and 2160 pixels or pass null to restore the app recommendation. Queued runs retain their captured preview settings.
