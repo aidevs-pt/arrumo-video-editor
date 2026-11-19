@@ -304,3 +304,26 @@ Use `install_plugin_release_from_snapshot` or `update_plugin_release_from_snapsh
 Use `fetch_plugin_registry` to inspect an HTTPS registry catalog, or `read_plugin_registry_snapshot` to validate a catalog at an absolute local path. Both return release metadata for review before installation.
 
 Use `install_reviewed_plugin_release` and `update_reviewed_plugin_release` with the catalog URL, plugin ID, repository, and exact release object returned by registry discovery. The host checks the metadata again before downloading the package and verifies the archive digest before registration. Updates require a newer release from the original registry and repository.
+
+### Local A2A
+
+Run `arrumo-workspaces <database-path> a2a <port>` with a randomly generated 32–256 character alphanumeric bearer token on redirected stdin. Use port `0` to let the OS choose a port. The command binds only to `127.0.0.1` and prints its endpoint when ready. Anyone with the token has the same access to that database and local operations as the CLI operator.
+
+Read `/.well-known/agent-card.json` at the printed origin for the [A2A 1.0 JSON-RPC interface](https://a2a-protocol.org/latest/specification/#9-json-rpc-protocol-binding). Send requests to the printed endpoint with `Authorization: Bearer <token>`, `Content-Type: application/json`, and `A2A-Version: 1.0`. For example, send this JSON body to discover operation names and arguments.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "SendMessage",
+  "params": {
+    "message": {
+      "messageId": "discover-operations-1",
+      "role": "ROLE_USER",
+      "parts": [{"data": {"operation": "list_operations", "arguments": {}}}]
+    }
+  }
+}
+```
+
+Use the same message format with a listed operation name and arguments. The reply contains a data part with `result` or an operation `error`. The endpoint currently returns direct messages. Generation runs can be polled with the shared run operations. Native A2A task lifecycle and streaming are pending.

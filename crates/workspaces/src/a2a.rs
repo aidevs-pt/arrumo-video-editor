@@ -1,0 +1,236 @@
+use std::{
+    error::Error,
+    io::{self, Read, Write},
+    path::Path,
+};
+
+use serde::Deserialize;
+use serde_json::{Map, Value, json};
+use subtle::ConstantTimeEq;
+use tiny_http::{Header, Method, Request, Response, Server};
+use uuid::Uuid;
+use zeroize::Zeroizing;
+
+use crate::{WorkspaceStore, operations};
+
+const MAX_BODY: u64 = 128 * 1024;
+
+#[derive(Deserialize)]
+struct Rpc {
+    jsonrpc: String,
+    id: Value,
+    method: String,
+    params: Value,
+}
+
+#[derive(Deserialize)]
+struct SendMessage {
+    message: Message,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Message {
+    role: String,
+    message_id: String,
+    task_id: Option<String>,
+    parts: [Part; 1],
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Part {
+    data: Operation,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Operation {
+    operation: String,
+    #[serde(default)]
+    arguments: Map<String, Value>,
+}
+
+pub fn serve_a2a(
+    store: &mut WorkspaceStore,
+    database: &Path,
+    port: u16,
+    token: Zeroizing<Vec<u8>>,
+    mut ready: impl Write,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    if !(32..=256).contains(&token.len()) || !token.iter().all(u8::is_ascii_alphanumeric) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Expected a 32–256 character alphanumeric bearer token",
+        )
+        .into());
+    }
+    let server = Server::http(("127.0.0.1", port))?;
+    let host = server.server_addr().to_string();
+    let endpoint = format!("http://{host}/a2a");
+    writeln!(ready, "{endpoint}")?;
+    ready.flush()?;
+    drop(ready);
+    for mut request in server.incoming_requests() {
+        let (status, body) = handle(store, database, &token, &host, &endpoint, &mut request);
+        let mut response = Response::from_string(body.to_string())
+            .with_status_code(status)
+            .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+            .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap());
+        if status == 401 {
+            response.add_header(Header::from_bytes("WWW-Authenticate", "Bearer").unwrap());
+        }
+        let _ = request.respond(response);
+    }
+    Ok(())
+}
+
+fn handle(
+    store: &mut WorkspaceStore,
+    database: &Path,
+    token: &[u8],
+    host: &str,
+    endpoint: &str,
+    request: &mut Request,
+) -> (u16, Value) {
+    if header(request, "Host") != Some(host) || header(request, "Origin").is_some() {
+        return (403, json!({"error": "Invalid local request origin"}));
+    }
+    match (request.method(), request.url()) {
+        (&Method::Get, "/.well-known/agent-card.json") => return (200, card(endpoint)),
+        (&Method::Post, "/a2a") => {}
+        _ => return (404, json!({"error": "Not found"})),
+    }
+    let provided = header(request, "Authorization").and_then(|value| value.strip_prefix("Bearer "));
+    if !provided.is_some_and(|value| bool::from(token.ct_eq(value.as_bytes()))) {
+        return (401, json!({"error": "Authentication required"}));
+    }
+    if header(request, "Content-Type").and_then(|value| value.split(';').next())
+        != Some("application/json")
+    {
+        return (415, json!({"error": "Expected application/json"}));
+    }
+    let mut body = Vec::new();
+    if request
+        .as_reader()
+        .take(MAX_BODY + 1)
+        .read_to_end(&mut body)
+        .is_err()
+    {
+        return (400, json!({"error": "Could not read request"}));
+    }
+    if body.len() as u64 > MAX_BODY {
+        return (413, json!({"error": "Request exceeds 128 KiB"}));
+    }
+    (
+        200,
+        dispatch(store, database, header(request, "A2A-Version"), &body),
+    )
+}
+
+fn header<'a>(request: &'a Request, name: &'static str) -> Option<&'a str> {
+    request
+        .headers()
+        .iter()
+        .find(|header| header.field.equiv(name))
+        .map(|header| header.value.as_str())
+}
+
+fn card(endpoint: &str) -> Value {
+    json!({
+        "name": "Arrumo Video Editor", "description": "Local workspace and video production operations.",
+        "version": env!("CARGO_PKG_VERSION"),
+        "supportedInterfaces": [{"url": endpoint, "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}],
+        "capabilities": {"streaming": false, "pushNotifications": false},
+        "securitySchemes": {"localBearer": {"httpAuthSecurityScheme": {"scheme": "Bearer"}}},
+        "securityRequirements": [{"schemes": {"localBearer": {"list": []}}}],
+        "defaultInputModes": ["application/json"], "defaultOutputModes": ["application/json"],
+        "skills": [{"id": "workspace-operations", "name": "Workspace operations",
+            "description": "Send a data part with operation list_operations to discover inputs or invoke a named operation.",
+            "tags": ["video", "workspace"]}]
+    })
+}
+
+fn dispatch(
+    store: &mut WorkspaceStore,
+    database: &Path,
+    version: Option<&str>,
+    body: &[u8],
+) -> Value {
+    let Ok(value) = serde_json::from_slice::<Value>(body) else {
+        return rpc_error(Value::Null, -32700, "Invalid JSON");
+    };
+    let Ok(request) = serde_json::from_value::<Rpc>(value) else {
+        return rpc_error(Value::Null, -32600, "Invalid request");
+    };
+    if request.jsonrpc != "2.0" || !(request.id.is_string() || request.id.is_number()) {
+        return rpc_error(Value::Null, -32600, "Invalid request");
+    }
+    if version.is_some_and(|value| value != "1.0") {
+        return rpc_error(request.id, -32009, "Unsupported A2A version");
+    }
+    if request.method != "SendMessage" {
+        return rpc_error(request.id, -32601, "Method not found");
+    }
+    let Ok(input) = serde_json::from_value::<SendMessage>(request.params) else {
+        return rpc_error(
+            request.id,
+            -32602,
+            "Expected one structured operation message",
+        );
+    };
+    let Message {
+        role,
+        message_id,
+        task_id,
+        parts: [Part { data }],
+    } = input.message;
+    if role != "ROLE_USER" || message_id.is_empty() || task_id.is_some() {
+        return rpc_error(
+            request.id,
+            -32602,
+            "Expected a new user message with a message ID",
+        );
+    }
+    let data = if data.operation == "list_operations" && data.arguments.is_empty() {
+        json!({"result": {"operations": operations::definitions()}})
+    } else {
+        match operations::invoke(store, database, &data.operation, data.arguments) {
+            Some(Ok(result)) => json!({"result": result}),
+            Some(Err(message)) => json!({"error": message}),
+            None => return rpc_error(request.id, -32602, "Unknown operation"),
+        }
+    };
+    json!({"jsonrpc": "2.0", "id": request.id, "result": {"message": {
+        "role": "ROLE_AGENT", "messageId": Uuid::new_v4().to_string(), "parts": [{"data": data}]
+    }}})
+}
+
+fn rpc_error(id: Value, code: i64, message: &str) -> Value {
+    json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wraps_shared_operation_results_as_a2a_messages() {
+        let database = Path::new(":memory:");
+        let mut store = WorkspaceStore::open(database).unwrap();
+        store.create("Studio").unwrap();
+        let request = br#"{"jsonrpc":"2.0","id":"fixture","method":"SendMessage","params":{"message":{"messageId":"request","role":"ROLE_USER","parts":[{"data":{"operation":"list_workspaces"}}]}}}"#;
+        let reply = dispatch(&mut store, database, Some("1.0"), request);
+        assert_eq!(reply["id"], "fixture");
+        let message = &reply["result"]["message"];
+        assert_eq!(message["role"], "ROLE_AGENT");
+        assert_eq!(
+            message["parts"][0]["data"]["result"]["workspaces"][0]["name"],
+            "Studio"
+        );
+
+        let rejected = dispatch(&mut store, database, Some("0.3"), request);
+        assert_eq!(rejected["id"], "fixture");
+        assert_eq!(rejected["error"]["code"], -32009);
+    }
+}

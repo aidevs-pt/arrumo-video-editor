@@ -3,6 +3,7 @@ use std::{path::Path, time::Duration};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
+mod a2a;
 mod agent_cli;
 mod agent_plugins;
 mod agent_settings;
@@ -41,6 +42,7 @@ mod transcription;
 mod video_drafts;
 mod workspace_feedback;
 
+pub use a2a::serve_a2a;
 pub use agent_cli::{AgentLoginStatus, agent_cli_detected, check_agent_login};
 pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};
 pub use agent_settings::{AgentProviderSource, AgentSettings};

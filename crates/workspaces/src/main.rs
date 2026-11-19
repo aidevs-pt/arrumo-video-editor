@@ -42,6 +42,24 @@ fn read_plugin_invocation_input() -> Result<serde_json::Value, Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
     match arguments.as_slice() {
+        [database, command, port] if command == "a2a" => {
+            if io::stdin().is_terminal() {
+                return Err("Supply the A2A bearer token on redirected stdin".into());
+            }
+            let port = utf8(port)?.parse()?;
+            let mut token = zeroize::Zeroizing::new(Vec::new());
+            io::stdin().lock().take(259).read_to_end(&mut token)?;
+            if token.last() == Some(&b'\n') {
+                token.pop();
+                if token.last() == Some(&b'\r') {
+                    token.pop();
+                }
+            }
+            let database = Path::new(database);
+            let mut store = WorkspaceStore::open(database)?;
+            arrumo_workspaces::serve_a2a(&mut store, database, port, token, io::stdout().lock())
+                .map_err(io::Error::other)?;
+        }
         [database, command] if command == "mcp" => {
             let mut store = WorkspaceStore::open(Path::new(database))?;
             arrumo_workspaces::serve_mcp(
@@ -832,7 +850,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
-                "mcp | plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
+                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
