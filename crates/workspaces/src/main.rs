@@ -135,6 +135,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
             )?;
         }
+        [database, command, plugin_id] if command == "invoke-plugin" => {
+            let limit = arrumo_workspaces::MAX_PLUGIN_IO_BYTES;
+            let mut input = Vec::new();
+            io::stdin().take(limit as u64 + 1).read_to_end(&mut input)?;
+            if input.len() > limit {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Plugin input exceeds 64 KiB",
+                )
+                .into());
+            }
+            let input = serde_json::from_slice(&input).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "Expected JSON plugin input")
+            })?;
+            let result = WorkspaceStore::open(Path::new(database))?
+                .invoke_plugin_component(utf8(plugin_id)?, &input)?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
         [database, command, manifest] if command == "install-plugin-manifest" => {
             eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
             let mut bytes = Vec::new();
@@ -753,6 +771,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
+                "invoke-plugin <plugin-id> (JSON on stdin) | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",

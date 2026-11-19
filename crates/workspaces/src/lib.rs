@@ -23,6 +23,7 @@ mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_package;
 mod plugin_registry;
+mod plugin_runtime;
 mod plugin_schema;
 mod plugin_settings;
 mod preview_settings;
@@ -59,6 +60,7 @@ pub use plugin_registry::{
     PluginRegistry, RegistryPlugin, RegistryRelease, RegistryReleaseSource, fetch_plugin_registry,
     read_plugin_registry, validate_registry_url,
 };
+pub use plugin_runtime::MAX_PLUGIN_IO_BYTES;
 pub use plugin_schema::{PluginCode, PluginSetting, PluginSettingKind, PluginSettingScope};
 pub use plugin_settings::ResolvedPluginSetting;
 pub use preview_settings::PreviewSettings;
