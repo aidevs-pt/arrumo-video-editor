@@ -1,4 +1,4 @@
-use rusqlite::{OptionalExtension, params};
+use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -22,6 +22,7 @@ pub struct GenerationActivity {
     pub state: String,
     pub kind: String,
     pub created_at: i64,
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -29,6 +30,7 @@ pub struct GenerationActivity {
 pub enum RunControl {
     Pause,
     Resume,
+    Retry,
     Cancel,
 }
 
@@ -81,6 +83,35 @@ impl WorkspaceStore {
         )
     }
 
+    pub fn fail_generation(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        detail: &str,
+    ) -> rusqlite::Result<GenerationRun> {
+        let detail = detail.trim();
+        if detail.is_empty() || detail.len() > 2000 || detail.contains('\0') {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let run = tx.query_row(
+            "UPDATE generation_runs SET state = 'failed', lease_until = NULL
+             WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
+               AND state = 'running' AND lease_until > unixepoch()
+             RETURNING id, draft_id, state, snapshot_json",
+            params![workspace_id, run_id, attempt],
+            read_run,
+        )?;
+        tx.execute(
+            "UPDATE generation_activity SET detail = ?2
+             WHERE id = (SELECT max(id) FROM generation_activity WHERE run_id = ?1)",
+            params![run_id, detail],
+        )?;
+        tx.commit()?;
+        Ok(run)
+    }
+
     pub fn control_generation(
         &self,
         workspace_id: i64,
@@ -89,6 +120,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<GenerationRun> {
         let (target, allowed) = match action {
             RunControl::Pause => ("paused", ["queued", "running", "paused"]),
+            RunControl::Retry => ("queued", ["failed", "queued", "queued"]),
             RunControl::Resume => ("queued", ["paused", "queued", "queued"]),
             RunControl::Cancel => ("cancelled", ["queued", "running", "paused"]),
         };
@@ -115,7 +147,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<Vec<GenerationActivity>> {
         self.0
             .prepare(
-                "SELECT event.attempt, event.state, event.kind, event.created_at
+                "SELECT event.attempt, event.state, event.kind, event.created_at, event.detail
              FROM generation_activity AS event JOIN generation_runs AS run ON run.id = event.run_id
              WHERE run.workspace_id = ?1 AND run.id = ?2 ORDER BY event.id",
             )?
@@ -125,6 +157,7 @@ impl WorkspaceStore {
                     state: row.get(1)?,
                     kind: row.get(2)?,
                     created_at: row.get(3)?,
+                    detail: row.get(4)?,
                 })
             })?
             .collect()
@@ -225,5 +258,66 @@ mod tests {
             ]
         );
         assert!(store.generation_activity(other, run.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn failure_is_fenced_and_retry_retains_checkpoint_and_history() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "request",
+                &RunOptions {
+                    autopilot: false,
+                    platform: None,
+                },
+            )
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        assert!(
+            store
+                .fail_generation(workspace, run.id, claim.attempt + 1, "Stale attempt")
+                .is_err()
+        );
+        assert!(
+            store
+                .fail_generation(workspace, run.id, claim.attempt, " ")
+                .is_err()
+        );
+        store
+            .checkpoint_generation(workspace, run.id, claim.attempt, &json!({"step":2}))
+            .unwrap();
+        let failed = store
+            .fail_generation(workspace, run.id, claim.attempt, "Source unavailable")
+            .unwrap();
+        assert_eq!(failed.state, "failed");
+        assert!(store.claim_generation(workspace).unwrap().is_none());
+        store
+            .control_generation(workspace, run.id, RunControl::Retry)
+            .unwrap();
+        let retry = store.claim_generation(workspace).unwrap().unwrap();
+        assert_eq!(retry.attempt, claim.attempt + 1);
+        assert_eq!(retry.checkpoint, Some(json!({"step":2})));
+        assert!(
+            store
+                .fail_generation(workspace, run.id, claim.attempt, "Stale attempt")
+                .is_err()
+        );
+        let history = store.generation_activity(workspace, run.id).unwrap();
+        assert_eq!(history[2].state, "failed");
+        assert_eq!(history[2].detail.as_deref(), Some("Source unavailable"));
     }
 }

@@ -281,8 +281,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let action = match utf8(action)? {
                 "pause" => RunControl::Pause,
                 "resume" => RunControl::Resume,
+                "retry" => RunControl::Retry,
                 "cancel" => RunControl::Cancel,
-                _ => return Err("Action must be pause, resume, or cancel".into()),
+                _ => return Err("Action must be pause, resume, retry, or cancel".into()),
             };
             let run = WorkspaceStore::open(Path::new(database))?.control_generation(
                 utf8(workspace)?.parse()?,
@@ -295,6 +296,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             let events = WorkspaceStore::open(Path::new(database))?
                 .generation_activity(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
             println!("{}", serde_json::to_string(&events)?);
+        }
+        [database, command, workspace, run, attempt, detail] if command == "fail-generation" => {
+            let run = WorkspaceStore::open(Path::new(database))?.fail_generation(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(attempt)?.parse()?,
+                utf8(detail)?,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
         }
         _ => {
             return Err(concat!(
@@ -326,8 +336,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "generation-runs <workspace-id> | ",
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
-                "control-generation <workspace-id> <run-id> <pause|resume|cancel> | ",
-                "generation-activity <workspace-id> <run-id>"
+                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
+                "generation-activity <workspace-id> <run-id> | ",
+                "fail-generation <workspace-id> <run-id> <attempt> <detail>"
             )
             .into());
         }

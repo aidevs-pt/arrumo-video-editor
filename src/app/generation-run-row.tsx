@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 
 type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
 export type Run = { id: number; draft_id: number; state: RunState; snapshot: { draft: { id: number; title: string } } };
-export type RunAction = "pause" | "resume" | "cancel";
-type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number };
+export type RunAction = "pause" | "resume" | "retry" | "cancel";
+type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
 
 export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
   run: Run;
@@ -75,6 +75,10 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
           )}
         </div>
       )}
+      {run.state === "failed" && (
+        <Button type="button" size="sm" variant="outline" className="mt-2.5" disabled={disabled}
+          aria-label={`${copy.retryRun} · ${title}`} onClick={() => void onControl(run.id, "retry")}>{copy.retryRun}</Button>
+      )}
       <details className="mt-2.5 [&>summary]:cursor-pointer" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
         <summary>{copy.activity}</summary>
         {historyError ? <p role="alert">{copy.activityError}</p> : !activity ? <p role="status">{copy.loading}</p> : (
@@ -84,6 +88,7 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
                 {copy[event.kind]} · {copy[event.state]} · <time dateTime={new Date(event.created_at * 1000).toISOString()}>
                   {new Date(event.created_at * 1000).toLocaleString(locale)}
                 </time>
+                {event.detail && <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{event.detail}</p>}
               </li>
             ))}
           </ol>

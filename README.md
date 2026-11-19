@@ -129,3 +129,5 @@ A worker claims queued work with `claim-generation <workspace-id>`. The claim in
 ## Interface translations
 
 Copy `locales/en.json` to a new file such as `locales/fr.json` and translate the values. Keep the same keys. The desktop build discovers the file automatically and reports missing or unexpected keys. The app follows the system’s language preferences, tries the base language when a regional translation is unavailable, and falls back to English.
+
+A worker can report a terminal failure with `fail-generation <workspace-id> <run-id> <attempt> <detail>`. Supply a short, user-facing reason without credentials or raw provider logs. The desktop activity history shows the reason. Use Retry in the desktop queue or `control-generation <workspace-id> <run-id> retry` to return a failed run to the queue with its checkpoint intact.

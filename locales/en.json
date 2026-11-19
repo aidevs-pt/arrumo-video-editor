@@ -173,6 +173,7 @@
     "completed": "Completed",
     "cancelled": "Cancelled",
     "pause": "Pause",
+    "retryRun": "Retry run",
     "resume": "Resume",
     "cancel": "Cancel run",
     "confirmCancel": "Cancel this generation run?",

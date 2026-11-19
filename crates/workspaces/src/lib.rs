@@ -66,6 +66,7 @@ impl WorkspaceStore {
             include_str!("012-video-drafts.sql"),
             include_str!("013-generation-queue.sql"),
             include_str!("014-generation-activity.sql"),
+            include_str!("015-generation-failures.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

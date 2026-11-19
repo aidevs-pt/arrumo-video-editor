@@ -173,6 +173,7 @@
     "completed": "Concluída",
     "cancelled": "Cancelada",
     "pause": "Pausar",
+    "retryRun": "Tentar execução novamente",
     "resume": "Retomar",
     "cancel": "Cancelar execução",
     "confirmCancel": "Cancelar esta execução?",
