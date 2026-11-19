@@ -7,6 +7,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { FormatDelivery } from "./format-delivery";
+import { deliveryCopy } from "./delivery-copy";
 import { profileFormatCopy } from "./profile-format-copy";
 
 type ProfileFormat = {
@@ -26,6 +28,7 @@ export function ProfileFormats({
   onBack: () => void;
   onOutputs: () => void;
 }) {
+  const [deliveryFormat, setDeliveryFormat] = useState<ProfileFormat | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const [formats, setFormats] = useState<ProfileFormat[]>();
   const [loadError, setLoadError] = useState(false);
@@ -67,6 +70,16 @@ export function ProfileFormats({
     }
   }
 
+  if (deliveryFormat) {
+    return <FormatDelivery
+      workspaceId={workspaceId}
+      profileId={profile.id}
+      format={deliveryFormat}
+      locale={locale}
+      onBack={() => setDeliveryFormat(null)}
+    />;
+  }
+
   return (
     <main className="workspace-shell profile-shell">
       <Button type="button" variant="ghost" onClick={onBack} disabled={pending !== null}>
@@ -98,7 +111,12 @@ export function ProfileFormats({
               <li key={format.id}>
                 <form onSubmit={(event) => void save(event, format.id)} aria-labelledby={`profile-format-${format.id}`}
                   onChange={() => { if (result?.id === format.id) setResult(null); }}>
-                  <h2 id={`profile-format-${format.id}`} className="profile-name">{format.name}</h2>
+                  <div className="profile-row-heading">
+                    <h2 id={`profile-format-${format.id}`} className="profile-name">{format.name}</h2>
+                    <Button type="button" size="sm" variant="outline" disabled={pending !== null}
+                      aria-label={`${deliveryCopy[locale].title} · ${format.name}`}
+                      onClick={() => setDeliveryFormat(format)}>{deliveryCopy[locale].title}</Button>
+                  </div>
                   <fieldset disabled={pending !== null}>
                     <FieldGroup className="profile-format-fields">
                       <Field>
