@@ -5,6 +5,8 @@ use serde_json::{Value, json};
 
 use crate::WorkspaceStore;
 
+mod generation;
+
 const VERSION: &str = "2025-11-25";
 const MAX_MESSAGE_BYTES: u64 = 128 * 1024;
 
@@ -125,20 +127,20 @@ fn dispatch(store: &WorkspaceStore, session: &mut Session, message: Value) -> Op
 
 fn tool_definitions() -> Value {
     let no_input = json!({"type": "object", "additionalProperties": false});
-    json!({"tools": [
-        {
+    let mut tools = vec![
+        json!({
             "name": "list_workspaces",
             "description": "List local Arrumo workspaces and their IDs.",
             "inputSchema": no_input,
             "annotations": {"readOnlyHint": true}
-        },
-        {
+        }),
+        json!({
             "name": "list_plugin_actions",
             "description": "List installed plugin actions, their scopes and current package digests.",
             "inputSchema": no_input,
             "annotations": {"readOnlyHint": true}
-        },
-        {
+        }),
+        json!({
             "name": "invoke_plugin_action",
             "description": "Invoke a declared plugin action in its app or workspace scope. Use the package digest returned by list_plugin_actions.",
             "inputSchema": {
@@ -153,8 +155,10 @@ fn tool_definitions() -> Value {
                 "required": ["pluginId", "actionId", "packageSha256", "input"],
                 "additionalProperties": false
             }
-        }
-    ]})
+        }),
+    ];
+    tools.extend(generation::definitions());
+    json!({"tools": tools})
 }
 
 fn call_tool(store: &WorkspaceStore, call: ToolCall) -> Option<Value> {
@@ -183,7 +187,7 @@ fn call_tool(store: &WorkspaceStore, call: ToolCall) -> Option<Value> {
             ).map(|output| json!({"output": output}))
              .map_err(|_| "Plugin action could not run. Check the installed revision, scope and permissions")
         }
-        _ => return None,
+        _ => generation::call(store, &call.name, call.arguments)?,
     };
     Some(match result {
         Ok(data) => json!({
@@ -229,7 +233,10 @@ mod tests {
         assert_eq!(responses[0]["error"]["code"], -32002);
         assert_eq!(responses[1]["result"]["protocolVersion"], VERSION);
         assert_eq!(responses[2]["id"], "list");
-        assert_eq!(responses[2]["result"]["tools"].as_array().unwrap().len(), 3);
+        assert_eq!(
+            responses[2]["result"]["tools"].as_array().unwrap().len(),
+            10
+        );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],
             "Studio"

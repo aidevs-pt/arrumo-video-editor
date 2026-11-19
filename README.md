@@ -250,3 +250,5 @@ In desktop Settings, expand an action under **Plugin actions**. The Settings sco
 ### Local MCP
 
 Configure a local MCP client to launch `arrumo-workspaces <database-path> mcp` over stdio. This server supports MCP `2025-11-25` and exposes `list_workspaces`, `list_plugin_actions`, and `invoke_plugin_action`. Pass the package digest returned by the action listing, and pass a workspace ID for a workspace action. The client process has the same workspace access as an operator running the local CLI. Action execution applies the existing sandbox and plugin grants. Pass an absolute database path when configuring the client.
+
+To queue a saved draft, call `list_video_drafts` with the workspace ID, then call `enqueue_video_draft` with the draft ID and a request key. Reuse the key for retries of the same submission. Use `list_generation_runs` and `get_generation_run` to inspect runs and captured settings, and `control_generation` to pause, resume, retry, or cancel a run. Use `get_production_progress` to identify a pending stage result and `review_production_result` to submit an approval, rejection, or revision request.
