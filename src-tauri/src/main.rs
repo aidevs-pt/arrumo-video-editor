@@ -2,7 +2,7 @@
 
 use std::{path::PathBuf, sync::Mutex};
 
-use arrumo_workspaces::{Workspace, WorkspaceStore};
+use arrumo_workspaces::{Profile, Workspace, WorkspaceStore};
 use tauri::{Manager, State};
 
 type Store = Mutex<WorkspaceStore>;
@@ -25,6 +25,33 @@ fn create_workspace(name: String, store: State<'_, Store>) -> Result<Workspace, 
         .map_err(|_| "create_failed")
 }
 
+#[tauri::command]
+async fn list_profiles(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<Profile>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_profiles(workspace_id)
+        .map_err(|_| "profiles_list_failed")
+}
+
+#[tauri::command]
+async fn create_profile(
+    workspace_id: i64,
+    name: String,
+    guidance: String,
+    color: Option<String>,
+    store: State<'_, Store>,
+) -> Result<Profile, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .create_profile(workspace_id, &name, &guidance, color.as_deref())
+        .map_err(|_| "profile_create_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -35,7 +62,12 @@ fn main() {
             )?));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![list_workspaces, create_workspace])
+        .invoke_handler(tauri::generate_handler![
+            list_workspaces,
+            create_workspace,
+            list_profiles,
+            create_profile
+        ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");
 }

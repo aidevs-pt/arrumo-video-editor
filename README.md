@@ -24,7 +24,14 @@ cargo run --locked -- ./workspaces.sqlite create "My studio"
 cargo run --locked -- ./workspaces.sqlite list
 ```
 
-Both commands print JSON. The database persists across runs. Run the backend tests with `cargo test --locked`.
+To create and list profiles for workspace ID 1:
+
+```sh
+cargo run --locked -- ./workspaces.sqlite create-profile 1 "Reviews" "## Keep hands-on demos" "#532A9D"
+cargo run --locked -- ./workspaces.sqlite profiles 1
+```
+
+Guidance and color are optional. Colors use `#RRGGBB`. The commands print JSON. The database persists across runs. Run the backend tests with `cargo test --locked`.
 
 Copyright © 2026 DEVS AI Unipessoal LDA. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
