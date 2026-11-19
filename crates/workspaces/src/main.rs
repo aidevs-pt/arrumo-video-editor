@@ -43,9 +43,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
     match arguments.as_slice() {
         [database, command] if command == "mcp" => {
-            let store = WorkspaceStore::open(Path::new(database))?;
+            let mut store = WorkspaceStore::open(Path::new(database))?;
             arrumo_workspaces::serve_mcp(
-                &store,
+                &mut store,
                 Path::new(database),
                 io::stdin().lock(),
                 io::stdout().lock(),

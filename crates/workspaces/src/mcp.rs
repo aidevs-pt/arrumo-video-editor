@@ -37,7 +37,7 @@ struct ActionArguments {
 }
 
 pub fn serve_mcp(
-    store: &WorkspaceStore,
+    store: &mut WorkspaceStore,
     database: &Path,
     mut input: impl BufRead,
     mut output: impl Write,
@@ -73,7 +73,7 @@ pub fn serve_mcp(
 }
 
 fn dispatch(
-    store: &WorkspaceStore,
+    store: &mut WorkspaceStore,
     database: &Path,
     session: &mut Session,
     message: Value,
@@ -168,7 +168,7 @@ fn tool_definitions() -> Value {
     json!({"tools": tools})
 }
 
-fn call_tool(store: &WorkspaceStore, database: &Path, call: ToolCall) -> Option<Value> {
+fn call_tool(store: &mut WorkspaceStore, database: &Path, call: ToolCall) -> Option<Value> {
     let result = match call.name.as_str() {
         "list_workspaces" if call.arguments.is_empty() => store
             .list()
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn negotiates_stdio_session_and_only_replies_to_requests() {
-        let store = WorkspaceStore::open(":memory:").unwrap();
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
         store.create("Studio").unwrap();
         let requests = r#"
 {"jsonrpc":"2.0","id":1,"method":"tools/list"}
@@ -231,7 +231,7 @@ mod tests {
 "#;
         let mut output = Vec::new();
         serve_mcp(
-            &store,
+            &mut store,
             Path::new(":memory:"),
             requests.trim_start().as_bytes(),
             &mut output,
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(responses[2]["id"], "list");
         assert_eq!(
             responses[2]["result"]["tools"].as_array().unwrap().len(),
-            22
+            24
         );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],
@@ -259,10 +259,18 @@ mod tests {
 
     #[test]
     fn rejects_overlong_stdio_messages_before_parsing() {
-        let store = WorkspaceStore::open(":memory:").unwrap();
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
         let input = vec![b' '; MAX_MESSAGE_BYTES as usize + 1];
         let mut output = Vec::new();
-        assert!(serve_mcp(&store, Path::new(":memory:"), input.as_slice(), &mut output).is_err());
+        assert!(
+            serve_mcp(
+                &mut store,
+                Path::new(":memory:"),
+                input.as_slice(),
+                &mut output
+            )
+            .is_err()
+        );
         assert!(output.is_empty());
     }
 }

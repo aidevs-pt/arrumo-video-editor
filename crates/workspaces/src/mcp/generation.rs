@@ -4,8 +4,8 @@ use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use crate::{
-    GenerationRun, ProductionStage, ReplayMode, ReviewDecision, RunControl, RunOptions,
-    WorkspaceStore,
+    DraftSettings, GenerationRun, ProductionStage, ReplayMode, ReviewDecision, RunControl,
+    RunOptions, WorkspaceStore,
 };
 
 #[derive(Deserialize)]
@@ -111,13 +111,40 @@ struct FailureInput {
     detail: String,
 }
 
-pub(super) fn definitions() -> [Value; 19] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CreateDraftInput {
+    workspace_id: i64,
+    settings: DraftSettings,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct UpdateDraftInput {
+    workspace_id: i64,
+    draft_id: i64,
+    settings: DraftSettings,
+}
+
+pub(super) fn definitions() -> [Value; 21] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
     let run = json!({"type": "object", "properties": {"workspaceId": id, "runId": id},
         "required": ["workspaceId", "runId"], "additionalProperties": false});
+    let draft = json!({"type": "object", "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "profile_id": {"type": ["integer", "null"], "minimum": 1},
+        "intent": {"type": "string"},
+        "source_ids": {"type": "array", "items": id, "uniqueItems": true}
+    }, "required": ["title"], "additionalProperties": false});
     [
+        json!({"name": "create_video_draft", "description": "Save a draft with a brief, an ordered list of managed video sources, or both.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "settings": draft},
+                "required": ["workspaceId", "settings"], "additionalProperties": false}}),
+        json!({"name": "update_video_draft", "description": "Replace a saved draft's title, brief, profile, and ordered sources. Send the full draft settings.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "draftId": id, "settings": draft},
+                "required": ["workspaceId", "draftId", "settings"], "additionalProperties": false}}),
         json!({"name": "list_video_drafts", "description": "List drafts in the selected workspace.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "list_generation_runs", "description": "List runs and their current states in a workspace.",
@@ -190,13 +217,25 @@ pub(super) fn definitions() -> [Value; 19] {
 }
 
 pub(super) fn call(
-    store: &WorkspaceStore,
+    store: &mut WorkspaceStore,
     database: &Path,
     name: &str,
     arguments: serde_json::Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     let arguments = Value::Object(arguments);
     Some(match name {
+        "create_video_draft" => parse(arguments).and_then(|args: CreateDraftInput| {
+            store
+                .create_video_draft(args.workspace_id, args.settings)
+                .map(|draft| json!({"draft": draft}))
+                .map_err(|_| "Could not create draft. Check title, brief, profile and sources")
+        }),
+        "update_video_draft" => parse(arguments).and_then(|args: UpdateDraftInput| {
+            store
+                .update_video_draft(args.workspace_id, args.draft_id, args.settings)
+                .map(|draft| json!({"draft": draft}))
+                .map_err(|_| "Could not update draft. Check the draft, workspace and settings")
+        }),
         "list_video_drafts" => parse(arguments).and_then(|args: WorkspaceInput| {
             store
                 .list_video_drafts(args.workspace_id)
