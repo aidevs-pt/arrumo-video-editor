@@ -15,8 +15,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
             println!("{}", serde_json::to_string(&workspaces)?);
         }
+        [_database, command] if command == "agent-plugins" => {
+            println!(
+                "{}",
+                serde_json::to_string(arrumo_workspaces::agent_plugins())?
+            );
+        }
         [_database, command, provider] if command == "agent-login-status" => {
-            let provider = serde_json::from_value(serde_json::json!(utf8(provider)?))?;
+            let provider = utf8(provider)?;
             println!(
                 "{}",
                 serde_json::to_string(&arrumo_workspaces::check_agent_login(provider))?
@@ -38,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let provider = match utf8(provider)? {
                 "unset" => None,
-                provider => Some(serde_json::from_value(serde_json::json!(provider))?),
+                provider => Some(provider),
             };
             let store = WorkspaceStore::open(Path::new(database))?;
             store.set_agent_provider(workspace_id, provider)?;
@@ -541,8 +547,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
-                "agent-login-status <codex|claude_code> | ",
-                "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <codex|claude_code|unset> | ",
+                "agent-plugins | agent-login-status <plugin-id> | ",
+                "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "completed-video <workspace-id> <run-id> | ",

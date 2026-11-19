@@ -608,6 +608,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             list_workspaces,
             agent_settings::get_agent_settings,
+            agent_settings::list_agent_plugins,
             agent_settings::set_agent_provider,
             agent_settings::agent_cli_detected,
             agent_settings::agent_login_status,

@@ -16,16 +16,16 @@ import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 
-type Provider = "codex" | "claude_code";
+type AgentPlugin = { id: string; label: string };
 type Settings = {
-  app_provider: Provider | null;
-  workspace_override: Provider | null;
-  effective_provider: Provider | null;
+  app_provider: string | null;
+  workspace_override: string | null;
+  effective_provider: string | null;
   source: "app" | "workspace" | null;
 };
-type Choice = Provider | "unset";
+const unset = "__inherit__";
 type LoginStatus = "confirmed" | "unconfirmed" | "unavailable" | "timed_out" | "failed";
-const providerNames = { codex: "Codex", claude_code: "Claude Code" };
+
 
 export function AgentSettingsPage() {
   const { status, workspaces, load } = useWorkspaceCatalog();
@@ -73,23 +73,28 @@ export function AgentSettingsPage() {
 function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
   const { messages: { agentSettings: copy, workspaces: workspaceCopy } } = useLocale();
   const [settings, setSettings] = useState<Settings>();
-  const [choice, setChoice] = useState<Choice>("unset");
+  const [choice, setChoice] = useState(unset);
+  const [plugins, setPlugins] = useState<AgentPlugin[]>([]);
   const [error, setError] = useState<"loadError" | "saveError">();
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  function selected(result: Settings): Choice {
-    return (workspaceId === null ? result.app_provider : result.workspace_override) ?? "unset";
+  function selected(result: Settings): string {
+    return (workspaceId === null ? result.app_provider : result.workspace_override) ?? unset;
   }
 
   useEffect(() => {
     let active = true;
-    invoke<Settings>("get_agent_settings", { workspaceId }).then(
-      (result) => {
+    Promise.all([
+      invoke<Settings>("get_agent_settings", { workspaceId }),
+      invoke<AgentPlugin[]>("list_agent_plugins"),
+    ]).then(
+      ([result, available]) => {
         if (!active) return;
         setSettings(result);
-        setChoice((workspaceId === null ? result.app_provider : result.workspace_override) ?? "unset");
+        setPlugins(available);
+        setChoice((workspaceId === null ? result.app_provider : result.workspace_override) ?? unset);
       },
       () => { if (active) setError("loadError"); },
     );
@@ -104,7 +109,7 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
     setError(undefined);
     try {
       const result = await invoke<Settings>("set_agent_provider", {
-        workspaceId, provider: choice === "unset" ? null : choice,
+        workspaceId, provider: choice === unset ? null : choice,
       });
       setSettings(result);
       setChoice(selected(result));
@@ -133,22 +138,21 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="agent-provider">{copy.providerChoice}</FieldLabel>
-                <Select value={choice} onValueChange={(value: Choice) => { setChoice(value); setSaved(false); }}
+                <Select value={choice} onValueChange={(value: string) => { setChoice(value); setSaved(false); }}
                   disabled={pending}>
                   <SelectTrigger id="agent-provider"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectGroup>
-                    <SelectItem value="unset">{workspaceId === null ? copy.unset : copy.inherit}</SelectItem>
-                    <SelectItem value="codex">{providerNames.codex}</SelectItem>
-                    <SelectItem value="claude_code">{providerNames.claude_code}</SelectItem>
+                    <SelectItem value={unset}>{workspaceId === null ? copy.unset : copy.inherit}</SelectItem>
+                    {plugins.map(({ id, label }) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
                   </SelectGroup></SelectContent>
                 </Select>
               </Field>
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span>{copy.effective}</span>
-                <Badge variant="secondary">{settings.effective_provider ? providerNames[settings.effective_provider] : copy.unset}</Badge>
+                <Badge variant="secondary">{settings.effective_provider ? plugins.find(({ id }) => id === settings.effective_provider)?.label ?? settings.effective_provider : copy.unset}</Badge>
                 {settings.source && <span className="text-muted-foreground">{settings.source === "app" ? copy.fromApp : copy.fromWorkspace}</span>}
               </div>
-              {choice !== "unset" && <AgentSetupHelp key={choice} provider={choice} />}
+              {choice !== unset && <AgentSetupHelp key={choice} provider={choice} />}
               {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={pending || choice === selected(settings)}>{copy.save}</Button>
@@ -163,7 +167,7 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
 }
 
 
-function AgentSetupHelp({ provider }: { provider: Provider }) {
+function AgentSetupHelp({ provider }: { provider: string }) {
   const { messages: { agentSettings: copy } } = useLocale();
   const [detected, setDetected] = useState<boolean>();
   const [failed, setFailed] = useState(false);

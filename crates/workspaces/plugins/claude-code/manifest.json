@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "claude-code",
+  "name": "Arrumo Claude Code Plugin",
+  "description": "The Claude Code agent adapter for planning, executing, and reporting on Arrumo video jobs.",
+  "capabilities": {
+    "agents": {
+      "name": "Agent adapter",
+      "description": "Plan and execute editing jobs and report progress."
+    }
+  },
+  "agentProvider": {
+    "label": "Claude Code",
+    "setupUrl": "https://code.claude.com/docs/en/setup",
+    "cli": {
+      "executable": "claude",
+      "authStatusArgs": [
+        "auth",
+        "status"
+      ]
+    }
+  }
+}

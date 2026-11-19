@@ -8,7 +8,7 @@ use std::{
 
 use serde::Serialize;
 
-use crate::AgentProvider;
+use crate::{AgentPlugin, agent_plugin};
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -20,24 +20,23 @@ pub enum AgentLoginStatus {
     Failed,
 }
 
-pub fn agent_cli_detected(provider: AgentProvider) -> bool {
-    find_agent_cli(provider).is_some()
+pub fn agent_cli_detected(provider: &str) -> bool {
+    agent_plugin(provider).and_then(find_agent_cli).is_some()
 }
 
-pub fn check_agent_login(provider: AgentProvider) -> AgentLoginStatus {
-    let Some(executable) = find_agent_cli(provider) else {
+pub fn check_agent_login(provider: &str) -> AgentLoginStatus {
+    let Some(plugin) = agent_plugin(provider) else {
         return AgentLoginStatus::Unavailable;
     };
-    let args = match provider {
-        AgentProvider::Codex => ["login", "status"],
-        AgentProvider::ClaudeCode => ["auth", "status"],
+    let Some(executable) = find_agent_cli(plugin) else {
+        return AgentLoginStatus::Unavailable;
     };
     let Ok(directory) = tempfile::tempdir() else {
         return AgentLoginStatus::Failed;
     };
     let mut command = Command::new(executable);
     command
-        .args(args)
+        .args(&plugin.cli.auth_status_args)
         .current_dir(directory.path())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -71,11 +70,8 @@ pub fn check_agent_login(provider: AgentProvider) -> AgentLoginStatus {
     }
 }
 
-fn find_agent_cli(provider: AgentProvider) -> Option<PathBuf> {
-    let executable = match provider {
-        AgentProvider::Codex => "codex",
-        AgentProvider::ClaudeCode => "claude",
-    };
+fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
+    let executable = &plugin.cli.executable;
     let search_path = env::var_os("PATH")?;
     env::split_paths(&search_path)
         .filter(|dir| dir.is_absolute())

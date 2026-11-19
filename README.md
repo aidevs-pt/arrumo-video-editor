@@ -176,10 +176,13 @@ Completed runs open at `/completed-video?workspace=<workspace-id>&run=<run-id>`.
 
 Desktop deep links use `arrumo://open/<section>?workspace=<id>`. Profile and run pages also take `profile=<id>` or `run=<id>`, respectively. For example, `arrumo://open/generation-run?workspace=2&run=8` opens the matching run in the local database. Linux registers the scheme on launch, and Windows debug builds register it for testing. Installed package registration follows Tauri's desktop scheme configuration.
 
-Use `agent-settings <app|workspace-id>` to inspect the configured agent and where it came from. Use `set-agent-provider <app|workspace-id> <codex|claude_code|unset>` to change the choice. Unsetting a workspace override restores the app choice, if configured. New runs freeze the resolved selection and provenance. Selecting a provider is separate from connecting or running its agent.
+Use `agent-settings <app|workspace-id>` to inspect the configured agent and where it came from. Use `set-agent-provider <app|workspace-id> <plugin-id|unset>` to change the choice. Unsetting a workspace override restores the app choice, if configured. New runs freeze the resolved selection and provenance. Selecting a provider is separate from connecting or running its agent.
 
 Open **Settings** in the desktop sidebar to choose the app's production agent. Use the settings scope picker to configure a workspace override or restore inheritance. The effective provider and its source appear under the selector.
 
 On a fresh install, creating the first workspace opens agent setup if no app provider is selected. Settings can check whether the selected CLI is on Arrumo's PATH and open the provider's installation guide in the system browser. This check reports local CLI availability. Authentication is handled through the provider's own setup.
 
-Use **Check sign-in** in Settings or `agent-login-status <codex|claude_code>` in the CLI to ask the installed provider about its local authentication state. The check makes no generation request and returns only a status category. It times out after five seconds. Windows detection and sign-in checks use a native executable on PATH.
+Use **Check sign-in** in Settings or `agent-login-status <plugin-id>` in the CLI to ask the installed provider about its local authentication state. The check makes no generation request and returns only a status category. It times out after five seconds. Windows detection and sign-in checks use a native executable on PATH.
+
+
+Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. The editor bundles byte-for-byte copies under `crates/workspaces/plugins` so its standalone build needs only this repository. Sync bundled copies when updating the official plugin manifests. Runtime installation and trust grants are separate host features.

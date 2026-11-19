@@ -4,6 +4,7 @@ use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
 mod agent_cli;
+mod agent_plugins;
 mod agent_settings;
 mod assets;
 mod brand_assets;
@@ -26,7 +27,8 @@ mod video_drafts;
 mod workspace_feedback;
 
 pub use agent_cli::{AgentLoginStatus, agent_cli_detected, check_agent_login};
-pub use agent_settings::{AgentProvider, AgentProviderSource, AgentSettings};
+pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};
+pub use agent_settings::{AgentProviderSource, AgentSettings};
 pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
@@ -94,6 +96,7 @@ impl WorkspaceStore {
             include_str!("../migrations/020-generation-replay.sql"),
             include_str!("../migrations/021-completed-video-feedback.sql"),
             include_str!("../migrations/022-agent-settings.sql"),
+            include_str!("../migrations/023-agent-plugin-ids.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

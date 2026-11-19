@@ -7,7 +7,7 @@
     "loginTimedOut": "Se agotó el tiempo de comprobación.",
     "loginCheckFailed": "No se pudo comprobar el inicio de sesión.",
     "setupTitle": "Configura tu agente de producción",
-    "setupIntro": "Elige Codex o Claude Code y sigue su guía de configuración antes de ejecutar tareas del agente.",
+    "setupIntro": "Elige un complemento de agente y sigue su guía de configuración antes de ejecutar tareas.",
     "setupAction": "Configurar agente",
     "continueSetup": "Continuar al contexto",
     "checkFailed": "No se pudo comprobar la CLI del agente",

@@ -7,7 +7,7 @@
     "loginTimedOut": "A verificação da sessão excedeu o tempo limite.",
     "loginCheckFailed": "Não foi possível verificar a sessão.",
     "setupTitle": "Configura o teu agente de produção",
-    "setupIntro": "Escolhe Codex ou Claude Code e segue o guia de configuração antes de executar tarefas do agente.",
+    "setupIntro": "Escolhe um plugin de agente e segue o guia de configuração antes de executar tarefas.",
     "setupAction": "Configurar agente",
     "continueSetup": "Continuar para o contexto",
     "checkFailed": "Não foi possível verificar a CLI do agente",

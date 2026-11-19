@@ -7,7 +7,7 @@
     "loginTimedOut": "The sign-in check timed out.",
     "loginCheckFailed": "The sign-in check could not run.",
     "setupTitle": "Set up your production agent",
-    "setupIntro": "Choose Codex or Claude Code and follow its setup guide before running agent work.",
+    "setupIntro": "Choose an agent plugin and follow its setup guide before running agent work.",
     "setupAction": "Set up agent",
     "continueSetup": "Continue to workspace context",
     "checkFailed": "Couldn’t check for the agent CLI",
