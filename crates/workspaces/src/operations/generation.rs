@@ -176,7 +176,7 @@ struct DeleteCompletedInput {
     confirmed_title: String,
 }
 
-pub(super) fn definitions() -> [Value; 27] {
+pub(super) fn definitions() -> [Value; 28] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -247,6 +247,8 @@ pub(super) fn definitions() -> [Value; 27] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "resultId": id, "markdown": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "markdown"], "additionalProperties": false}}),
+        json!({"name": "recover_delivery_cleanup", "description": "Retry cleanup of managed delivery files for runs already deleted in this workspace.",
+            "inputSchema": workspace, "annotations": {"idempotentHint": true}}),
         json!({"name": "delete_completed_video", "description": "Delete a completed run and its managed delivery files after confirming the exact display title. Runs referenced by replays are protected.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
@@ -407,6 +409,12 @@ pub(super) fn call(
                 .add_completed_video_feedback(args.workspace_id, args.run_id, args.result_id, &args.markdown)
                 .map(|feedback| json!({"feedback": feedback}))
                 .map_err(|_| "Could not save feedback. Check the completed run, result and Markdown")
+        }),
+        "recover_delivery_cleanup" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .recover_delivery_cleanup(database, args.workspace_id)
+                .map(|report| json!({"cleanup": report}))
+                .map_err(|_| "Could not recover delivery cleanup")
         }),
         "delete_completed_video" => parse(arguments).and_then(|args: DeleteCompletedInput| {
             store

@@ -51,6 +51,7 @@ pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
 pub use completed_video_feedback::CompletedVideoFeedback;
+pub use delivery_cleanup::DeliveryCleanupReport;
 pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,

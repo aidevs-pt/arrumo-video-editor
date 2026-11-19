@@ -343,3 +343,5 @@ Delete an unqueued draft with `delete-draft <workspace-id> <draft-id> <confirmed
 Use `delete-completed-video <workspace-id> <run-id> <confirmed-title>` in the CLI to remove a completed run and its managed delivery directory. Use the exact current display title. A run referenced by a replay stays available. If file cleanup is interrupted, rerun the same command to finish the pending cleanup. Shared source assets stay in the workspace library.
 
 Through MCP or A2A, use `delete_completed_video` with `workspaceId`, `runId`, and the exact `confirmedTitle`. It uses the same deletion and resumable file cleanup as the CLI command.
+
+Use `recover-delivery-cleanup <workspace-id>` in the CLI or `recover_delivery_cleanup` in MCP and A2A to retry pending cleanup for previously deleted runs. The report lists completed cleanup and entries that still require attention.
