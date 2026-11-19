@@ -1,6 +1,6 @@
 use std::{env, error::Error, ffi::OsStr, io, path::Path};
 
-use arrumo_workspaces::{WorkspaceStore, asset_root};
+use arrumo_workspaces::{BrandAssetRole, WorkspaceStore, asset_root};
 
 fn utf8(value: &OsStr) -> io::Result<&str> {
     value
@@ -201,6 +201,32 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .set_brand_colors(utf8(workspace)?.parse()?, &colors)?;
             println!("{}", serde_json::to_string(&stored)?);
         }
+        [database, command, workspace] if command == "brand-assets" => {
+            let assets = WorkspaceStore::open(Path::new(database))?
+                .list_brand_assets(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&assets)?);
+        }
+        [database, command, workspace, asset, role]
+            if command == "attach-brand-asset" || command == "detach-brand-asset" =>
+        {
+            let role = match utf8(role)? {
+                "identity" => BrandAssetRole::Identity,
+                "style" => BrandAssetRole::Style,
+                _ => return Err("Role must be identity or style".into()),
+            };
+            let store = WorkspaceStore::open(Path::new(database))?;
+            let workspace_id = utf8(workspace)?.parse()?;
+            let asset_id = utf8(asset)?.parse()?;
+            if command == "attach-brand-asset" {
+                store.attach_brand_asset(workspace_id, asset_id, role)?;
+                println!("null");
+            } else {
+                println!(
+                    "{}",
+                    store.detach_brand_asset(workspace_id, asset_id, role)?
+                );
+            }
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -222,7 +248,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "context <workspace-id> | set-context <workspace-id> <markdown> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
                 "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",
-                "brand-colors <workspace-id> | set-brand-colors <workspace-id> <colors-json>"
+                "brand-colors <workspace-id> | set-brand-colors <workspace-id> <colors-json> | ",
+                "brand-assets <workspace-id> | ",
+                "attach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
+                "detach-brand-asset <workspace-id> <asset-id> <identity|style>"
             )
             .into());
         }

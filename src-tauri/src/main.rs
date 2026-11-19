@@ -3,9 +3,9 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use arrumo_workspaces::{
-    DeliveryOverrides, DimensionOverrides, FormatDelivery, OutputFormat, OutputFormatSettings,
-    Profile, ProfileDelivery, ProfileFormat, SupplementalOutputs, Workspace, WorkspaceAsset,
-    WorkspaceFeedback, WorkspaceStore, asset_root,
+    BrandAsset, BrandAssetRole, DeliveryOverrides, DimensionOverrides, FormatDelivery,
+    OutputFormat, OutputFormatSettings, Profile, ProfileDelivery, ProfileFormat,
+    SupplementalOutputs, Workspace, WorkspaceAsset, WorkspaceFeedback, WorkspaceStore, asset_root,
 };
 use tauri::{AppHandle, Manager, State};
 
@@ -334,6 +334,46 @@ async fn set_brand_colors(
         .map_err(|_| "brand_colors_save_failed")
 }
 
+#[tauri::command]
+async fn list_brand_assets(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<BrandAsset>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_brand_assets(workspace_id)
+        .map_err(|_| "brand_assets_load_failed")
+}
+
+#[tauri::command]
+async fn attach_brand_asset(
+    workspace_id: i64,
+    asset_id: i64,
+    role: BrandAssetRole,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .attach_brand_asset(workspace_id, asset_id, role)
+        .map_err(|_| "brand_asset_attach_failed")
+}
+
+#[tauri::command]
+async fn detach_brand_asset(
+    workspace_id: i64,
+    asset_id: i64,
+    role: BrandAssetRole,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .detach_brand_asset(workspace_id, asset_id, role)
+        .map_err(|_| "brand_asset_detach_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -369,7 +409,10 @@ fn main() {
             list_workspace_feedback,
             update_workspace_feedback,
             get_brand_colors,
-            set_brand_colors
+            set_brand_colors,
+            list_brand_assets,
+            attach_brand_asset,
+            detach_brand_asset
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

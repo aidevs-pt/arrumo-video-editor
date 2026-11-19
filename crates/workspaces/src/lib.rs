@@ -4,6 +4,7 @@ use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
 mod assets;
+mod brand_assets;
 mod format_deliveries;
 mod output_formats;
 mod profile_deliveries;
@@ -11,6 +12,7 @@ mod profile_formats;
 mod workspace_feedback;
 
 pub use assets::{WorkspaceAsset, asset_path, asset_root};
+pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
@@ -54,6 +56,7 @@ impl WorkspaceStore {
             include_str!("008-workspace-context.sql"),
             include_str!("009-workspace-feedback.sql"),
             include_str!("010-workspace-brand.sql"),
+            include_str!("011-brand-assets.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

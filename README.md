@@ -98,3 +98,11 @@ cargo run --locked -- ./workspaces.sqlite context 1
 Agent feedback cards live in workspace Context. A tool can record an observation locally using `add-feedback <workspace-id> <title> <markdown>`. Use `feedback <workspace-id>` to list cards and `update-feedback <workspace-id> <feedback-id> <title> <markdown>` to revise one. Cards can also be expanded and edited in the desktop app.
 
 The workspace Brand view stores an ordered palette. Use `brand-colors <workspace-id>` to read it and `set-brand-colors <workspace-id> '["#532A9D","#FFFFFF"]'` to replace it. Colors use six-digit hex notation. Use an empty array to clear the palette.
+
+The brand image catalog associates existing workspace images with `identity` (for example, logos or avatars) and `style` (visual reference) roles. An image can serve both roles without another copy of the file.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite attach-brand-asset 1 1 identity
+cargo run --locked -- ./workspaces.sqlite brand-assets 1
+cargo run --locked -- ./workspaces.sqlite detach-brand-asset 1 1 identity
+```
