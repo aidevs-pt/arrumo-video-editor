@@ -127,6 +127,7 @@ impl WorkspaceStore {
         self.0.query_row(
             "UPDATE generation_runs SET state = ?3, lease_until = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND state IN (?4, ?5, ?6)
+               AND (?3 != 'queued' OR pending_review_id IS NULL)
              RETURNING id, draft_id, state, snapshot_json",
             params![
                 workspace_id,

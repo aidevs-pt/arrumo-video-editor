@@ -319,6 +319,37 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .generation_plan(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
             println!("{}", serde_json::to_string(&plan)?);
         }
+        [database, command, workspace, run] if command == "production-progress" => {
+            let progress = WorkspaceStore::open(Path::new(database))?
+                .production_progress(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            println!("{}", serde_json::to_string(&progress)?);
+        }
+        [database, command, workspace, run, attempt, stage, result]
+            if command == "submit-stage" =>
+        {
+            let stage = serde_json::from_value(serde_json::json!(utf8(stage)?))?;
+            let id = WorkspaceStore::open(Path::new(database))?.submit_production_result(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(attempt)?.parse()?,
+                stage,
+                &serde_json::from_str(utf8(result)?)?,
+            )?;
+            println!("{id}");
+        }
+        [database, command, workspace, run, result, decision, notes]
+            if command == "review-stage" =>
+        {
+            let decision = serde_json::from_value(serde_json::json!(utf8(decision)?))?;
+            WorkspaceStore::open(Path::new(database))?.review_production_result(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(result)?.parse()?,
+                decision,
+                utf8(notes)?,
+            )?;
+            println!("null");
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -352,7 +383,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
                 "generation-activity <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
-                "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id>"
+                "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
+                "production-progress <workspace-id> <run-id> | ",
+                "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
+                "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes>"
             )
             .into());
         }
