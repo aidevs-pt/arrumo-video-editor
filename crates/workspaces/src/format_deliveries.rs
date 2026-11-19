@@ -12,6 +12,49 @@ pub struct SupplementalOutputs {
     pub tags: bool,
     pub thumbnail_guidance: String,
     pub specifications: String,
+    pub portrait_derivatives: PortraitDerivatives,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PortraitDerivatives {
+    pub count: u16,
+    pub source: PortraitSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PortraitSource {
+    Manual {
+        #[serde(default)]
+        guidance: String,
+        #[serde(default)]
+        thumbnails_per_video: u16,
+        #[serde(default)]
+        thumbnail_guidance: String,
+    },
+    Profile {
+        profile_id: i64,
+    },
+}
+
+impl Default for PortraitSource {
+    fn default() -> Self {
+        Self::Manual {
+            guidance: String::new(),
+            thumbnails_per_video: 0,
+            thumbnail_guidance: String::new(),
+        }
+    }
+}
+
+impl PortraitDerivatives {
+    pub(crate) fn source_profile(&self) -> Option<i64> {
+        match self.source {
+            PortraitSource::Profile { profile_id } => Some(profile_id),
+            PortraitSource::Manual { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -54,9 +97,17 @@ impl WorkspaceStore {
         self.0.query_row(
             "INSERT INTO format_deliveries (format_id, settings_json)
              SELECT id, ?3 FROM output_formats WHERE workspace_id = ?1 AND id = ?2
+             AND (?4 IS NULL OR EXISTS (
+                 SELECT 1 FROM profiles WHERE workspace_id = ?1 AND id = ?4
+             ))
              ON CONFLICT (format_id) DO UPDATE SET settings_json = excluded.settings_json
              RETURNING format_id",
-            params![workspace_id, format_id, json],
+            params![
+                workspace_id,
+                format_id,
+                json,
+                settings.portrait_derivatives.source_profile()
+            ],
             |_| Ok(()),
         )
     }

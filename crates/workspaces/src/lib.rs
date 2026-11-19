@@ -8,7 +8,9 @@ mod output_formats;
 mod profile_deliveries;
 mod profile_formats;
 
-pub use format_deliveries::{FormatDelivery, RequiredOutput, SupplementalOutputs};
+pub use format_deliveries::{
+    FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
+};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};

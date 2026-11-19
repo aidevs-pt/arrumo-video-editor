@@ -2,7 +2,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::format_deliveries::{assemble_delivery, read_settings};
-use crate::{FormatDelivery, SupplementalOutputs, WorkspaceStore};
+use crate::{FormatDelivery, PortraitDerivatives, SupplementalOutputs, WorkspaceStore};
 
 #[derive(Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -13,6 +13,7 @@ pub struct DeliveryOverrides {
     pub tags: Option<bool>,
     pub thumbnail_guidance: Option<String>,
     pub specifications: Option<String>,
+    pub portrait_derivatives: Option<PortraitDerivatives>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -38,6 +39,11 @@ impl DeliveryOverrides {
                 .specifications
                 .as_ref()
                 .unwrap_or(&workspace.specifications)
+                .clone(),
+            portrait_derivatives: self
+                .portrait_derivatives
+                .as_ref()
+                .unwrap_or(&workspace.portrait_derivatives)
                 .clone(),
         }
     }
@@ -90,10 +96,22 @@ impl WorkspaceStore {
              JOIN output_formats AS format ON format.workspace_id = profile.workspace_id
              WHERE profile.workspace_id = ?1 AND profile.id = ?2 AND format.id = ?3
                AND format.enabled = 1
+               AND (?5 IS NULL OR EXISTS (
+                   SELECT 1 FROM profiles WHERE workspace_id = ?1 AND id = ?5
+               ))
              ON CONFLICT (workspace_id, profile_id, format_id)
              DO UPDATE SET settings_json = excluded.settings_json
              RETURNING format_id",
-            params![workspace_id, profile_id, format_id, settings],
+            params![
+                workspace_id,
+                profile_id,
+                format_id,
+                settings,
+                overrides
+                    .portrait_derivatives
+                    .as_ref()
+                    .and_then(PortraitDerivatives::source_profile),
+            ],
             |_| Ok(()),
         )
     }
@@ -166,6 +184,80 @@ mod tests {
                     .get::<_, i64>(0))
                 .unwrap(),
             0
+        );
+    }
+
+    #[test]
+    fn portrait_derivatives_require_a_source_profile_in_the_same_workspace() {
+        use crate::PortraitSource;
+
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let profile = store
+            .create_profile(workspace, "Reviews", "", None)
+            .unwrap()
+            .id;
+        let other = store.create("Other").unwrap().id;
+        let foreign_profile = store.create_profile(other, "Foreign", "", None).unwrap().id;
+        let format = store.list_output_formats(workspace).unwrap()[0].id;
+
+        let mut settings = SupplementalOutputs {
+            portrait_derivatives: PortraitDerivatives {
+                count: 2,
+                source: PortraitSource::Profile {
+                    profile_id: foreign_profile,
+                },
+            },
+            ..Default::default()
+        };
+        assert!(
+            store
+                .set_format_delivery(workspace, format, &settings)
+                .is_err()
+        );
+        let invalid_override = DeliveryOverrides {
+            portrait_derivatives: Some(settings.portrait_derivatives.clone()),
+            ..Default::default()
+        };
+        assert!(
+            store
+                .set_profile_delivery(workspace, profile, format, &invalid_override)
+                .is_err()
+        );
+
+        settings.portrait_derivatives.source = PortraitSource::Profile {
+            profile_id: profile,
+        };
+        store
+            .set_format_delivery(workspace, format, &settings)
+            .unwrap();
+        assert_eq!(
+            store
+                .profile_delivery(workspace, profile, format)
+                .unwrap()
+                .effective
+                .supplemental
+                .portrait_derivatives,
+            settings.portrait_derivatives,
+        );
+
+        let manual: DeliveryOverrides = serde_json::from_str(r#"{
+            "portrait_derivatives": {
+                "count": 1,
+                "source": {"type":"manual", "guidance":"Make a short demo", "thumbnails_per_video":2}
+            }
+        }"#).unwrap();
+        store
+            .set_profile_delivery(workspace, profile, format, &manual)
+            .unwrap();
+        assert_eq!(
+            store
+                .profile_delivery(workspace, profile, format)
+                .unwrap()
+                .effective
+                .supplemental
+                .portrait_derivatives,
+            manual.portrait_derivatives.unwrap(),
         );
     }
 }

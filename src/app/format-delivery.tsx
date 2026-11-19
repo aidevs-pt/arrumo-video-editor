@@ -21,13 +21,13 @@ type Supplemental = {
 
 type Delivery = {
   required: ("final_video" | "subtitles")[];
-  supplemental: Supplemental;
+  supplemental: Supplemental & { portrait_derivatives: unknown };
 };
 
 type ProfileDelivery = {
   workspace: Supplemental;
   effective: Delivery;
-  overrides: { [Key in keyof Supplemental]: Supplemental[Key] | null };
+  overrides: { [Key in keyof Supplemental]: Supplemental[Key] | null } & { portrait_derivatives: unknown };
 };
 
 const countFields = ["thumbnails", "titles", "descriptions"] as const;
@@ -97,9 +97,9 @@ export function FormatDelivery({
       if (isProfile) {
         const custom = Object.fromEntries((Object.keys(settings) as (keyof Supplemental)[])
           .filter(overridden).map((field) => [field, settings[field]]));
-        await invoke("set_profile_delivery", { workspaceId, profileId, formatId: format.id, overrides: custom });
+        await invoke("set_profile_delivery", { workspaceId, profileId, formatId: format.id, overrides: { ...custom, portrait_derivatives: profileDelivery?.overrides.portrait_derivatives } });
       } else {
-        await invoke("set_format_delivery", { workspaceId, formatId: format.id, settings });
+        await invoke("set_format_delivery", { workspaceId, formatId: format.id, settings: { ...settings, portrait_derivatives: delivery?.supplemental.portrait_derivatives } });
       }
       setResult("saved");
     } catch {
