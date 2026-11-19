@@ -7,9 +7,9 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
+use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 2] = [1, 2];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 3] = [1, 2, 3];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -32,10 +32,16 @@ pub struct PluginManifest {
         deserialize_with = "deserialize_present",
         skip_serializing_if = "Option::is_none"
     )]
+    pub code: Option<PluginCode>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub agent_provider: Option<ProviderDescriptor>,
 }
 
-fn deserialize_present<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
+pub(crate) fn deserialize_present<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<T>, D::Error> {
     T::deserialize(deserializer).map(Some)
@@ -73,7 +79,7 @@ pub struct CatalogPlugin {
 }
 
 impl PluginManifest {
-    fn parse(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
         if bytes.len() > MAX_PLUGIN_MANIFEST_BYTES {
             return Err(invalid_manifest("Plugin manifest exceeds 64 KiB").into());
         }
@@ -104,6 +110,26 @@ impl PluginManifest {
         {
             return Err(invalid_manifest("Invalid or duplicate plugin setting declaration").into());
         }
+        if let Some(code) = &manifest.code {
+            use crate::plugin_schema::valid_code_path;
+            let mut surfaces = HashSet::new();
+            if manifest.schema_version < 3
+                || (code.backend.is_none() && code.frontend.is_empty())
+                || code
+                    .backend
+                    .as_ref()
+                    .is_some_and(|entry| !valid_code_path(&entry.component, ".wasm"))
+                || code.frontend.len() > 16
+                || code.frontend.iter().any(|surface| {
+                    !identifier(&surface.id)
+                        || !surfaces.insert(&surface.id)
+                        || blank(&surface.title)
+                        || !valid_code_path(&surface.document, ".html")
+                })
+            {
+                return Err(invalid_manifest("Invalid plugin code declaration").into());
+            }
+        }
         if let Some(provider) = &manifest.agent_provider
             && (!manifest.capabilities.contains_key("agents")
                 || blank(&provider.label)
@@ -127,22 +153,15 @@ impl PluginManifest {
     }
 }
 
+include!(concat!(env!("OUT_DIR"), "/bundled_plugins.rs"));
+
 pub(crate) fn bundled_manifests() -> &'static [PluginManifest] {
     static MANIFESTS: OnceLock<Vec<PluginManifest>> = OnceLock::new();
     MANIFESTS.get_or_init(|| {
-        // Release inputs copied from the official SDK plugin repositories.
-        [
-            include_bytes!("../plugins/codex/manifest.json").as_slice(),
-            include_bytes!("../plugins/claude-code/manifest.json").as_slice(),
-            include_bytes!("../plugins/openai/manifest.json").as_slice(),
-            include_bytes!("../plugins/higgsfield/manifest.json").as_slice(),
-            include_bytes!("../plugins/gemini/manifest.json").as_slice(),
-            include_bytes!("../plugins/elevenlabs/manifest.json").as_slice(),
-            include_bytes!("../plugins/auto-dubbing/manifest.json").as_slice(),
-        ]
-        .into_iter()
-        .map(|bytes| PluginManifest::parse(bytes).expect("valid bundled plugin manifest"))
-        .collect()
+        BUNDLED
+            .iter()
+            .map(|(bytes, _)| PluginManifest::parse(bytes).expect("valid bundled plugin manifest"))
+            .collect()
     })
 }
 
@@ -170,6 +189,9 @@ impl WorkspaceStore {
         previous: Option<&crate::plugin_registry::InstalledRelease>,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
         let manifest = PluginManifest::parse(bytes)?;
+        if manifest.code.is_some() && package.is_none() {
+            return Err(invalid_manifest("Plugins with code require a ZIP package").into());
+        }
         let (info, archive) = package.unzip();
         let source = info.and_then(|info| info.release.as_ref());
         if source.is_some_and(|source| source.plugin_id != manifest.id) {

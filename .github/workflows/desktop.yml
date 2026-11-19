@@ -2,6 +2,8 @@ name: Desktop
 on: [push, pull_request]
 permissions:
   contents: read
+env:
+  ARRUMO_CORE_ONLY: "1"
 jobs:
   linux:
     runs-on: ubuntu-latest
@@ -13,7 +15,7 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: sudo apt-get update
-      - run: sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: sudo apt-get install -y libdbus-1-dev libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: cargo clippy --locked -p arrumo-desktop -- -D warnings

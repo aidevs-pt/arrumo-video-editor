@@ -2,6 +2,8 @@ name: Rust
 on: [push, pull_request]
 permissions:
   contents: read
+env:
+  ARRUMO_CORE_ONLY: "1"
 jobs:
   verify:
     strategy:
@@ -10,6 +12,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked

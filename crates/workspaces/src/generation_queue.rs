@@ -339,10 +339,17 @@ mod tests {
             .enqueue_video_draft(studio, draft.id, "attempt-one", &options)
             .unwrap();
         assert_eq!(run.state, "queued");
-        assert_eq!(
-            run.snapshot["provider_orders"]["transcription"],
-            json!({"effective": ["elevenlabs", "openai"], "source": "bundled_default"})
-        );
+        let default_order = store
+            .provider_preferences("transcription", Some(studio))
+            .unwrap()
+            .effective;
+        let captured = &run.snapshot["provider_orders"]["transcription"];
+        if !default_order.is_empty() {
+            assert_eq!(
+                captured,
+                &json!({"effective": default_order, "source": "bundled_default"})
+            );
+        }
         store
             .set_provider_preferences("transcription", Some(studio), Some(&[]))
             .unwrap();
@@ -392,8 +399,18 @@ mod tests {
             revised.snapshot["provider_orders"]["transcription"],
             json!({"effective": [], "source": "workspace"})
         );
+        store.install_plugin_manifest(br#"{
+            "schemaVersion": 1,
+            "id": "fixture-provider",
+            "name": "Fixture Provider",
+            "description": "Test fixture",
+            "capabilities": {"transcription": {"name": "Transcription", "description": "Test fixture"}}
+        }"#).unwrap();
         let override_options = RunOptions {
-            provider_overrides: BTreeMap::from([("transcription".into(), vec!["openai".into()])]),
+            provider_overrides: BTreeMap::from([(
+                "transcription".into(),
+                vec!["fixture-provider".into()],
+            )]),
             ..options
         };
         let overridden = store
@@ -401,7 +418,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             overridden.snapshot["provider_orders"]["transcription"],
-            json!({"effective": ["openai"], "source": "run"})
+            json!({"effective": ["fixture-provider"], "source": "run"})
         );
         assert!(
             store

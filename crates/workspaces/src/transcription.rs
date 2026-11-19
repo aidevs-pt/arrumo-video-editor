@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     io::{self, Read},
     time::Duration,
 };
@@ -8,42 +9,52 @@ use reqwest::{
     header::{HeaderName, HeaderValue},
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::WorkspaceStore;
 
 const MAX_AUDIO_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
-const BUNDLED_TRANSCRIPTION: &[&str] = &[
-    include_str!("../plugins/elevenlabs/transcription.json"),
-    include_str!("../plugins/openai/transcription.json"),
-];
-
-#[derive(Clone, Copy, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-enum Protocol {
-    TimedWordsMultipart,
-    TextMultipart,
-}
-
-impl Protocol {
-    fn max_audio_bytes(self) -> u64 {
-        match self {
-            Self::TimedWordsMultipart => MAX_AUDIO_BYTES,
-            Self::TextMultipart => 25_000_000,
-        }
-    }
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TranscriptionAdapter {
     schema_version: u32,
     plugin_id: String,
-    protocol: Protocol,
     endpoint: String,
     credential_setting: String,
     credential_header: String,
-    model: String,
+    credential_prefix: String,
+    max_audio_bytes: u64,
+    file_field: String,
+    form: BTreeMap<String, String>,
+    response: ResponseMapping,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ResponseMapping {
+    text: String,
+    language: String,
+    language_item: Option<String>,
+    words: Option<WordMapping>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WordMapping {
+    items: String,
+    text: String,
+    start: String,
+    end: String,
+    speaker: Option<String>,
+    filter: Option<WordFilter>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WordFilter {
+    field: String,
+    equals: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -67,35 +78,6 @@ pub struct ProviderTranscript {
     pub transcript: Transcript,
 }
 
-#[derive(Deserialize)]
-struct TextTranscript {
-    text: String,
-    #[serde(default)]
-    languages: Vec<DetectedLanguage>,
-}
-
-#[derive(Deserialize)]
-struct DetectedLanguage {
-    code: String,
-}
-
-#[derive(Deserialize)]
-struct WireTranscript {
-    language_code: String,
-    text: String,
-    words: Vec<WireToken>,
-}
-
-#[derive(Deserialize)]
-struct WireToken {
-    #[serde(rename = "type")]
-    kind: String,
-    text: String,
-    start: Option<f64>,
-    end: Option<f64>,
-    speaker_id: Option<String>,
-}
-
 impl WorkspaceStore {
     pub fn transcribe_wav(
         &self,
@@ -110,7 +92,7 @@ impl WorkspaceStore {
         if !plugin.capabilities.contains_key("transcription") {
             return Err(io::Error::other("Plugin does not declare transcription"));
         }
-        let bytes = read_wav(audio, adapter.protocol.max_audio_bytes())?;
+        let bytes = read_wav(audio, adapter.max_audio_bytes)?;
         let secret = self
             .provider_secret(plugin_id, &adapter.credential_setting, workspace_id)?
             .ok_or_else(|| io::Error::other("Transcription credential is not configured"))?;
@@ -135,7 +117,7 @@ impl WorkspaceStore {
             let Some(adapter) = find_bundled_transcription_adapter(&provider)? else {
                 continue;
             };
-            if bytes.len() as u64 > adapter.protocol.max_audio_bytes() {
+            if bytes.len() as u64 > adapter.max_audio_bytes {
                 continue;
             }
             let Some(secret) =
@@ -228,7 +210,7 @@ fn execute_transcription(
     if !response.status().is_success() {
         return Err(AttemptError::from_status(response.status()));
     }
-    decode_transcript(response, adapter.protocol).map_err(AttemptError::Failed)
+    decode_transcript(response, &adapter.response).map_err(AttemptError::Failed)
 }
 
 fn bundled_transcription_adapter(plugin_id: &str) -> io::Result<TranscriptionAdapter> {
@@ -241,19 +223,28 @@ fn bundled_transcription_adapter(plugin_id: &str) -> io::Result<TranscriptionAda
 }
 
 fn find_bundled_transcription_adapter(plugin_id: &str) -> io::Result<Option<TranscriptionAdapter>> {
-    for source in BUNDLED_TRANSCRIPTION {
-        let adapter: TranscriptionAdapter = serde_json::from_str(source)
+    for (manifest, (_, source)) in crate::plugin_catalog::bundled_manifests()
+        .iter()
+        .zip(crate::plugin_catalog::BUNDLED)
+    {
+        let Some(source) = source.filter(|_| manifest.id == plugin_id) else {
+            continue;
+        };
+        let adapter: TranscriptionAdapter = serde_json::from_slice(source)
             .map_err(|_| io::Error::other("Invalid bundled transcription adapter"))?;
-        if adapter.plugin_id == plugin_id {
-            if adapter.schema_version != 1 {
-                return Err(io::Error::other(
-                    "Unsupported transcription adapter protocol",
-                ));
-            }
-            crate::validate_registry_url(&adapter.endpoint)
-                .map_err(|_| io::Error::other("Invalid transcription endpoint"))?;
-            return Ok(Some(adapter));
+        if adapter.plugin_id != manifest.id
+            || adapter.schema_version != 2
+            || !manifest.capabilities.contains_key("transcription")
+            || !(1..=MAX_AUDIO_BYTES).contains(&adapter.max_audio_bytes)
+            || adapter.form.contains_key(&adapter.file_field)
+        {
+            return Err(io::Error::other(
+                "Invalid transcription adapter declaration",
+            ));
         }
+        crate::validate_registry_url(&adapter.endpoint)
+            .map_err(|_| io::Error::other("Invalid transcription endpoint"))?;
+        return Ok(Some(adapter));
     }
     Ok(None)
 }
@@ -267,9 +258,7 @@ fn transcription_request(
     let header = HeaderName::from_bytes(adapter.credential_header.as_bytes())
         .map_err(|_| io::Error::other("Invalid adapter credential header"))?;
     let mut credentials = zeroize::Zeroizing::new(Vec::new());
-    if matches!(adapter.protocol, Protocol::TextMultipart) {
-        credentials.extend_from_slice(b"Bearer ");
-    }
+    credentials.extend_from_slice(adapter.credential_prefix.as_bytes());
     credentials.extend_from_slice(secret);
     let mut credential = HeaderValue::from_bytes(&credentials)
         .map_err(|_| io::Error::other("Invalid transcription credential format"))?;
@@ -278,13 +267,10 @@ fn transcription_request(
         .file_name("source.wav")
         .mime_str("audio/wav")
         .map_err(|_| io::Error::other("Could not build transcription upload"))?;
-    let form = multipart::Form::new().part("file", audio);
-    let form = match adapter.protocol {
-        Protocol::TimedWordsMultipart => form
-            .text("model_id", adapter.model.clone())
-            .text("timestamps_granularity", "word"),
-        Protocol::TextMultipart => form.text("model", adapter.model.clone()),
-    };
+    let mut form = multipart::Form::new().part(adapter.file_field.clone(), audio);
+    for (field, value) in &adapter.form {
+        form = form.text(field.clone(), value.clone());
+    }
     client
         .post(&adapter.endpoint)
         .header(header, credential)
@@ -293,7 +279,7 @@ fn transcription_request(
         .map_err(|_| io::Error::other("Could not build transcription request"))
 }
 
-fn decode_transcript(response: impl Read, protocol: Protocol) -> io::Result<Transcript> {
+fn decode_transcript(response: impl Read, mapping: &ResponseMapping) -> io::Result<Transcript> {
     let mut bytes = Vec::new();
     response
         .take(MAX_RESPONSE_BYTES + 1)
@@ -302,91 +288,135 @@ fn decode_transcript(response: impl Read, protocol: Protocol) -> io::Result<Tran
     if bytes.len() as u64 > MAX_RESPONSE_BYTES {
         return Err(io::Error::other("Transcription response exceeds 16 MiB"));
     }
-    if matches!(protocol, Protocol::TextMultipart) {
-        let result: TextTranscript = serde_json::from_slice(&bytes)
-            .map_err(|_| io::Error::other("Provider returned an invalid transcript"))?;
-        let language_code = match result.languages.as_slice() {
-            [language] => language.code.clone(),
-            [] => "und".into(),
-            _ => "mul".into(),
-        };
-        return Ok(Transcript {
-            language_code,
-            text: result.text,
-            words: Vec::new(),
-        });
-    }
-    let decoded: WireTranscript = serde_json::from_slice(&bytes)
-        .map_err(|_| io::Error::other("Provider returned an invalid transcript"))?;
-    let words = decoded
-        .words
-        .into_iter()
-        .filter(|token| token.kind == "word")
-        .map(|token| match (token.start, token.end) {
-            (Some(start), Some(end))
-                if start.is_finite() && end.is_finite() && start >= 0.0 && end >= start =>
-            {
-                Ok(TranscriptWord {
-                    text: token.text,
-                    start,
-                    end,
-                    speaker_id: token.speaker_id,
+    let document: Value = serde_json::from_slice(&bytes).map_err(|_| invalid_transcript())?;
+    let text = mapped_text(&document, &mapping.text)?.to_owned();
+    let language_code = if let Some(item) = &mapping.language_item {
+        match document.pointer(&mapping.language) {
+            None => "und".into(),
+            Some(Value::Array(items)) => match items.as_slice() {
+                [] => "und".into(),
+                [language] => mapped_text(language, item)?.to_owned(),
+                _ => "mul".into(),
+            },
+            _ => return Err(invalid_transcript()),
+        }
+    } else {
+        mapped_text(&document, &mapping.language)?.to_owned()
+    };
+    let words = if let Some(words) = &mapping.words {
+        let items = document
+            .pointer(&words.items)
+            .and_then(Value::as_array)
+            .ok_or_else(invalid_transcript)?;
+        items
+            .iter()
+            .filter(|item| {
+                words.filter.as_ref().is_none_or(|filter| {
+                    item.pointer(&filter.field).and_then(Value::as_str)
+                        == Some(filter.equals.as_str())
                 })
-            }
-            _ => Err(io::Error::other(
-                "Provider returned invalid word timestamps",
-            )),
-        })
-        .collect::<io::Result<_>>()?;
+            })
+            .map(|item| {
+                let start = item.pointer(&words.start).and_then(Value::as_f64);
+                let end = item.pointer(&words.end).and_then(Value::as_f64);
+                match (start, end) {
+                    (Some(start), Some(end)) if start >= 0.0 && end >= start && end.is_finite() => {
+                        Ok(TranscriptWord {
+                            text: mapped_text(item, &words.text)?.to_owned(),
+                            start,
+                            end,
+                            speaker_id: words
+                                .speaker
+                                .as_ref()
+                                .and_then(|pointer| item.pointer(pointer))
+                                .and_then(Value::as_str)
+                                .map(str::to_owned),
+                        })
+                    }
+                    _ => Err(io::Error::other(
+                        "Provider returned invalid word timestamps",
+                    )),
+                }
+            })
+            .collect::<io::Result<_>>()?
+    } else {
+        Vec::new()
+    };
     Ok(Transcript {
-        language_code: decoded.language_code,
-        text: decoded.text,
+        language_code,
+        text,
         words,
     })
+}
+
+fn mapped_text<'a>(value: &'a Value, pointer: &str) -> io::Result<&'a str> {
+    value
+        .pointer(pointer)
+        .and_then(Value::as_str)
+        .ok_or_else(invalid_transcript)
+}
+
+fn invalid_transcript() -> io::Error {
+    io::Error::other("Provider returned an invalid transcript")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn fixture() -> TranscriptionAdapter {
+        serde_json::from_value(serde_json::json!({
+            "schemaVersion": 2, "pluginId": "fixture",
+            "endpoint": "https://example.org/transcribe",
+            "credentialSetting": "api-key", "credentialHeader": "x-secret",
+            "credentialPrefix": "Token ", "maxAudioBytes": 1024,
+            "fileField": "source", "form": {"preset": "accurate"},
+            "response": {
+                "text": "/result", "language": "/languages", "languageItem": "/id",
+                "words": {"items": "/tokens", "text": "/value", "start": "/from",
+                    "end": "/to", "speaker": "/voice", "filter": {"field": "/kind", "equals": "word"}}
+            }
+        })).unwrap()
+    }
+
     #[test]
-    fn bundled_adapter_builds_authenticated_request_without_exposing_header_in_debug() {
-        let adapter = bundled_transcription_adapter("elevenlabs").unwrap();
+    fn builds_requests_from_descriptor_without_exposing_credentials() {
+        let adapter = fixture();
         let client = Client::builder().https_only(true).build().unwrap();
         let request = transcription_request(&client, &adapter, vec![0], b"fixture-secret").unwrap();
         assert_eq!(request.url().as_str(), adapter.endpoint);
         assert_eq!(request.method(), reqwest::Method::POST);
-        assert!(request.headers()[adapter.credential_header.as_str()].is_sensitive());
-        assert!(!format!("{request:?}").contains("fixture-secret"));
-        let openai = bundled_transcription_adapter("openai").unwrap();
-        let request = transcription_request(&client, &openai, vec![0], b"fixture-secret").unwrap();
-        assert_eq!(request.headers()["authorization"], "Bearer fixture-secret");
-        assert!(request.headers()["authorization"].is_sensitive());
+        assert_eq!(request.headers()["x-secret"], "Token fixture-secret");
+        assert!(request.headers()["x-secret"].is_sensitive());
         assert!(!format!("{request:?}").contains("fixture-secret"));
     }
 
     #[test]
-    fn normalizes_provider_words_and_rejects_invalid_timing() {
-        let payload = br#"{"language_code":"eng","text":"Hello world","words":[
-            {"type":"word","text":"Hello","start":0.1,"end":0.3,"speaker_id":"speaker_1"},
-            {"type":"spacing","text":" "},
-            {"type":"word","text":"world","start":0.4,"end":0.7}
+    fn maps_transcript_fields_and_rejects_invalid_timing() {
+        let adapter = fixture();
+        let payload = br#"{"result":"Hello","languages":[{"id":"en"}],"tokens":[
+            {"kind":"word","value":"Hello","from":0.1,"to":0.3,"voice":"one"},
+            {"kind":"spacing"}
         ]}"#;
-        let transcript =
-            decode_transcript(payload.as_slice(), Protocol::TimedWordsMultipart).unwrap();
-        assert_eq!(transcript.words.len(), 2);
-        assert_eq!(transcript.words[0].speaker_id.as_deref(), Some("speaker_1"));
-        let bad = br#"{"language_code":"en","text":"a","words":[{"type":"word","text":"a","start":1,"end":0}]}"#;
-        assert!(decode_transcript(bad.as_slice(), Protocol::TimedWordsMultipart).is_err());
+        let transcript = decode_transcript(payload.as_slice(), &adapter.response).unwrap();
+        assert_eq!(transcript.language_code, "en");
+        assert_eq!(transcript.words.len(), 1);
+        assert_eq!(transcript.words[0].speaker_id.as_deref(), Some("one"));
+        let bad = br#"{"result":"Hello","languages":[],"tokens":[
+            {"kind":"word","value":"Hello","from":0.3,"to":0.1}
+        ]}"#;
+        assert!(decode_transcript(bad.as_slice(), &adapter.response).is_err());
     }
+
     #[test]
-    fn normalizes_openai_text_without_inventing_word_timings() {
-        let payload = br#"{"text":"Bonjour","languages":[{"code":"fr"}]}"#;
-        let transcript = decode_transcript(payload.as_slice(), Protocol::TextMultipart).unwrap();
-        assert_eq!(transcript.language_code, "fr");
-        assert_eq!(transcript.text, "Bonjour");
+    fn absent_timing_mapping_does_not_invent_timings() {
+        let mut mapping = fixture().response;
+        mapping.words = None;
+        let transcript = decode_transcript(br#"{"result":"Hello"}"#.as_slice(), &mapping).unwrap();
+        assert_eq!(transcript.language_code, "und");
         assert!(transcript.words.is_empty());
     }
+
     #[test]
     fn only_explicit_auth_and_rate_rejection_can_fall_back_after_dispatch() {
         use reqwest::StatusCode;

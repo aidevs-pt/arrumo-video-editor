@@ -15,6 +15,12 @@ The first desktop screen creates and lists workspaces. It uses the system langua
 
 `pnpm tauri build --debug --no-bundle` builds a native executable from the static frontend. Installers and signing are tracked separately.
 
+## Default plugin inputs
+
+In the Arrumo workspace layout, the build reads the sibling `plugin-registry/catalog.json` and loads entries marked `default` from the sibling `plugins/<id>` checkouts. The checkouts may be symlinks. Set `ARRUMO_PLUGIN_REGISTRY` and `ARRUMO_PLUGIN_SOURCE_ROOT` to use a different registry file or checkout location. The build embeds the selected artifacts from those inputs without tracking copies in the editor repository.
+
+Use `ARRUMO_CORE_ONLY=1` for isolated host verification without private checkout access. That build starts with an empty default catalog.
+
 ## Workspace CLI
 
 From this repository, use Cargo to create and list workspaces in a local SQLite database.
@@ -185,9 +191,9 @@ On a fresh install, creating the first workspace opens agent setup if no app pro
 Use **Check sign-in** in Settings or `agent-login-status <plugin-id>` in the CLI to ask the installed provider about its local authentication state. The check makes no generation request and returns only a status category. It times out after five seconds. Windows detection and sign-in checks use a native executable on PATH.
 
 
-Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. The editor bundles byte-for-byte copies under `crates/workspaces/plugins` so its standalone build needs only this repository. Sync bundled copies when updating the official plugin manifests. Runtime installation and trust grants are separate host features.
+Use `agent-plugins` to list the bundled agent providers. Their IDs, labels, setup guides, and authentication probes come from the provider repositories' SDK manifests. Builds import the registry defaults from their separate plugin checkouts. Runtime installation and trust grants are separate host features.
 
-The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 and v2 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
+The app database also holds a plugin manifest catalog. With the database path as the first CLI argument, use `plugin-catalog` to inspect bundled and locally registered SDK manifests, `install-plugin-manifest <manifest.json>` to register a manifest, and `remove-plugin-manifest <plugin-id>` to remove a local entry. The catalog validates SDK v1 through v3 metadata and reserves the IDs of bundled plugins. Local entries are metadata only. The agent selector and sign-in probes use the bundled agent adapters until the host supports runtime grants.
 
 Use `install-plugin-zip <package.zip>` to register a local ZIP containing a root SDK `manifest.json`. The catalog reports the package size and SHA-256 digest and retains the original ZIP in the app database. Removing the local entry removes its stored ZIP. The CLI displays the third-party plugin notice on registration. ZIP contents remain inert.
 
@@ -215,7 +221,7 @@ Use `plugin-credential-status <plugin-id> <app|workspace-id> <setting-id>` to re
 
 In desktop Settings, expand a bundled provider under **Plugin settings** to save or remove its credential at the app or workspace scope. Arrumo shows whether a credential is configured and where it comes from. Removing a workspace credential restores the app credential when one is configured.
 
-Use `provider-preferences <capability> <app|workspace-id>` to inspect the catalog candidates and effective provider order. Use `set-provider-preferences <capability> <app|workspace-id> <order-json>` with an ordered JSON array of plugin IDs. An empty array explicitly selects no providers. Use `clear-provider-preferences <capability> <app|workspace-id>` to inherit. The default order contains only bundled plugins, with ElevenLabs before OpenAI for transcription. Eligibility here reflects declared capabilities. Runtime readiness and execution are separate.
+Use `provider-preferences <capability> <app|workspace-id>` to inspect the catalog candidates and effective provider order. Use `set-provider-preferences <capability> <app|workspace-id> <order-json>` with an ordered JSON array of plugin IDs. An empty array explicitly selects no providers. Use `clear-provider-preferences <capability> <app|workspace-id>` to inherit. The default order contains only bundled plugins. Eligibility here reflects declared capabilities. Runtime readiness and execution are separate.
 
 New generation runs capture the effective provider order and its source for each capability. A replay using captured settings preserves that order. A replay using current settings resolves it again. Agent selection continues to use the separately captured agent settings. Snapshots created before provider order capture remain readable.
 
@@ -223,6 +229,6 @@ The `enqueue-draft` options JSON can include `provider_overrides`, a map from ca
 
 In the desktop generation form, expand **Providers for this run** to include or exclude individual providers. **Use saved order** clears a capability override. Closing the disclosure preserves your selections for that draft. Submitting the run leaves the workspace preferences unchanged.
 
-Use `transcribe-wav <workspace-id> elevenlabs <audio.wav>` to send a WAV of up to 32 MiB to the bundled ElevenLabs transcription adapter. It uses the workspace credential or app default and returns normalized transcript text and word timings as JSON. This is an explicit cloud upload. The generation queue and provider fallback do not yet call this adapter.
+Use `transcribe-wav <workspace-id> [plugin-id] <audio.wav>` to submit a WAV to a bundled transcription adapter. Omit the plugin ID to use the effective provider order. Each plugin declares its limits and transcript fields. The host skips unavailable adapters, oversized inputs for a particular adapter, and missing credentials before upload. An HTTP 401, 403, or 429 permits fallback. Other failures stop the request. This is an explicit cloud upload.
 
-Use `transcribe-wav <workspace-id> openai <audio.wav>` for OpenAI transcription of a WAV up to 25 MB. The adapter returns text and detected language metadata, with an empty word list. Omit the plugin ID to use the effective transcription order and receive the chosen provider alongside the transcript. The host skips unavailable adapters, oversized inputs for a particular adapter, and missing credentials before upload. An HTTP 401, 403, or 429 permits fallback. Other failures stop the request.
+The bundled plugin index is generated from the official registry defaults and local plugin checkouts. Provider-specific transcription settings live in the plugin's SDK descriptor. Manifest schema v3 accepts ZIPs with declared WebAssembly backend and HTML frontend entrypoints, validates their presence, and retains the code. The execution and frontend bridge are pending.

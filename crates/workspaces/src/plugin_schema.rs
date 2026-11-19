@@ -26,3 +26,64 @@ pub struct PluginSetting {
     pub scope: PluginSettingScope,
     pub required: bool,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginCode {
+    #[serde(
+        default,
+        deserialize_with = "crate::plugin_catalog::deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub backend: Option<PluginBackend>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub frontend: Vec<PluginSurface>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginBackend {
+    pub component: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginSurface {
+    pub id: String,
+    pub title: String,
+    pub document: String,
+    pub placement: PluginSurfacePlacement,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginSurfacePlacement {
+    Settings,
+    Workspace,
+    CompletedVideo,
+}
+
+impl PluginCode {
+    pub(crate) fn entrypoints(&self) -> impl Iterator<Item = &str> {
+        self.backend
+            .iter()
+            .map(|backend| backend.component.as_str())
+            .chain(
+                self.frontend
+                    .iter()
+                    .map(|surface| surface.document.as_str()),
+            )
+    }
+}
+
+pub(crate) fn valid_code_path(path: &str, extension: &str) -> bool {
+    path.len() <= 240
+        && path.ends_with(extension)
+        && path.split('/').all(|part| {
+            !part.is_empty()
+                && !matches!(part, "." | "..")
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        })
+}

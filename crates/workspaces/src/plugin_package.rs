@@ -9,7 +9,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use zip::ZipArchive;
 
-use crate::{CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, RegistryReleaseSource, WorkspaceStore};
+use crate::{
+    CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, RegistryReleaseSource, WorkspaceStore,
+};
 
 const MAX_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES: usize = 512;
@@ -117,6 +119,17 @@ fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     entry
         .take(MAX_PLUGIN_MANIFEST_BYTES as u64 + 1)
         .read_to_end(&mut manifest)?;
+    let parsed = PluginManifest::parse(&manifest)?;
+    if let Some(code) = &parsed.code {
+        for path in code.entrypoints() {
+            let entry = archive.by_name(path)?;
+            if !entry.is_file() || entry.size() == 0 {
+                return Err(
+                    invalid_package("Plugin code entrypoint must be a non-empty file").into(),
+                );
+            }
+        }
+    }
     Ok(manifest)
 }
 

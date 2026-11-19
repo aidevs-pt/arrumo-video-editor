@@ -60,7 +60,7 @@ pub fn remove_plugin_package(id: String, store: State<'_, Store>) -> Result<bool
 #[serde(rename_all = "camelCase")]
 pub struct RegistryListing {
     registry: arrumo_workspaces::PluginRegistry,
-    supported_manifest_schema_versions: [u32; 2],
+    supported_manifest_schema_versions: &'static [u32],
     update_versions: BTreeMap<String, Vec<String>>,
 }
 
@@ -90,7 +90,7 @@ pub async fn browse_plugin_registry(
             update_versions,
             registry,
             supported_manifest_schema_versions:
-                arrumo_workspaces::SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
+                &arrumo_workspaces::SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
         })
     })
     .await

@@ -59,7 +59,7 @@ pub use plugin_registry::{
     PluginRegistry, RegistryPlugin, RegistryRelease, RegistryReleaseSource, fetch_plugin_registry,
     read_plugin_registry, validate_registry_url,
 };
-pub use plugin_schema::{PluginSetting, PluginSettingKind, PluginSettingScope};
+pub use plugin_schema::{PluginCode, PluginSetting, PluginSettingKind, PluginSettingScope};
 pub use plugin_settings::ResolvedPluginSetting;
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
