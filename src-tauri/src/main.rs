@@ -16,6 +16,7 @@ mod completed_video;
 mod delivery_stream;
 mod guided_preview;
 mod media_worker;
+mod plugin_settings;
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -609,6 +610,9 @@ fn main() {
             list_workspaces,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
+            plugin_settings::list_plugin_catalog,
+            plugin_settings::import_plugin_package,
+            plugin_settings::remove_plugin_package,
             agent_settings::set_agent_provider,
             agent_settings::agent_cli_detected,
             agent_settings::agent_login_status,

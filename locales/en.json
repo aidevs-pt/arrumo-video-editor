@@ -1,4 +1,23 @@
 {
+  "pluginCatalog": {
+    "title": "Plugins",
+    "description": "Manage plugin packages for this Arrumo installation.",
+    "import": "Import ZIP",
+    "chooseFile": "Choose ZIP file",
+    "warning": "Third-party plugins may be unsafe. Review the publisher and source before choosing a package. Imported packages stay inactive.",
+    "cancel": "Cancel",
+    "loading": "Loading plugins…",
+    "loadError": "Could not load plugins. Try again.",
+    "importError": "Could not import the ZIP. Check that it contains a supported manifest with an unused plugin ID.",
+    "removeError": "Could not remove the plugin. Try again.",
+    "working": "Updating plugins…",
+    "imported": "Plugin imported.",
+    "removed": "Plugin removed.",
+    "bundled": "Bundled",
+    "remove": "Remove",
+    "removeNamed": "Remove {name}",
+    "removeDescription": "This removes the local plugin entry and its stored ZIP, if present."
+  },
   "agentSettings": {
     "checkLogin": "Check sign-in",
     "checkingLogin": "Checking sign-in…",

@@ -1,4 +1,23 @@
 {
+  "pluginCatalog": {
+    "title": "Plugins",
+    "description": "Gira os pacotes de plugins desta instalação do Arrumo.",
+    "import": "Importar ZIP",
+    "chooseFile": "Escolher ficheiro ZIP",
+    "warning": "Os plugins de terceiros podem ser inseguros. Verifique quem publica o pacote e o seu código-fonte antes de o escolher. Os pacotes importados ficam inativos.",
+    "cancel": "Cancelar",
+    "loading": "A carregar plugins…",
+    "loadError": "Não foi possível carregar os plugins. Tente novamente.",
+    "importError": "Não foi possível importar o ZIP. Verifique se contém um manifesto compatível com um identificador de plugin que ainda não esteja em uso.",
+    "removeError": "Não foi possível remover o plugin. Tente novamente.",
+    "working": "A atualizar os plugins…",
+    "imported": "Plugin importado.",
+    "removed": "Plugin removido.",
+    "bundled": "Incluído",
+    "remove": "Remover",
+    "removeNamed": "Remover {name}",
+    "removeDescription": "Remove o plugin local e o seu ficheiro ZIP, se estiver guardado."
+  },
   "agentSettings": {
     "checkLogin": "Verificar sessão",
     "checkingLogin": "A verificar a sessão…",

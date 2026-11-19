@@ -1,4 +1,23 @@
 {
+  "pluginCatalog": {
+    "title": "Complementos",
+    "description": "Gestiona los paquetes de complementos de esta instalación de Arrumo.",
+    "import": "Importar ZIP",
+    "chooseFile": "Elegir archivo ZIP",
+    "warning": "Los complementos de terceros pueden ser inseguros. Revisa quién lo publica y su código fuente antes de elegir un paquete. Los paquetes importados permanecen inactivos.",
+    "cancel": "Cancelar",
+    "loading": "Cargando complementos…",
+    "loadError": "No se pudieron cargar los complementos. Inténtalo de nuevo.",
+    "importError": "No se pudo importar el ZIP. Comprueba que contiene un manifiesto compatible con un identificador de complemento que no esté en uso.",
+    "removeError": "No se pudo eliminar el complemento. Inténtalo de nuevo.",
+    "working": "Actualizando complementos…",
+    "imported": "Complemento importado.",
+    "removed": "Complemento eliminado.",
+    "bundled": "Incluido",
+    "remove": "Eliminar",
+    "removeNamed": "Eliminar {name}",
+    "removeDescription": "Se eliminará el complemento local y su archivo ZIP si está guardado."
+  },
   "agentSettings": {
     "checkLogin": "Comprobar inicio de sesión",
     "checkingLogin": "Comprobando el inicio de sesión…",

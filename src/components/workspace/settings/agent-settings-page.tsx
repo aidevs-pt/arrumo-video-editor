@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
+import { PluginCatalog } from "./plugin-catalog";
 
 type AgentPlugin = { id: string; label: string };
 type Settings = {
@@ -64,6 +65,7 @@ export function AgentSettingsPage() {
             {setupWorkspace && <Button asChild variant="outline" className="self-start">
               <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
             </Button>}
+            {!requested && !setupWorkspace && <PluginCatalog />}
           </div>
         )}
     </WorkspaceShell>
