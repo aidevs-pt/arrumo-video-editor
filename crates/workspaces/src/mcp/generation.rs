@@ -76,7 +76,15 @@ struct VerifyDeliveryInput {
     attempt: i64,
 }
 
-pub(super) fn definitions() -> [Value; 13] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ExportDeliveryInput {
+    workspace_id: i64,
+    run_id: i64,
+    destination: String,
+}
+
+pub(super) fn definitions() -> [Value; 14] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -109,6 +117,10 @@ pub(super) fn definitions() -> [Value; 13] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "attempt": id
             }, "required": ["workspaceId", "runId", "attempt"], "additionalProperties": false}}),
+        json!({"name": "export_generation_delivery", "description": "Write the completed run's verified video and subtitle files to a new ZIP at an absolute path on the local machine.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "destination": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "destination"], "additionalProperties": false}}),
         json!({"name": "get_completed_video", "description": "Read the verified outputs and production history for a completed video.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
@@ -190,6 +202,16 @@ pub(super) fn call(
                 .verify_generation_delivery(database, args.workspace_id, args.run_id, args.attempt)
                 .map(|run| json!({"run": run_summary(&run)}))
                 .map_err(|_| "Could not verify delivery. Check the current lease and required media files")
+        }),
+        "export_generation_delivery" => parse(arguments).and_then(|args: ExportDeliveryInput| {
+            let destination = Path::new(&args.destination);
+            if !destination.is_absolute() {
+                return Err("Export destination must be an absolute local path");
+            }
+            store
+                .export_generation_delivery(database, args.workspace_id, args.run_id, destination)
+                .map(|()| json!({"destination": args.destination}))
+                .map_err(|_| "Could not export delivery. Check the verified files and choose a new destination")
         }),
         "get_completed_video" => parse(arguments).and_then(|args: RunInput| {
             store

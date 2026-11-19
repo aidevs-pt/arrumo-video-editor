@@ -256,3 +256,5 @@ To queue a saved draft, call `list_video_drafts` with the workspace ID, then cal
 Workers can call `claim_generation` for the next run and use the returned attempt number with `checkpoint_generation` to save progress and renew the lease. Submit stage results with `submit_production_result` while the lease is active. Delivery verification uses a separate workflow. Use `get_generation_activity` to read the run's recorded transitions.
 
 At the `verify_delivery` step, call `verify_generation_delivery` with the workspace ID, run ID, and current attempt. The server checks the managed MP4 and SRT files with `ffprobe` using the database path configured at launch. After a successful verification, call `get_completed_video` for verified output metadata and production history.
+
+Call `export_generation_delivery` with the workspace ID, completed run ID, and an absolute local `destination` path in an existing directory. The shared exporter writes a ZIP of the verified video and subtitle files and refuses to replace an existing path.
