@@ -3,11 +3,13 @@ use std::{path::Path, time::Duration};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
+mod assets;
 mod format_deliveries;
 mod output_formats;
 mod profile_deliveries;
 mod profile_formats;
 
+pub use assets::{WorkspaceAsset, asset_path, asset_root};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
@@ -46,6 +48,7 @@ impl WorkspaceStore {
             include_str!("004-profile-format-overrides.sql"),
             include_str!("005-format-deliveries.sql"),
             include_str!("006-profile-deliveries.sql"),
+            include_str!("007-workspace-assets.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

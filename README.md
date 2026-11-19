@@ -77,3 +77,11 @@ cargo run --locked -- ./workspaces.sqlite profile-delivery 1 1 1
 ```
 
 Delivery settings can include `portrait_derivatives`. To request two portrait derivatives from profile ID 1, use `{"portrait_derivatives":{"count":2,"source":{"type":"profile","profile_id":1}}}` as part of the delivery settings JSON. The source profile must belong to the workspace. Use `{"type":"manual","guidance":"…","thumbnails_per_video":2,"thumbnail_guidance":"…"}` as the source to specify the derivative and thumbnail guidance directly. Count zero disables derivative requests. Profile delivery can override the portrait configuration as a unit.
+
+Importing a workspace asset copies it into workspace-owned storage alongside the database at `<database>.media/<workspace-id>/<asset-id>`. The source file stays in place. File extensions classify supported image, audio, and video assets.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite import-asset 1 ./reference.png
+cargo run --locked -- ./workspaces.sqlite assets 1
+cargo run --locked -- ./workspaces.sqlite set-asset-notes 1 1 "Keep the product centered"
+```

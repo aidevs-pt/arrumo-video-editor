@@ -4,9 +4,10 @@ use std::{path::PathBuf, sync::Mutex};
 
 use arrumo_workspaces::{
     DeliveryOverrides, DimensionOverrides, FormatDelivery, OutputFormat, OutputFormatSettings,
-    Profile, ProfileDelivery, ProfileFormat, SupplementalOutputs, Workspace, WorkspaceStore,
+    Profile, ProfileDelivery, ProfileFormat, SupplementalOutputs, Workspace, WorkspaceAsset,
+    WorkspaceStore, asset_root,
 };
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -207,6 +208,51 @@ async fn set_profile_delivery(
         .map_err(|_| "profile_delivery_save_failed")
 }
 
+#[tauri::command]
+async fn list_assets(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<WorkspaceAsset>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_assets(workspace_id)
+        .map_err(|_| "asset_list_failed")
+}
+
+#[tauri::command]
+async fn import_asset(
+    workspace_id: i64,
+    source: PathBuf,
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<WorkspaceAsset, &'static str> {
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "asset_storage_unavailable")?
+        .join("workspaces.sqlite");
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .import_asset(&asset_root(&database), workspace_id, &source)
+        .map_err(|_| "asset_import_failed")
+}
+
+#[tauri::command]
+async fn set_asset_notes(
+    workspace_id: i64,
+    asset_id: i64,
+    notes: String,
+    store: State<'_, Store>,
+) -> Result<WorkspaceAsset, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_asset_notes(workspace_id, asset_id, &notes)
+        .map_err(|_| "asset_notes_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -232,7 +278,10 @@ fn main() {
             get_format_delivery,
             set_format_delivery,
             get_profile_delivery,
-            set_profile_delivery
+            set_profile_delivery,
+            list_assets,
+            import_asset,
+            set_asset_notes
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

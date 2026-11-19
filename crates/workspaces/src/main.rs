@@ -1,6 +1,6 @@
 use std::{env, error::Error, ffi::OsStr, io, path::Path};
 
-use arrumo_workspaces::WorkspaceStore;
+use arrumo_workspaces::{WorkspaceStore, asset_root};
 
 fn utf8(value: &OsStr) -> io::Result<&str> {
     value
@@ -130,6 +130,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace] if command == "assets" => {
+            let assets = WorkspaceStore::open(Path::new(database))?
+                .list_assets(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&assets)?);
+        }
+        [database, command, workspace, source] if command == "import-asset" => {
+            let database = Path::new(database);
+            let asset = WorkspaceStore::open(database)?
+                .import_asset(
+                    &asset_root(database),
+                    utf8(workspace)?.parse()?,
+                    Path::new(source),
+                )
+                .map_err(io::Error::other)?;
+            println!("{}", serde_json::to_string(&asset)?);
+        }
+        [database, command, workspace, asset, notes] if command == "set-asset-notes" => {
+            let asset = WorkspaceStore::open(Path::new(database))?.set_asset_notes(
+                utf8(workspace)?.parse()?,
+                utf8(asset)?.parse()?,
+                utf8(notes)?,
+            )?;
+            println!("{}", serde_json::to_string(&asset)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -144,7 +168,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "format-delivery <workspace-id> <format-id> | ",
                 "set-format-delivery <workspace-id> <format-id> <settings-json> | ",
                 "profile-delivery <workspace-id> <profile-id> <format-id> | ",
-                "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json>"
+                "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json> | ",
+                "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
+                "set-asset-notes <workspace-id> <asset-id> <notes>"
             )
             .into());
         }
