@@ -255,6 +255,7 @@ async fn set_asset_notes(
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir: PathBuf = app.path().app_local_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;

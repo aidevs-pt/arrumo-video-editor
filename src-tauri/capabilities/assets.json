@@ -1,0 +1,5 @@
+{
+  "identifier": "assets",
+  "windows": ["main"],
+  "permissions": ["dialog:allow-open"]
+}

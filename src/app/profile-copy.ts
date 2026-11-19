@@ -2,6 +2,7 @@ export const profileCopy = {
   en: {
     back: "Back to workspaces",
     outputs: "Outputs",
+    assets: "Assets",
     formats: "Formats",
     title: "Profiles",
     empty: "No profiles yet",
@@ -26,6 +27,7 @@ export const profileCopy = {
   es: {
     back: "Volver a los espacios de trabajo",
     outputs: "Salidas",
+    assets: "Recursos",
     formats: "Formatos",
     title: "Perfiles",
     empty: "Aún no hay perfiles",
@@ -50,6 +52,7 @@ export const profileCopy = {
   pt: {
     back: "Voltar aos espaços de trabalho",
     outputs: "Saídas",
+    assets: "Recursos",
     formats: "Formatos",
     title: "Perfis",
     empty: "Ainda não há perfis",
@@ -74,6 +77,7 @@ export const profileCopy = {
 } satisfies Record<"en" | "es" | "pt", Record<keyof {
   back: string;
   outputs: string;
+  assets: string;
   formats: string;
   title: string;
   empty: string;

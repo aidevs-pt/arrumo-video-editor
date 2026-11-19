@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { WorkspaceAssets } from "./workspace-assets";
 import { WorkspaceOutputs } from "./workspace-outputs";
 import { WorkspaceProfiles } from "./workspace-profiles";
 import { workspaceCopy, workspaceLocale } from "./workspace-copy";
@@ -19,7 +20,7 @@ export default function Page() {
   const [locale, setLocale] = useState<keyof typeof workspaceCopy>("en");
   const [status, setStatus] = useState<Status>("loading");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [showOutputs, setShowOutputs] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<"profiles" | "outputs" | "assets">("profiles");
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -72,12 +73,14 @@ export default function Page() {
         <img src="/arrumo-icon.svg" alt="" width={28} height={28} />
         <span>Arrumo</span>
       </header>
-      {selected && showOutputs ? (
+      {selected && workspaceView === "assets" ? (
+        <WorkspaceAssets key={selected.id} workspace={selected} locale={locale} onBack={() => setWorkspaceView("profiles")} />
+      ) : selected && workspaceView === "outputs" ? (
         <WorkspaceOutputs
           key={selected.id}
           workspace={selected}
           locale={locale}
-          onBack={() => setShowOutputs(false)}
+          onBack={() => setWorkspaceView("profiles")}
         />
       ) : selected ? (
         <WorkspaceProfiles
@@ -85,7 +88,8 @@ export default function Page() {
           workspace={selected}
           locale={locale}
           onBack={() => setSelected(null)}
-          onOutputs={() => setShowOutputs(true)}
+          onOutputs={() => setWorkspaceView("outputs")}
+          onAssets={() => setWorkspaceView("assets")}
         />
       ) : (
         <main className="workspace-shell">
