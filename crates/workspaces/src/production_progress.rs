@@ -77,6 +77,17 @@ impl WorkspaceStore {
             .get(index as usize)
             .filter(|step| step.stage == stage)
             .ok_or(rusqlite::Error::InvalidQuery)?;
+        if stage == ProductionStage::Preview && result.get("cuts").is_some() {
+            let source_ids: String = tx.query_row(
+                "SELECT json_extract(snapshot_json, '$.draft.source_ids')
+                 FROM generation_runs WHERE id = ?1",
+                [run_id],
+                |row| row.get(0),
+            )?;
+            let source_ids: Vec<i64> = read_settings(Some(source_ids), 0)?;
+            crate::final_render::preview_cuts(result, &source_ids)
+                .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        }
         let id = tx.query_row(
             "INSERT INTO production_results (run_id, stage_index, attempt, result_json)
              VALUES (?1, ?2, ?3, ?4) RETURNING id",

@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fs, io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
@@ -9,7 +9,7 @@ use std::{
 
 use rusqlite::params;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::format_deliveries::read_settings;
 use crate::{
@@ -37,6 +37,40 @@ struct Dimensions {
     id: i64,
     width: u32,
     height: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct PreviewCut {
+    asset_id: i64,
+    start_ms: u32,
+    end_ms: u32,
+}
+
+pub(crate) fn preview_cuts(
+    result: &Value,
+    source_ids: &[i64],
+) -> io::Result<Option<Vec<PreviewCut>>> {
+    let Some(value) = result.get("cuts") else {
+        return Ok(None);
+    };
+    let cuts: Vec<PreviewCut> = serde_json::from_value(value.clone())?;
+    if cuts.is_empty()
+        || cuts
+            .iter()
+            .any(|cut| cut.end_ms <= cut.start_ms || !source_ids.contains(&cut.asset_id))
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Preview cuts require increasing times and assets from the frozen source list",
+        ));
+    }
+    Ok(Some(cuts))
+}
+
+struct RenderClip {
+    path: PathBuf,
+    cut: Option<PreviewCut>,
+    has_audio: bool,
 }
 
 struct ActiveRender<'a> {
@@ -74,6 +108,34 @@ impl WorkspaceStore {
             .into());
         }
 
+        let (preview_index, preview_step) = plan
+            .steps
+            .iter()
+            .enumerate()
+            .find(|(_, step)| step.stage == ProductionStage::Preview)
+            .ok_or_else(|| io::Error::other("No preview step exists in the saved plan"))?;
+        let preview: String = self.0.query_row(
+            "SELECT result_json FROM production_results
+             WHERE run_id = ?1 AND stage_index = ?2
+               AND ((?3 AND decision = 'approved') OR (NOT ?3 AND decision IS NULL))
+             ORDER BY id DESC LIMIT 1",
+            params![run_id, preview_index as i64, preview_step.review_required],
+            |row| row.get(0),
+        )?;
+        let sources =
+            match preview_cuts(&serde_json::from_str(&preview)?, &inputs.draft.source_ids)? {
+                Some(cuts) => cuts
+                    .into_iter()
+                    .map(|cut| (cut.asset_id, Some(cut)))
+                    .collect(),
+                None => inputs
+                    .draft
+                    .source_ids
+                    .into_iter()
+                    .map(|id| (id, None))
+                    .collect::<Vec<_>>(),
+            };
+
         let delivery = delivery_directory(database, workspace_id, run_id);
         fs::create_dir_all(&delivery)?;
         let delivery = delivery.canonicalize()?;
@@ -87,26 +149,24 @@ impl WorkspaceStore {
         };
         let rendered = (|| -> Result<i64, Box<dyn Error>> {
             let root = asset_root(database);
-            let sources = inputs
-                .draft
-                .source_ids
-                .iter()
-                .map(|id| {
-                    let path = asset_path(&root, workspace_id, *id);
-                    if !path.symlink_metadata()?.is_file() {
-                        return Err(io::Error::other("A managed source video is missing"));
-                    }
-                    path.canonicalize()
-                })
-                .collect::<io::Result<Vec<_>>>()?;
-            let audio = sources
-                .iter()
-                .map(|source| renderer.has_audio(source))
-                .collect::<Result<Vec<_>, _>>()?;
+            let mut clips = Vec::new();
+            for (id, cut) in sources {
+                let path = asset_path(&root, workspace_id, id);
+                if !path.symlink_metadata()?.is_file() {
+                    return Err(io::Error::other("A managed source video is missing").into());
+                }
+                let path = path.canonicalize()?;
+                let has_audio = renderer.inspect_source(&path, cut.as_ref())?;
+                clips.push(RenderClip {
+                    path,
+                    cut,
+                    has_audio,
+                });
+            }
             let mut filenames = Vec::new();
             for output in inputs.formats {
                 let format = output.format;
-                renderer.render_format(&scratch, &sources, &audio, &format)?;
+                renderer.render_format(&scratch, &clips, &format)?;
                 filenames.push(format!("{}.mp4", format.id));
             }
             self.submit_production_result_with(
@@ -176,7 +236,11 @@ impl ActiveRender<'_> {
         }
     }
 
-    fn has_audio(&self, path: &Path) -> Result<bool, Box<dyn Error>> {
+    fn inspect_source(
+        &self,
+        path: &Path,
+        cut: Option<&PreviewCut>,
+    ) -> Result<bool, Box<dyn Error>> {
         self.confirm_lease()?;
         let output = Command::new("ffprobe")
             .args([
@@ -184,26 +248,50 @@ impl ActiveRender<'_> {
                 "error",
                 "-protocol_whitelist",
                 "file",
-                "-select_streams",
-                "a:0",
                 "-show_entries",
-                "stream=index",
+                "stream=codec_type,duration:format=duration",
                 "-of",
-                "csv=p=0",
+                "json",
             ])
             .arg(path)
             .output()?;
         if !output.status.success() {
             return Err(io::Error::other("Could not inspect a source video").into());
         }
-        Ok(!output.stdout.is_empty())
+        let info: Value = serde_json::from_slice(&output.stdout)?;
+        let streams = info["streams"]
+            .as_array()
+            .ok_or_else(|| io::Error::other("No streams found in managed source"))?;
+        let video = streams
+            .iter()
+            .find(|stream| stream["codec_type"] == "video")
+            .ok_or_else(|| io::Error::other("Managed source has no video stream"))?;
+        if let Some(cut) = cut {
+            let duration = [&video["duration"], &info["format"]["duration"]]
+                .into_iter()
+                .filter_map(Value::as_str)
+                .find_map(|duration| {
+                    duration
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|value| value.is_finite())
+                })
+                .ok_or_else(|| io::Error::other("Could not determine duration of a cut source"))?;
+            if f64::from(cut.end_ms) > (duration * 1000.0).round() {
+                return Err(io::Error::other(format!(
+                    "Preview cut ends beyond the duration of source {}",
+                    cut.asset_id
+                ))
+                .into());
+            }
+        }
+        Ok(streams.iter().any(|stream| stream["codec_type"] == "audio"))
     }
 
     fn render_format(
         &self,
         scratch: &Path,
-        sources: &[std::path::PathBuf],
-        audio: &[bool],
+        clips: &[RenderClip],
         format: &Dimensions,
     ) -> Result<(), Box<dyn Error>> {
         let Dimensions { id, width, height } = format;
@@ -216,27 +304,31 @@ impl ActiveRender<'_> {
             "scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30"
         );
         let mut manifest = String::new();
-        for (index, (source, has_audio)) in sources.iter().zip(audio).enumerate() {
+        for (index, clip) in clips.iter().enumerate() {
             let filename = format!("clip-{id}-{index}.mp4");
             let mut command = Command::new("ffmpeg");
-            command
-                .args([
-                    "-nostdin",
-                    "-v",
-                    "error",
-                    "-filter_threads",
-                    "1",
-                    "-protocol_whitelist",
-                    "file",
-                    "-i",
-                ])
-                .arg(source);
-            let audio_source = if *has_audio {
+            command.args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-filter_threads",
+                "1",
+                "-protocol_whitelist",
+                "file",
+            ]);
+            if let Some(cut) = &clip.cut {
+                command.args(["-ss", &format!("{}ms", cut.start_ms)]);
+            }
+            command.arg("-i").arg(&clip.path);
+            let audio_source = if clip.has_audio {
                 "0:a:0"
             } else {
                 command.args(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]);
                 "1:a:0"
             };
+            if let Some(cut) = &clip.cut {
+                command.args(["-t", &format!("{}ms", cut.end_ms - cut.start_ms)]);
+            }
             command
                 .args([
                     "-map",
