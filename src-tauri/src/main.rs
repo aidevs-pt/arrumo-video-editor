@@ -12,6 +12,7 @@ use arrumo_workspaces::{
 use tauri::{AppHandle, Manager, State};
 
 mod completed_video;
+mod delivery_stream;
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -516,6 +517,7 @@ async fn review_production_result(
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(delivery_stream::DeliveryStream::default())
         .setup(|app| {
             let data_dir: PathBuf = app.path().app_local_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -566,7 +568,8 @@ fn main() {
             completed_video::rename_completed_video,
             completed_video::export_completed_video,
             completed_video::replay_completed_video,
-            completed_video::add_completed_video_feedback
+            completed_video::add_completed_video_feedback,
+            completed_video::preview_completed_output
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

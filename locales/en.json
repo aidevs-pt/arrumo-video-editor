@@ -276,7 +276,12 @@
     "feedbackNote": "Feedback note (Markdown)",
     "addFeedback": "Add feedback",
     "feedbackSaved": "Feedback saved.",
-    "feedbackError": "Could not save the feedback. Try again."
+    "feedbackError": "Could not save the feedback. Try again.",
+    "previewOutput": "Preview delivery",
+    "previewError": "Could not open the verified files. Check that the delivery is still available.",
+    "loadingPreview": "Loading delivery preview…",
+    "playbackError": "Could not play this video. You can still export the delivery ZIP.",
+    "subtitleText": "Subtitle text"
   },
   "productionPlan": {
     "title": "Production plan",

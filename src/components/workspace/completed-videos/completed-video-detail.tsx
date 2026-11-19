@@ -10,6 +10,7 @@ import { useLocale } from "@/lib/locale-provider";
 
 import type { Stage } from "../generation/generation-plan";
 import { CompletedVideoFeedback, type FeedbackResult, type VideoFeedback } from "./completed-video-feedback";
+import { CompletedOutputPreview } from "./completed-output-preview";
 import { CompletedVideoReplay } from "./completed-video-replay";
 
 type CompletedVideo = {
@@ -114,12 +115,16 @@ export function CompletedVideoDetail({ workspaceId, runId, onTitle }: {
             <h4 id={`delivery-files-${runId}`} className="font-medium">{copy.files}</h4>
             <ul className="mt-2 flex flex-col gap-2 text-sm text-muted-foreground">
               {video.delivery.verified_outputs.map((output) => (
-                <li className="flex flex-wrap gap-x-3 gap-y-1" key={output.format_id}>
-                  <span>{output.video}</span>
-                  <span>{output.subtitles}</span>
-                  <span className="tabular-nums">{new Intl.NumberFormat(locale, {
-                    style: "unit", unit: "second", maximumFractionDigits: 1,
-                  }).format(output.duration_seconds)}</span>
+                <li className="flex flex-col gap-1" key={output.format_id}>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span>{output.video}</span>
+                    <span>{output.subtitles}</span>
+                    <span className="tabular-nums">{new Intl.NumberFormat(locale, {
+                      style: "unit", unit: "second", maximumFractionDigits: 1,
+                    }).format(output.duration_seconds)}</span>
+                  </div>
+                  <CompletedOutputPreview workspaceId={workspaceId} runId={runId} formatId={output.format_id}
+                    filename={output.video} />
                 </li>
               ))}
             </ul>

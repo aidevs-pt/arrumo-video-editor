@@ -239,3 +239,35 @@ fn verify_output(directory: &Path, format: Format) -> Result<VerifiedOutput, Box
         subtitle_cues: captions.packets.len(),
     })
 }
+
+impl WorkspaceStore {
+    pub fn verified_delivery_files(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+    ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+        let output = self
+            .verified_delivery(workspace_id, run_id)?
+            .verified_outputs
+            .into_iter()
+            .find(|output| output.format_id == format_id)
+            .ok_or_else(|| io::Error::other("Output format is not in the verified delivery"))?;
+        let directory = delivery_directory(&database.canonicalize()?, workspace_id, run_id);
+        let resolve = |name: String, extension: &str| -> io::Result<PathBuf> {
+            if name != format!("{format_id}.{extension}") {
+                return Err(io::Error::other("Unexpected filename in verified delivery"));
+            }
+            let path = directory.join(name);
+            if !path.symlink_metadata()?.is_file() || path.canonicalize()? != path {
+                return Err(io::Error::other("Invalid verified delivery file"));
+            }
+            Ok(path)
+        };
+        Ok((
+            resolve(output.video, "mp4")?,
+            resolve(output.subtitles, "srt")?,
+        ))
+    }
+}

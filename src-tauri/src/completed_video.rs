@@ -95,3 +95,47 @@ pub async fn add_completed_video_feedback(
         .add_completed_video_feedback(workspace_id, run_id, result_id, &markdown)
         .map_err(|_| "add_completed_video_feedback_failed")
 }
+
+#[derive(serde::Serialize)]
+pub struct DeliveryPreview {
+    video_url: String,
+    subtitles: String,
+}
+
+#[tauri::command]
+pub async fn preview_completed_output(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    app: AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<DeliveryPreview, &'static str> {
+    use std::{fs::File, io::Read};
+
+    const MAX_SUBTITLE_BYTES: u64 = 2 * 1024 * 1024;
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "store_unavailable")?
+        .join("workspaces.sqlite");
+    let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
+    let (video_path, subtitle_path) = store
+        .verified_delivery_files(&database, workspace_id, run_id, format_id)
+        .map_err(|_| "delivery_preview_failed")?;
+    let mut subtitles = String::new();
+    File::open(subtitle_path)
+        .map_err(|_| "delivery_preview_failed")?
+        .take(MAX_SUBTITLE_BYTES + 1)
+        .read_to_string(&mut subtitles)
+        .map_err(|_| "delivery_preview_failed")?;
+    if subtitles.len() as u64 > MAX_SUBTITLE_BYTES {
+        return Err("delivery_preview_failed");
+    }
+    let video_url = stream
+        .open(video_path)
+        .map_err(|_| "delivery_preview_failed")?;
+    Ok(DeliveryPreview {
+        video_url,
+        subtitles,
+    })
+}

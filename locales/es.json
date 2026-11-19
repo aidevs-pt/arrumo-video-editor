@@ -276,7 +276,12 @@
     "feedbackNote": "Comentario (Markdown)",
     "addFeedback": "Añadir comentario",
     "feedbackSaved": "Comentario guardado.",
-    "feedbackError": "No se pudo guardar el comentario. Inténtalo de nuevo."
+    "feedbackError": "No se pudo guardar el comentario. Inténtalo de nuevo.",
+    "previewOutput": "Previsualizar entrega",
+    "previewError": "No se pudieron abrir los archivos verificados. Comprueba que la entrega siga disponible.",
+    "loadingPreview": "Cargando vista previa de la entrega…",
+    "playbackError": "No se pudo reproducir este vídeo. Puedes exportar el ZIP de entrega.",
+    "subtitleText": "Texto de los subtítulos"
   },
   "productionPlan": {
     "title": "Plan de producción",
