@@ -4,8 +4,10 @@ use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
 mod output_formats;
+mod profile_formats;
 
 pub use output_formats::{OutputFormat, OutputFormatSettings};
+pub use profile_formats::{DimensionOverrides, ProfileFormat};
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Workspace {
@@ -35,6 +37,7 @@ impl WorkspaceStore {
             include_str!("001-create-workspaces.sql"),
             include_str!("002-create-profiles.sql"),
             include_str!("003-create-output-formats.sql"),
+            include_str!("004-profile-format-overrides.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

@@ -82,6 +82,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .remove_output_format(utf8(workspace)?.parse()?, utf8(format)?.parse()?)?;
             println!("{}", serde_json::to_string(&removed)?);
         }
+        [database, command, workspace, profile] if command == "profile-formats" => {
+            let formats = WorkspaceStore::open(Path::new(database))?
+                .list_profile_formats(utf8(workspace)?.parse()?, utf8(profile)?.parse()?)?;
+            println!("{}", serde_json::to_string(&formats)?);
+        }
+        [database, command, workspace, profile, format, overrides]
+            if command == "set-profile-format" =>
+        {
+            WorkspaceStore::open(Path::new(database))?.set_profile_format_overrides(
+                utf8(workspace)?.parse()?,
+                utf8(profile)?.parse()?,
+                utf8(format)?.parse()?,
+                &serde_json::from_str(utf8(overrides)?)?,
+            )?;
+            println!("null");
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -90,7 +106,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "update-profile <workspace-id> <profile-id> <name> <guidance> [color] | ",
                 "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
                 "update-format <workspace-id> <format-id> <settings-json> | ",
-                "remove-format <workspace-id> <format-id>"
+                "remove-format <workspace-id> <format-id> | ",
+                "profile-formats <workspace-id> <profile-id> | ",
+                "set-profile-format <workspace-id> <profile-id> <format-id> <overrides-json>"
             )
             .into());
         }

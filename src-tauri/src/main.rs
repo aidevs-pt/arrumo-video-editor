@@ -2,7 +2,10 @@
 
 use std::{path::PathBuf, sync::Mutex};
 
-use arrumo_workspaces::{OutputFormat, OutputFormatSettings, Profile, Workspace, WorkspaceStore};
+use arrumo_workspaces::{
+    DimensionOverrides, OutputFormat, OutputFormatSettings, Profile, ProfileFormat, Workspace,
+    WorkspaceStore,
+};
 use tauri::{Manager, State};
 
 type Store = Mutex<WorkspaceStore>;
@@ -120,6 +123,34 @@ async fn remove_output_format(
         .map_err(|_| "format_remove_failed")
 }
 
+#[tauri::command]
+async fn list_profile_formats(
+    workspace_id: i64,
+    profile_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<ProfileFormat>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_profile_formats(workspace_id, profile_id)
+        .map_err(|_| "profile_format_list_failed")
+}
+
+#[tauri::command]
+async fn set_profile_format_overrides(
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    overrides: DimensionOverrides,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_profile_format_overrides(workspace_id, profile_id, format_id, &overrides)
+        .map_err(|_| "profile_format_save_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -139,7 +170,9 @@ fn main() {
             list_output_formats,
             create_output_format,
             update_output_format,
-            remove_output_format
+            remove_output_format,
+            list_profile_formats,
+            set_profile_format_overrides
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

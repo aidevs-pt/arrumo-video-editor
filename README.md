@@ -51,3 +51,13 @@ cargo run --locked -- ./workspaces.sqlite create-format 1 '{"name":"Square","wid
 ```
 
 Use `update-format <workspace-id> <format-id> <settings-json>` to edit or disable a format, and `remove-format <workspace-id> <format-id>` to remove it.
+
+Profiles see enabled workspace formats and can override width and height independently. The listing returns resolved dimensions and the raw overrides. On save, absent or null fields inherit workspace values.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite profile-formats 1 1
+cargo run --locked -- ./workspaces.sqlite set-profile-format 1 1 1 '{"width":1280}'
+cargo run --locked -- ./workspaces.sqlite set-profile-format 1 1 1 '{}'
+```
+
+Disabling a format hides it and preserves its overrides for re-enabling. Removing a format deletes its overrides.
