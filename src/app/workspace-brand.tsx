@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { WorkspaceBrandImages } from "./workspace-brand-images";
 
 const en = {
   title: "Brand", back: "Back to profiles", colors: "Brand colors", picker: "Color",
@@ -41,6 +42,7 @@ export function WorkspaceBrand({ workspace, locale, onBack }: {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [savingImages, setSavingImages] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [result, setResult] = useState<"saved" | "saveError" | null>(null);
   const copy = translations[locale];
@@ -79,7 +81,7 @@ export function WorkspaceBrand({ workspace, locale, onBack }: {
 
   return (
     <main className="workspace-shell profile-shell">
-      <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
+      <Button type="button" variant="ghost" onClick={onBack} disabled={saving || savingImages}>
         <ArrowLeft data-icon="inline-start" />
         {copy.back}
       </Button>
@@ -124,6 +126,7 @@ export function WorkspaceBrand({ workspace, locale, onBack }: {
           {result === "saveError" && <p role="alert">{copy.saveError}</p>}
         </section>
       )}
+      <WorkspaceBrandImages workspaceId={workspace.id} locale={locale} onSaving={setSavingImages} />
     </main>
   );
 }

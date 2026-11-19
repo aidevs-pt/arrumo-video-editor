@@ -260,3 +260,12 @@ body { font-family: system-ui, sans-serif; margin: 0; }
 .brand-swatch { width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); }
 .brand-color-picker { width: auto; }
 .brand-color-picker input { width: 52px; }
+
+.brand-image-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.brand-image-roles label { overflow-wrap: anywhere; }
