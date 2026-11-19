@@ -6,7 +6,7 @@ use crate::format_deliveries::read_settings;
 use crate::generation_queue::read_run;
 use crate::{GenerationRun, WorkspaceStore};
 
-const LEASE_SECONDS: i64 = 60;
+pub(crate) const LEASE_SECONDS: i64 = 60;
 
 #[derive(Debug, Serialize)]
 pub struct GenerationClaim {

@@ -11,6 +11,7 @@ mod format_deliveries;
 mod generation_plan;
 mod generation_queue;
 mod generation_worker;
+mod media_worker;
 mod output_formats;
 mod preview_settings;
 mod production_progress;
@@ -28,6 +29,7 @@ pub use format_deliveries::{
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{GenerationRun, RunOptions};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
+pub use media_worker::MediaWork;
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};

@@ -363,6 +363,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run, edit @ ..]
+            if command == "process-media-stage" && edit.len() <= 1 =>
+        {
+            let path = Path::new(database);
+            let edit = edit
+                .first()
+                .map(|value| Ok::<_, Box<dyn Error>>(serde_json::from_str(utf8(value)?)?))
+                .transpose()?;
+            let work = WorkspaceStore::open(path)?.process_media_stage(
+                path,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                edit.as_ref(),
+            )?;
+            println!("{}", serde_json::to_string(&work)?);
+        }
         [database, command, workspace, run, attempt] if command == "verify-delivery" => {
             let path = Path::new(database);
             let run = WorkspaceStore::open(path)?.verify_generation_delivery(
@@ -432,6 +448,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
+                "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"
             )
