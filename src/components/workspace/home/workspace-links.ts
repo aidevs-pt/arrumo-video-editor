@@ -18,7 +18,11 @@ export function completedVideoHref(workspaceId: number, runId: number, formatId?
   return `/completed-video?${query}`;
 }
 
+export function isCalendarMonth(value?: string | null): value is string {
+  return Boolean(value && /^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(value));
+}
+
 export function calendarHref(workspaceId: number, profileId?: number, month?: string | null) {
   const href = workspaceHref("calendar", workspaceId, profileId);
-  return month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(month) ? `${href}&month=${month}` : href;
+  return isCalendarMonth(month) ? `${href}&month=${month}` : href;
 }

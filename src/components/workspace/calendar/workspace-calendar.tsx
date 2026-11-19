@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { calendarHref, completedVideoHref } from "@/components/workspace/home/workspace-links";
+import { calendarHref, completedVideoHref, isCalendarMonth } from "@/components/workspace/home/workspace-links";
 import { useWorkspaceCatalog } from "@/components/workspace/home/workspace-router";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
@@ -28,10 +28,16 @@ type Output = {
   height: number;
 };
 
+function utcDate(year: number, month: number, day: number) {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  return date;
+}
+
 function monthStart(value: string | null) {
-  if (value && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(value)) return new Date(`${value}-01T00:00:00Z`);
+  if (isCalendarMonth(value)) return new Date(`${value}-01T00:00:00Z`);
   const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+  return utcDate(now.getFullYear(), now.getMonth(), 1);
 }
 
 function asDate(day: Date) {
@@ -61,7 +67,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
   const year = month.getUTCFullYear();
   const monthIndex = month.getUTCMonth();
   const start = asDate(month);
-  const end = asDate(new Date(Date.UTC(year, monthIndex + 1, 0)));
+  const end = asDate(utcDate(year, monthIndex + 1, 0));
   const key = `${start}-${profileId}-${retry}`;
   const rows = results?.key === key ? results.rows : undefined;
   const failed = results?.key === key && !results.rows;
@@ -69,7 +75,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
   const monthLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(month);
 
   function showMonth(offset: number) {
-    const next = asDate(new Date(Date.UTC(year, monthIndex + offset, 1))).slice(0, 7);
+    const next = asDate(utcDate(year, monthIndex + offset, 1)).slice(0, 7);
     router.push(calendarHref(workspaceId, profileId ?? undefined, next), { scroll: false });
   }
 
@@ -98,7 +104,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
     else byDate.set(row.scheduled_date, [row]);
   }
   const days = Array.from({ length: Number(end.slice(-2)) }, (_, index) =>
-    asDate(new Date(Date.UTC(year, monthIndex, index + 1))));
+    asDate(utcDate(year, monthIndex, index + 1)));
   const weekday = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
   const dayLabel = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" });
 
@@ -111,7 +117,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
             <CardTitle className="capitalize">{monthLabel}</CardTitle>
             <div className="flex gap-1">
               <Button variant="outline" size="icon-sm" aria-label={copy.previousMonth}
-                disabled={year <= 1000 && monthIndex === 0}
+                disabled={year === 1 && monthIndex === 0}
                 onClick={() => showMonth(-1)}><ChevronLeft /></Button>
               <Button variant="outline" size="icon-sm" aria-label={copy.nextMonth}
                 disabled={year >= 9999 && monthIndex === 11}
