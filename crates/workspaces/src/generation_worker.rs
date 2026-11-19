@@ -213,7 +213,7 @@ mod tests {
                 "key",
                 &RunOptions {
                     autopilot: false,
-                    platform: None,
+                    ..RunOptions::default()
                 },
             )
             .unwrap();
@@ -302,7 +302,7 @@ mod tests {
                 "request",
                 &RunOptions {
                     autopilot: false,
-                    platform: None,
+                    ..RunOptions::default()
                 },
             )
             .unwrap();

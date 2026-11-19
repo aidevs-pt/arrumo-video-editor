@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rusqlite::{OptionalExtension, Row, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -5,12 +7,14 @@ use serde_json::{Value, json};
 use crate::WorkspaceStore;
 use crate::format_deliveries::read_settings;
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RunOptions {
     #[serde(default)]
     pub autopilot: bool,
     pub platform: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub provider_overrides: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -196,8 +200,14 @@ impl WorkspaceStore {
         if formats.is_empty() {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let overrides = options
+            .get("provider_overrides")
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?
+            .unwrap_or_default();
         let provider_orders = self
-            .capture_provider_orders(workspace_id)
+            .capture_provider_orders(workspace_id, &overrides)
             .map_err(|error| {
                 rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
                     error.to_string(),
@@ -318,6 +328,7 @@ mod tests {
         let options = RunOptions {
             autopilot: false,
             platform: Some("YouTube".into()),
+            ..RunOptions::default()
         };
         assert!(
             store
@@ -367,6 +378,7 @@ mod tests {
                     &RunOptions {
                         autopilot: true,
                         platform: None,
+                        ..RunOptions::default()
                     }
                 )
                 .is_err()
@@ -379,6 +391,22 @@ mod tests {
         assert_eq!(
             revised.snapshot["provider_orders"]["transcription"],
             json!({"effective": [], "source": "workspace"})
+        );
+        let override_options = RunOptions {
+            provider_overrides: BTreeMap::from([("transcription".into(), vec!["openai".into()])]),
+            ..options
+        };
+        let overridden = store
+            .enqueue_video_draft(studio, draft.id, "per-run", &override_options)
+            .unwrap();
+        assert_eq!(
+            overridden.snapshot["provider_orders"]["transcription"],
+            json!({"effective": ["openai"], "source": "run"})
+        );
+        assert!(
+            store
+                .enqueue_video_draft(studio, draft.id, "attempt-one", &override_options)
+                .is_err()
         );
     }
 }

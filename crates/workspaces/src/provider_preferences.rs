@@ -15,6 +15,7 @@ enum PreferenceSource {
     BundledDefault,
     App,
     Workspace,
+    Run,
 }
 
 #[derive(Debug, Serialize)]
@@ -57,6 +58,7 @@ impl WorkspaceStore {
     pub(crate) fn capture_provider_orders(
         &self,
         workspace_id: i64,
+        overrides: &BTreeMap<String, Vec<String>>,
     ) -> Result<BTreeMap<String, CapturedProviderOrder>, Box<dyn Error>> {
         let mut capabilities: BTreeMap<String, Vec<CapabilityProvider>> = BTreeMap::new();
         for plugin in self.plugin_catalog()? {
@@ -78,9 +80,25 @@ impl WorkspaceStore {
         for stored in query.query_map([workspace_id], |row| row.get::<_, String>(0))? {
             capabilities.entry(stored?).or_default();
         }
+        for (capability, order) in overrides {
+            let available = capabilities
+                .get(capability)
+                .filter(|_| capability != "agents")
+                .ok_or_else(|| invalid_preference("Unsupported per-run capability override"))?;
+            validate_provider_order(order, available)?;
+        }
         capabilities
             .into_iter()
             .map(|(capability, available)| {
+                if let Some(order) = overrides.get(&capability) {
+                    return Ok((
+                        capability,
+                        CapturedProviderOrder {
+                            effective: order.clone(),
+                            source: PreferenceSource::Run,
+                        },
+                    ));
+                }
                 let order =
                     self.resolve_provider_preferences(&capability, Some(workspace_id), available)?;
                 Ok((
@@ -151,17 +169,8 @@ impl WorkspaceStore {
         let transaction = self.0.unchecked_transaction()?;
         self.check_preference_scope(capability, workspace_id)?;
         if let Some(order) = order {
-            let mut seen = HashSet::new();
             let available = self.capability_providers(capability)?;
-            if order
-                .iter()
-                .any(|id| !seen.insert(id) || !available.iter().any(|plugin| &plugin.id == id))
-            {
-                return Err(invalid_preference(
-                    "Provider order contains a duplicate or an unavailable plugin",
-                )
-                .into());
-            }
+            validate_provider_order(order, &available)?;
             transaction.execute(
                 "INSERT INTO plugin_provider_preferences (capability, workspace_id, plugin_ids)
                  VALUES (?1, ?2, ?3) ON CONFLICT DO UPDATE SET plugin_ids = excluded.plugin_ids",
@@ -208,6 +217,19 @@ impl WorkspaceStore {
         }
         Ok(())
     }
+}
+
+fn validate_provider_order(order: &[String], available: &[CapabilityProvider]) -> io::Result<()> {
+    let mut seen = HashSet::new();
+    if order
+        .iter()
+        .any(|id| !seen.insert(id) || !available.iter().any(|provider| &provider.id == id))
+    {
+        return Err(invalid_preference(
+            "Provider order contains a duplicate or an unavailable plugin",
+        ));
+    }
+    Ok(())
 }
 
 fn invalid_preference(message: &str) -> io::Error {

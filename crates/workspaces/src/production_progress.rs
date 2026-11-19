@@ -212,7 +212,7 @@ mod tests {
                 "guided",
                 &RunOptions {
                     autopilot: false,
-                    platform: None,
+                    ..RunOptions::default()
                 },
             )
             .unwrap();
@@ -308,7 +308,7 @@ mod tests {
                 "auto",
                 &RunOptions {
                     autopilot: true,
-                    platform: None,
+                    ..RunOptions::default()
                 },
             )
             .unwrap();
