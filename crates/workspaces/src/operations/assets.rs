@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::{WorkspaceStore, asset_root};
+use crate::{BrandAssetRole, WorkspaceStore, asset_root};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -26,8 +26,19 @@ struct NotesInput {
     notes: String,
 }
 
-pub(super) fn definitions() -> [Value; 4] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrandAssetInput {
+    workspace_id: i64,
+    asset_id: i64,
+    role: BrandAssetRole,
+}
+
+pub(super) fn definitions() -> [Value; 7] {
     let id = json!({"type": "integer", "minimum": 1});
+    let assignment = json!({"type": "object", "properties": {
+        "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
+    }, "required": ["workspaceId", "assetId", "role"], "additionalProperties": false});
     [
         json!({"name": "list_workspace_assets", "description": "List managed assets and their IDs in a workspace.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
@@ -46,6 +57,14 @@ pub(super) fn definitions() -> [Value; 4] {
                 "workspaceId": id, "assetId": id, "notes": {"type": "string"}
             }, "required": ["workspaceId", "assetId", "notes"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "list_brand_assets", "description": "List image assets assigned to workspace identity and style.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "attach_brand_asset", "description": "Assign a managed workspace image to identity or style.",
+            "inputSchema": assignment, "annotations": {"idempotentHint": true}}),
+        json!({"name": "detach_brand_asset", "description": "Remove a brand role from an image while keeping the managed asset.",
+            "inputSchema": assignment, "annotations": {"idempotentHint": true}}),
     ]
 }
 
@@ -91,6 +110,31 @@ pub(super) fn call(
                     .map(|asset| json!({"asset": asset}))
                     .map_err(|_| "Could not update usage notes for this asset")
             }),
+        "list_brand_assets" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid workspace asset arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .list_brand_assets(args.workspace_id)
+                    .map(|assets| json!({"assets": assets}))
+                    .map_err(|_| "Could not list brand assets")
+            }),
+        "attach_brand_asset" | "detach_brand_asset" => {
+            serde_json::from_value(Value::Object(arguments.clone()))
+                .map_err(|_| "Invalid brand asset arguments")
+                .and_then(|args: BrandAssetInput| {
+                    if name == "attach_brand_asset" {
+                        store
+                            .attach_brand_asset(args.workspace_id, args.asset_id, args.role)
+                            .map(|()| json!({"saved": true}))
+                            .map_err(|_| "Could not assign brand role. Choose a workspace image")
+                    } else {
+                        store
+                            .detach_brand_asset(args.workspace_id, args.asset_id, args.role)
+                            .map(|removed| json!({"removed": removed}))
+                            .map_err(|_| "Could not remove brand role")
+                    }
+                })
+        }
         _ => return None,
     })
 }

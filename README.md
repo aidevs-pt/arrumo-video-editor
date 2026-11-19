@@ -331,3 +331,5 @@ Use the same message format with a listed operation name and arguments. The repl
 To submit a decision on a task waiting for review, send a follow-up message with its `taskId` and the `review_production_result` operation. Pass the current `pendingReviewId` as `resultId`, plus the decision and optional notes. The task ID supplies the workspace and run. If you include `contextId`, it must match the task. A successful decision returns the updated task.
 
 Use `remove_output_format` with a workspace and format ID to remove that format from future runs. Captured generation settings retain their original formats.
+
+Use `list_brand_assets`, `attach_brand_asset`, and `detach_brand_asset` through MCP or A2A to manage which workspace images serve as identity assets or style references. Removing a role keeps the image in the workspace library.
