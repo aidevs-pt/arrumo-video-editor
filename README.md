@@ -61,3 +61,10 @@ cargo run --locked -- ./workspaces.sqlite set-profile-format 1 1 1 '{}'
 ```
 
 Disabling a format hides it and preserves its overrides for re-enabling. Removing a format deletes its overrides.
+
+Workspace output formats have supplemental delivery settings for thumbnail, title, and description counts, a tags toggle, and Markdown thumbnail guidance and specifications. Final video and subtitles stay required. Replacing the supplemental settings defaults omitted fields to zero, false, or empty text.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite set-format-delivery 1 1 '{"thumbnails":3,"titles":3,"descriptions":1,"tags":true}'
+cargo run --locked -- ./workspaces.sqlite format-delivery 1 1
+```

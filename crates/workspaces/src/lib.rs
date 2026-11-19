@@ -3,9 +3,11 @@ use std::{path::Path, time::Duration};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 
+mod format_deliveries;
 mod output_formats;
 mod profile_formats;
 
+pub use format_deliveries::{FormatDelivery, RequiredOutput, SupplementalOutputs};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
 
@@ -38,6 +40,7 @@ impl WorkspaceStore {
             include_str!("002-create-profiles.sql"),
             include_str!("003-create-output-formats.sql"),
             include_str!("004-profile-format-overrides.sql"),
+            include_str!("005-format-deliveries.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
