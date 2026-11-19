@@ -4,7 +4,8 @@ use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use crate::{
-    GenerationRun, ProductionStage, ReviewDecision, RunControl, RunOptions, WorkspaceStore,
+    GenerationRun, ProductionStage, ReplayMode, ReviewDecision, RunControl, RunOptions,
+    WorkspaceStore,
 };
 
 #[derive(Deserialize)]
@@ -92,7 +93,25 @@ struct NotificationInput {
     after_id: u64,
 }
 
-pub(super) fn definitions() -> [Value; 16] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReplayInput {
+    workspace_id: i64,
+    run_id: i64,
+    request_key: String,
+    mode: ReplayMode,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FailureInput {
+    workspace_id: i64,
+    run_id: i64,
+    attempt: i64,
+    detail: String,
+}
+
+pub(super) fn definitions() -> [Value; 19] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -138,6 +157,17 @@ pub(super) fn definitions() -> [Value; 16] {
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "read_completion_notification", "description": "Mark a completed run's notification as read. Returns whether the read state changed.",
             "inputSchema": run, "annotations": {"idempotentHint": true, "destructiveHint": false}}),
+        json!({"name": "get_generation_plan", "description": "Read the prepared production plan for a run.",
+            "inputSchema": run, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "replay_generation", "description": "Queue a new run from a completed video using captured or current settings. Reuse the request key for the same submission.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "requestKey": {"type": "string", "minLength": 1, "maxLength": 128},
+                "mode": {"enum": ["captured", "current"]}
+            }, "required": ["workspaceId", "runId", "requestKey", "mode"], "additionalProperties": false}}),
+        json!({"name": "fail_generation", "description": "Report a failure for the currently leased attempt. Supply a brief diagnostic suitable for the activity log.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "attempt": id, "detail": {"type": "string", "minLength": 1, "maxLength": 2000}
+            }, "required": ["workspaceId", "runId", "attempt", "detail"], "additionalProperties": false}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, and current step.",
@@ -246,6 +276,24 @@ pub(super) fn call(
                 .read_completion_notification(args.workspace_id, args.run_id)
                 .map(|changed| json!({"changed": changed}))
                 .map_err(|_| "Could not acknowledge completion notification")
+        }),
+        "get_generation_plan" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .generation_plan(args.workspace_id, args.run_id)
+                .map(|plan| json!({"plan": plan}))
+                .map_err(|_| "Could not read generation plan")
+        }),
+        "replay_generation" => parse(arguments).and_then(|args: ReplayInput| {
+            store
+                .replay_generation(args.workspace_id, args.run_id, &args.request_key, args.mode)
+                .map(|run| json!({"run": run_summary(&run)}))
+                .map_err(|_| "Could not replay run. Check the completed run, workspace and request key")
+        }),
+        "fail_generation" => parse(arguments).and_then(|args: FailureInput| {
+            store
+                .fail_generation(args.workspace_id, args.run_id, args.attempt, &args.detail)
+                .map(|run| json!({"run": run_summary(&run)}))
+                .map_err(|_| "Could not record failure. Check the workspace, current lease and diagnostic")
         }),
         "get_generation_activity" => parse(arguments).and_then(|args: RunInput| {
             store
