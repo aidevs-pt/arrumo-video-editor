@@ -262,7 +262,15 @@
     "preview": "Pré-visualizações de vídeo",
     "supplemental_outputs": "Saídas adicionais",
     "final_render": "Renderização final",
-    "verify_delivery": "Verificar a entrega"
+    "verify_delivery": "Verificar a entrega",
+    "awaitingReview": "A aguardar revisão",
+    "currentStage": "Etapa atual",
+    "stageComplete": "Concluída",
+    "reviewNotes": "Notas da revisão",
+    "approve": "Aprovar etapa",
+    "reject": "Rejeitar etapa",
+    "revise": "Pedir alterações",
+    "reviewError": "Não foi possível guardar a decisão. O resultado pode ter mudado."
   },
   "markdownEditor": {
     "source": "Código Markdown",

@@ -5,9 +5,9 @@ use std::{path::PathBuf, sync::Mutex};
 use arrumo_workspaces::{
     BrandAsset, BrandAssetRole, DeliveryOverrides, DimensionOverrides, DraftSettings,
     FormatDelivery, GenerationActivity, GenerationPlan, GenerationRun, OutputFormat,
-    OutputFormatSettings, Profile, ProfileDelivery, ProfileFormat, RunControl, RunOptions,
-    SupplementalOutputs, VideoDraft, Workspace, WorkspaceAsset, WorkspaceFeedback, WorkspaceStore,
-    asset_root,
+    OutputFormatSettings, ProductionProgress, Profile, ProfileDelivery, ProfileFormat,
+    ReviewDecision, RunControl, RunOptions, SupplementalOutputs, VideoDraft, Workspace,
+    WorkspaceAsset, WorkspaceFeedback, WorkspaceStore, asset_root,
 };
 use tauri::{AppHandle, Manager, State};
 
@@ -482,6 +482,35 @@ async fn generation_plan(
         .map_err(|_| "generation_plan_failed")
 }
 
+#[tauri::command]
+async fn production_progress(
+    workspace_id: i64,
+    run_id: i64,
+    store: State<'_, Store>,
+) -> Result<ProductionProgress, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .production_progress(workspace_id, run_id)
+        .map_err(|_| "production_progress_failed")
+}
+
+#[tauri::command]
+async fn review_production_result(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    decision: ReviewDecision,
+    notes: String,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .review_production_result(workspace_id, run_id, result_id, decision, &notes)
+        .map_err(|_| "production_review_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -528,7 +557,9 @@ fn main() {
             list_generation_runs,
             control_generation,
             generation_activity,
-            generation_plan
+            generation_plan,
+            production_progress,
+            review_production_result
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

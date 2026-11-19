@@ -262,7 +262,15 @@
     "preview": "Video previews",
     "supplemental_outputs": "Supplemental outputs",
     "final_render": "Final render",
-    "verify_delivery": "Verify delivery"
+    "verify_delivery": "Verify delivery",
+    "awaitingReview": "Awaiting review",
+    "currentStage": "Current stage",
+    "stageComplete": "Complete",
+    "reviewNotes": "Review notes",
+    "approve": "Approve stage",
+    "reject": "Reject stage",
+    "revise": "Request revision",
+    "reviewError": "The decision couldn’t be saved. The result may have changed."
   },
   "markdownEditor": {
     "source": "Markdown source",

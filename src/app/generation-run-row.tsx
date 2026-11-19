@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { GenerationPlan } from "./generation-plan";
 
 type RunState = "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
-export type Run = { id: number; draft_id: number; state: RunState; snapshot: { draft: { id: number; title: string } } };
+export type Run = { id: number; draft_id: number; state: RunState; pending_review_id: number | null; snapshot: { draft: { id: number; title: string } } };
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
 type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
 
@@ -26,7 +26,7 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
   const copy = messages.queue;
   const title = run.snapshot.draft.title;
   const canPause = run.state === "queued" || run.state === "running";
-  const canResume = run.state === "paused";
+  const canResume = run.state === "paused" && run.pending_review_id === null;
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -50,8 +50,8 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
   return (
     <li>
       <h3 className="flex min-w-0 items-baseline gap-2.5 font-[680]">{title}</h3>
-      <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy[run.state]}</p>
-      {(canPause || canResume) && (
+      <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{run.state === "paused" && run.pending_review_id !== null ? messages.productionPlan.awaitingReview : copy[run.state]}</p>
+      {(canPause || run.state === "paused") && (
         <div className="mt-2.5 [&>summary]:cursor-pointer">
           {confirm ? (
             <>
@@ -80,7 +80,7 @@ export function GenerationRunRow({ run, workspaceId, disabled, onControl }: {
         <Button type="button" size="sm" variant="outline" className="mt-2.5" disabled={disabled}
           aria-label={`${copy.retryRun} · ${title}`} onClick={() => void onControl(run.id, "retry")}>{copy.retryRun}</Button>
       )}
-      <GenerationPlan workspaceId={workspaceId} runId={run.id} />
+      <GenerationPlan workspaceId={workspaceId} runId={run.id} pendingReviewId={run.state === "paused" ? run.pending_review_id : null} />
       <details className="mt-2.5 [&>summary]:cursor-pointer" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
         <summary>{copy.activity}</summary>
         {historyError ? <p role="alert">{copy.activityError}</p> : !activity ? <p role="status">{copy.loading}</p> : (

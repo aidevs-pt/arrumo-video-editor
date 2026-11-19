@@ -19,6 +19,7 @@ pub struct GenerationRun {
     pub draft_id: i64,
     pub state: String,
     pub snapshot: Value,
+    pub pending_review_id: Option<i64>,
 }
 
 impl WorkspaceStore {
@@ -36,7 +37,7 @@ impl WorkspaceStore {
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let existing = tx
             .query_row(
-                "SELECT id, draft_id, state, snapshot_json FROM generation_runs
+                "SELECT id, draft_id, state, snapshot_json, pending_review_id FROM generation_runs
              WHERE workspace_id = ?1 AND request_key = ?2",
                 params![workspace_id, key],
                 read_run,
@@ -99,7 +100,7 @@ impl WorkspaceStore {
             });
             tx.query_row(
                 "INSERT INTO generation_runs (workspace_id, draft_id, request_key, snapshot_json)
-                 VALUES (?1, ?2, ?3, ?4) RETURNING id, draft_id, state, snapshot_json",
+                 VALUES (?1, ?2, ?3, ?4) RETURNING id, draft_id, state, snapshot_json, pending_review_id",
                 params![workspace_id, draft_id, key, snapshot.to_string()],
                 read_run,
             )?
@@ -111,7 +112,7 @@ impl WorkspaceStore {
     pub fn list_generation_runs(&self, workspace_id: i64) -> rusqlite::Result<Vec<GenerationRun>> {
         self.0
             .prepare(
-                "SELECT id, draft_id, state, snapshot_json FROM generation_runs
+                "SELECT id, draft_id, state, snapshot_json, pending_review_id FROM generation_runs
              WHERE workspace_id = ?1 ORDER BY id",
             )?
             .query_map([workspace_id], read_run)?
@@ -125,6 +126,7 @@ pub(crate) fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
         draft_id: row.get(1)?,
         state: row.get(2)?,
         snapshot: read_settings(row.get(3)?, 3)?,
+        pending_review_id: row.get(4)?,
     })
 }
 

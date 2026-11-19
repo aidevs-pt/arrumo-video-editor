@@ -45,14 +45,14 @@ impl WorkspaceStore {
                  AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
                  ORDER BY id LIMIT 1
              )
-             RETURNING id, draft_id, state, snapshot_json, attempt, lease_until, checkpoint_json",
+             RETURNING id, draft_id, state, snapshot_json, pending_review_id, attempt, lease_until, checkpoint_json",
                 params![workspace_id, LEASE_SECONDS],
                 |row| {
                     Ok(GenerationClaim {
                         run: read_run(row)?,
-                        attempt: row.get(4)?,
-                        lease_until: row.get(5)?,
-                        checkpoint: read_settings(row.get(6)?, 6)?,
+                        attempt: row.get(5)?,
+                        lease_until: row.get(6)?,
+                        checkpoint: read_settings(row.get(7)?, 7)?,
                     })
                 },
             )
@@ -99,7 +99,7 @@ impl WorkspaceStore {
             "UPDATE generation_runs SET state = 'failed', lease_until = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
                AND state = 'running' AND lease_until > unixepoch()
-             RETURNING id, draft_id, state, snapshot_json",
+             RETURNING id, draft_id, state, snapshot_json, pending_review_id",
             params![workspace_id, run_id, attempt],
             read_run,
         )?;
@@ -128,7 +128,7 @@ impl WorkspaceStore {
             "UPDATE generation_runs SET state = ?3, lease_until = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND state IN (?4, ?5, ?6)
                AND (?3 != 'queued' OR pending_review_id IS NULL)
-             RETURNING id, draft_id, state, snapshot_json",
+             RETURNING id, draft_id, state, snapshot_json, pending_review_id",
             params![
                 workspace_id,
                 run_id,
