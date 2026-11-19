@@ -349,3 +349,5 @@ Use `recover-delivery-cleanup <workspace-id>` in the CLI or `recover_delivery_cl
 Use `delete-generation <workspace-id> <run-id> <confirmed-title>` or the shared `delete_generation` operation to delete a queued, active, or terminal run. A successful deletion invalidates any worker lease and removes the managed delivery directory. The draft and shared assets remain available. External workers must stop using run paths when their lease becomes invalid.
 
 Schedule a verified output with `set-output-schedule <workspace-id> <run-id> <format-id> <YYYY-MM-DD|clear>`. Each output format can have its own calendar date. Use `scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id]` to list an inclusive range. Calendar entries include the saved profile color and output dimensions.
+
+Through MCP or A2A, use `set_output_schedule` with a workspace, run, and format ID. Pass an ISO calendar `date` or null to clear it. Use `list_scheduled_outputs` with `start` and `end` dates and an optional `profileId` to browse the schedule.

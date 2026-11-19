@@ -176,7 +176,26 @@ struct DeleteRunInput {
     confirmed_title: String,
 }
 
-pub(super) fn definitions() -> [Value; 29] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ScheduleInput {
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    #[serde(deserialize_with = "Option::deserialize")]
+    date: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CalendarInput {
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    start: String,
+    end: String,
+}
+
+pub(super) fn definitions() -> [Value; 31] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -188,6 +207,8 @@ pub(super) fn definitions() -> [Value; 29] {
         "intent": {"type": "string"},
         "source_ids": {"type": "array", "items": id, "uniqueItems": true}
     }, "required": ["title"], "additionalProperties": false});
+    let date =
+        json!({"type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"});
     [
         json!({"name": "create_video_draft", "description": "Save a draft with a brief, an ordered list of managed video sources, or both.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "settings": draft},
@@ -249,6 +270,16 @@ pub(super) fn definitions() -> [Value; 29] {
             }, "required": ["workspaceId", "runId", "markdown"], "additionalProperties": false}}),
         json!({"name": "recover_delivery_cleanup", "description": "Retry cleanup of managed delivery files for runs already deleted in this workspace.",
             "inputSchema": workspace, "annotations": {"idempotentHint": true}}),
+        json!({"name": "set_output_schedule", "description": "Assign a calendar date to a verified output. Pass null to clear the date.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "formatId": id, "date": {"anyOf": [date, {"type": "null"}]}
+            }, "required": ["workspaceId", "runId", "formatId", "date"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "list_scheduled_outputs", "description": "List scheduled outputs in an inclusive date range with optional profile filtering.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "profileId": id, "start": date, "end": date
+            }, "required": ["workspaceId", "start", "end"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "delete_generation", "description": "Stop and delete a generation run and its managed files after confirming the exact display title. Runs referenced by replays are protected.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
@@ -420,6 +451,18 @@ pub(super) fn call(
                 .recover_delivery_cleanup(database, args.workspace_id)
                 .map(|report| json!({"cleanup": report}))
                 .map_err(|_| "Could not recover delivery cleanup")
+        }),
+        "set_output_schedule" => parse(arguments).and_then(|args: ScheduleInput| {
+            store
+                .set_output_schedule(args.workspace_id, args.run_id, args.format_id, args.date.as_deref())
+                .map(|()| json!({"saved": true}))
+                .map_err(|_| "Could not save schedule. Check the workspace, verified output and calendar date")
+        }),
+        "list_scheduled_outputs" => parse(arguments).and_then(|args: CalendarInput| {
+            store
+                .scheduled_outputs(args.workspace_id, args.profile_id, &args.start, &args.end)
+                .map(|outputs| json!({"outputs": outputs}))
+                .map_err(|_| "Could not list scheduled outputs. Check the date range")
         }),
         "delete_generation" => parse(arguments).and_then(|args: DeleteRunInput| {
             store
