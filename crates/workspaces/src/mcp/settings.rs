@@ -33,7 +33,7 @@ struct PreviewInput {
     max_edge: Value,
 }
 
-pub(super) fn definitions() -> [Value; 5] {
+pub(super) fn definitions() -> [Value; 7] {
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
     [
@@ -57,6 +57,13 @@ pub(super) fn definitions() -> [Value; 5] {
                 "maxEdge": {"type": ["integer", "null"], "minimum": 144, "maximum": 2160}
             }, "required": ["maxEdge"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "list_plugin_catalog", "description": "List bundled and installed plugins with declared capabilities, settings metadata, and package information.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_plugin_credential_status", "description": "Check whether a plugin credential is configured and where it comes from. Returns status only.",
+            "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
+                "required": ["pluginId", "settingId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
     ]
 }
 
@@ -96,6 +103,17 @@ pub(super) fn call(
                 .set_preview_max_edge(max_edge)
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not save preview edge. Use 144 to 2160 pixels or null")
+        }),
+        "list_plugin_catalog" if arguments.is_empty() => store
+            .plugin_catalog()
+            .map(|plugins| json!({"plugins": plugins}))
+            .map_err(|_| "Could not list plugin catalog"),
+        "list_plugin_catalog" => Err("Unexpected plugin catalog arguments"),
+        "get_plugin_credential_status" => parse(arguments).and_then(|args: SettingInput| {
+            store
+                .plugin_credential_status(&args.plugin_id, &args.setting_id, args.workspace_id)
+                .map(|status| json!({"status": status}))
+                .map_err(|_| "Could not check credential status")
         }),
         _ => return None,
     })
