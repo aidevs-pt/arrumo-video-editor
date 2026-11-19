@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { WorkspaceBrand } from "./workspace-brand";
 import { WorkspaceContext } from "./workspace-context";
 import { WorkspaceAssets } from "./workspace-assets";
 import { WorkspaceOutputs } from "./workspace-outputs";
@@ -21,7 +22,7 @@ export default function Page() {
   const [locale, setLocale] = useState<keyof typeof workspaceCopy>("en");
   const [status, setStatus] = useState<Status>("loading");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceView, setWorkspaceView] = useState<"profiles" | "outputs" | "assets" | "context">("profiles");
+  const [workspaceView, setWorkspaceView] = useState<"profiles" | "outputs" | "assets" | "context" | "brand">("profiles");
   const [selected, setSelected] = useState<Workspace | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -74,7 +75,9 @@ export default function Page() {
         <img src="/arrumo-icon.svg" alt="" width={28} height={28} />
         <span>Arrumo</span>
       </header>
-      {selected && workspaceView === "context" ? (
+      {selected && workspaceView === "brand" ? (
+        <WorkspaceBrand key={selected.id} workspace={selected} locale={locale} onBack={() => setWorkspaceView("profiles")} />
+      ) : selected && workspaceView === "context" ? (
         <WorkspaceContext key={selected.id} workspace={selected} locale={locale} onBack={() => setWorkspaceView("profiles")} />
       ) : selected && workspaceView === "assets" ? (
         <WorkspaceAssets key={selected.id} workspace={selected} locale={locale} onBack={() => setWorkspaceView("profiles")} />
@@ -94,6 +97,7 @@ export default function Page() {
           onOutputs={() => setWorkspaceView("outputs")}
           onAssets={() => setWorkspaceView("assets")}
           onContext={() => setWorkspaceView("context")}
+          onBrand={() => setWorkspaceView("brand")}
         />
       ) : (
         <main className="workspace-shell">

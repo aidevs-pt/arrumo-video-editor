@@ -53,6 +53,7 @@ impl WorkspaceStore {
             include_str!("007-workspace-assets.sql"),
             include_str!("008-workspace-context.sql"),
             include_str!("009-workspace-feedback.sql"),
+            include_str!("010-workspace-brand.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -95,6 +96,44 @@ impl WorkspaceStore {
             rusqlite::params![workspace_id, markdown],
             |_| Ok(()),
         )
+    }
+
+    pub fn brand_colors(&self, workspace_id: i64) -> rusqlite::Result<Vec<String>> {
+        let json = self.0.query_row(
+            "SELECT brand_colors_json FROM workspaces WHERE id = ?1",
+            [workspace_id],
+            |row| row.get::<_, String>(0),
+        )?;
+        format_deliveries::read_settings(Some(json), 0)
+    }
+
+    pub fn set_brand_colors(
+        &self,
+        workspace_id: i64,
+        colors: &[String],
+    ) -> rusqlite::Result<Vec<String>> {
+        let mut seen = std::collections::HashSet::new();
+        let mut normalized = Vec::new();
+        for color in colors {
+            let hex = color
+                .strip_prefix('#')
+                .filter(|value| {
+                    value.len() == 6 && value.bytes().all(|digit| digit.is_ascii_hexdigit())
+                })
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let color = format!("#{}", hex.to_ascii_uppercase());
+            if seen.insert(color.clone()) {
+                normalized.push(color);
+            }
+        }
+        let json = serde_json::to_string(&normalized)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        self.0.query_row(
+            "UPDATE workspaces SET brand_colors_json = ?2 WHERE id = ?1 RETURNING id",
+            rusqlite::params![workspace_id, json],
+            |_| Ok(()),
+        )?;
+        Ok(normalized)
     }
 
     pub fn create_profile(
@@ -268,5 +307,22 @@ mod tests {
         store.set_workspace_context(first, "").unwrap();
         assert_eq!(store.workspace_context(first).unwrap().as_deref(), Some(""));
         assert!(store.set_workspace_context(i64::MAX, "").is_err());
+    }
+
+    #[test]
+    fn palette_is_scoped_ordered_and_validated_before_replacing() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let main = store.create("Studio").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        let colors = ["#a1b2c3", "#020304", "#A1B2C3"].map(String::from);
+        assert_eq!(
+            store.set_brand_colors(main, &colors).unwrap(),
+            ["#A1B2C3", "#020304"]
+        );
+        assert!(store.set_brand_colors(main, &["#ZZ0000".into()]).is_err());
+        assert_eq!(store.brand_colors(main).unwrap(), ["#A1B2C3", "#020304"]);
+        assert!(store.brand_colors(other).unwrap().is_empty());
+        assert!(store.set_brand_colors(main, &[]).unwrap().is_empty());
+        assert!(store.brand_colors(main).unwrap().is_empty());
     }
 }

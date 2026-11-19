@@ -309,6 +309,31 @@ async fn update_workspace_feedback(
         .map_err(|_| "feedback_save_failed")
 }
 
+#[tauri::command]
+async fn get_brand_colors(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<String>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .brand_colors(workspace_id)
+        .map_err(|_| "brand_colors_load_failed")
+}
+
+#[tauri::command]
+async fn set_brand_colors(
+    workspace_id: i64,
+    colors: Vec<String>,
+    store: State<'_, Store>,
+) -> Result<Vec<String>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_brand_colors(workspace_id, &colors)
+        .map_err(|_| "brand_colors_save_failed")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -342,7 +367,9 @@ fn main() {
             get_workspace_context,
             set_workspace_context,
             list_workspace_feedback,
-            update_workspace_feedback
+            update_workspace_feedback,
+            get_brand_colors,
+            set_brand_colors
         ])
         .run(tauri::generate_context!())
         .expect("failed to start Arrumo");

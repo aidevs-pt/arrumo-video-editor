@@ -190,6 +190,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&card)?);
         }
+        [database, command, workspace] if command == "brand-colors" => {
+            let colors = WorkspaceStore::open(Path::new(database))?
+                .brand_colors(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&colors)?);
+        }
+        [database, command, workspace, colors] if command == "set-brand-colors" => {
+            let colors: Vec<String> = serde_json::from_str(utf8(colors)?)?;
+            let stored = WorkspaceStore::open(Path::new(database))?
+                .set_brand_colors(utf8(workspace)?.parse()?, &colors)?;
+            println!("{}", serde_json::to_string(&stored)?);
+        }
         _ => {
             return Err(concat!(
                 "Usage: arrumo-workspaces <database> ",
@@ -210,7 +221,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "set-asset-notes <workspace-id> <asset-id> <notes> | ",
                 "context <workspace-id> | set-context <workspace-id> <markdown> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
-                "update-feedback <workspace-id> <feedback-id> <title> <markdown>"
+                "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",
+                "brand-colors <workspace-id> | set-brand-colors <workspace-id> <colors-json>"
             )
             .into());
         }

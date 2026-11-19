@@ -3,6 +3,7 @@ export const profileCopy = {
     back: "Back to workspaces",
     outputs: "Outputs",
     context: "Context",
+    brand: "Brand",
     assets: "Assets",
     formats: "Formats",
     title: "Profiles",
@@ -29,6 +30,7 @@ export const profileCopy = {
     back: "Volver a los espacios de trabajo",
     outputs: "Salidas",
     context: "Contexto",
+    brand: "Marca",
     assets: "Recursos",
     formats: "Formatos",
     title: "Perfiles",
@@ -55,6 +57,7 @@ export const profileCopy = {
     back: "Voltar aos espaços de trabalho",
     outputs: "Saídas",
     context: "Contexto",
+    brand: "Marca",
     assets: "Recursos",
     formats: "Formatos",
     title: "Perfis",
@@ -81,6 +84,7 @@ export const profileCopy = {
   back: string;
   outputs: string;
   context: string;
+  brand: string;
   assets: string;
   formats: string;
   title: string;
