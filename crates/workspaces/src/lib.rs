@@ -20,6 +20,7 @@ mod generation_worker;
 mod media_worker;
 mod output_formats;
 mod plugin_catalog;
+mod plugin_credentials;
 mod plugin_package;
 mod plugin_registry;
 mod plugin_schema;
@@ -50,6 +51,7 @@ pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use plugin_catalog::{
     CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
 };
+pub use plugin_credentials::{MAX_PLUGIN_SECRET_BYTES, PluginCredentialStatus};
 pub use plugin_package::{PluginPackageInfo, THIRD_PARTY_PLUGIN_NOTICE};
 pub use plugin_registry::{
     PluginRegistry, RegistryPlugin, RegistryRelease, RegistryReleaseSource, fetch_plugin_registry,
@@ -116,6 +118,7 @@ impl WorkspaceStore {
             include_str!("../migrations/025-plugin-packages.sql"),
             include_str!("../migrations/026-plugin-release-source.sql"),
             include_str!("../migrations/027-plugin-settings.sql"),
+            include_str!("../migrations/028-credential-namespace.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

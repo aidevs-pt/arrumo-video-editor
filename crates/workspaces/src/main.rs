@@ -3,7 +3,7 @@ use std::{
     error::Error,
     ffi::OsStr,
     fs::File,
-    io::{self, Read},
+    io::{self, IsTerminal, Read},
     path::Path,
 };
 
@@ -35,6 +35,47 @@ fn main() -> Result<(), Box<dyn Error>> {
         [database, command] if command == "plugin-catalog" => {
             let plugins = WorkspaceStore::open(Path::new(database))?.plugin_catalog()?;
             println!("{}", serde_json::to_string(&plugins)?);
+        }
+        [database, command, id, scope, setting] if command == "plugin-credential-status" => {
+            let status = WorkspaceStore::open(Path::new(database))?.plugin_credential_status(
+                utf8(id)?,
+                utf8(setting)?,
+                plugin_workspace(scope)?,
+            )?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
+        [database, command, id, scope, setting] if command == "set-plugin-credential" => {
+            if io::stdin().is_terminal() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Pass the credential through redirected stdin",
+                )
+                .into());
+            }
+            let mut secret = zeroize::Zeroizing::new(Vec::new());
+            io::stdin()
+                .take(arrumo_workspaces::MAX_PLUGIN_SECRET_BYTES as u64 + 3)
+                .read_to_end(&mut secret)?;
+            if secret.last() == Some(&b'\n') {
+                secret.pop();
+                if secret.last() == Some(&b'\r') {
+                    secret.pop();
+                }
+            }
+            WorkspaceStore::open(Path::new(database))?.set_plugin_credential(
+                utf8(id)?,
+                utf8(setting)?,
+                plugin_workspace(scope)?,
+                Some(secret),
+            )?;
+        }
+        [database, command, id, scope, setting] if command == "clear-plugin-credential" => {
+            WorkspaceStore::open(Path::new(database))?.set_plugin_credential(
+                utf8(id)?,
+                utf8(setting)?,
+                plugin_workspace(scope)?,
+                None,
+            )?;
         }
         [database, command, id, scope] if command == "plugin-settings" => {
             let workspace_id = plugin_workspace(scope)?;
@@ -676,6 +717,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",
                 "update-plugin-release-from-snapshot <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "plugin-settings <plugin-id> <app|workspace-id> | set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json> | clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id> | ",
+                "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
