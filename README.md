@@ -268,3 +268,5 @@ Use `get_generation_plan` to inspect a run's prepared steps. A worker can use `f
 Use `create_video_draft` and `update_video_draft` to save drafts before enqueueing. Pass the full `settings` object with a title and either an intent or an ordered `source_ids` list of managed video assets in the workspace. An optional `profile_id` selects a workspace profile. Keep the returned draft ID for updates and enqueueing.
 
 Use `import_workspace_asset` with a workspace ID and an absolute local `source` path to copy a media file into managed storage. Use `list_workspace_assets` to find asset IDs for draft sources.
+
+Use `import_thumbnail_reference` to import a local image with thumbnail reference notes. Use `set_asset_notes` with the workspace ID, asset ID, and Markdown notes to change the asset's usage guidance. Pass an empty string to clear the notes.
