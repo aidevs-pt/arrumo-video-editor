@@ -131,10 +131,12 @@ impl WorkspaceStore {
         &self,
         bytes: &[u8],
         package: Option<(&PluginPackageInfo, &[u8])>,
-        expected_id: Option<&str>,
+        previous: Option<&crate::plugin_registry::InstalledRelease>,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
         let manifest = PluginManifest::parse(bytes)?;
-        if expected_id.is_some_and(|id| id != manifest.id) {
+        let (info, archive) = package.unzip();
+        let source = info.and_then(|info| info.release.as_ref());
+        if source.is_some_and(|source| source.plugin_id != manifest.id) {
             return Err(
                 invalid_manifest("Package plugin ID differs from the registry entry").into(),
             );
@@ -145,19 +147,35 @@ impl WorkspaceStore {
         {
             return Err(invalid_manifest("Plugin ID belongs to a bundled plugin").into());
         }
-        let (info, archive) = package.unzip();
-        let release = info
-            .and_then(|info| info.release.as_ref())
-            .map(serde_json::to_string)
-            .transpose()?;
-        let added = self.0.execute(
-            "INSERT INTO installed_plugin_manifests (plugin_id, manifest, package_sha256, package_bytes, release_source)
-             VALUES (?1, ?2, ?3, ?4, ?5)
-             ON CONFLICT(plugin_id) DO NOTHING",
-            rusqlite::params![manifest.id, bytes, info.map(|info| &info.sha256), archive, release],
-        )?;
-        if added == 0 {
-            return Err(invalid_manifest("Plugin ID is already installed").into());
+        let release = source.map(serde_json::to_string).transpose()?;
+        if let Some(previous) = previous {
+            let changed = self.0.execute(
+                "UPDATE installed_plugin_manifests
+                 SET manifest = ?2, package_sha256 = ?3, package_bytes = ?4, release_source = ?5
+                 WHERE plugin_id = ?1 AND package_sha256 = ?6 AND release_source = ?7",
+                rusqlite::params![
+                    manifest.id,
+                    bytes,
+                    info.map(|info| &info.sha256),
+                    archive,
+                    release,
+                    previous.sha256,
+                    previous.raw_source
+                ],
+            )?;
+            if changed == 0 {
+                return Err(invalid_manifest("Installed plugin changed during update").into());
+            }
+        } else {
+            let added = self.0.execute(
+                "INSERT INTO installed_plugin_manifests (plugin_id, manifest, package_sha256, package_bytes, release_source)
+                 VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(plugin_id) DO NOTHING",
+                rusqlite::params![manifest.id, bytes, info.map(|info| &info.sha256), archive, release],
+            )?;
+            if added == 0 {
+                return Err(invalid_manifest("Plugin ID is already installed").into());
+            }
         }
         Ok(CatalogPlugin {
             bundled: false,

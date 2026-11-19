@@ -200,3 +200,5 @@ Use `download-plugin-release <catalog-url> <plugin-id> <version>` to fetch an ex
 List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. Releases with `manifestSchemaVersion` set to `1` are compatible with this host. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
 
 In desktop Settings, open **Browse registry** under **Plugins** and load an HTTPS catalog URL. Expand a plugin to review its source repository and available versions. Arrumo checks the reviewed release again before downloading. If its source or checksum changed, reload the catalog and review the release again.
+
+Use `update-plugin-release <plugin-id> <version>` to replace a remotely installed package with a newer SemVer release from its recorded HTTPS catalog and source repository. Arrumo validates the replacement before saving it and checks that the installed release did not change during the download. Updates to bundled plugins ship with Arrumo.

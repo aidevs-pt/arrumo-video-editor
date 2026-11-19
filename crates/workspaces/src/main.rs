@@ -82,6 +82,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&installed)?);
         }
+        [database, command, id, version] if command == "update-plugin-release" => {
+            eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
+            let updated = WorkspaceStore::open(Path::new(database))?
+                .update_plugin_release(utf8(id)?, utf8(version)?)?;
+            println!("{}", serde_json::to_string(&updated)?);
+        }
         [database, command, id] if command == "remove-plugin-manifest" => {
             let removed = WorkspaceStore::open(Path::new(database))?
                 .remove_installed_plugin_manifest(utf8(id)?)?;
@@ -622,7 +628,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
-                "download-plugin-release <catalog-url> <plugin-id> <version> | ",
+                "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",

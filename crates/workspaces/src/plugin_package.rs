@@ -27,7 +27,7 @@ pub struct PluginPackageInfo {
 
 impl WorkspaceStore {
     pub fn install_plugin_zip(&self, archive: impl Read) -> Result<CatalogPlugin, Box<dyn Error>> {
-        self.register_plugin_zip(archive, None, None)
+        self.register_plugin_zip(archive, None, None, None)
     }
 
     pub fn install_verified_plugin_zip(
@@ -35,7 +35,7 @@ impl WorkspaceStore {
         archive: impl Read,
         expected_sha256: &str,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
-        self.register_plugin_zip(archive, Some(expected_sha256), None)
+        self.register_plugin_zip(archive, Some(expected_sha256), None, None)
     }
 
     pub(crate) fn register_plugin_zip(
@@ -43,6 +43,7 @@ impl WorkspaceStore {
         archive: impl Read,
         expected_sha256: Option<&str>,
         release: Option<RegistryReleaseSource>,
+        previous: Option<&crate::plugin_registry::InstalledRelease>,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
         if expected_sha256.is_some_and(|digest| !valid_sha256(digest)) {
             return Err(
@@ -73,13 +74,7 @@ impl WorkspaceStore {
             byte_length: bytes.len() as i64,
             release,
         };
-        self.register_plugin(
-            &manifest,
-            Some((&info, &bytes)),
-            info.release
-                .as_ref()
-                .map(|source| source.plugin_id.as_str()),
-        )
+        self.register_plugin(&manifest, Some((&info, &bytes)), previous)
     }
 }
 
