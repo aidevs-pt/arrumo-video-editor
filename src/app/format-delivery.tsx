@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { PortraitFields, type PortraitDerivatives, type SourceProfile } from "./portrait-fields";
 import { deliveryCopy } from "./delivery-copy";
 
 type Supplemental = {
@@ -17,17 +18,18 @@ type Supplemental = {
   tags: boolean;
   thumbnail_guidance: string;
   specifications: string;
+  portrait_derivatives: PortraitDerivatives;
 };
 
 type Delivery = {
   required: ("final_video" | "subtitles")[];
-  supplemental: Supplemental & { portrait_derivatives: unknown };
+  supplemental: Supplemental;
 };
 
 type ProfileDelivery = {
   workspace: Supplemental;
   effective: Delivery;
-  overrides: { [Key in keyof Supplemental]: Supplemental[Key] | null } & { portrait_derivatives: unknown };
+  overrides: { [Key in keyof Supplemental]: Supplemental[Key] | null };
 };
 
 const countFields = ["thumbnails", "titles", "descriptions"] as const;
@@ -38,7 +40,7 @@ export function FormatDelivery({
 }: {
   workspaceId: number;
   profileId?: number;
-  format: { id: number; name: string };
+  format: { id: number; name: string; width: number; height: number };
   locale: keyof typeof deliveryCopy;
   onBack: () => void;
 }) {
@@ -46,6 +48,9 @@ export function FormatDelivery({
   const [profileDelivery, setProfileDelivery] = useState<ProfileDelivery>();
   const [overrides, setOverrides] = useState<Partial<Record<keyof Supplemental, boolean>>>({});
   const isProfile = profileId !== undefined;
+  const [profiles, setProfiles] = useState<SourceProfile[]>([]);
+  const [portrait, setPortrait] = useState<PortraitDerivatives>();
+  const showPortrait = format.width > format.height;
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(false);
@@ -58,13 +63,21 @@ export function FormatDelivery({
     let active = true;
     async function load() {
       try {
+        if (showPortrait) {
+          const rows = await invoke<SourceProfile[]>("list_profiles", { workspaceId });
+          if (!active) return;
+          setProfiles(rows);
+        }
         if (profileId === undefined) {
           const value = await invoke<Delivery>("get_format_delivery", { workspaceId, formatId: format.id });
-          if (active) setDelivery(value);
+          if (!active) return;
+          setPortrait(value.supplemental.portrait_derivatives);
+          setDelivery(value);
         } else {
           const value = await invoke<ProfileDelivery>("get_profile_delivery", { workspaceId, profileId, formatId: format.id });
           if (!active) return;
           setProfileDelivery(value);
+          setPortrait(value.effective.supplemental.portrait_derivatives);
           setDelivery(value.effective);
         }
       } catch {
@@ -73,7 +86,7 @@ export function FormatDelivery({
     }
     void load();
     return () => { active = false; };
-  }, [workspaceId, profileId, format.id, attempt]);
+  }, [workspaceId, profileId, format.id, attempt, showPortrait]);
 
   function overridden(field: keyof Supplemental) {
     return overrides[field] ?? (profileDelivery?.overrides[field] != null);
@@ -81,7 +94,7 @@ export function FormatDelivery({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    if (pending || !portrait) return;
     const fields = new FormData(event.currentTarget);
     const settings: Supplemental = {
       thumbnails: Number(fields.get("thumbnails")),
@@ -90,6 +103,7 @@ export function FormatDelivery({
       tags: fields.has("tags"),
       thumbnail_guidance: String(fields.get("thumbnail_guidance") ?? ""),
       specifications: String(fields.get("specifications") ?? ""),
+      portrait_derivatives: portrait,
     };
     setPending(true);
     setResult(null);
@@ -97,9 +111,9 @@ export function FormatDelivery({
       if (isProfile) {
         const custom = Object.fromEntries((Object.keys(settings) as (keyof Supplemental)[])
           .filter(overridden).map((field) => [field, settings[field]]));
-        await invoke("set_profile_delivery", { workspaceId, profileId, formatId: format.id, overrides: { ...custom, portrait_derivatives: profileDelivery?.overrides.portrait_derivatives } });
+        await invoke("set_profile_delivery", { workspaceId, profileId, formatId: format.id, overrides: custom });
       } else {
-        await invoke("set_format_delivery", { workspaceId, formatId: format.id, settings: { ...settings, portrait_derivatives: delivery?.supplemental.portrait_derivatives } });
+        await invoke("set_format_delivery", { workspaceId, formatId: format.id, settings });
       }
       setResult("saved");
     } catch {
@@ -112,7 +126,9 @@ export function FormatDelivery({
   function overrideControl(field: keyof Supplemental) {
     if (!profileDelivery) return null;
     const value = profileDelivery.workspace[field];
-    const display = typeof value === "boolean" ? (value ? copy.on : copy.off) : String(value) || copy.empty;
+    const display = typeof value === "boolean" ? (value ? copy.on : copy.off)
+      : typeof value === "object" ? String(value.count)
+      : String(value) || copy.empty;
     return (
       <>
         <Field orientation="horizontal">
@@ -181,6 +197,14 @@ export function FormatDelivery({
                     {overrideControl(field)}
                   </Field>
                 ))}
+                {showPortrait && portrait && (
+                  <FieldGroup>
+                    {isProfile && overrideControl("portrait_derivatives")}
+                    {(!isProfile || overridden("portrait_derivatives")) && (
+                      <PortraitFields value={portrait} profiles={profiles} copy={copy} onChange={setPortrait} />
+                    )}
+                  </FieldGroup>
+                )}
                 {result === "saved" && <p role="status">{copy.saved}</p>}
                 {result === "saveError" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
                 <Button type="submit">{copy.save}</Button>

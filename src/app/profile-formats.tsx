@@ -14,6 +14,8 @@ import { profileFormatCopy } from "./profile-format-copy";
 type ProfileFormat = {
   id: number;
   name: string;
+  width: number;
+  height: number;
   workspace_width: number;
   workspace_height: number;
   overrides: { width: number | null; height: number | null };

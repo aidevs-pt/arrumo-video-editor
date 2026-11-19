@@ -1,0 +1,74 @@
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { deliveryCopy } from "./delivery-copy";
+
+type ManualSource = {
+  type: "manual";
+  guidance: string;
+  thumbnails_per_video: number;
+  thumbnail_guidance: string;
+};
+type ProfileSource = { type: "profile"; profile_id: number };
+export type PortraitDerivatives = { count: number; source: ManualSource | ProfileSource };
+export type SourceProfile = { id: number; name: string };
+
+const emptyManual: ManualSource = {
+  type: "manual", guidance: "", thumbnails_per_video: 0, thumbnail_guidance: "",
+};
+
+export function PortraitFields({ value, profiles, copy, onChange }: {
+  value: PortraitDerivatives;
+  profiles: SourceProfile[];
+  copy: (typeof deliveryCopy)["en"];
+  onChange: (value: PortraitDerivatives) => void;
+}) {
+  const { count, source } = value;
+  return (
+    <FieldSet>
+      <FieldLegend>{copy.portrait_derivatives}</FieldLegend>
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="portrait-count">{copy.portraitCount}</FieldLabel>
+          <Input id="portrait-count" type="number" min={0} max={65535} required value={count}
+            onChange={(event) => onChange({ ...value, count: Number(event.target.value) })} />
+        </Field>
+        {count > 0 && (
+          <Field>
+            <FieldLabel htmlFor="portrait-source">{copy.portraitSource}</FieldLabel>
+            <select id="portrait-source" className="rounded-md border border-input bg-background px-2 py-1.5"
+              value={source.type === "manual" ? "manual" : source.profile_id}
+              onChange={(event) => onChange({
+                ...value,
+                source: event.target.value === "manual" ? emptyManual : {
+                  type: "profile", profile_id: Number(event.target.value),
+                },
+              })}>
+              <option value="manual">{copy.portraitManual}</option>
+              {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+            </select>
+          </Field>
+        )}
+        {count > 0 && source.type === "manual" && (
+          <>
+            <Field>
+              <FieldLabel htmlFor="portrait-guidance">{copy.portraitGuidance}</FieldLabel>
+              <Textarea id="portrait-guidance" value={source.guidance}
+                onChange={(event) => onChange({ ...value, source: { ...source, guidance: event.target.value } })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="portrait-thumbnails">{copy.portraitThumbnails}</FieldLabel>
+              <Input id="portrait-thumbnails" type="number" min={0} max={65535} required value={source.thumbnails_per_video}
+                onChange={(event) => onChange({ ...value, source: { ...source, thumbnails_per_video: Number(event.target.value) } })} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="portrait-thumbnail-guidance">{copy.portraitThumbnailGuidance}</FieldLabel>
+              <Textarea id="portrait-thumbnail-guidance" value={source.thumbnail_guidance}
+                onChange={(event) => onChange({ ...value, source: { ...source, thumbnail_guidance: event.target.value } })} />
+            </Field>
+          </>
+        )}
+      </FieldGroup>
+    </FieldSet>
+  );
+}
