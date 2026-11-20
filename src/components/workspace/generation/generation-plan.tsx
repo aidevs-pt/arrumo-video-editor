@@ -324,7 +324,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const staged = textDecisions.length + mediaDecisions.length;
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
-    key !== "markdown" && key !== "summary" && (key !== "preview_videos" || previews.length === 0)
+    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
