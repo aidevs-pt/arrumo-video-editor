@@ -157,7 +157,9 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
         )}
       </section>
       {currentStage && <div className="flex items-center gap-3 py-2 text-white">
-        <NextImage src="/arrumo-icon.svg" width={44} height={44} alt="" className="shrink-0 rounded-lg" />
+        <span className="grid size-11 shrink-0 place-items-center rounded-md bg-attention" aria-hidden="true">
+          <NextImage src="/arrumo-face.svg" width={26} height={26} alt="" />
+        </span>
         <div className="flex min-w-0 flex-col items-start gap-1" role="status">
           <p className={cn("flex flex-wrap gap-x-2 text-sm font-bold", awaiting ? "text-attention" : "text-white/80")}>
             {agent && <span>{agent}</span>}
@@ -225,6 +227,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
           kind: "kind" in item && item.kind === "transition" ? "transition" as const : "animation" as const,
         }] : []
     )) : [];
+  const reviewFormId = `stage-review-${runId}-${result.id}`;
   const draftKey = `arrumo:review:${workspaceId}:${runId}:${result.id}`;
   const [draft, setDraft] = useState<ReviewDraft>(() => {
     try {
@@ -304,7 +307,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
           </Collapsible>
         )}
         <Separator />
-        <form onSubmit={(event) => void submit(event)}>
+        <form id={reviewFormId} onSubmit={(event) => void submit(event)}>
           <fieldset disabled={reviewing}>
             <FieldGroup>
               <Field>
@@ -340,21 +343,21 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
                 </fieldset>
               )}
               {reviewError && <Alert variant="destructive"><AlertDescription>{copy.reviewError}</AlertDescription></Alert>}
-              <div className="sticky bottom-4 z-[1] flex flex-wrap items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
-                <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || draft.notes) && "font-bold text-attention")} role="status">
-                  {draft.decision && <span aria-hidden="true"
-                    className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
-                  {draft.decision || draft.notes ? copy.unsentReview : copy.selectDecision}
-                </p>
-                <Button type="submit" disabled={!draft.decision || reviewing}
-                  className="ms-auto bg-attention text-[oklch(23%_.05_268)] hover:bg-[oklch(90%_.13_86)]">
-                  {copy.submitDecision}
-                </Button>
-              </div>
             </FieldGroup>
           </fieldset>
         </form>
       </CardContent>
+      <div className="sticky bottom-4 z-[1] flex flex-wrap mx-4 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
+        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || draft.notes) && "font-bold text-attention")} role="status">
+          {draft.decision && <span aria-hidden="true"
+            className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
+          {draft.decision || draft.notes ? copy.unsentReview : copy.selectDecision}
+        </p>
+        <Button type="submit" form={reviewFormId} disabled={!draft.decision || reviewing}
+          className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)]">
+          {copy.submitDecision}
+        </Button>
+      </div>
     </Card>
   );
 }

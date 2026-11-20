@@ -68,7 +68,7 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
   return (
     <div className="min-h-[calc(100svh-3.5rem)] bg-agent text-white">
       <WorkspaceShell className="flex max-w-[94rem] flex-col gap-5">
-        <header className="flex flex-wrap items-start justify-between gap-4">
+        <header className="grid items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
           <div className="flex min-w-0 flex-col items-start gap-3">
             <Button asChild variant="ghost" size="sm" className="-ms-2 text-white/80 hover:bg-white/10 hover:text-white">
               <Link href={workspaceHref("generations", workspaceId)}><ArrowLeft data-icon="inline-start" />{copy.title}</Link>

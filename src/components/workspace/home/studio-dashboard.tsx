@@ -64,9 +64,14 @@ export function StudioDashboard({ workspace }: { workspace: Workspace }) {
     <WorkspaceShell className="flex flex-col gap-8">
       <header className="flex max-w-3xl flex-col items-start gap-3">
         <h1 className="text-[clamp(1.875rem,4vw,3rem)] leading-[1.04] font-[850] tracking-[-.015em] text-balance [font-variation-settings:'wdth'_135]">{heading}</h1>
-        <Button asChild>
-          <Link href={`${workspaceHref("drafts", workspaceId)}&compose=1`}><Plus data-icon="inline-start" />{messages.studio.newVideo}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href={`${workspaceHref("drafts", workspaceId)}&compose=scratch`}>{messages.videoCatalog.scratch}</Link>
+          </Button>
+          <Button asChild>
+            <Link href={`${workspaceHref("drafts", workspaceId)}&compose=1`}><Plus data-icon="inline-start" />{messages.videoCatalog.generate}</Link>
+          </Button>
+        </div>
       </header>
       {failed && <Alert><AlertDescription>{messages.queue.loadError}</AlertDescription></Alert>}
       {!data && !failed && <Skeleton className="h-24 w-full" aria-label={messages.queue.loading} />}

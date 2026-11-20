@@ -53,11 +53,11 @@ export function WorkspaceSearch({ workspaceId }: { workspaceId: number }) {
     <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={copy.search} aria-keyshortcuts="Control+k Meta+k">
       <Search data-icon="inline-start" />
       <span className="hidden sm:inline">{copy.search}</span>
-      <kbd className="ms-4 hidden rounded-sm bg-secondary px-1.5 text-xs text-muted-foreground lg:inline">Ctrl K</kbd>
+      <kbd className="ms-4 hidden rounded-sm bg-secondary px-1.5 font-sans text-xs text-muted-foreground lg:inline">Ctrl K</kbd>
     </Button>
     <CommandDialog open={open} onOpenChange={setOpen} title={copy.search} description={copy.searchHint}>
       <Command>
-        <CommandInput placeholder={copy.searchHint} />
+        <CommandInput aria-label={copy.searchHint} placeholder={copy.searchHint} />
         <CommandList>
           <CommandEmpty>{failed ? messages.queue.loadError : results ? copy.noMatches : messages.queue.loading}</CommandEmpty>
           <CommandGroup heading={messages.profiles.title}>
