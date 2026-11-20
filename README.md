@@ -480,7 +480,7 @@ Use `synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file>` t
 The local CLI command `verified-video-source <workspace-id> <run-id> <format-id>` prints the verified MP4 path as JSON for workflows running on the same machine.
 
 Use `speech-provider-status <workspace-id> <plugin-id>` to read the bundled
-provider's response format, maximum cue length and configured credential scope
+provider's response format, maximum cue length, adapter digest, and configured credential scope
 before synthesis. The command makes no provider request.
 
 Use `import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4>`

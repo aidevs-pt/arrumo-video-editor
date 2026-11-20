@@ -67,6 +67,7 @@ pub struct SpeechProviderStatus {
     response_format: &'static str,
     max_text_characters: usize,
     credential_source: Option<PluginSettingScope>,
+    adapter_sha256: String,
 }
 
 impl WorkspaceStore {
@@ -75,7 +76,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         plugin_id: &str,
     ) -> io::Result<SpeechProviderStatus> {
-        let adapter = speech_adapter(plugin_id)?;
+        let (adapter, descriptor) = speech_adapter(plugin_id)?;
         speech_endpoint(&adapter, "voice", "a")?;
         let status = self.plugin_credential_status(
             plugin_id,
@@ -86,6 +87,8 @@ impl WorkspaceStore {
             response_format: adapter.response_format.extension(),
             max_text_characters: adapter.max_text_characters,
             credential_source: status.source,
+            adapter_sha256: crate::plugin_package::package_sha256(descriptor)
+                .map_err(|_| io::Error::other("Could not hash speech descriptor"))?,
         })
     }
 
@@ -97,7 +100,7 @@ impl WorkspaceStore {
         text: &str,
         output: &Path,
     ) -> io::Result<()> {
-        let adapter = speech_adapter(plugin_id)?;
+        let (adapter, _) = speech_adapter(plugin_id)?;
         let extension = adapter.response_format.extension();
         if output.extension().and_then(|value| value.to_str()) != Some(extension) {
             return Err(io::Error::other(
@@ -185,7 +188,7 @@ fn execute_speech(
     Ok(())
 }
 
-fn speech_adapter(plugin_id: &str) -> io::Result<SpeechAdapter> {
+fn speech_adapter(plugin_id: &str) -> io::Result<(SpeechAdapter, &'static [u8])> {
     let (manifest, source) = bundled_manifests()
         .iter()
         .zip(BUNDLED)
@@ -217,7 +220,7 @@ fn speech_adapter(plugin_id: &str) -> io::Result<SpeechAdapter> {
     {
         return Err(invalid_adapter());
     }
-    Ok(adapter)
+    Ok((adapter, bytes))
 }
 
 fn valid_key(key: &str) -> bool {
