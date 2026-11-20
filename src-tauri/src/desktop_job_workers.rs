@@ -43,6 +43,17 @@ impl DesktopJobWorkers {
                     .map_err(|_| ())
             },
         )?;
+        workers.spawn(
+            "arrumo-asset-planner",
+            database.clone(),
+            Duration::from_secs(2),
+            |store| {
+                store
+                    .process_next_asset_plan()
+                    .map(|result| result.is_some())
+                    .map_err(|_| ())
+            },
+        )?;
         let preview_database = database.clone();
         workers.spawn(
             "arrumo-first-cut",

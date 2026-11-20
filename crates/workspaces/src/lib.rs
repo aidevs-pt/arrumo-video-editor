@@ -11,6 +11,7 @@ mod agent_settings;
 mod agent_stage;
 mod asset_cleanup;
 mod asset_organization;
+mod asset_plan;
 mod assets;
 mod automatic_subtitles;
 mod brand_assets;

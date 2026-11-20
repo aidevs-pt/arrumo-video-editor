@@ -226,7 +226,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 37] {
+pub(super) fn definitions() -> [Value; 38] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -281,6 +281,9 @@ pub(super) fn definitions() -> [Value; 37] {
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
                 "required": ["workspaceId", "runId"], "additionalProperties": false}}),
         json!({"name": "process_preview_edit", "description": "Let the run's agent choose the cuts from the recorded footage, following the approved script and transcripts, and render the preview for review.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
+                "required": ["workspaceId", "runId"], "additionalProperties": false}}),
+        json!({"name": "process_asset_plan", "description": "Let the run's agent plan which library assets and animations support each script section. Applies when the run has no motion renderer.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
                 "required": ["workspaceId", "runId"], "additionalProperties": false}}),
         json!({"name": "process_media_stage", "description": "Claim and execute one ready media stage. Pass previewEdit (or an empty object for whole clips) for preview rendering. Omit it for final rendering or verification.",
@@ -487,6 +490,12 @@ pub(super) fn call(
                 .process_preview_edit(database, args.workspace_id, args.run_id)
                 .map(|result_id| json!({"resultId": result_id}))
                 .map_err(|_| "The first cut could not be made. Check the run activity for the reason")
+        }),
+        "process_asset_plan" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .process_asset_plan(args.workspace_id, args.run_id)
+                .map(|result_id| json!({"resultId": result_id}))
+                .map_err(|_| "The asset plan could not be made. Check the run activity for the reason")
         }),
         "process_media_stage" => parse(arguments).and_then(|args: MediaStageInput| {
             store
