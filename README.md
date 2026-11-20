@@ -2,6 +2,10 @@
 
 The Tauri and Next.js desktop editor and shared application API for the UI, CLI, MCP, and A2A.
 
+## User guide
+
+Create, review, and export a video. [English](docs/user/en/first-video.md) · [Español](docs/user/es/first-video.md) · [Português](docs/user/pt/first-video.md)
+
 ## Desktop development
 
 Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node, and the pnpm version in `package.json`.
