@@ -38,6 +38,8 @@ pub struct ProductionResult {
     pub result: Value,
     pub decision: Option<String>,
     pub review_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supplemental_review: Option<crate::SupplementalReview>,
 }
 
 impl WorkspaceStore {
@@ -127,6 +129,12 @@ impl WorkspaceStore {
                 entries,
             )?;
         }
+        let merged = if stage == ProductionStage::SupplementalOutputs {
+            crate::supplemental_review::merge_supplemental_revisions(tx, run_id, index, result)?
+        } else {
+            None
+        };
+        let result = merged.as_ref().unwrap_or(result);
         let id = tx.query_row(
             "INSERT INTO production_results (run_id, stage_index, attempt, result_json)
              VALUES (?1, ?2, ?3, ?4) RETURNING id",
@@ -182,10 +190,33 @@ impl WorkspaceStore {
         notes: &str,
         save_motion_indexes: Option<&[usize]>,
     ) -> rusqlite::Result<()> {
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        self.review_production_result_in(
+            &tx,
+            workspace_id,
+            run_id,
+            result_id,
+            decision,
+            notes,
+            save_motion_indexes,
+        )?;
+        tx.commit()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn review_production_result_in(
+        &self,
+        tx: &Transaction<'_>,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+        decision: ReviewDecision,
+        notes: &str,
+        save_motion_indexes: Option<&[usize]>,
+    ) -> rusqlite::Result<()> {
         if save_motion_indexes.is_some() && decision != ReviewDecision::Approved {
             return Err(rusqlite::Error::InvalidQuery);
         }
-        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         tx.query_row(
             "UPDATE generation_runs
              SET state = 'queued', stage_index = stage_index + ?4, pending_review_id = NULL
@@ -213,7 +244,7 @@ impl WorkspaceStore {
                 save_motion_indexes,
             )?;
         }
-        tx.commit()
+        Ok(())
     }
 
     fn persist_accepted_motion_items(
@@ -285,7 +316,7 @@ impl WorkspaceStore {
         )?;
         let results = tx
             .prepare(
-                "SELECT id, stage_index, attempt, result_json, decision, review_notes
+                "SELECT id, stage_index, attempt, result_json, decision, review_notes, supplemental_review_json
              FROM production_results WHERE run_id = ?1 ORDER BY id",
             )?
             .query_map([run_id], |row| {
@@ -296,6 +327,7 @@ impl WorkspaceStore {
                     result: read_settings(row.get(3)?, 3)?,
                     decision: row.get(4)?,
                     review_notes: row.get(5)?,
+                    supplemental_review: read_settings(row.get(6)?, 6)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
