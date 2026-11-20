@@ -70,3 +70,30 @@ pub async fn duplicate_motion_library_item(
         .duplicate_motion_library_item(workspace_id, item_id, &title)
         .map_err(|_| "motion_library_save_failed")
 }
+
+#[tauri::command]
+pub async fn get_motion_library_shares(
+    workspace_id: i64,
+    item_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<i64>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .motion_library_shares(workspace_id, item_id)
+        .map_err(|_| "motion_library_shares_load_failed")
+}
+
+#[tauri::command]
+pub async fn set_motion_library_shares(
+    workspace_id: i64,
+    item_id: i64,
+    profile_ids: Vec<i64>,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_motion_library_shares(workspace_id, item_id, &profile_ids)
+        .map_err(|_| "motion_library_shares_save_failed")
+}

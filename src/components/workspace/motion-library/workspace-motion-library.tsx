@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Layers, Plus } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,8 @@ import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout"
 import { workspaceHref, type Workspace } from "@/components/workspace/home/workspace-links";
 import { useLocale } from "@/lib/locale-provider";
 
+import { MotionShareDialog } from "./motion-share-dialog";
+
 type Kind = "animation" | "transition";
 type Settings = {
   kind: Kind; title: string; usage_markdown: string; profile_id: number | null;
@@ -29,12 +32,19 @@ type Asset = { id: number; name: string; kind: "video" | "image" | "audio" };
 type Profile = { id: number; name: string };
 
 export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) {
+  const query = useSearchParams();
+  const requested = query.get("profile") ?? "";
+  const scope = /^[1-9]\d*$/.test(requested) && Number.isSafeInteger(Number(requested)) ? requested : "";
+  return <MotionLibraryScope key={scope} workspace={workspace} scope={scope} />;
+}
+
+function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope: string }) {
+  const router = useRouter();
   const { messages } = useLocale();
   const heading = useRef<HTMLHeadingElement>(null);
   const copy = messages.motionLibrary;
   const [catalog, setCatalog] = useState<{ assets: Asset[]; profiles: Profile[] }>();
   const [items, setItems] = useState<Item[]>();
-  const [scope, setScope] = useState("");
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [open, setOpen] = useState(false);
@@ -48,12 +58,12 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
     Promise.all([
       invoke<Asset[]>("list_assets", { workspaceId }),
       invoke<Profile[]>("list_profiles", { workspaceId }),
-      invoke<Item[]>("list_motion_library", { workspaceId, profileId: scope ? Number(scope) : null }),
-    ]).then(([assets, profiles, entries]) => {
+    ]).then(async ([assets, profiles]) => {
       if (!active) return;
       setCatalog({ assets, profiles });
-      setItems(entries);
-    }, () => { if (active) setLoadError(true); });
+      const entries = await invoke<Item[]>("list_motion_library", { workspaceId, profileId: scope ? Number(scope) : null });
+      if (active) setItems(entries);
+    }).catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
   }, [workspaceId, scope, attempt]);
 
@@ -109,9 +119,8 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
           <FieldLabel htmlFor="motion-scope">{copy.scope}</FieldLabel>
           <NativeSelect id="motion-scope" value={scope} disabled={!catalog || open}
             onChange={(event) => {
-              setItems(undefined);
-              setLoadError(false);
-              setScope(event.target.value);
+              const value = event.target.value;
+              router.push(workspaceHref("motion-library", workspaceId, value ? Number(value) : undefined));
             }}>
             <NativeSelectOption value="">{copy.workspaceScope}</NativeSelectOption>
             {catalog?.profiles.map((profile) => <NativeSelectOption key={profile.id} value={profile.id}>{profile.name}</NativeSelectOption>)}
@@ -196,6 +205,10 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
                       setOpen(true);
                     }}>{copy[mode]}</Button>
                 ))}
+                {settings.profile_id !== null && catalog && <MotionShareDialog
+                  workspaceId={workspaceId} itemId={id} title={settings.title}
+                  ownerId={settings.profile_id} profiles={catalog.profiles} disabled={open}
+                  onSave={() => setAttempt((value) => value + 1)} />}
                 <ConfirmTitleDelete title={settings.title} disabled={open} copy={copy.deletion}
                   onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
                     workspaceId, itemId: id, confirmedTitle,

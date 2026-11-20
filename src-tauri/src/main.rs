@@ -781,6 +781,8 @@ fn main() {
             motion_library::update_motion_library_item,
             motion_library::duplicate_motion_library_item,
             motion_library::delete_motion_library_item,
+            motion_library::get_motion_library_shares,
+            motion_library::set_motion_library_shares,
             list_workspaces,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,

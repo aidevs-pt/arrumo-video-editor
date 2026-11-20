@@ -186,6 +186,13 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "share": "Share with profiles",
+    "shareDescription": "Choose which other profiles can use this item. Its owning profile always has access.",
+    "loadingShares": "Loading recipients…",
+    "noRecipients": "No other profiles in this workspace.",
+    "shareLoadError": "Could not load the recipients.",
+    "shareSaveError": "Could not save sharing. Check that the selected profiles still exist.",
+    "saveShares": "Save sharing",
     "edit": "Edit item",
     "editDescription": "Update the title, usage notes, or linked media.",
     "duplicate": "Duplicate item",

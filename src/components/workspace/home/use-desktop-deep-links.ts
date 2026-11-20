@@ -31,7 +31,7 @@ function internalRoute(value: string) {
     return calendarHref(workspace, numericId(query, "profile"), query.get("month"));
   } else {
     const section = workspaceSections.find((view) => url.pathname === `/${view}`);
-    if (section) return workspaceHref(section, workspace, section === "drafts" ? numericId(query, "profile") : undefined);
+    if (section) return workspaceHref(section, workspace, section === "drafts" || section === "motion-library" ? numericId(query, "profile") : undefined);
   }
 }
 

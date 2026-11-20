@@ -186,6 +186,13 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "motionLibrary": {
+    "share": "Partilhar com perfis",
+    "shareDescription": "Escolhe que outros perfis podem usar este elemento. O perfil proprietário tem sempre acesso.",
+    "loadingShares": "A carregar destinatários…",
+    "noRecipients": "Não há outros perfis neste espaço de trabalho.",
+    "shareLoadError": "Não foi possível carregar os destinatários.",
+    "shareSaveError": "Não foi possível guardar. Verifica se os perfis selecionados ainda existem.",
+    "saveShares": "Guardar partilha",
     "edit": "Editar elemento",
     "editDescription": "Atualiza o nome, as notas de utilização ou os recursos associados.",
     "duplicate": "Duplicar elemento",
