@@ -106,6 +106,14 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
   const currentStage = progress && plan?.steps[progress.stage_index]?.stage;
   const previousReview = awaiting && progress?.results.findLast((entry) => entry.stage_index === awaiting.stage_index
     && entry.id < awaiting.id);
+  const stageName = (stage: Stage) => copy[stage].toLowerCase();
+  function agentCaption(stage: Stage) {
+    const summary = awaiting?.result.summary;
+    if (awaiting) return typeof summary === "string" && summary.trim() ? summary : copy.captionReview.replace("{stage}", stageName(stage));
+    if (runState === "completed") return copy.captionDone;
+    if (runState === "paused") return copy.captionPaused.replace("{stage}", stageName(stage));
+    return (runState === "running" ? copy.captionRunning : copy.captionQueued).replace("{stage}", stageName(stage));
+  }
   const mediaStage = currentStage === "verify_delivery"
     || (hasSources && (currentStage === "preview" || currentStage === "final_render"))
     ? currentStage : undefined;
@@ -175,11 +183,10 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
         </span>
         <div className="flex min-w-0 flex-col items-start gap-1" role="status">
           <p className={cn("flex flex-wrap gap-x-2 text-sm font-bold", awaiting ? "text-attention" : "text-white/80")}>
-            {agent && <span>{agent}</span>}
-            <span>{awaiting ? copy.awaitingReview : queue[runState]}</span>
+            {awaiting ? copy.waitingFor.replace("{agent}", agent ?? copy.agentFallback) : <>{agent && <span>{agent}</span>}<span>{queue[runState]}</span></>}
           </p>
-          <p className="rounded-thumb bg-caption px-2.5 py-0.5 text-[23px] leading-[31px] font-bold wrap-anywhere">
-            {copy[currentStage]}
+          <p className="max-w-[60ch] rounded-thumb bg-caption px-2.5 py-0.5 text-[clamp(1.125rem,2vw,1.4375rem)] leading-[1.35] font-bold text-balance wrap-anywhere">
+            {agentCaption(currentStage)}
           </p>
         </div>
       </div>}
@@ -209,6 +216,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
               results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
             {awaiting && currentStage && (
               <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting} formats={formats}
+                agent={agent} version={progress?.results.filter((entry) => entry.stage_index === awaiting.stage_index && entry.id <= awaiting.id).length ?? 1}
                 reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault}
                 previousSupplementalReview={previousReview?.supplemental_review} previousPreviewReview={previousReview?.preview_review} />
             )}
@@ -220,8 +228,10 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
   );
 }
 
-function StageReview({ workspaceId, runId, stage, result, formats, reviewing, reviewError, onReview, saveMotionDefault, previousSupplementalReview, previousPreviewReview }: {
+function StageReview({ workspaceId, runId, stage, result, formats, agent, version, reviewing, reviewError, onReview, saveMotionDefault, previousSupplementalReview, previousPreviewReview }: {
   workspaceId: number;
+  agent?: string;
+  version: number;
   runId: number;
   stage: Stage;
   result: StageResult;
@@ -314,7 +324,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   const staged = textDecisions.length + mediaDecisions.length;
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
-    key !== "markdown" && (key !== "preview_videos" || previews.length === 0)
+    key !== "markdown" && key !== "summary" && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
@@ -386,8 +396,10 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   return (
     <Card className="overflow-visible rounded-[14px]">
       <CardHeader className="border-b">
-        <CardTitle className="text-xl font-bold">{copy[stage]}</CardTitle>
-        <CardDescription>{copy.awaitingReview}</CardDescription>
+        <CardTitle className="font-heading text-[1.5rem] font-[850] [font-variation-settings:'wdth'_112]">
+          {copy.draftTitle.replace("{stage}", copy[stage]).replace("{version}", String(version))}
+        </CardTitle>
+        <CardDescription>{copy.reviewHint}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {markdown && <ScriptReviewText markdown={markdown} />}
@@ -486,11 +498,13 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || staged > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
-          {draft.decision || staged > 0 || draft.notes || hasItemNotes ? copy.unsentReview : hasItemReview ? copy.selectEveryItem : copy.selectDecision}
+          {!hasItemReview && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
+            : draft.decision || staged > 0 || draft.notes || hasItemNotes ? copy.unsentReview : hasItemReview ? copy.selectEveryItem : copy.selectDecision}
         </p>
         <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
-          className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)]">
-          {hasItemReview && staged !== 1 ? copy.submitDecisions.replace("{count}", String(staged)) : copy.submitDecision}
+          className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
+          {hasItemReview ? (staged === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(staged)))
+            : draft.decision ? copy.submitDecision : copy.sendNothing}
         </Button>
       </div>
     </Card>

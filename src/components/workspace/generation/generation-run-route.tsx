@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useStudioTrail } from "@/components/workspace/home/studio-trail";
+import { profileHref } from "@/components/workspace/home/workspace-links";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +27,8 @@ export function GenerationRunRoute() {
 }
 
 function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runId: number | null }) {
-  const { messages: { queue: copy } } = useLocale();
+  const { messages } = useLocale();
+  const copy = messages.queue;
   const router = useRouter();
   const [run, setRun] = useState<Run | null>();
   const [loadError, setLoadError] = useState(false);
@@ -64,6 +67,12 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
     }
   }
 
+  const profile = run?.snapshot.profile;
+  useStudioTrail([
+    { label: messages.studio.videos, href: workspaceHref("generations", workspaceId) },
+    ...(profile ? [{ label: profile.name, href: profileHref(workspaceId, profile.id) }] : []),
+    { label: run ? runTitle(run) : copy.runDetail },
+  ]);
   const problem = runId === null || run === null ? copy.missingRun : loadError ? copy.loadError : undefined;
   return (
     <div className="min-h-[calc(100svh-3.5rem)] bg-agent text-white">
@@ -73,7 +82,11 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
             <Button asChild variant="ghost" size="sm" className="-ms-2 text-white/80 hover:bg-white/10 hover:text-white">
               <Link href={workspaceHref("generations", workspaceId)}><ArrowLeft data-icon="inline-start" />{copy.title}</Link>
             </Button>
-            <h1 className="max-w-[28ch] text-3xl leading-tight font-[850] wrap-anywhere sm:text-[2.125rem]">
+            {profile && <span className="flex items-center gap-2 text-sm font-semibold text-white/90">
+              <span aria-hidden="true" className="size-3 rounded-[3px] ring-1 ring-white/60" style={{ backgroundColor: profile.color ?? "transparent" }} />
+              {profile.name}
+            </span>}
+            <h1 className="max-w-[24ch] text-[clamp(2rem,4.5vw,3rem)] leading-[1] font-[850] tracking-[-.01em] text-balance wrap-anywhere [font-variation-settings:'wdth'_130]">
               {run ? runTitle(run) : copy.runDetail}
             </h1>
           </div>
