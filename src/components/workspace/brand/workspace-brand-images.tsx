@@ -5,12 +5,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Images, Plus } from "lucide-react";
+import { Images, TriangleAlert, Upload, X } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,7 +18,7 @@ import { workspaceHref } from "../home/workspace-links";
 
 const roles = ["identity", "style"] as const;
 type Role = typeof roles[number];
-type Image = { id: number; name: string; kind: string };
+type Image = { id: number; name: string; kind: string; notes: string };
 type Association = { asset_id: number; role: Role };
 
 export function WorkspaceBrandImages({ workspaceId }: {
@@ -32,6 +31,7 @@ export function WorkspaceBrandImages({ workspaceId }: {
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [pending, setPending] = useState(false);
+  const [uploadError, setUploadError] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
   const { messages } = useLocale();
   const copy = messages.brandImages;
@@ -68,8 +68,51 @@ export function WorkspaceBrandImages({ workspaceId }: {
     }
   }
 
+  async function upload(role: Role) {
+    if (pending) return;
+    setSaveError(false);
+    const files = await open({ multiple: true, title: copy.upload,
+      filters: [{ name: copy[role], extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] }] }).catch(() => null);
+    if (!files?.length) return;
+    setPending(true);
+    try {
+      for (const source of files) {
+        const asset = await invoke<Image>("import_asset", { workspaceId, source });
+        if (asset.kind !== "image") continue;
+        await invoke("attach_brand_asset", { workspaceId, assetId: asset.id, role });
+        setImages((current) => [...(current ?? []), asset]);
+        setAssociations((current) => [...current, { asset_id: asset.id, role }]);
+      }
+    } catch {
+      setUploadError(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function header(role: Role) {
+    return (
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id={`brand-${role}-title`} className="text-[1.75rem]">{copy[role]}</h2>
+          <p className="text-muted-foreground">{copy[role === "style" ? "styleHint" : "identityHint"]}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={pending || !images?.length} onClick={() => { setSaveError(false); setEditing(role); }}>
+            <Images data-icon="inline-start" />{copy.manage}
+          </Button>
+          <Button variant="outline" disabled={pending} onClick={() => void upload(role)}><Upload data-icon="inline-start" />{copy.upload}</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const assigned = (role: Role) => (images ?? []).filter((image) => associations.some((item) => item.asset_id === image.id && item.role === role));
+  const empty = <p className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">{copy.noAssignments}</p>;
+
   return (
-    <div className="mt-6 flex flex-col gap-7" aria-busy={pending}>
+    <div className="mt-12 flex flex-col gap-12" aria-busy={pending}>
+      {uploadError && <Alert variant="destructive"><AlertDescription>{copy.uploadError}</AlertDescription></Alert>}
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -80,45 +123,45 @@ export function WorkspaceBrandImages({ workspaceId }: {
         </Alert>
       ) : !images ? (
         <div role="status" aria-label={copy.loading} className="flex flex-col gap-5">
-          <Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" />
+          <Skeleton className="h-40 w-full" /><Skeleton className="h-24 w-full" />
         </div>
-      ) : roles.map((role) => {
-        const assigned = images.filter((image) => associations.some((item) => item.asset_id === image.id && item.role === role));
-        return (
-          <section key={role} aria-labelledby={`brand-${role}-title`} className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 id={`brand-${role}-title`} className="font-semibold">{copy[role]}</h2>
-              {images.length > 0 ? (
-                <Button variant="outline" size="sm" onClick={() => { setSaveError(false); setEditing(role); }}>
-                  <Plus data-icon="inline-start" />{copy.manage}
-                </Button>
-              ) : (
-                <Button asChild variant="outline" size="sm">
-                  <Link href={workspaceHref("assets", workspaceId)}><Plus data-icon="inline-start" />{messages.assets.pick}</Link>
-                </Button>
-              )}
-            </div>
-            {assigned.length > 0 ? (
-              <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(10rem,100%),1fr))] gap-3">
-                {assigned.map((image) => (
-                  <li key={image.id}>
-                    <Card size="sm" className="gap-2 pt-0">
-                      <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" />
-                      <CardContent><p title={image.name} className="truncate font-medium">{image.name}</p></CardContent>
-                    </Card>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Empty className="min-h-24 rounded-xl border py-3">
-                <EmptyHeader><EmptyMedia variant="icon"><Images /></EmptyMedia>
-                  <EmptyDescription>{images.length ? copy.noAssignments : copy.empty}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-          </section>
-        );
-      })}
+      ) : <>
+        <section aria-labelledby="brand-style-title">
+          {header("style")}
+          {assigned("style").length ? <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(14rem,100%),1fr))] gap-4">
+            {assigned("style").map((image) => (
+              <li key={image.id} className="group relative flex min-w-0 flex-col gap-2">
+                <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" className="w-full" />
+                <Button variant="secondary" size="icon-sm" aria-label={copy.unassign.replace("{name}", image.name)} disabled={pending}
+                  className="absolute end-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
+                  onClick={() => void assign(image.id, "style", false)}><X /></Button>
+                {image.notes.trim() ? <p className="line-clamp-2 text-sm">{image.notes}</p> : <>
+                  <p className="flex items-center gap-1.5 text-sm text-[oklch(50%_.13_60)]"><TriangleAlert className="size-4" aria-hidden="true" />{copy.noContext}</p>
+                  <Button asChild variant="outline" size="sm"><Link href={workspaceHref("assets", workspaceId)}>{copy.describe}</Link></Button>
+                </>}
+              </li>
+            ))}
+          </ul> : empty}
+        </section>
+        <section aria-labelledby="brand-identity-title">
+          {header("identity")}
+          {assigned("identity").length ? <ul className="divide-y rounded-xl border bg-card">
+            {assigned("identity").map((image) => (
+              <li key={image.id} className="flex items-center gap-4 px-4 py-3">
+                <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" className="aspect-square w-12 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{image.name}</p>
+                  {image.notes.trim() ? <p className="truncate text-sm text-muted-foreground">{image.notes}</p>
+                    : <Link href={workspaceHref("assets", workspaceId)} className="text-sm text-[oklch(50%_.13_60)] hover:underline">{copy.missingNotes}</Link>}
+                </div>
+                {!image.notes.trim() && <TriangleAlert className="size-4 shrink-0 text-[oklch(55%_.14_70)]" aria-hidden="true" />}
+                <Button variant="ghost" size="icon-sm" aria-label={copy.unassign.replace("{name}", image.name)} disabled={pending}
+                  onClick={() => void assign(image.id, "identity", false)}><X /></Button>
+              </li>
+            ))}
+          </ul> : empty}
+        </section>
+      </>}
       <Dialog open={editing !== null} onOpenChange={(open) => { if (!open && !pending) setEditing(null); }}>
         {editing && <DialogContent showCloseButton={!pending}>
           <DialogHeader><DialogTitle>{copy[editing]}</DialogTitle><DialogDescription>{copy.manageHint}</DialogDescription></DialogHeader>

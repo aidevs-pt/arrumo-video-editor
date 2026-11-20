@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { Ref } from "react";
 import { workspaceHref, type Workspace, type WorkspaceView } from "@/components/workspace/home/workspace-links";
-import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
@@ -20,17 +19,15 @@ export function WorkspaceSettingsHeading({ workspace, current, headingRef }: {
     ["outputs", messages.outputs.title],
     ["motion-library", messages.profileHub.animations],
   ] as const;
-  return <>
-    <WorkspaceHeading className="mb-3">
-      <h1 tabIndex={-1} ref={headingRef}>{messages.studio.workspaceSettings}</h1>
-      <p>{messages.studio.workspaceSettingsHint.replace("{workspace}", workspace.name)}</p>
-    </WorkspaceHeading>
-    <nav aria-label={messages.studio.workspaceSettings} className="mb-6 flex flex-wrap gap-x-5 gap-y-1 border-b">
+  return <header className="mb-8">
+    <h1 tabIndex={-1} ref={headingRef} className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] outline-none [font-variation-settings:'wdth'_135]">{messages.studio.workspaceSettings}</h1>
+    <p className="mt-2 text-lg text-muted-foreground">{messages.studio.workspaceSettingsHint.replace("{workspace}", workspace.name)}</p>
+    <nav aria-label={messages.studio.workspaceSettings} className="mt-8 flex gap-x-1 overflow-x-auto border-b [scrollbar-width:none]">
       {tabs.map(([view, label]) => (
         <Link key={view} href={workspaceHref(view, workspace.id)} aria-current={view === current ? "page" : undefined}
-          className={cn("border-b-2 border-transparent py-2 text-sm font-semibold text-muted-foreground hover:text-foreground",
+          className={cn("-mb-px inline-flex min-h-11 shrink-0 items-center border-b-[3px] border-transparent px-3 font-semibold text-muted-foreground transition-colors duration-150 hover:text-foreground",
             view === current && "border-primary text-foreground")}>{label}</Link>
       ))}
     </nav>
-  </>;
+  </header>;
 }

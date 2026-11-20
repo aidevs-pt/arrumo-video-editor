@@ -683,9 +683,9 @@
     "saveError": "Brand colors couldn’t be saved."
   },
   "brandImages": {
-    "manage": "Choose images",
+    "manage": "From library",
     "manageHint": "Changes are saved when you select or clear an image.",
-    "noAssignments": "No images assigned yet.",
+    "noAssignments": "Nothing here yet. Upload images or pick them from the library.",
     "title": "Brand images",
     "identity": "Brand assets",
     "style": "Style references",
@@ -693,7 +693,15 @@
     "loading": "Loading brand images…",
     "loadError": "Brand images couldn’t be loaded.",
     "retry": "Retry",
-    "saveError": "The image assignment couldn’t be saved."
+    "saveError": "The image assignment couldn’t be saved.",
+    "upload": "Upload",
+    "styleHint": "Looks you want videos and thumbnails to follow.",
+    "identityHint": "Logos, avatars and marks used as they are.",
+    "noContext": "No context yet",
+    "describe": "Describe it",
+    "missingNotes": "Add a description so the agent knows when to use it.",
+    "unassign": "Remove {name} from this list",
+    "uploadError": "Some images couldn't be uploaded."
   },
   "context": {
     "title": "Context",

@@ -683,9 +683,9 @@
     "saveError": "No se pudieron guardar los colores."
   },
   "brandImages": {
-    "manage": "Elegir imágenes",
+    "manage": "De la biblioteca",
     "manageHint": "Los cambios se guardan al seleccionar o desmarcar una imagen.",
-    "noAssignments": "Aún no hay imágenes asignadas.",
+    "noAssignments": "Aún no hay nada. Sube imágenes o elígelas de la biblioteca.",
     "title": "Imágenes de marca",
     "identity": "Recursos de marca",
     "style": "Referencias de estilo",
@@ -693,7 +693,15 @@
     "loading": "Cargando imágenes de marca…",
     "loadError": "No se pudieron cargar las imágenes de marca.",
     "retry": "Reintentar",
-    "saveError": "No se pudo guardar la asignación."
+    "saveError": "No se pudo guardar la asignación.",
+    "upload": "Subir",
+    "styleHint": "Estilos que quieres que sigan tus vídeos y miniaturas.",
+    "identityHint": "Logotipos, avatares y marcas que se usan tal cual.",
+    "noContext": "Sin contexto aún",
+    "describe": "Descríbela",
+    "missingNotes": "Añade una descripción para que el agente sepa cuándo usarla.",
+    "unassign": "Quitar {name} de esta lista",
+    "uploadError": "Algunas imágenes no se pudieron subir."
   },
   "context": {
     "title": "Contexto",

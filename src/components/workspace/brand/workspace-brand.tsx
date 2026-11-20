@@ -7,8 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Plus, X } from "lucide-react";
 import { WorkspaceBrandImages } from "./workspace-brand-images";
 
 export function WorkspaceBrand({ workspace }: {
@@ -21,8 +20,7 @@ export function WorkspaceBrand({ workspace }: {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [result, setResult] = useState<"saved" | "saveError" | null>(null);
+  const [result, setResult] = useState<"saveError" | null>(null);
   const { messages } = useLocale();
   const copy = messages.brand;
 
@@ -36,21 +34,12 @@ export function WorkspaceBrand({ workspace }: {
     return () => { active = false; };
   }, [workspace.id, attempt]);
 
-  function update(next: string[]) {
-    setColors(next);
-    setDirty(true);
-    setResult(null);
-  }
-
-  async function save() {
-    if (!dirty || saving || !colors) return;
+  async function save(next: string[]) {
+    if (saving) return;
     setSaving(true);
     setResult(null);
     try {
-      const stored = await invoke<string[]>("set_brand_colors", { workspaceId: workspace.id, colors });
-      setColors(stored);
-      setDirty(false);
-      setResult("saved");
+      setColors(await invoke<string[]>("set_brand_colors", { workspaceId: workspace.id, colors: next }));
     } catch {
       setResult("saveError");
     } finally {
@@ -59,7 +48,7 @@ export function WorkspaceBrand({ workspace }: {
   }
 
   return (
-    <WorkspaceShell>
+    <WorkspaceShell className="max-w-6xl">
       <WorkspaceSettingsHeading workspace={workspace} current="brand" headingRef={heading} />
       {loadError ? (
         <Alert variant="destructive">
@@ -70,32 +59,28 @@ export function WorkspaceBrand({ workspace }: {
           }}>{copy.retry}</Button>
         </Alert>
       ) : !colors ? <p role="status">{copy.loading}</p> : (
-        <section className="border-b pb-5" aria-labelledby="brand-colors">
-          <h2 id="brand-colors" className="text-[1.3125rem]">{copy.colors}</h2>
-          {colors.length ? (
-            <ul className="my-4 flex flex-wrap items-start gap-3">
-              {colors.map((color) => (
-                <li key={color} className="flex min-w-20 flex-col items-center gap-1">
-                  <span className="h-11 w-22 rounded-sm border" style={{ backgroundColor: color }} aria-hidden="true" />
-                  <span className="text-xs font-medium tabular-nums">{color}</span>
-                  <Button type="button" variant="ghost" size="sm" disabled={saving}
-                    aria-label={`${copy.remove} ${color}`} onClick={() => update(colors.filter((item) => item !== color))}>{copy.remove}</Button>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="mt-1.25 whitespace-pre-wrap text-muted-foreground">{copy.empty}</p>}
-          <div className="my-3.5 flex flex-wrap items-center gap-3">
-            <Field orientation="horizontal" className="w-auto [&_input]:w-13">
-              <FieldLabel htmlFor="brand-candidate">{copy.picker}</FieldLabel>
-              <Input id="brand-candidate" type="color" value={candidate} disabled={saving}
-                onChange={(event) => setCandidate(event.target.value)} />
-            </Field>
-            <Button type="button" variant="outline" disabled={saving || colors.includes(candidate.toUpperCase())}
-              onClick={() => update([...colors, candidate.toUpperCase()])}>{copy.add}</Button>
-            <Button type="button" disabled={!dirty || saving} onClick={() => void save()}>{copy.save}</Button>
-          </div>
-          {result === "saved" && <p role="status">{copy.saved}</p>}
-          {result === "saveError" && <p role="alert">{copy.saveError}</p>}
+        <section aria-labelledby="brand-colors">
+          <h2 id="brand-colors" className="mb-4 text-[1.75rem]">{copy.colors}</h2>
+          <ul className="flex flex-wrap items-start gap-4">
+            {colors.map((color) => (
+              <li key={color} className="group relative flex w-32 flex-col gap-2">
+                <span className="h-20 rounded-lg border" style={{ backgroundColor: color }} aria-hidden="true" />
+                <span className="text-sm text-muted-foreground tabular-nums">{color}</span>
+                <Button type="button" variant="secondary" size="icon-sm" disabled={saving} aria-label={`${copy.remove} ${color}`}
+                  className="absolute end-1.5 top-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
+                  onClick={() => void save(colors.filter((item) => item !== color))}><X /></Button>
+              </li>
+            ))}
+            <li className="w-32">
+              <label className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line-strong text-sm text-muted-foreground hover:border-primary hover:text-foreground focus-within:outline-2 focus-within:outline-ring">
+                <Plus className="size-4" aria-hidden="true" />{copy.add}
+                <input type="color" className="sr-only" value={candidate} disabled={saving}
+                  onChange={(event) => setCandidate(event.target.value)}
+                  onBlur={() => { const next = candidate.toUpperCase(); if (!colors.includes(next)) void save([...colors, next]); }} />
+              </label>
+            </li>
+          </ul>
+          {result === "saveError" && <p role="alert" className="mt-3 text-destructive">{copy.saveError}</p>}
         </section>
       )}
       <WorkspaceBrandImages workspaceId={workspace.id} />
