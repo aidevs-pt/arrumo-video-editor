@@ -226,7 +226,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 36] {
+pub(super) fn definitions() -> [Value; 37] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -278,6 +278,9 @@ pub(super) fn definitions() -> [Value; 36] {
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
                 "required": ["workspaceId", "runId"], "additionalProperties": false}}),
         json!({"name": "process_supplemental_writing", "description": "Let the run's agent write the titles, descriptions and tags each format asks for, from the approved script. Applies when the Supplemental outputs stage needs only text.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
+                "required": ["workspaceId", "runId"], "additionalProperties": false}}),
+        json!({"name": "process_preview_edit", "description": "Let the run's agent choose the cuts from the recorded footage, following the approved script and transcripts, and render the preview for review.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
                 "required": ["workspaceId", "runId"], "additionalProperties": false}}),
         json!({"name": "process_media_stage", "description": "Claim and execute one ready media stage. Pass previewEdit (or an empty object for whole clips) for preview rendering. Omit it for final rendering or verification.",
@@ -478,6 +481,12 @@ pub(super) fn call(
                 .process_supplemental_writing(args.workspace_id, args.run_id)
                 .map(|result_id| json!({"resultId": result_id}))
                 .map_err(|_| "The titles and descriptions could not be written. Check the run activity for the reason")
+        }),
+        "process_preview_edit" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .process_preview_edit(database, args.workspace_id, args.run_id)
+                .map(|result_id| json!({"resultId": result_id}))
+                .map_err(|_| "The first cut could not be made. Check the run activity for the reason")
         }),
         "process_media_stage" => parse(arguments).and_then(|args: MediaStageInput| {
             store

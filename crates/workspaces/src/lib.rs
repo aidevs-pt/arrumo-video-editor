@@ -47,6 +47,7 @@ mod plugin_runtime;
 mod plugin_schema;
 mod plugin_settings;
 mod plugin_surfaces;
+mod preview_edit;
 mod preview_review;
 mod preview_settings;
 mod production_progress;

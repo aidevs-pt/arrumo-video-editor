@@ -167,7 +167,7 @@ impl WorkspaceStore {
     }
 }
 
-fn media_duration(path: &Path) -> io::Result<f64> {
+pub(crate) fn media_duration(path: &Path) -> io::Result<f64> {
     let output = Command::new("ffprobe")
         .args([
             "-v",

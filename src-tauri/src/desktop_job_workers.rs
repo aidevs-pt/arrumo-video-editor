@@ -43,6 +43,18 @@ impl DesktopJobWorkers {
                     .map_err(|_| ())
             },
         )?;
+        let preview_database = database.clone();
+        workers.spawn(
+            "arrumo-first-cut",
+            database.clone(),
+            Duration::from_secs(2),
+            move |store| {
+                store
+                    .process_next_preview_edit(&preview_database)
+                    .map(|result| result.is_some())
+                    .map_err(|_| ())
+            },
+        )?;
         workers.spawn(
             "arrumo-publishing-text",
             database.clone(),
