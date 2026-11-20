@@ -482,3 +482,8 @@ The local CLI command `verified-video-source <workspace-id> <run-id> <format-id>
 Use `speech-provider-status <workspace-id> <plugin-id>` to read the bundled
 provider's response format, maximum cue length and configured credential scope
 before synthesis. The command makes no provider request.
+
+Use `import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4>`
+to add a rendered alternate video. The editor verifies the managed copy's
+dimensions and duration against the selected completed output and requires an
+audio track before committing the asset and attachment together.

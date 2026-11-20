@@ -39,6 +39,7 @@ struct VideoProbe {
 struct Dimensions {
     width: u32,
     height: u32,
+    duration: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -259,6 +260,80 @@ pub(crate) fn verify_subtitle_cues(
 }
 
 impl WorkspaceStore {
+    pub fn import_completed_video_variant(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+        source: &Path,
+    ) -> Result<crate::WorkspaceAsset, Box<dyn Error + Send + Sync>> {
+        if source.extension().and_then(|extension| extension.to_str()) != Some("mp4")
+            || !source.symlink_metadata()?.is_file()
+        {
+            return Err(io::Error::other("Expected a regular MP4 variant file").into());
+        }
+        let database = database.canonicalize()?;
+        let media_root = crate::asset_root(&database);
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let delivery = self.verified_delivery(workspace_id, run_id)?;
+        let expected = delivery
+            .verified_outputs
+            .iter()
+            .find(|output| output.format_id == format_id)
+            .ok_or_else(|| io::Error::other("Output format is not in the verified delivery"))?;
+        if expected.video != format!("{format_id}.mp4") {
+            return Err(io::Error::other("Unexpected filename in verified delivery").into());
+        }
+        let original = managed_delivery_file(&database, workspace_id, run_id, &expected.video)?;
+        let count: u32 = tx.query_row(
+            "SELECT count(*) FROM completed_media WHERE run_id = ?1",
+            [run_id],
+            |row| row.get(0),
+        )?;
+        if count >= 100 {
+            return Err(io::Error::other("Completed delivery attachment limit reached").into());
+        }
+        let asset =
+            crate::assets::copy_asset_in(&tx, &media_root, workspace_id, source, false, None)?;
+        let managed = crate::asset_path(&media_root, workspace_id, asset.id);
+        let attached = (|| -> Result<(), Box<dyn Error + Send + Sync>> {
+            let original = inspect_variant(&original)?;
+            let variant = inspect_variant(&managed)?;
+            let source_video = &original.streams[0];
+            let variant_video = &variant.streams[0];
+            if (source_video.width, source_video.height)
+                != (variant_video.width, variant_video.height)
+            {
+                return Err(
+                    io::Error::other("Variant dimensions differ from the verified source").into(),
+                );
+            }
+            let duration = positive_duration(&variant.format.duration)?;
+            let video_duration =
+                |stream: &Dimensions| positive_duration(stream.duration.as_deref().unwrap_or(""));
+            if (duration - expected.duration_seconds).abs() > 0.05
+                || (video_duration(source_video)? - video_duration(variant_video)?).abs() > 0.05
+            {
+                return Err(
+                    io::Error::other("Variant duration differs from the verified source").into(),
+                );
+            }
+            crate::motion_artifacts::validate_motion_file(&managed, &asset.name, "audio")?;
+            tx.execute(
+                "INSERT INTO completed_media (run_id, format_id, asset_id) VALUES (?1, ?2, ?3)",
+                params![run_id, format_id, asset.id],
+            )?;
+            Ok(())
+        })();
+        if let Err(error) = attached {
+            let _ = fs::remove_file(&managed);
+            return Err(error);
+        }
+        tx.commit()?;
+        Ok(asset)
+    }
+
     pub fn verified_delivery_files(
         &self,
         database: &Path,
@@ -294,6 +369,35 @@ pub(crate) fn managed_delivery_file(
         return Err(io::Error::other("Invalid managed delivery file"));
     }
     Ok(path)
+}
+
+fn positive_duration(value: &str) -> io::Result<f64> {
+    value
+        .parse::<f64>()
+        .ok()
+        .filter(|duration| duration.is_finite() && *duration > 0.0)
+        .ok_or_else(|| io::Error::other("Invalid video duration"))
+}
+
+fn inspect_variant(path: &Path) -> Result<VideoProbe, Box<dyn Error + Send + Sync>> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("Missing video directory"))?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| io::Error::other("Invalid video filename"))?;
+    let probe: VideoProbe = serde_json::from_slice(&probe(
+        parent,
+        name,
+        "mov",
+        "stream=width,height,duration:format=duration",
+        &["-select_streams", "V:0"],
+    )?)?;
+    if probe.streams.len() != 1 {
+        return Err(io::Error::other("Variant does not contain a video stream").into());
+    }
+    Ok(probe)
 }
 
 impl WorkspaceStore {

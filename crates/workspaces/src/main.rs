@@ -1161,6 +1161,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{removed}");
         }
+        [database, command, workspace, run, format, source]
+            if command == "import-completed-video-variant" =>
+        {
+            let database = Path::new(database);
+            let asset = WorkspaceStore::open(database)?
+                .import_completed_video_variant(
+                    database,
+                    utf8(workspace)?.parse()?,
+                    utf8(run)?.parse()?,
+                    utf8(format)?.parse()?,
+                    Path::new(source),
+                )
+                .map_err(|error| io::Error::other(error.to_string()))?;
+            println!("{}", serde_json::to_string(&asset)?);
+        }
         [database, command, workspace, run, format] if command == "verified-video-source" => {
             let database = Path::new(database);
             let (video, _) = WorkspaceStore::open(database)?.verified_delivery_files(
@@ -1312,7 +1327,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
-                "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",
+                "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
