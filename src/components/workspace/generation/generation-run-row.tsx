@@ -26,7 +26,7 @@ export type Run = {
   state: RunState;
   pending_review_id: number | null;
   display_title: string | null;
-  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; formats?: { format: DeliveryFormat }[] };
+  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean } };
 };
 
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
@@ -141,6 +141,7 @@ export function GenerationRunPanels({ run, workspaceId }: { run: Run; workspaceI
         <GenerationPlan workspaceId={workspaceId} runId={run.id}
           pendingReviewId={runNeedsReview(run) ? run.pending_review_id : null}
           runState={run.state} hasSources={Boolean(run.snapshot.draft.source_ids?.length)}
+          saveMotionDefault={run.snapshot.options?.save_motion_to_library ?? true}
           formats={run.snapshot.formats?.map((entry) => entry.format) ?? []} />
         <GenerationActivity run={run} workspaceId={workspaceId} />
       </div>

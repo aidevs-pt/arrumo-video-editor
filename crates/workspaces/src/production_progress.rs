@@ -117,7 +117,7 @@ impl WorkspaceStore {
             |_| Ok(()),
         )?;
         if stage == ProductionStage::Assets && !step.review_required {
-            self.persist_accepted_motion_items(workspace_id, run_id, id)?;
+            self.persist_accepted_motion_items(workspace_id, run_id, id, None)?;
         }
         publish()?;
         tx.commit()?;
@@ -132,6 +132,28 @@ impl WorkspaceStore {
         decision: ReviewDecision,
         notes: &str,
     ) -> rusqlite::Result<()> {
+        self.review_production_result_with_motion(
+            workspace_id,
+            run_id,
+            result_id,
+            decision,
+            notes,
+            None,
+        )
+    }
+
+    pub fn review_production_result_with_motion(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+        decision: ReviewDecision,
+        notes: &str,
+        save_motion_indexes: Option<&[usize]>,
+    ) -> rusqlite::Result<()> {
+        if save_motion_indexes.is_some() && decision != ReviewDecision::Approved {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         tx.query_row(
             "UPDATE generation_runs
@@ -153,7 +175,12 @@ impl WorkspaceStore {
             |_| Ok(()),
         )?;
         if decision == ReviewDecision::Approved {
-            self.persist_accepted_motion_items(workspace_id, run_id, result_id)?;
+            self.persist_accepted_motion_items(
+                workspace_id,
+                run_id,
+                result_id,
+                save_motion_indexes,
+            )?;
         }
         tx.commit()
     }
@@ -163,21 +190,44 @@ impl WorkspaceStore {
         workspace_id: i64,
         run_id: i64,
         result_id: i64,
+        selected: Option<&[usize]>,
     ) -> rusqlite::Result<()> {
-        let items: Option<String> = self.0.query_row(
-            "SELECT CASE
-                 WHEN json_extract(run.plan_json, '$.steps[' || result.stage_index || '].stage') = 'assets'
-                   AND coalesce(json_extract(run.snapshot_json, '$.options.save_motion_to_library'), 1) = 1
-                 THEN json_extract(result.result_json, '$.motion_items')
-             END
+        let (assets_stage, save_default, items): (bool, bool, Option<String>) = self.0.query_row(
+            "SELECT json_extract(run.plan_json, '$.steps[' || result.stage_index || '].stage') = 'assets',
+                    coalesce(json_extract(run.snapshot_json, '$.options.save_motion_to_library'), 1),
+                    json_extract(result.result_json, '$.motion_items')
              FROM production_results AS result JOIN generation_runs AS run ON run.id = result.run_id
              WHERE run.workspace_id = ?1 AND run.id = ?2 AND result.id = ?3",
             params![workspace_id, run_id, result_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )?;
-        if let Some(items) = items {
-            let settings: Vec<crate::MotionLibrarySettings> = read_settings(Some(items), 0)?;
-            for (index, item) in settings.iter().enumerate() {
+        if !assets_stage || items.is_none() {
+            return if selected.is_none() {
+                Ok(())
+            } else {
+                Err(rusqlite::Error::InvalidQuery)
+            };
+        }
+        if selected.is_none() && !save_default {
+            return Ok(());
+        }
+        let settings: Vec<crate::MotionLibrarySettings> = read_settings(items, 2)?;
+        let selected = selected
+            .map(|indexes| {
+                let distinct: std::collections::HashSet<_> = indexes.iter().copied().collect();
+                if distinct.len() != indexes.len()
+                    || indexes.iter().any(|&index| index >= settings.len())
+                {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
+                Ok(distinct)
+            })
+            .transpose()?;
+        for (index, item) in settings.iter().enumerate() {
+            if selected
+                .as_ref()
+                .is_none_or(|indexes| indexes.contains(&index))
+            {
                 self.save_captured_motion_item(
                     workspace_id,
                     run_id,

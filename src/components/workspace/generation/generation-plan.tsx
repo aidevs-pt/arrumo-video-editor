@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +27,7 @@ type Plan = { steps: { stage: Stage; review_required: boolean }[] };
 type StageResult = MotionStageResult;
 type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
 type Decision = "approved" | "revise" | "rejected";
-type ReviewDraft = { decision: Decision | ""; notes: string };
+type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[] };
 
 const stages = {
   script: FileText,
@@ -43,13 +44,14 @@ function isDecision(value: unknown): value is Decision {
   return value === "approved" || value === "revise" || value === "rejected";
 }
 
-export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, hasSources, formats }: {
+export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, hasSources, formats, saveMotionDefault }: {
   workspaceId: number;
   runId: number;
   pendingReviewId: number | null;
   runState: string;
   hasSources: boolean;
   formats: DeliveryFormat[];
+  saveMotionDefault: boolean;
 }) {
   const { messages: { productionPlan: copy } } = useLocale();
   const [progress, setProgress] = useState<StageProgress>();
@@ -87,12 +89,12 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     || (hasSources && (currentStage === "preview" || currentStage === "final_render"))
     ? currentStage : undefined;
 
-  async function review(resultId: number, decision: Decision, notes: string) {
+  async function review(resultId: number, decision: Decision, notes: string, saveMotionIndexes?: number[]) {
     if (reviewing) return false;
     setReviewing(true);
     setReviewError(false);
     try {
-      await invoke("review_production_result", { workspaceId, runId, resultId, decision, notes });
+      await invoke("review_production_result", { workspaceId, runId, resultId, decision, notes, saveMotionIndexes });
       setProgress((current) => current && { ...current, pending_review_id: null });
       return true;
     } catch {
@@ -151,32 +153,45 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
         results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
       {awaiting && currentStage && (
         <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting}
-          reviewing={reviewing} reviewError={reviewError} onReview={review} />
+          reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault} />
       )}
     </div>
   );
 }
 
-function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError, onReview }: {
+function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError, onReview, saveMotionDefault }: {
   workspaceId: number;
   runId: number;
   stage: Stage;
   result: StageResult;
   reviewing: boolean;
   reviewError: boolean;
-  onReview: (resultId: number, decision: Decision, notes: string) => Promise<boolean>;
+  onReview: (resultId: number, decision: Decision, notes: string, saveMotionIndexes?: number[]) => Promise<boolean>;
+  saveMotionDefault: boolean;
 }) {
   const { messages: { productionPlan: copy } } = useLocale();
+  const motionItems = stage === "assets" && Array.isArray(result.result.motion_items)
+    ? result.result.motion_items.flatMap((item: unknown, index: number) => (
+      item && typeof item === "object" && "title" in item && typeof item.title === "string"
+        ? [{ index, title: item.title }] : []
+    )) : [];
   const draftKey = `arrumo:review:${workspaceId}:${runId}:${result.id}`;
   const [draft, setDraft] = useState<ReviewDraft>(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(draftKey) ?? "null");
       if (saved && typeof saved.notes === "string") {
-        return { notes: saved.notes, decision: isDecision(saved.decision) ? saved.decision : "" };
+        return {
+          notes: saved.notes,
+          decision: isDecision(saved.decision) ? saved.decision : "",
+          motionIndexes: Array.isArray(saved.motionIndexes)
+            ? motionItems.map(({ index }) => index).filter((index) => saved.motionIndexes.includes(index))
+            : undefined,
+        };
       }
     } catch {}
     return emptyDraft;
   });
+  const selectedMotion = draft.motionIndexes ?? (saveMotionDefault ? motionItems.map(({ index }) => index) : []);
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
   const markdown = typeof result.result.markdown === "string" ? result.result.markdown : undefined;
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
@@ -190,7 +205,8 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.decision || reviewing) return;
-    if (await onReview(result.id, draft.decision, draft.notes)) {
+    if (await onReview(result.id, draft.decision, draft.notes,
+      draft.decision === "approved" && motionItems.length ? selectedMotion : undefined)) {
       try { sessionStorage.removeItem(draftKey); } catch {}
     }
   }
@@ -244,6 +260,21 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
                 <Textarea id={`review-notes-${runId}`} name="notes" value={draft.notes}
                   onChange={(event) => updateDraft({ ...draft, notes: event.target.value })} />
               </Field>
+              {draft.decision === "approved" && motionItems.length > 0 && (
+                <fieldset className="grid gap-2">
+                  <legend className="mb-2 text-sm font-medium">{copy.keepMotionItems}</legend>
+                  {motionItems.map(({ index, title }) => (
+                    <label key={index} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                      <Checkbox checked={selectedMotion.includes(index)} onCheckedChange={(checked) => {
+                        updateDraft({ ...draft, motionIndexes: checked
+                          ? [...selectedMotion, index]
+                          : selectedMotion.filter((value) => value !== index) });
+                      }} />
+                      <span className="wrap-anywhere">{title}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               {reviewError && <Alert variant="destructive"><AlertDescription>{copy.reviewError}</AlertDescription></Alert>}
               <Button type="submit" disabled={!draft.decision || reviewing}
                 variant={draft.decision === "rejected" ? "destructive" : "default"} className="self-start">

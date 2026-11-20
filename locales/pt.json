@@ -626,6 +626,7 @@
     "replayMode": "Definições a usar"
   },
   "productionPlan": {
+    "keepMotionItems": "Guardar elementos na biblioteca de movimento",
     "resultDetails": "Dados do resultado",
     "decision": "Decisão",
     "selectDecision": "Escolhe uma decisão",

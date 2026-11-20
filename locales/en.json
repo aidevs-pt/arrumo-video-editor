@@ -626,6 +626,7 @@
     "replayMode": "Settings to use"
   },
   "productionPlan": {
+    "keepMotionItems": "Save selected items to the Motion library",
     "resultDetails": "Result data",
     "decision": "Decision",
     "selectDecision": "Choose a decision",

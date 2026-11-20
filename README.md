@@ -391,3 +391,5 @@ Use `save-motion-result <workspace-id> <run-id> <result-id> <index>` to save one
 In MCP and A2A, call `save_motion_result` with `workspaceId`, `runId`, `resultId`, and the zero-based `index` in the accepted Assets result's `motion_items` array. The response includes the saved `item`.
 
 Accepted motion results are saved to the library by default when an Assets stage advances, including in autopilot. Set `save_motion_to_library` to `false` in the run options or turn off **Save motion to library** when queuing a desktop run. You can still save an item manually from its accepted result.
+
+During guided Assets review, select which animations and transitions to keep before approving. In MCP and A2A, pass `saveMotionIndexes` to `review_production_result`. In the CLI, append a JSON array of indexes to `review-stage`. Omit the selection to use the run default, or pass an empty array to save none. Indexes are zero-based.

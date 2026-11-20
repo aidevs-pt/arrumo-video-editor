@@ -48,6 +48,7 @@ struct ReviewInput {
     decision: ReviewDecision,
     #[serde(default)]
     notes: String,
+    save_motion_indexes: Option<Vec<usize>>,
 }
 
 #[derive(Deserialize)]
@@ -326,7 +327,9 @@ pub(super) fn definitions() -> [Value; 31] {
         json!({"name": "review_production_result", "description": "Submit an explicit approval, rejection, or revision request for a pending result.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "resultId": id,
-                "decision": {"enum": ["approved", "rejected", "revise"]}, "notes": {"type": "string"}
+                "decision": {"enum": ["approved", "rejected", "revise"]}, "notes": {"type": "string"},
+                "saveMotionIndexes": {"type": "array", "items": {"type": "integer", "minimum": 0}, "uniqueItems": true,
+                    "description": "On Assets approval, save these zero-based motion item indexes. An empty list saves none."}
             }, "required": ["workspaceId", "runId", "resultId", "decision"], "additionalProperties": false}}),
     ]
 }
@@ -552,12 +555,13 @@ pub(super) fn call(
         }),
         "review_production_result" => parse(arguments).and_then(|args: ReviewInput| {
             store
-                .review_production_result(
+                .review_production_result_with_motion(
                     args.workspace_id,
                     args.run_id,
                     args.result_id,
                     args.decision,
                     &args.notes,
+                    args.save_motion_indexes.as_deref(),
                 )
                 .map(|()| json!({"submitted": true}))
                 .map_err(|_| "Could not review this result. Check the workspace and pending review")

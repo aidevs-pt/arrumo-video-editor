@@ -803,16 +803,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{id}");
         }
-        [database, command, workspace, run, result, decision, notes]
-            if command == "review-stage" =>
-        {
+        [
+            database,
+            command,
+            workspace,
+            run,
+            result,
+            decision,
+            notes,
+            selection @ ..,
+        ] if command == "review-stage" && selection.len() <= 1 => {
             let decision = serde_json::from_value(serde_json::json!(utf8(decision)?))?;
-            WorkspaceStore::open(Path::new(database))?.review_production_result(
+            let indexes = selection
+                .first()
+                .map(|value| {
+                    serde_json::from_str::<Vec<usize>>(utf8(value)?).map_err(io::Error::other)
+                })
+                .transpose()?;
+            WorkspaceStore::open(Path::new(database))?.review_production_result_with_motion(
                 utf8(workspace)?.parse()?,
                 utf8(run)?.parse()?,
                 utf8(result)?.parse()?,
                 decision,
                 utf8(notes)?,
+                indexes.as_deref(),
             )?;
             println!("null");
         }
@@ -1005,7 +1019,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
-                "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> | ",
+                "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
                 "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",

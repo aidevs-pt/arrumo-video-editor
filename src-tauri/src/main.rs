@@ -717,12 +717,20 @@ async fn review_production_result(
     result_id: i64,
     decision: ReviewDecision,
     notes: String,
+    save_motion_indexes: Option<Vec<usize>>,
     store: State<'_, Store>,
 ) -> Result<(), &'static str> {
     store
         .lock()
         .map_err(|_| "store_unavailable")?
-        .review_production_result(workspace_id, run_id, result_id, decision, &notes)
+        .review_production_result_with_motion(
+            workspace_id,
+            run_id,
+            result_id,
+            decision,
+            &notes,
+            save_motion_indexes.as_deref(),
+        )
         .map_err(|_| "production_review_failed")
 }
 
