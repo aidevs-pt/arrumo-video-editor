@@ -2,7 +2,7 @@
 
 import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Check, Circle, Clock3, ListVideo, Pause, Play, RotateCcw } from "lucide-react";
+import { ArrowUpRight, Check, Circle, Clock3, Pause, Play, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import {
@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
+import { StepTrack } from "@/components/workspace/step-track";
+import { VideoThumbnail } from "@/components/workspace/video-thumbnail";
 import { GenerationPlan } from "./generation-plan";
 import type { DeliveryFormat } from "./delivery-subtitles";
 
@@ -84,13 +86,20 @@ export function GenerationRunRow({ run, workspaceId, actions }: { run: Run; work
     : `/generation-run?workspace=${workspaceId}&run=${run.id}`;
 
   return (
-    <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-      <span className="grid size-9 place-items-center rounded-lg bg-secondary text-secondary-foreground" aria-hidden="true">
-        <ListVideo className="size-4" />
-      </span>
-      <Link href={href} className="min-w-0 wrap-anywhere rounded-sm text-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-        {title}
-      </Link>
+    <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <VideoThumbnail title={title} color={run.snapshot.profile?.color} small className="row-span-2 w-24 sm:row-span-1 sm:w-36" />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {run.snapshot.profile && <span className="flex items-center gap-2 text-sm font-semibold">
+          <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: run.snapshot.profile.color ?? "var(--border)" }} />
+          {run.snapshot.profile.name}
+        </span>}
+        <Link href={href} className="min-w-0 font-heading text-lg leading-tight font-[800] wrap-anywhere [font-variation-settings:'wdth'_108] hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+          {title}
+        </Link>
+        {!completed && run.progress && <StepTrack count={run.progress.stage_count} current={run.progress.stage_index}
+          label={messages.dashboard.progressLabel} className="max-w-sm" />}
+        {!completed && <span className="text-sm text-muted-foreground">{runSummary(run, messages)}</span>}
+      </div>
       <div className="col-start-2 flex flex-wrap items-center gap-2 sm:col-start-3">
         <RunStatus run={run} />
         <Button asChild size="sm" variant={runNeedsReview(run) ? "default" : "outline"}>
