@@ -1185,5 +1185,8 @@
     "rejectAll": "Descartar este rascunho e recomeçar",
     "overall": "Mais alguma coisa sobre o guião todo (opcional)",
     "notesHeading": "Decisões por secção:"
+  },
+  "media": {
+    "linuxCodecs": "No Linux, o vídeo é reproduzido através do GStreamer. Instale o descodificador H.264 (gstreamer1.0-libav no Debian e Ubuntu, gstreamer1-plugin-openh264 ou gstreamer1-plugin-libav no Fedora) e reinicie o Arrumo."
   }
 }

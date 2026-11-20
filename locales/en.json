@@ -1185,5 +1185,8 @@
     "rejectAll": "Scrap this draft and start over",
     "overall": "Anything else about the whole script (optional)",
     "notesHeading": "Section decisions:"
+  },
+  "media": {
+    "linuxCodecs": "On Linux, video plays through GStreamer. Install its H.264 decoder (gstreamer1.0-libav on Debian and Ubuntu, gstreamer1-plugin-openh264 or gstreamer1-plugin-libav on Fedora), then restart Arrumo."
   }
 }

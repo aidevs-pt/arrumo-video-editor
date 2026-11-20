@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { CodecHint } from "@/components/workspace/media/codec-hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -109,7 +110,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
     <div className={cn("grid min-w-0 items-start gap-5", showTranscript && "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]")}>
       {error ? (
         <Alert variant="destructive">
-          <AlertDescription>{copy[error]}</AlertDescription>
+          <AlertDescription>{copy[error]}{error === "playbackError" && <CodecHint />}</AlertDescription>
           <AlertAction>
             <Button variant="outline" size="sm" onClick={() => {
               setPreview(undefined);

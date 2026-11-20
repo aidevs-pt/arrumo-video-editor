@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { CodecHint } from "@/components/workspace/media/codec-hint";
 import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -48,7 +49,7 @@ export function MotionPreviewDialog({ workspaceId, profileId, itemId, title }: {
           <DialogTitle className="wrap-anywhere pe-6">{title}</DialogTitle>
           <DialogDescription>{copy.previewDescription}</DialogDescription>
         </DialogHeader>
-        {videoError ? <Alert variant="destructive"><AlertDescription>{copy.previewError}</AlertDescription></Alert>
+        {videoError ? <Alert variant="destructive"><AlertDescription>{copy.previewError}<CodecHint /></AlertDescription></Alert>
           : preview ? <video aria-label={copy.video} src={preview.video_url} controls loop playsInline preload="metadata"
               className="aspect-video max-h-[55dvh] w-full rounded-md bg-black" onError={() => setVideoError(true)} />
             : <p role="status" className="text-sm text-muted-foreground">{copy.loadingPreview}</p>}

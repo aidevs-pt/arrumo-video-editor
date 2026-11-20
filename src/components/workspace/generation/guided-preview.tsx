@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { CodecHint } from "@/components/workspace/media/codec-hint";
 import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -43,7 +44,7 @@ export function GuidedPreview({ workspaceId, runId, resultId, filename, formatId
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2">
-          {error ? <Alert variant="destructive"><AlertDescription>{copy.playPreviewError}</AlertDescription></Alert>
+          {error ? <Alert variant="destructive"><AlertDescription>{copy.playPreviewError}<CodecHint /></AlertDescription></Alert>
             : url ? <video aria-label={filename} className="max-h-80 w-full rounded-sm bg-black"
                 controls preload="metadata" src={url} onError={() => setError(true)} />
             : <p role="status" className="text-sm text-muted-foreground">{copy.loadingPreview}</p>}
