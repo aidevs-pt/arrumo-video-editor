@@ -2,7 +2,7 @@
 
 import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Check, Circle, Clock3, Pause, Play, RotateCcw } from "lucide-react";
+import { ArrowUpRight, Check, Circle, Clock3, Pause, Play, RotateCcw, Square } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import {
@@ -31,7 +31,7 @@ export type Run = {
   snapshot: { draft: { id: number; title: string; source_ids?: number[] }; profile?: { id: number; name: string; color: string | null } | null; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean; autopilot?: boolean }; agent_settings?: { effective_provider?: string | null } };
 };
 
-export type RunAction = "pause" | "resume" | "retry" | "cancel";
+export type RunAction = "pause" | "resume" | "retry" | "cancel" | "stop";
 type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
 
 export function runNeedsReview(run: Run) {
@@ -124,6 +124,7 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
   const copy = messages.queue;
   const canPause = run.state === "queued" || run.state === "running";
   const canResume = run.state === "paused" && run.pending_review_id === null;
+  const canStop = ["queued", "running", "paused", "failed"].includes(run.state) && (run.progress?.stage_index ?? 0) > 0;
 
   return (
     <div className="flex flex-wrap items-center gap-2 [&_a[data-variant=outline]]:text-foreground [&_button[data-variant=outline]]:text-foreground">
@@ -139,6 +140,23 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
       {run.state === "failed" && (
         <Button type="button" size="sm" variant="outline" disabled={disabled}
           onClick={() => void onControl(run.id, "retry")}><RotateCcw data-icon="inline-start" />{copy.retryRun}</Button>
+      )}
+      {canStop && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button type="button" size="sm" variant="outline" disabled={disabled}><Square data-icon="inline-start" />{copy.stop}</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{copy.stopTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{copy.stopDescription}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{copy.keepGoing}</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void onControl(run.id, "stop")}>{copy.stop}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
       {(canPause || run.state === "paused") && (
         <AlertDialog>

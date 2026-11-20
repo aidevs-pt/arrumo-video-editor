@@ -40,6 +40,8 @@ pub enum RunControl {
     Resume,
     Retry,
     Cancel,
+    /// Returns to the previous reviewed step so its result can be changed.
+    Stop,
 }
 
 impl WorkspaceStore {
@@ -171,7 +173,18 @@ impl WorkspaceStore {
         run_id: i64,
         action: RunControl,
     ) -> rusqlite::Result<GenerationRun> {
+        let run = self.apply_generation_control(workspace_id, run_id, action)?;
+        Ok(self.generation_run(workspace_id, run.id)?.unwrap_or(run))
+    }
+
+    fn apply_generation_control(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        action: RunControl,
+    ) -> rusqlite::Result<GenerationRun> {
         let (target, allowed) = match action {
+            RunControl::Stop => return self.stop_generation(workspace_id, run_id),
             RunControl::Pause => ("paused", ["queued", "running", "paused"]),
             RunControl::Retry => ("queued", ["failed", "queued", "queued"]),
             RunControl::Resume => ("queued", ["paused", "queued", "queued"]),
@@ -192,6 +205,54 @@ impl WorkspaceStore {
             ],
             read_run,
         )
+    }
+
+    /// Reopens the most recent result of an earlier stage for review and pauses the run there.
+    /// The original decision stays in the history; the review applies to a copy of the result.
+    fn stop_generation(&self, workspace_id: i64, run_id: i64) -> rusqlite::Result<GenerationRun> {
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let (previous, stage_index, was_paused): (i64, i64, bool) = tx.query_row(
+            "SELECT result.id, result.stage_index, run.state = 'paused' FROM production_results AS result
+             JOIN generation_runs AS run ON run.id = result.run_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2
+               AND run.state IN ('queued', 'running', 'paused', 'failed')
+               AND result.stage_index < run.stage_index
+             ORDER BY result.id DESC LIMIT 1",
+            params![workspace_id, run_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        let reopened: i64 = tx.query_row(
+            "INSERT INTO production_results (run_id, stage_index, attempt, result_json)
+             SELECT run_id, stage_index, attempt, result_json FROM production_results WHERE id = ?1
+             RETURNING id",
+            [previous],
+            |row| row.get(0),
+        )?;
+        let run = tx.query_row(
+            "UPDATE generation_runs
+             SET state = 'paused', stage_index = ?3, pending_review_id = ?4, lease_until = NULL
+             WHERE workspace_id = ?1 AND id = ?2
+             RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
+            params![workspace_id, run_id, stage_index, reopened],
+            read_run,
+        )?;
+        let detail = "Stopped and returned to the previous step";
+        if was_paused {
+            // A paused run stays paused, so the state trigger records nothing.
+            tx.execute(
+                "INSERT INTO generation_activity (run_id, attempt, state, kind, detail)
+                 SELECT id, attempt, state, 'transition', ?2 FROM generation_runs WHERE id = ?1",
+                params![run_id, detail],
+            )?;
+        } else {
+            tx.execute(
+                "UPDATE generation_activity SET detail = ?2
+                 WHERE id = (SELECT max(id) FROM generation_activity WHERE run_id = ?1)",
+                params![run_id, detail],
+            )?;
+        }
+        tx.commit()?;
+        Ok(run)
     }
 
     pub fn generation_activity(
@@ -373,5 +434,88 @@ mod tests {
         let history = store.generation_activity(workspace, run.id).unwrap();
         assert_eq!(history[2].state, "failed");
         assert_eq!(history[2].detail.as_deref(), Some("Source unavailable"));
+    }
+}
+
+#[cfg(test)]
+mod stop_tests {
+    use crate::{
+        DraftSettings, ProductionStage, ReviewDecision, RunControl, RunOptions, WorkspaceStore,
+    };
+
+    #[test]
+    fn stop_reopens_the_previous_step_and_keeps_its_history() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Explainer".into(),
+                    profile_id: None,
+                    intent: "Explain".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &RunOptions::default())
+            .unwrap();
+        assert!(
+            store
+                .control_generation(workspace, run.id, RunControl::Stop)
+                .is_err(),
+            "nothing to go back to yet"
+        );
+
+        let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+        let script = serde_json::json!({"markdown": "## Hook"});
+        let first = store
+            .submit_production_result(workspace, run.id, attempt, ProductionStage::Script, &script)
+            .unwrap();
+        store
+            .review_production_result(workspace, run.id, first, ReviewDecision::Approved, "Good")
+            .unwrap();
+
+        let other = store.create("Other").unwrap().id;
+        assert!(
+            store
+                .control_generation(other, run.id, RunControl::Stop)
+                .is_err()
+        );
+
+        let stopped = store
+            .control_generation(workspace, run.id, RunControl::Stop)
+            .unwrap();
+        assert_eq!(stopped.state, "paused");
+        let progress = store.production_progress(workspace, run.id).unwrap();
+        assert_eq!(progress.stage_index, 0);
+        let reopened = progress.pending_review_id.unwrap();
+        assert_ne!(reopened, first);
+        assert_eq!(progress.results[0].decision.as_deref(), Some("approved"));
+        assert_eq!(progress.results[1].result, script);
+        assert!(progress.results[1].decision.is_none());
+        let activity = store.generation_activity(workspace, run.id).unwrap();
+        assert_eq!(
+            activity.last().unwrap().detail.as_deref(),
+            Some("Stopped and returned to the previous step")
+        );
+
+        store
+            .review_production_result(
+                workspace,
+                run.id,
+                reopened,
+                ReviewDecision::Revise,
+                "Shorter",
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .production_progress(workspace, run.id)
+                .unwrap()
+                .stage_index,
+            0
+        );
     }
 }

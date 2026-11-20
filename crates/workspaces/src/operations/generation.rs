@@ -272,7 +272,7 @@ pub(super) fn definitions() -> [Value; 35] {
             }, "required": ["workspaceId", "draftId", "requestKey"], "additionalProperties": false}}),
         json!({"name": "control_generation", "description": "Pause, resume, retry, or cancel a generation run.",
             "inputSchema": {"type": "object", "properties": {
-                "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel"]}
+                "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel", "stop"]}
             }, "required": ["workspaceId", "runId", "action"], "additionalProperties": false}}),
         json!({"name": "process_script_stage", "description": "Run the run's agent on its queued Script stage and submit the draft for review. Earlier drafts' review notes are included. The run fails with a reason if the agent cannot finish.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},

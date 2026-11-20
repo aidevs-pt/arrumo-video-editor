@@ -295,38 +295,44 @@ impl WorkspaceStore {
         workspace_id: i64,
         run_id: i64,
     ) -> rusqlite::Result<Option<GenerationRun>> {
-        self.0.query_row(
-            "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title FROM generation_runs
-             WHERE workspace_id = ?1 AND id = ?2",
-            params![workspace_id, run_id],
-            read_run,
-        ).optional()
+        self.0
+            .query_row(
+                &format!("{RUN_WITH_PROGRESS} WHERE workspace_id = ?1 AND id = ?2"),
+                params![workspace_id, run_id],
+                read_run_with_progress,
+            )
+            .optional()
     }
 
     pub fn list_generation_runs(&self, workspace_id: i64) -> rusqlite::Result<Vec<GenerationRun>> {
         self.0
-            .prepare(
-                "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title, stage_index,
-                    json_array_length(plan_json, '$.steps'),
-                    json_extract(plan_json, '$.steps[' || stage_index || '].stage')
-             FROM generation_runs WHERE workspace_id = ?1 ORDER BY id",
-            )?
-            .query_map([workspace_id], |row| {
-                let mut run = read_run(row)?;
-                run.progress = row
-                    .get::<_, Option<i64>>(7)?
-                    .map(|stage_count| -> rusqlite::Result<_> {
-                        Ok(RunProgress {
-                            stage_index: row.get(6)?,
-                            stage_count,
-                            stage: row.get(8)?,
-                        })
-                    })
-                    .transpose()?;
-                Ok(run)
-            })?
+            .prepare(&format!(
+                "{RUN_WITH_PROGRESS} WHERE workspace_id = ?1 ORDER BY id"
+            ))?
+            .query_map([workspace_id], read_run_with_progress)?
             .collect()
     }
+}
+
+const RUN_WITH_PROGRESS: &str =
+    "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title,
+    stage_index, json_array_length(plan_json, '$.steps'),
+    json_extract(plan_json, '$.steps[' || stage_index || '].stage')
+    FROM generation_runs";
+
+fn read_run_with_progress(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
+    let mut run = read_run(row)?;
+    run.progress = row
+        .get::<_, Option<i64>>(7)?
+        .map(|stage_count| -> rusqlite::Result<_> {
+            Ok(RunProgress {
+                stage_index: row.get(6)?,
+                stage_count,
+                stage: row.get(8)?,
+            })
+        })
+        .transpose()?;
+    Ok(run)
 }
 
 pub(crate) fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {

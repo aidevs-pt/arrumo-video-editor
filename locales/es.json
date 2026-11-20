@@ -639,7 +639,11 @@
     "activityPaused": "En pausa",
     "activityFailed": "Se detuvo por un problema",
     "activityCompleted": "Terminado",
-    "activityCancelled": "Cancelado"
+    "activityCancelled": "Cancelado",
+    "stop": "Detener",
+    "stopTitle": "¿Detener y volver al paso anterior?",
+    "stopDescription": "El trabajo actual se detiene. El último resultado que aprobaste se vuelve a abrir para que puedas cambiarlo; tu decisión anterior queda en el historial.",
+    "keepGoing": "Continuar"
   },
   "onboarding": {
     "tagline": "De material en bruto a vídeos brillantes.",

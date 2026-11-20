@@ -913,7 +913,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "resume" => RunControl::Resume,
                 "retry" => RunControl::Retry,
                 "cancel" => RunControl::Cancel,
-                _ => return Err("Action must be pause, resume, retry, or cancel".into()),
+                "stop" => RunControl::Stop,
+                _ => return Err("Action must be pause, resume, retry, cancel or stop".into()),
             };
             let run = WorkspaceStore::open(Path::new(database))?.control_generation(
                 utf8(workspace)?.parse()?,
@@ -1462,7 +1463,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
-                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel> | ",
+                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> | ",
                 "generation-activity <workspace-id> <run-id> | generation-notifications <workspace-id> <after-id> | ",
                 "read-completion-notification <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",

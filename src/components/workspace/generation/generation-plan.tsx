@@ -218,7 +218,8 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
               results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
             {awaiting && currentStage && (
               <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting} formats={formats}
-                agent={agent} version={progress?.results.filter((entry) => entry.stage_index === awaiting.stage_index && entry.id <= awaiting.id).length ?? 1}
+                agent={agent} version={new Set(progress?.results.filter((entry) => entry.stage_index === awaiting.stage_index && entry.id <= awaiting.id)
+                  .map((entry) => JSON.stringify(entry.result))).size || 1}
                 reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault}
                 previousSupplementalReview={previousReview?.supplemental_review} previousPreviewReview={previousReview?.preview_review} />
             )}

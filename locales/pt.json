@@ -639,7 +639,11 @@
     "activityPaused": "Em pausa",
     "activityFailed": "Parou com um problema",
     "activityCompleted": "Concluído",
-    "activityCancelled": "Cancelado"
+    "activityCancelled": "Cancelado",
+    "stop": "Parar",
+    "stopTitle": "Parar e voltar ao passo anterior?",
+    "stopDescription": "O trabalho atual para. O último resultado que aprovou volta a abrir para o poder alterar; a sua decisão anterior fica no histórico.",
+    "keepGoing": "Continuar"
   },
   "onboarding": {
     "tagline": "De filmagens em bruto a vídeos brilhantes.",
