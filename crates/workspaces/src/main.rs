@@ -483,6 +483,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(io::Error::other)?;
             println!("{}", serde_json::to_string(&asset)?);
         }
+        [database, command, workspace, asset] if command == "asset-organization" => {
+            let settings = WorkspaceStore::open(Path::new(database))?
+                .asset_organization(utf8(workspace)?.parse()?, utf8(asset)?.parse()?)?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
+        [database, command, workspace, asset, settings] if command == "set-asset-organization" => {
+            let settings = WorkspaceStore::open(Path::new(database))?.set_asset_organization(
+                utf8(workspace)?.parse()?,
+                utf8(asset)?.parse()?,
+                serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
         [database, command, workspace, ids, notes] if command == "set-batch-asset-notes" => {
             let ids: Vec<i64> = serde_json::from_str(utf8(ids)?)?;
             let assets = WorkspaceStore::open(Path::new(database))?.set_batch_asset_notes(
@@ -887,6 +900,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
+                "asset-organization <workspace-id> <asset-id> | set-asset-organization <workspace-id> <asset-id> <settings-json> | ",
                 "set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown> | set-asset-notes <workspace-id> <asset-id> <notes> | ",
                 "context <workspace-id> | set-context <workspace-id> <markdown> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",

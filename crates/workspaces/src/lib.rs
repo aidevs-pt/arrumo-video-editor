@@ -7,6 +7,7 @@ mod a2a;
 mod agent_cli;
 mod agent_plugins;
 mod agent_settings;
+mod asset_organization;
 mod assets;
 mod brand_assets;
 mod clip_render;
@@ -48,6 +49,7 @@ pub use a2a::serve_a2a;
 pub use agent_cli::{AgentLoginStatus, agent_cli_detected, check_agent_login};
 pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};
 pub use agent_settings::{AgentProviderSource, AgentSettings};
+pub use asset_organization::AssetOrganization;
 pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
@@ -151,6 +153,7 @@ impl WorkspaceStore {
             include_str!("../migrations/032-generation-notification-reads.sql"),
             include_str!("../migrations/033-delivery-cleanup.sql"),
             include_str!("../migrations/034-output-schedules.sql"),
+            include_str!("../migrations/035-asset-organization.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

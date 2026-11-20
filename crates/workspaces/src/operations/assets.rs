@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::{BrandAssetRole, WorkspaceStore, asset_root};
+use crate::{AssetOrganization, BrandAssetRole, WorkspaceStore, asset_root};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -42,7 +42,22 @@ struct BatchNotesInput {
     notes: String,
 }
 
-pub(super) fn definitions() -> [Value; 8] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AssetInput {
+    workspace_id: i64,
+    asset_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OrganizationInput {
+    workspace_id: i64,
+    asset_id: i64,
+    settings: AssetOrganization,
+}
+
+pub(super) fn definitions() -> [Value; 10] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -79,6 +94,17 @@ pub(super) fn definitions() -> [Value; 8] {
             "inputSchema": assignment, "annotations": {"idempotentHint": true}}),
         json!({"name": "detach_brand_asset", "description": "Remove a brand role from an image while keeping the managed asset.",
             "inputSchema": assignment, "annotations": {"idempotentHint": true}}),
+        json!({"name": "get_asset_organization", "description": "Read an asset's group and labels.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "assetId": id},
+                "required": ["workspaceId", "assetId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_asset_organization", "description": "Replace an asset's group and labels. An empty settings object clears both.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "assetId": id, "settings": {"type": "object", "properties": {
+                    "group": {"type": ["string", "null"]}, "labels": {"type": "array", "items": {"type": "string"}}
+                }, "additionalProperties": false}
+            }, "required": ["workspaceId", "assetId", "settings"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
     ]
 }
 
@@ -157,6 +183,22 @@ pub(super) fn call(
                     }
                 })
         }
+        "get_asset_organization" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid asset organization arguments")
+            .and_then(|args: AssetInput| {
+                store
+                    .asset_organization(args.workspace_id, args.asset_id)
+                    .map(|settings| json!({"organization": settings}))
+                    .map_err(|_| "Could not read asset organization")
+            }),
+        "set_asset_organization" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid asset organization arguments")
+            .and_then(|args: OrganizationInput| {
+                store
+                    .set_asset_organization(args.workspace_id, args.asset_id, args.settings)
+                    .map(|settings| json!({"organization": settings}))
+                    .map_err(|_| "Could not save asset group and labels")
+            }),
         _ => return None,
     })
 }

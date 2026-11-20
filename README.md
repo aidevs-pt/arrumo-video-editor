@@ -355,3 +355,5 @@ Through MCP or A2A, use `set_output_schedule` with a workspace, run, and format 
 Open the desktop calendar at a specific month and profile with a link such as `arrumo://open/calendar?workspace=1&profile=2&month=2028-02`. Omit the profile for all workspace outputs. Completed-video links can include a `format` ID to select a specific delivered output.
 
 Use `set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown>` in the CLI, or `set_batch_asset_notes` in MCP and A2A, to replace notes for multiple workspace assets together. A missing or foreign asset rolls back the entire update.
+
+Read asset labels and grouping with `asset-organization <workspace-id> <asset-id>` or `get_asset_organization` through MCP and A2A. Replace them with `set-asset-organization <workspace-id> <asset-id> <settings-json>` or `set_asset_organization`. Settings contain an optional `group` and a `labels` array. An empty settings object clears both without changing the asset or its references.
