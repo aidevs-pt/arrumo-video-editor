@@ -401,3 +401,5 @@ MCP and A2A expose `submit_motion_artifacts` with `workspaceId`, `runId`, `attem
 On a queued desktop run at the Assets stage, use **Submit motion files** to add one or more finished animations and transitions, each with a video preview and optional thumbnail and sound. Use **Add another item** to include more in the same submission. Submitting completes the stage or sends it to guided review, according to the run options.
 
 Motion artifact submission requires `ffprobe`. The host probes each managed copy with the demuxer for its extension and checks for the expected video or audio stream before publishing the batch.
+
+On Linux, run an installed motion-rendering package with `run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain]`. Use the installed package digest from the plugin catalog and point `sdk-worker` at your trusted local Plugin SDK checkout's `tools/run_motion_package.py`. Arrumo checks that the installed ZIP still matches the digest and declares `motion-render`. The SDK worker runs it in Bubblewrap and returns a JSON artifact batch. Submit that batch separately with the active Assets-stage lease.

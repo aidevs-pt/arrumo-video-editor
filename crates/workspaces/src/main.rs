@@ -292,6 +292,49 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .update_plugin_release(utf8(id)?, utf8(version)?)?;
             println!("{}", serde_json::to_string(&updated)?);
         }
+        [
+            database,
+            command,
+            id,
+            digest,
+            worker,
+            output,
+            toolchain @ ..,
+        ] if command == "run-installed-motion-renderer" && toolchain.len() <= 1 => {
+            if !cfg!(target_os = "linux") {
+                return Err(
+                    io::Error::other("The local motion renderer worker requires Linux").into(),
+                );
+            }
+            let digest = utf8(digest)?;
+            let bytes = WorkspaceStore::open(Path::new(database))?
+                .reviewed_motion_renderer_package(utf8(id)?, digest)?;
+            let worker = Path::new(worker).canonicalize()?;
+            if !worker.is_file() {
+                return Err(
+                    io::Error::other("The SDK worker must be a regular script file").into(),
+                );
+            }
+            let job = tempfile::tempdir()?;
+            let package = job.path().join("renderer.zip");
+            std::fs::write(&package, bytes)?;
+            let mut runner = std::process::Command::new("python3");
+            runner
+                .args(["-E", "-B"])
+                .arg(worker)
+                .arg(package)
+                .arg("--sha256")
+                .arg(digest.to_ascii_lowercase())
+                .arg("--output")
+                .arg(output)
+                .stdin(std::process::Stdio::null());
+            if let Some(path) = toolchain.first() {
+                runner.arg("--toolchain").arg(path);
+            }
+            if !runner.status()?.success() {
+                return Err(io::Error::other("The SDK renderer worker failed").into());
+            }
+        }
         [database, command, id] if command == "remove-plugin-manifest" => {
             let removed = WorkspaceStore::open(Path::new(database))?
                 .remove_installed_plugin_manifest(utf8(id)?)?;
@@ -1037,7 +1080,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json> | submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",

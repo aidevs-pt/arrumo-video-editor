@@ -28,6 +28,35 @@ pub struct PluginPackageInfo {
 }
 
 impl WorkspaceStore {
+    pub fn reviewed_motion_renderer_package(
+        &self,
+        plugin_id: &str,
+        expected_sha256: &str,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        if !valid_sha256(expected_sha256) {
+            return Err(
+                invalid_package("Expected SHA-256 must contain 64 hexadecimal digits").into(),
+            );
+        }
+        let (manifest, bytes): (Vec<u8>, Vec<u8>) = self.0.query_row(
+            "SELECT manifest, package_bytes FROM installed_plugin_manifests
+             WHERE plugin_id = ?1 AND package_sha256 = ?2 AND package_bytes IS NOT NULL",
+            rusqlite::params![plugin_id, expected_sha256.to_ascii_lowercase()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        let manifest = PluginManifest::parse(&manifest)?;
+        if manifest.id != plugin_id || !manifest.capabilities.contains_key("motion-render") {
+            return Err(
+                invalid_package("Installed package does not declare motion rendering").into(),
+            );
+        }
+        let actual = package_sha256(&bytes)?;
+        if !actual.eq_ignore_ascii_case(expected_sha256) {
+            return Err(invalid_package("Installed renderer package digest mismatch").into());
+        }
+        Ok(bytes)
+    }
+
     pub fn install_plugin_zip(&self, archive: impl Read) -> Result<CatalogPlugin, Box<dyn Error>> {
         self.register_plugin_zip(archive, None, None, None)
     }
@@ -60,10 +89,7 @@ impl WorkspaceStore {
             return Err(invalid_package("Plugin package exceeds 16 MiB").into());
         }
 
-        let mut sha256 = String::with_capacity(64);
-        for byte in Sha256::digest(&bytes) {
-            write!(sha256, "{byte:02x}")?;
-        }
+        let sha256 = package_sha256(&bytes)?;
         if expected_sha256.is_some_and(|expected| !sha256.eq_ignore_ascii_case(expected)) {
             return Err(invalid_package(
                 "Plugin package SHA-256 does not match the expected digest",
@@ -78,6 +104,14 @@ impl WorkspaceStore {
         };
         self.register_plugin(&manifest, Some((&info, &bytes)), previous)
     }
+}
+
+fn package_sha256(bytes: &[u8]) -> Result<String, std::fmt::Error> {
+    let mut sha256 = String::with_capacity(64);
+    for byte in Sha256::digest(bytes) {
+        write!(sha256, "{byte:02x}")?;
+    }
+    Ok(sha256)
 }
 
 fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
