@@ -34,6 +34,10 @@
     "emptyHint": "Define uma data num vídeo concluído para o adicionar ao calendário."
   },
   "pluginActions": {
+    "recentJobs": "Tarefas recentes",
+    "jobsLoadError": "Não foi possível carregar as tarefas recentes dos plugins.",
+    "resumeJob": "Processar tarefa",
+    "jobState": {"queued": "Em fila", "running": "Em execução", "completed": "Concluída", "failed": "Falhou"},
     "title": "Ações de plugins",
     "loadError": "Não foi possível carregar as ações dos plugins.",
     "input": "Entrada JSON",

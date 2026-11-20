@@ -410,3 +410,85 @@ pub async fn invoke_reviewed_plugin_action(
     .await
     .map_err(|_| "plugin_action_failed")?
 }
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DesktopPluginActionRequest {
+    id: String,
+    workspace_id: Option<i64>,
+    plugin_id: String,
+    action_id: String,
+    package_sha256: String,
+    input_json: String,
+}
+
+#[tauri::command]
+pub async fn queue_plugin_action_job(
+    app: AppHandle,
+    request: DesktopPluginActionRequest,
+) -> Result<(), &'static str> {
+    if request.input_json.len() > arrumo_workspaces::MAX_PLUGIN_IO_BYTES {
+        return Err("plugin_action_input_invalid");
+    }
+    let request = arrumo_workspaces::PluginActionJobRequest {
+        id: request.id,
+        workspace_id: request.workspace_id,
+        plugin_id: request.plugin_id,
+        action_id: request.action_id,
+        package_sha256: request.package_sha256,
+        input: serde_json::from_str(&request.input_json)
+            .map_err(|_| "plugin_action_input_invalid")?,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        open_app_workspace_store(&app)?
+            .queue_plugin_action_job(&request)
+            .map(|_| ())
+            .map_err(|_| "plugin_action_queue_failed")
+    })
+    .await
+    .map_err(|_| "plugin_action_queue_failed")?
+}
+
+#[tauri::command]
+pub async fn list_plugin_action_jobs(
+    app: AppHandle,
+    workspace_id: Option<i64>,
+) -> Result<Vec<serde_json::Value>, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        open_app_workspace_store(&app)?
+            .list_plugin_action_jobs(workspace_id)
+            .map_err(|_| "plugin_action_job_list_failed")?
+            .into_iter()
+            .map(desktop_job)
+            .collect()
+    })
+    .await
+    .map_err(|_| "plugin_action_job_list_failed")?
+}
+
+#[tauri::command]
+pub async fn process_plugin_action_job(
+    app: AppHandle,
+    workspace_id: Option<i64>,
+    id: String,
+) -> Result<serde_json::Value, &'static str> {
+    let id = id.parse().map_err(|_| "plugin_action_job_invalid")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        open_app_workspace_store(&app)?
+            .process_plugin_action_job(workspace_id, id)
+            .map_err(|_| "plugin_action_job_failed")
+            .and_then(desktop_job)
+    })
+    .await
+    .map_err(|_| "plugin_action_job_failed")?
+}
+
+fn desktop_job(job: arrumo_workspaces::PluginActionJob) -> Result<serde_json::Value, &'static str> {
+    let mut value = serde_json::to_value(job).map_err(|_| "plugin_action_job_failed")?;
+    if matches!(value["state"].as_str(), Some("completed" | "failed")) {
+        let serialized = serde_json::to_string_pretty(&value["result"])
+            .map_err(|_| "plugin_action_job_failed")?;
+        value["result"] = serde_json::Value::String(serialized);
+    }
+    Ok(value)
+}

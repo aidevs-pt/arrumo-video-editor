@@ -10,13 +10,22 @@ struct JobScope {
     workspace_id: Option<i64>,
 }
 
-pub(super) fn definitions() -> [Value; 3] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ListScope {
+    workspace_id: Option<i64>,
+}
+
+pub(super) fn definitions() -> [Value; 4] {
     let key = json!({"type": "string", "format": "uuid"});
     let space = json!({"type": "integer", "minimum": 1});
     let scope = json!({"type": "object", "properties": {
         "id": key, "workspaceId": space,
     }, "required": ["id"], "additionalProperties": false});
     [
+        json!({"name": "list_plugin_action_jobs", "description": "List up to ten recent plugin jobs in one scope.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": space}, "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "queue_plugin_action_job",
             "description": "Persist a declared plugin action against a reviewed package digest. Reuse the same job UUID only for an identical request.",
             "inputSchema": {"type": "object", "properties": {
@@ -40,6 +49,14 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
+        "list_plugin_action_jobs" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid plugin action job scope")
+            .and_then(|scope: ListScope| {
+                store
+                    .list_plugin_action_jobs(scope.workspace_id)
+                    .map(|jobs| json!(jobs))
+                    .map_err(|_| "Could not list plugin jobs")
+            }),
         "queue_plugin_action_job" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid plugin action job request")
             .and_then(|request: PluginActionJobRequest| {

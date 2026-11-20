@@ -510,3 +510,9 @@ after its two-minute lease expires. MCP and A2A expose these as
 `process_plugin_action_job`. These jobs run declared Wasm actions in the
 existing sandbox. Job requests persist their input, so include only the data
 the action needs.
+
+The desktop **Plugin actions** panel records each run as a job and includes
+recent jobs in the selected scope. Open a queued or interrupted job and
+choose **Process job** to claim it when available. The CLI equivalent is
+`list-plugin-action-jobs <app|workspace-id>`; MCP and A2A expose
+`list_plugin_action_jobs`.

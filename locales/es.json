@@ -34,6 +34,10 @@
     "emptyHint": "Indica una fecha en un vídeo completado para añadirlo al calendario."
   },
   "pluginActions": {
+    "recentJobs": "Tareas recientes",
+    "jobsLoadError": "No se pudieron cargar las tareas recientes de los complementos.",
+    "resumeJob": "Procesar tarea",
+    "jobState": {"queued": "En cola", "running": "En curso", "completed": "Completada", "failed": "Fallida"},
     "title": "Acciones de complementos",
     "loadError": "No se pudieron cargar las acciones de complementos.",
     "input": "Entrada JSON",

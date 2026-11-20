@@ -106,21 +106,23 @@ impl WorkspaceStore {
             "SELECT id, workspace_id, plugin_id, action_id, package_sha256, state, attempt, result
              FROM plugin_action_jobs WHERE id = ?1 AND workspace_id IS ?2",
             params![id.to_string(), workspace_id],
-            |row| {
-                let result: Option<String> = row.get(7)?;
-                Ok(PluginActionJob {
-                    id: row.get(0)?,
-                    workspace_id: row.get(1)?,
-                    plugin_id: row.get(2)?,
-                    action_id: row.get(3)?,
-                    package_sha256: row.get(4)?,
-                    state: row.get(5)?,
-                    attempt: row.get(6)?,
-                    result: result.map(|value| serde_json::from_str(&value)
-                        .map_err(|_| rusqlite::Error::InvalidQuery)).transpose()?,
-                })
-            },
+            read_job,
         ).map_err(|_| job_error())
+    }
+
+    pub fn list_plugin_action_jobs(
+        &self,
+        workspace_id: Option<i64>,
+    ) -> io::Result<Vec<PluginActionJob>> {
+        let mut query = self.0.prepare(
+            "SELECT id, workspace_id, plugin_id, action_id, package_sha256, state, attempt, result
+             FROM plugin_action_jobs WHERE workspace_id IS ?1 ORDER BY created_at DESC, rowid DESC LIMIT 10",
+        ).map_err(|_| job_error())?;
+        query
+            .query_map([workspace_id], read_job)
+            .map_err(|_| job_error())?
+            .collect::<rusqlite::Result<_>>()
+            .map_err(|_| job_error())
     }
 
     pub fn process_plugin_action_job(
@@ -165,6 +167,22 @@ impl WorkspaceStore {
         }
         self.plugin_action_job(workspace_id, id)
     }
+}
+
+fn read_job(row: &rusqlite::Row<'_>) -> rusqlite::Result<PluginActionJob> {
+    let result: Option<String> = row.get(7)?;
+    Ok(PluginActionJob {
+        id: row.get(0)?,
+        workspace_id: row.get(1)?,
+        plugin_id: row.get(2)?,
+        action_id: row.get(3)?,
+        package_sha256: row.get(4)?,
+        state: row.get(5)?,
+        attempt: row.get(6)?,
+        result: result
+            .map(|value| serde_json::from_str(&value).map_err(|_| rusqlite::Error::InvalidQuery))
+            .transpose()?,
+    })
 }
 
 fn job_error() -> io::Error {

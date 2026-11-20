@@ -214,6 +214,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 WorkspaceStore::open(Path::new(database))?.queue_plugin_action_job(&request)?;
             println!("{}", serde_json::to_string(&job)?);
         }
+        [database, command, scope] if command == "list-plugin-action-jobs" => {
+            let jobs = WorkspaceStore::open(Path::new(database))?
+                .list_plugin_action_jobs(plugin_workspace(scope)?)?;
+            println!("{}", serde_json::to_string(&jobs)?);
+        }
         [database, command, scope, id]
             if command == "plugin-action-job" || command == "process-plugin-action-job" =>
         {
@@ -1339,7 +1344,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | speech-provider-status <workspace-id> <plugin-id> | synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file> (text on stdin) | ",
-                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | queue-plugin-action-job (JSON on stdin) | plugin-action-job <app|workspace-id> <job-id> | process-plugin-action-job <app|workspace-id> <job-id> | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
+                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | queue-plugin-action-job (JSON on stdin) | list-plugin-action-jobs <app|workspace-id> | plugin-action-job <app|workspace-id> <job-id> | process-plugin-action-job <app|workspace-id> <job-id> | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",

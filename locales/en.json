@@ -34,6 +34,10 @@
     "emptyHint": "Set a date on a completed output to add it to the calendar."
   },
   "pluginActions": {
+    "recentJobs": "Recent jobs",
+    "jobsLoadError": "Could not load recent plugin jobs.",
+    "resumeJob": "Process job",
+    "jobState": {"queued": "Queued", "running": "Running", "completed": "Completed", "failed": "Failed"},
     "title": "Plugin actions",
     "loadError": "Could not load plugin actions.",
     "input": "JSON input",
