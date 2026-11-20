@@ -35,7 +35,7 @@ impl SupplementalItemNotes {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SupplementalDecision {
     Approved,
@@ -123,27 +123,116 @@ impl WorkspaceStore {
     }
 }
 
+struct PreviousReview {
+    result_id: i64,
+    result: Value,
+    review: SupplementalReview,
+    notes: Option<String>,
+}
+
+fn previous_review(
+    connection: &rusqlite::Connection,
+    run_id: i64,
+    stage_index: i64,
+) -> rusqlite::Result<Option<PreviousReview>> {
+    connection
+        .query_row(
+            "SELECT id, result_json, supplemental_review_json, review_notes FROM (
+             SELECT id, result_json, supplemental_review_json, review_notes, decision
+             FROM production_results WHERE run_id = ?1 AND stage_index = ?2 ORDER BY id DESC LIMIT 1
+         ) WHERE supplemental_review_json IS NOT NULL AND decision = 'revise'",
+            params![run_id, stage_index],
+            |row| {
+                Ok(PreviousReview {
+                    result_id: row.get(0)?,
+                    result: read_settings(row.get(1)?, 1)?,
+                    review: read_settings::<Option<SupplementalReview>>(row.get(2)?, 2)?
+                        .ok_or(rusqlite::Error::InvalidQuery)?,
+                    notes: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+}
+
+#[derive(Debug, Serialize)]
+pub struct SupplementalRevisionRequest {
+    pub result_id: i64,
+    pub notes: Option<String>,
+    pub text: Vec<RequestedReplacement>,
+    pub media: Vec<RequestedReplacement>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RequestedReplacement {
+    pub index: usize,
+    pub decision: SupplementalDecision,
+    pub note: Option<String>,
+    pub previous: Value,
+}
+
+pub(crate) fn supplemental_revision_request(
+    connection: &rusqlite::Connection,
+    run_id: i64,
+    stage_index: i64,
+) -> rusqlite::Result<Option<SupplementalRevisionRequest>> {
+    let Some(previous) = previous_review(connection, run_id, stage_index)? else {
+        return Ok(None);
+    };
+    let replacements = |key,
+                        decisions: &[SupplementalDecision],
+                        notes: Option<&[Option<String>]>|
+     -> rusqlite::Result<Vec<RequestedReplacement>> {
+        let originals = items(&previous.result, key)?;
+        if decisions.len() != originals.len()
+            || notes.is_some_and(|notes| notes.len() != decisions.len())
+        {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(originals
+            .iter()
+            .zip(decisions)
+            .enumerate()
+            .filter(|(_, (_, decision))| **decision != SupplementalDecision::Approved)
+            .map(|(index, (entry, decision))| RequestedReplacement {
+                index,
+                decision: *decision,
+                note: notes.and_then(|notes| notes[index].clone()),
+                previous: entry.clone(),
+            })
+            .collect())
+    };
+    let notes = previous.review.item_notes.as_ref();
+    Ok(Some(SupplementalRevisionRequest {
+        result_id: previous.result_id,
+        notes: previous.notes,
+        text: replacements(
+            SECTIONS[0],
+            &previous.review.text,
+            notes.map(|notes| notes.text.as_slice()),
+        )?,
+        media: replacements(
+            SECTIONS[1],
+            &previous.review.media,
+            notes.map(|notes| notes.media.as_slice()),
+        )?,
+    }))
+}
+
 pub(crate) fn merge_supplemental_revisions(
     tx: &Transaction<'_>,
     run_id: i64,
     stage_index: i64,
     replacement: &Value,
 ) -> rusqlite::Result<Option<Value>> {
-    let previous: Option<(Value, String)> = tx
-        .query_row(
-            "SELECT result_json, supplemental_review_json FROM (
-             SELECT result_json, supplemental_review_json FROM production_results
-             WHERE run_id = ?1 AND stage_index = ?2 ORDER BY id DESC LIMIT 1
-         ) WHERE supplemental_review_json IS NOT NULL",
-            params![run_id, stage_index],
-            |row| Ok((read_settings(row.get(0)?, 0)?, row.get(1)?)),
-        )
-        .optional()?;
-    let Some((previous, review)) = previous else {
+    let Some(PreviousReview {
+        result: previous,
+        review,
+        ..
+    }) = previous_review(tx, run_id, stage_index)?
+    else {
         return Ok(None);
     };
-    let review: SupplementalReview =
-        serde_json::from_str(&review).map_err(|_| rusqlite::Error::InvalidQuery)?;
     let mut merged = replacement.clone();
     for (key, decisions) in review.sections() {
         let originals = items(&previous, key)?;

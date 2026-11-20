@@ -102,7 +102,10 @@ pub use profile_formats::{DimensionOverrides, ProfileFormat};
 pub use provider_preferences::{CapabilityProvider, ProviderPreferences};
 pub use subtitle_revisions::{SubtitleRevision, read_subtitle_file};
 pub use supplemental_delivery::{SupplementalMedia, SupplementalText};
-pub use supplemental_review::{SupplementalDecision, SupplementalItemNotes, SupplementalReview};
+pub use supplemental_review::{
+    RequestedReplacement, SupplementalDecision, SupplementalItemNotes, SupplementalReview,
+    SupplementalRevisionRequest,
+};
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;

@@ -439,3 +439,5 @@ MCP and A2A support `review_supplemental_items` with `workspaceId`, `runId`, `re
 Check individual outputs to apply a batch decision only to the selected rows. After a partial revision, prior approvals fill in automatically and the replacement items need a new decision. Review choices stay editable until Send.
 
 A supplemental review may include `review.item_notes` with `text` and `media` arrays aligned with the decision arrays. Use `null` for an item without a note. Each note has a 4 KiB UTF-8 limit. The desktop note buttons stage feedback on the corresponding row until Send. Workers receive the notes with the saved review in production progress.
+
+When a worker claims a Supplemental Outputs stage after a selective review, the claim includes `supplemental_revision`. This carries the source result ID, shared notes, and separate `text` and `media` arrays of unresolved items. Each item has its zero-based slot index, decision, optional note, and previous submitted value. Submit one replacement per listed item in array order. The same request survives lease expiry and takeover. Other claims omit this field.

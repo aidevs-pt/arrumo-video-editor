@@ -4,7 +4,10 @@ use serde_json::Value;
 
 use crate::format_deliveries::read_settings;
 use crate::generation_queue::read_run;
-use crate::{GenerationPlan, GenerationRun, PlanStep, WorkspaceStore};
+use crate::{
+    GenerationPlan, GenerationRun, PlanStep, ProductionStage, SupplementalRevisionRequest,
+    WorkspaceStore,
+};
 
 pub(crate) const LEASE_SECONDS: i64 = 60;
 
@@ -15,6 +18,8 @@ pub struct GenerationClaim {
     pub lease_until: i64,
     pub checkpoint: Option<Value>,
     pub current_step: Option<PlanStep>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supplemental_revision: Option<SupplementalRevisionRequest>,
 }
 
 #[derive(Debug, Serialize)]
@@ -37,7 +42,8 @@ pub enum RunControl {
 
 impl WorkspaceStore {
     pub fn claim_generation(&self, workspace_id: i64) -> rusqlite::Result<Option<GenerationClaim>> {
-        self.0
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let claimed = tx
             .query_row(
                 "UPDATE generation_runs
              SET state = 'running', attempt = attempt + 1, lease_until = unixepoch() + ?2
@@ -50,17 +56,36 @@ impl WorkspaceStore {
                 params![workspace_id, LEASE_SECONDS],
                 |row| {
                     let plan: Option<GenerationPlan> = read_settings(row.get("plan_json")?, 9)?;
-                    let index = row.get::<_, u32>("stage_index")? as usize;
-                    Ok(GenerationClaim {
+                    let index = row.get::<_, u32>("stage_index")?;
+                    Ok((GenerationClaim {
                         run: read_run(row)?,
                         attempt: row.get(5)?,
                         lease_until: row.get(6)?,
                         checkpoint: read_settings(row.get(7)?, 7)?,
-                        current_step: plan.and_then(|plan| plan.steps.into_iter().nth(index)),
-                    })
+                        current_step: plan.and_then(|plan| plan.steps.into_iter().nth(index as usize)),
+                        supplemental_revision: None,
+                    }, i64::from(index)))
                 },
             )
-            .optional()
+            .optional()?;
+        let mut result = None;
+        if let Some((mut claim, stage_index)) = claimed {
+            if claim
+                .current_step
+                .as_ref()
+                .is_some_and(|step| step.stage == ProductionStage::SupplementalOutputs)
+            {
+                claim.supplemental_revision =
+                    crate::supplemental_review::supplemental_revision_request(
+                        &tx,
+                        claim.run.id,
+                        stage_index,
+                    )?;
+            }
+            result = Some(claim);
+        }
+        tx.commit()?;
+        Ok(result)
     }
 
     pub fn renew_generation_lease(

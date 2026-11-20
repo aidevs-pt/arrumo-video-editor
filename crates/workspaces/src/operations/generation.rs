@@ -324,7 +324,7 @@ pub(super) fn definitions() -> [Value; 32] {
             }, "required": ["workspaceId", "runId", "attempt", "detail"], "additionalProperties": false}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
-        json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, and current step.",
+        json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, current step, and any pending supplemental replacements.",
             "inputSchema": workspace}),
         json!({"name": "checkpoint_generation", "description": "Save progress and renew the lease for the current attempt.",
             "inputSchema": {"type": "object", "properties": {
