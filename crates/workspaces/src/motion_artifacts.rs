@@ -2,6 +2,7 @@ use std::{
     error::Error,
     fs, io,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
@@ -96,18 +97,28 @@ impl WorkspaceStore {
         )?;
         let mut copied = Vec::new();
         let result = (|| -> Result<i64, Box<dyn Error + Send + Sync>> {
-            let mut import = |source: &Path| -> Result<i64, Box<dyn Error + Send + Sync>> {
-                if !source.is_absolute() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Motion artifact paths must be absolute",
-                    )
-                    .into());
-                }
-                let asset = copy_asset_in(&tx, &root, workspace_id, source, false, None)?;
-                copied.push(asset_path(&root, workspace_id, asset.id));
-                Ok(asset.id)
-            };
+            let mut import =
+                |source: &Path, kind: &str| -> Result<i64, Box<dyn Error + Send + Sync>> {
+                    if !source.is_absolute() {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Motion artifact paths must be absolute",
+                        )
+                        .into());
+                    }
+                    let asset = copy_asset_in(&tx, &root, workspace_id, source, false, None)?;
+                    let path = asset_path(&root, workspace_id, asset.id);
+                    copied.push(path.clone());
+                    if asset.kind != kind {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Unexpected motion media kind",
+                        )
+                        .into());
+                    }
+                    validate_motion_file(&path, &asset.name, kind)?;
+                    Ok(asset.id)
+                };
             let mut items = Vec::new();
             for artifact in artifacts {
                 items.push(MotionLibrarySettings {
@@ -115,13 +126,17 @@ impl WorkspaceStore {
                     title: artifact.title.clone(),
                     usage_markdown: artifact.usage_markdown.clone(),
                     profile_id: artifact.profile_id,
-                    preview_asset_id: import(&artifact.preview)?,
+                    preview_asset_id: import(&artifact.preview, "video")?,
                     thumbnail_asset_id: artifact
                         .thumbnail
                         .as_deref()
-                        .map(&mut import)
+                        .map(|path| import(path, "image"))
                         .transpose()?,
-                    sound_asset_id: artifact.sound.as_deref().map(&mut import).transpose()?,
+                    sound_asset_id: artifact
+                        .sound
+                        .as_deref()
+                        .map(|path| import(path, "audio"))
+                        .transpose()?,
                 });
             }
             Ok(self.record_production_result(
@@ -147,4 +162,66 @@ impl WorkspaceStore {
             }
         }
     }
+}
+
+fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::Result<()> {
+    let extension = Path::new(name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let demuxer = match extension.as_str() {
+        "mp4" | "mov" | "m4a" | "avif" => "mov",
+        "webm" | "mkv" => "matroska",
+        "avi" => "avi",
+        "png" => "png_pipe",
+        "jpg" | "jpeg" => "jpeg_pipe",
+        "webp" => "webp_pipe",
+        "gif" => "gif",
+        "mp3" => "mp3",
+        "wav" => "wav",
+        "flac" => "flac",
+        "aac" => "aac",
+        "ogg" => "ogg",
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported motion media format",
+            ));
+        }
+    };
+    let selector = if kind == "audio" { "a:0" } else { "V:0" };
+    let output = Command::new("ffprobe")
+        .args([
+            "-v",
+            "error",
+            "-protocol_whitelist",
+            "file",
+            "-f",
+            demuxer,
+            "-select_streams",
+            selector,
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            "-i",
+        ])
+        .arg(path)
+        .output()?;
+    let expected = if kind == "audio" {
+        b"audio".as_slice()
+    } else {
+        b"video".as_slice()
+    };
+    if !output.status.success()
+        || !output.stderr.is_empty()
+        || output.stdout.trim_ascii() != expected
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Motion media could not be probed",
+        ));
+    }
+    Ok(())
 }

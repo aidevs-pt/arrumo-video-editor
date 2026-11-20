@@ -399,3 +399,5 @@ A local renderer worker can submit finished files with `submit-motion-artifacts 
 MCP and A2A expose `submit_motion_artifacts` with `workspaceId`, `runId`, `attempt`, and `artifacts`. Each artifact uses the CLI's field names and absolute paths on the machine running Arrumo. The response includes `resultId`.
 
 On a queued desktop run at the Assets stage, use **Submit motion files** to add one finished animation or transition with its video preview and optional thumbnail and sound. Submitting completes the stage or sends it to guided review, according to the run options.
+
+Motion artifact submission requires `ffprobe`. The host probes each managed copy with the demuxer for its extension and checks for the expected video or audio stream before publishing the batch.
