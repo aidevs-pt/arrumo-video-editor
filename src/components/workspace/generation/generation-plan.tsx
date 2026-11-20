@@ -23,12 +23,13 @@ import { RunMotionResults, type MotionStageResult } from "../motion-library/run-
 import { MotionRendererAction } from "./motion-renderer-action";
 import { MotionArtifactAction } from "./motion-artifact-action";
 import { SupplementalReview } from "./supplemental-review";
+import type { AutomaticSubtitles } from "./delivery-subtitles";
 import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
 type StageResult = MotionStageResult & { supplemental_review?: SupplementalReview; preview_review?: PreviewChoice[] };
-type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
+type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[]; automatic_subtitles?: AutomaticSubtitles };
 type Decision = "approved" | "revise" | "rejected";
 type PreviewChoice = { format_id: number; decision: Decision; note?: string };
 type SupplementalChoices<T = Decision> = { text: T[]; media: T[] };
@@ -199,7 +200,8 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                 <CardHeader><CardTitle>{copy[mediaStage]}</CardTitle></CardHeader>
                 <CardContent>
                   <MediaStageAction key={mediaStage} workspaceId={workspaceId} runId={runId} stage={mediaStage}
-                    available={runState === "queued"} canImportSubtitles={runState === "queued" || runState === "failed"} formats={formats} />
+                    available={runState === "queued"} canImportSubtitles={runState === "queued" || runState === "failed"} formats={formats}
+                    automaticSubtitles={progress?.automatic_subtitles} />
                 </CardContent>
               </Card>
             )}

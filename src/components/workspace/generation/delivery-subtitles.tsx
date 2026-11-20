@@ -4,12 +4,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/locale-provider";
 
+export type AutomaticSubtitles = Record<number, "started" | "failed" | "completed">;
+
+const automaticStatus = {
+  started: "automaticSubtitlesStarted",
+  failed: "automaticSubtitlesFailed",
+  completed: "automaticSubtitlesCompleted",
+} as const;
+
 export type DeliveryFormat = { id: number; name: string };
 
-export function DeliverySubtitles({ workspaceId, runId, formats, disabled, onBusy }: {
+export function DeliverySubtitles({ workspaceId, runId, formats, automatic, disabled, onBusy }: {
   workspaceId: number;
   runId: number;
   formats: DeliveryFormat[];
+  automatic?: AutomaticSubtitles;
   disabled: boolean;
   onBusy: (busy: boolean) => void;
 }) {
@@ -59,7 +68,7 @@ export function DeliverySubtitles({ workspaceId, runId, formats, disabled, onBus
                 aria-label={`${copy.importSubtitles} · ${format.name}`}
                 onClick={() => void updateSubtitles(format.id, "import")}>{copy.importSubtitles}</Button>
               <span role="status" className="text-sm text-muted-foreground">
-                {saved[format.id] && copy[saved[format.id]]}
+                {saved[format.id] ? copy[saved[format.id]] : automatic?.[format.id] && copy[automaticStatus[automatic[format.id]]]}
               </span>
             </div>
             {error?.formatId === format.id && <Alert variant="destructive"><AlertDescription>{copy[error.key]}</AlertDescription></Alert>}

@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/locale-provider";
 
-import { DeliverySubtitles, type DeliveryFormat } from "./delivery-subtitles";
+import { DeliverySubtitles, type AutomaticSubtitles, type DeliveryFormat } from "./delivery-subtitles";
 
 export type MediaStage = "preview" | "final_render" | "verify_delivery";
 
@@ -14,13 +14,14 @@ const labels = {
   verify_delivery: "verifyFiles",
 } as const;
 
-export function MediaStageAction({ workspaceId, runId, stage, available, canImportSubtitles, formats }: {
+export function MediaStageAction({ workspaceId, runId, stage, available, canImportSubtitles, formats, automaticSubtitles }: {
   workspaceId: number;
   runId: number;
   stage: MediaStage;
   available: boolean;
   canImportSubtitles: boolean;
   formats: DeliveryFormat[];
+  automaticSubtitles?: AutomaticSubtitles;
 }) {
   const { messages: { productionPlan: copy } } = useLocale();
   const [importing, setImporting] = useState(false);
@@ -44,7 +45,7 @@ export function MediaStageAction({ workspaceId, runId, stage, available, canImpo
   return (
     <div className="mt-3 flex flex-col items-start gap-2">
       {stage === "verify_delivery" && (
-        <DeliverySubtitles workspaceId={workspaceId} runId={runId} formats={formats}
+        <DeliverySubtitles workspaceId={workspaceId} runId={runId} formats={formats} automatic={automaticSubtitles}
           disabled={pending || importing || !canImportSubtitles} onBusy={setImporting} />
       )}
       <Button type="button" size="sm" variant="outline" disabled={pending || importing || !available}

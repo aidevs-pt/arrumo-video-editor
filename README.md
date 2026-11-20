@@ -170,7 +170,10 @@ or A2A, set
 `generate_delivery_subtitles: true` in its run options. While the desktop is
 open, it attempts transcription once per rendered format missing an SRT.
 An interrupted or failed automatic attempt requires an explicit retry via
-**Generate subtitles**, or you can import an SRT. Existing SRTs are kept.
+**Generate subtitles**, or you can import an SRT. Existing SRTs are kept. The
+desktop delivery step shows the last automatic attempt for each format. The
+shared production progress response exposes the same states in
+`automatic_subtitles`, keyed by format ID.
 
 Delivery verification requires `ffprobe` on PATH. At the `verify_delivery` stage, place each configured format's final files under `<database>.deliveries/<workspace-id>/<run-id>/`, named `<format-id>.mp4` and `<format-id>.srt`. Run `verify-delivery <workspace-id> <run-id> <attempt>` to check each video’s dimensions and duration and its subtitle cues. A successful verification records metadata and completes the run while the lease is still active. While the desktop is open, it automatically verifies eligible runs once every captured output format has a managed MP4 and SRT. Runs with missing files stay queued so you can import the remaining subtitles.
 

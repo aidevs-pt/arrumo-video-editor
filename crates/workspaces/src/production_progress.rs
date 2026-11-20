@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rusqlite::{Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -28,6 +30,7 @@ pub struct ProductionProgress {
     pub stage_index: usize,
     pub pending_review_id: Option<i64>,
     pub results: Vec<ProductionResult>,
+    pub automatic_subtitles: BTreeMap<i64, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -366,11 +369,16 @@ impl WorkspaceStore {
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let automatic_subtitles = tx
+            .prepare("SELECT format_id, state FROM automatic_delivery_subtitles WHERE run_id = ?1")?
+            .query_map([run_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
         tx.commit()?;
         Ok(ProductionProgress {
             stage_index,
             pending_review_id,
             results,
+            automatic_subtitles,
         })
     }
 }
