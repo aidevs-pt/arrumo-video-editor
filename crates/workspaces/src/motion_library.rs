@@ -1,4 +1,4 @@
-use rusqlite::{Row, params};
+use rusqlite::{Row, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 
 use crate::WorkspaceStore;
@@ -81,7 +81,8 @@ impl WorkspaceStore {
         item_id: i64,
         settings: &MotionLibrarySettings,
     ) -> rusqlite::Result<MotionLibraryItem> {
-        self.0.query_row(
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let item = tx.query_row(
             &format!(
                 "UPDATE motion_library
                  SET profile_id = ?2, kind = ?3, title = ?4, usage_markdown = ?5,
@@ -102,7 +103,14 @@ impl WorkspaceStore {
                 item_id,
             ],
             read_item,
-        )
+        )?;
+        tx.execute(
+            "DELETE FROM motion_profile_shares
+             WHERE workspace_id = ?1 AND item_id = ?2 AND (?3 IS NULL OR profile_id = ?3)",
+            params![workspace_id, item_id, settings.profile_id],
+        )?;
+        tx.commit()?;
+        Ok(item)
     }
 
     pub fn duplicate_motion_library_item(
@@ -111,7 +119,8 @@ impl WorkspaceStore {
         item_id: i64,
         title: &str,
     ) -> rusqlite::Result<MotionLibraryItem> {
-        self.0.query_row(
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let item = tx.query_row(
             "INSERT INTO motion_library
                 (workspace_id, profile_id, kind, title, usage_markdown,
                  preview_asset_id, thumbnail_asset_id, sound_asset_id)
@@ -122,7 +131,15 @@ impl WorkspaceStore {
                        preview_asset_id, thumbnail_asset_id, sound_asset_id",
             params![workspace_id, item_id, title.trim()],
             read_item,
-        )
+        )?;
+        tx.execute(
+            "INSERT INTO motion_profile_shares (workspace_id, item_id, profile_id)
+             SELECT workspace_id, ?3, profile_id FROM motion_profile_shares
+             WHERE workspace_id = ?1 AND item_id = ?2",
+            params![workspace_id, item_id, item.id],
+        )?;
+        tx.commit()?;
+        Ok(item)
     }
 
     pub fn delete_motion_library_item(
@@ -137,6 +154,57 @@ impl WorkspaceStore {
                 params![workspace_id, item_id, confirmed_title],
             )
             .map(|count| count != 0)
+    }
+
+    pub fn motion_library_shares(
+        &self,
+        workspace_id: i64,
+        item_id: i64,
+    ) -> rusqlite::Result<Vec<i64>> {
+        self.0.query_row(
+            "SELECT id FROM motion_library WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, item_id],
+            |_| Ok(()),
+        )?;
+        self.0
+            .prepare(
+                "SELECT profile_id FROM motion_profile_shares
+             WHERE workspace_id = ?1 AND item_id = ?2 ORDER BY profile_id",
+            )?
+            .query_map(params![workspace_id, item_id], |row| row.get(0))?
+            .collect()
+    }
+
+    pub fn set_motion_library_shares(
+        &self,
+        workspace_id: i64,
+        item_id: i64,
+        profile_ids: &[i64],
+    ) -> rusqlite::Result<()> {
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let owner: Option<i64> = tx.query_row(
+            "SELECT profile_id FROM motion_library WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, item_id],
+            |row| row.get(0),
+        )?;
+        if owner.is_none() && !profile_ids.is_empty() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        tx.execute(
+            "DELETE FROM motion_profile_shares WHERE workspace_id = ?1 AND item_id = ?2",
+            params![workspace_id, item_id],
+        )?;
+        for &profile_id in profile_ids {
+            if Some(profile_id) == owner {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            tx.execute(
+                "INSERT INTO motion_profile_shares (workspace_id, item_id, profile_id)
+                 VALUES (?1, ?2, ?3)",
+                params![workspace_id, item_id, profile_id],
+            )?;
+        }
+        tx.commit()
     }
 
     pub fn list_motion_library(
@@ -155,8 +223,10 @@ impl WorkspaceStore {
             .prepare(
                 "SELECT id, workspace_id, profile_id, kind, title, usage_markdown,
                     preview_asset_id, thumbnail_asset_id, sound_asset_id
-             FROM motion_library
-             WHERE workspace_id = ?1 AND (profile_id IS NULL OR profile_id = ?2)
+             FROM motion_library AS item
+             WHERE workspace_id = ?1 AND (profile_id IS NULL OR profile_id = ?2
+                 OR EXISTS (SELECT 1 FROM motion_profile_shares AS share
+                            WHERE share.workspace_id = ?1 AND share.item_id = item.id AND share.profile_id = ?2))
              ORDER BY id",
             )?
             .query_map(params![workspace_id, profile_id], read_item)?

@@ -503,6 +503,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{deleted}");
         }
+        [database, command, workspace, item] if command == "motion-item-shares" => {
+            let shares = WorkspaceStore::open(Path::new(database))?
+                .motion_library_shares(utf8(workspace)?.parse()?, utf8(item)?.parse()?)?;
+            println!("{}", serde_json::to_string(&shares)?);
+        }
+        [database, command, workspace, item, profiles] if command == "set-motion-item-shares" => {
+            WorkspaceStore::open(Path::new(database))?.set_motion_library_shares(
+                utf8(workspace)?.parse()?,
+                utf8(item)?.parse()?,
+                &serde_json::from_str::<Vec<i64>>(utf8(profiles)?)?,
+            )?;
+        }
         [database, command, workspace] if command == "assets" => {
             let assets = WorkspaceStore::open(Path::new(database))?
                 .list_assets(utf8(workspace)?.parse()?)?;
