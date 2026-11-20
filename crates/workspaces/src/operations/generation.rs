@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 use crate::{
     DraftSettings, GenerationRun, ProductionStage, ReplayMode, ReviewDecision, RunControl,
-    RunOptions, WorkspaceStore,
+    RunOptions, SupplementalReview, WorkspaceStore,
 };
 
 #[derive(Deserialize)]
@@ -49,6 +49,17 @@ struct ReviewInput {
     #[serde(default)]
     notes: String,
     save_motion_indexes: Option<Vec<usize>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SupplementalReviewInput {
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    review: SupplementalReview,
+    #[serde(default)]
+    notes: String,
 }
 
 #[derive(Deserialize)]
@@ -196,7 +207,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 31] {
+pub(super) fn definitions() -> [Value; 32] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -324,6 +335,15 @@ pub(super) fn definitions() -> [Value; 31] {
                 "workspaceId": id, "runId": id, "attempt": id,
                 "stage": {"enum": ["script", "assets", "preview", "supplemental_outputs", "final_render"]}, "result": {"type": "object"}
             }, "required": ["workspaceId", "runId", "attempt", "stage", "result"], "additionalProperties": false}}),
+        json!({"name": "review_supplemental_items",
+            "description": "Submit one decision per item in the pending supplemental result. Arrays follow submission order. Only unresolved items need replacement.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "resultId": id, "notes": {"type": "string"},
+                "review": {"type": "object", "properties": {
+                    "text": {"type": "array", "maxItems": 100, "items": {"enum": ["approved", "revise", "rejected"]}},
+                    "media": {"type": "array", "maxItems": 100, "items": {"enum": ["approved", "revise", "rejected"]}}
+                }, "required": ["text", "media"], "additionalProperties": false}
+            }, "required": ["workspaceId", "runId", "resultId", "review"], "additionalProperties": false}}),
         json!({"name": "review_production_result", "description": "Submit an explicit approval, rejection, or revision request for a pending result.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "resultId": id,
@@ -552,6 +572,11 @@ pub(super) fn call(
                 .map_err(
                     |_| "Could not submit result. Check the workspace, current lease and stage",
                 )
+        }),
+        "review_supplemental_items" => parse(arguments).and_then(|args: SupplementalReviewInput| {
+            store.review_supplemental_items(args.workspace_id, args.run_id, args.result_id, &args.review, &args.notes)
+                .map(|()| json!({"submitted": true}))
+                .map_err(|_| "Could not review supplemental items. Check the pending result and provide a decision for each item")
         }),
         "review_production_result" => parse(arguments).and_then(|args: ReviewInput| {
             store

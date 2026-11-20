@@ -329,7 +329,10 @@ fn review_task(
     if context_id.is_some_and(|id| id != format!("workspace-{workspace_id}")) {
         return Err((-32602, "Context does not match task"));
     }
-    if data.operation != "review_production_result" {
+    if !matches!(
+        data.operation.as_str(),
+        "review_production_result" | "review_supplemental_items"
+    ) {
         return Err((-32004, "Task messages support review decisions"));
     }
     for (key, value) in [("workspaceId", workspace_id), ("runId", run_id)] {
