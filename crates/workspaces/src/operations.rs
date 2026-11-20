@@ -11,6 +11,7 @@ mod motion;
 mod providers;
 mod settings;
 mod setup;
+mod subtitles;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -60,6 +61,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     tools.extend(setup::definitions());
     tools.extend(providers::definitions());
     tools.extend(settings::definitions());
+    tools.extend(subtitles::definitions());
     tools
 }
 
@@ -99,6 +101,7 @@ pub(crate) fn invoke(
             .or_else(|| setup::call(store, name, &arguments))
             .or_else(|| providers::call(store, name, &arguments))
             .or_else(|| settings::call(store, name, &arguments))
+            .or_else(|| subtitles::call(store, database, name, &arguments))
             .or_else(|| generation::call(store, database, name, arguments))?,
     })
 }
