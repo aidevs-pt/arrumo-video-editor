@@ -1,7 +1,7 @@
 use std::{
     env,
     error::Error,
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     fs::File,
     io::{self, IsTerminal, Read},
     path::Path,
@@ -37,6 +37,44 @@ fn read_plugin_invocation_input() -> Result<serde_json::Value, Box<dyn Error>> {
     serde_json::from_slice(&input).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "Expected JSON plugin input").into()
     })
+}
+
+fn run_motion_worker(
+    bytes: &[u8],
+    digest: &str,
+    worker: &OsStr,
+    output: &OsStr,
+    toolchain: &[OsString],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    if !cfg!(target_os = "linux") {
+        return Err(io::Error::other("The local motion renderer worker requires Linux").into());
+    }
+    let worker = Path::new(worker).canonicalize()?;
+    if !worker.is_file() {
+        return Err(io::Error::other("The SDK worker must be a regular script file").into());
+    }
+    let job = tempfile::tempdir()?;
+    let package = job.path().join("renderer.zip");
+    std::fs::write(&package, bytes)?;
+    let mut runner = std::process::Command::new("python3");
+    runner
+        .args(["-E", "-B"])
+        .arg(worker)
+        .arg(package)
+        .arg("--sha256")
+        .arg(digest.to_ascii_lowercase())
+        .arg("--output")
+        .arg(output)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit());
+    if let Some(path) = toolchain.first() {
+        runner.arg("--toolchain").arg(path);
+    }
+    let result = runner.output()?;
+    if !result.status.success() {
+        return Err(io::Error::other("The SDK renderer worker failed").into());
+    }
+    Ok(result.stdout)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -301,39 +339,46 @@ fn main() -> Result<(), Box<dyn Error>> {
             output,
             toolchain @ ..,
         ] if command == "run-installed-motion-renderer" && toolchain.len() <= 1 => {
-            if !cfg!(target_os = "linux") {
-                return Err(
-                    io::Error::other("The local motion renderer worker requires Linux").into(),
-                );
-            }
             let digest = utf8(digest)?;
             let bytes = WorkspaceStore::open(Path::new(database))?
                 .reviewed_motion_renderer_package(utf8(id)?, digest)?;
-            let worker = Path::new(worker).canonicalize()?;
-            if !worker.is_file() {
-                return Err(
-                    io::Error::other("The SDK worker must be a regular script file").into(),
-                );
+            use std::io::Write;
+            io::stdout().write_all(&run_motion_worker(
+                &bytes, digest, worker, output, toolchain,
+            )?)?;
+        }
+        [
+            database,
+            command,
+            workspace,
+            run,
+            id,
+            digest,
+            worker,
+            output,
+            toolchain @ ..,
+        ] if command == "render-run-motion" && toolchain.len() <= 1 => {
+            let database = Path::new(database);
+            let workspace_id = utf8(workspace)?.parse()?;
+            let run_id = utf8(run)?.parse()?;
+            let id = utf8(id)?;
+            let digest = utf8(digest)?;
+            let store = WorkspaceStore::open(database)?;
+            if !store.motion_stage_is_queued(workspace_id, run_id)? {
+                return Err(io::Error::other("The selected run has no queued Assets stage").into());
             }
-            let job = tempfile::tempdir()?;
-            let package = job.path().join("renderer.zip");
-            std::fs::write(&package, bytes)?;
-            let mut runner = std::process::Command::new("python3");
-            runner
-                .args(["-E", "-B"])
-                .arg(worker)
-                .arg(package)
-                .arg("--sha256")
-                .arg(digest.to_ascii_lowercase())
-                .arg("--output")
-                .arg(output)
-                .stdin(std::process::Stdio::null());
-            if let Some(path) = toolchain.first() {
-                runner.arg("--toolchain").arg(path);
-            }
-            if !runner.status()?.success() {
-                return Err(io::Error::other("The SDK renderer worker failed").into());
-            }
+            let bytes = store.reviewed_motion_renderer_package(id, digest)?;
+            let result = run_motion_worker(&bytes, digest, worker, output, toolchain)?;
+            let artifacts: Vec<arrumo_workspaces::MotionArtifact> =
+                serde_json::from_slice(&result)?;
+            store.reviewed_motion_renderer_package(id, digest)?;
+            let result_id = store
+                .publish_queued_motion_artifacts(database, workspace_id, run_id, &artifacts)
+                .map_err(io::Error::other)?
+                .ok_or_else(|| {
+                    io::Error::other("The run changed while the renderer was working")
+                })?;
+            println!("{result_id}");
         }
         [database, command, id] if command == "remove-plugin-manifest" => {
             let removed = WorkspaceStore::open(Path::new(database))?
@@ -1080,7 +1125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json> | submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",

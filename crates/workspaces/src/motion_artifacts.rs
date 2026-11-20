@@ -29,6 +29,16 @@ pub struct MotionArtifact {
 }
 
 impl WorkspaceStore {
+    pub fn motion_stage_is_queued(&self, workspace_id: i64, run_id: i64) -> rusqlite::Result<bool> {
+        self.0.query_row(
+            "SELECT EXISTS (SELECT 1 FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2 AND state = 'queued'
+               AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'assets')",
+            params![workspace_id, run_id],
+            |row| row.get(0),
+        )
+    }
+
     pub fn publish_queued_motion_artifacts(
         &self,
         database: &Path,
