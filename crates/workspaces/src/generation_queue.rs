@@ -45,6 +45,16 @@ pub struct GenerationRun {
     pub snapshot: Value,
     pub pending_review_id: Option<i64>,
     pub display_title: Option<String>,
+    /// Present in run listings so overviews can show where each run is without loading its plan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress: Option<RunProgress>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub struct RunProgress {
+    pub stage_index: i64,
+    pub stage_count: i64,
+    pub stage: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -292,10 +302,25 @@ impl WorkspaceStore {
     pub fn list_generation_runs(&self, workspace_id: i64) -> rusqlite::Result<Vec<GenerationRun>> {
         self.0
             .prepare(
-                "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title FROM generation_runs
-             WHERE workspace_id = ?1 ORDER BY id",
+                "SELECT id, draft_id, state, snapshot_json, pending_review_id, display_title, stage_index,
+                    json_array_length(plan_json, '$.steps'),
+                    json_extract(plan_json, '$.steps[' || stage_index || '].stage')
+             FROM generation_runs WHERE workspace_id = ?1 ORDER BY id",
             )?
-            .query_map([workspace_id], read_run)?
+            .query_map([workspace_id], |row| {
+                let mut run = read_run(row)?;
+                run.progress = row
+                    .get::<_, Option<i64>>(7)?
+                    .map(|stage_count| -> rusqlite::Result<_> {
+                        Ok(RunProgress {
+                            stage_index: row.get(6)?,
+                            stage_count,
+                            stage: row.get(8)?,
+                        })
+                    })
+                    .transpose()?;
+                Ok(run)
+            })?
             .collect()
     }
 }
@@ -308,6 +333,7 @@ pub(crate) fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
         snapshot: read_settings(row.get(3)?, 3)?,
         pending_review_id: row.get(4)?,
         display_title: row.get("display_title")?,
+        progress: None,
     })
 }
 
@@ -417,7 +443,17 @@ mod tests {
                 )
                 .is_err()
         );
-        assert_eq!(store.list_generation_runs(studio).unwrap(), [run]);
+        let mut listed = store.list_generation_runs(studio).unwrap();
+        let steps = store.generation_plan(studio, run.id).unwrap().unwrap().steps.len() as i64;
+        assert_eq!(
+            listed[0].progress.take(),
+            Some(RunProgress {
+                stage_index: 0,
+                stage_count: steps,
+                stage: Some("script".into())
+            })
+        );
+        assert_eq!(listed, [run]);
         assert!(store.list_generation_runs(other).unwrap().is_empty());
         let revised = store
             .enqueue_video_draft(studio, draft.id, "with-override", &options)
