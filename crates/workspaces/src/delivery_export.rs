@@ -8,7 +8,7 @@ use std::{
 use tempfile::NamedTempFile;
 use zip::{ZipWriter, write::SimpleFileOptions};
 
-use crate::{WorkspaceStore, delivery_directory};
+use crate::{WorkspaceStore, asset_path, asset_root, delivery_directory};
 
 impl WorkspaceStore {
     pub fn export_generation_delivery(
@@ -40,6 +40,7 @@ impl WorkspaceStore {
             })
             .collect::<rusqlite::Result<Vec<_>>>()?;
         let supplemental = self.completed_supplemental_text(workspace_id, run_id)?;
+        let media = self.completed_supplemental_media(workspace_id, run_id)?;
         snapshot.commit()?;
 
         let source_dir = delivery_directory(database, workspace_id, run_id);
@@ -82,6 +83,27 @@ impl WorkspaceStore {
         for (index, entry) in supplemental.iter().enumerate() {
             archive.start_file(entry.filename(index), SimpleFileOptions::default())?;
             archive.write_all(entry.text.as_bytes())?;
+        }
+        if !media.is_empty() {
+            let root = asset_root(&database.canonicalize()?);
+            for (index, entry) in media.iter().enumerate() {
+                let source = asset_path(&root, workspace_id, entry.asset_id);
+                let metadata = source.symlink_metadata()?;
+                if !metadata.is_file()
+                    || source.canonicalize()? != source
+                    || metadata.len() != u64::try_from(entry.byte_size)?
+                {
+                    return Err(io::Error::other("Supplemental media is unavailable").into());
+                }
+                let mut file = File::open(source)?;
+                archive.start_file(
+                    entry.filename(index),
+                    SimpleFileOptions::default().large_file(metadata.len() >= u32::MAX.into()),
+                )?;
+                if io::copy(&mut file, &mut archive)? != metadata.len() {
+                    return Err(io::Error::other("Supplemental media changed during export").into());
+                }
+            }
         }
         archive.finish()?.sync_all()?;
         pending.persist_noclobber(destination)?;

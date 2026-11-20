@@ -45,6 +45,13 @@ impl WorkspaceStore {
                                     json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.thumbnail_asset_id'),
                                     json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.sound_asset_id'))
                    )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM production_results AS result
+                       JOIN generation_runs AS run ON run.id = result.run_id
+                       JOIN json_each(result.result_json, '$.supplemental_media') AS item
+                       WHERE run.workspace_id = ?1 AND item.type = 'object'
+                         AND json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.asset_id') = ?2
+                   )
                    AND NOT EXISTS (SELECT 1 FROM motion_library WHERE workspace_id = ?1
                                    AND ?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id))
                    AND NOT EXISTS (

@@ -114,7 +114,18 @@ impl WorkspaceStore {
             if stage != ProductionStage::SupplementalOutputs {
                 return Err(rusqlite::Error::InvalidQuery);
             }
-            crate::supplemental_text::validate_supplemental_text(tx, run_id, entries)?;
+            crate::supplemental_delivery::validate_supplemental_text(tx, run_id, entries)?;
+        }
+        if let Some(entries) = result.get("supplemental_media") {
+            if stage != ProductionStage::SupplementalOutputs {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            crate::supplemental_delivery::validate_supplemental_media(
+                tx,
+                workspace_id,
+                run_id,
+                entries,
+            )?;
         }
         let id = tx.query_row(
             "INSERT INTO production_results (run_id, stage_index, attempt, result_json)

@@ -46,7 +46,7 @@ mod profile_deliveries;
 mod profile_formats;
 mod provider_preferences;
 mod subtitle_revisions;
-mod supplemental_text;
+mod supplemental_delivery;
 mod transcription;
 mod video_drafts;
 mod workspace_feedback;
