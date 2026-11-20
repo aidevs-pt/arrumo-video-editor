@@ -4,10 +4,10 @@ import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, FileText, Film, Package } from "lucide-react";
+import { ArrowLeft, FileText, Film } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -184,14 +184,14 @@ export function FormatDelivery({
     return (
       <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2">
         <div className="grid min-w-0 gap-1">
-          <Badge variant="outline" className="w-fit">{overridden(field) ? copy.override : copy.inherited}</Badge>
+          <LayerGauge layer={overridden(field) ? "profile" : "workspace"} />
           <p className="max-h-24 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
-            {copy.workspaceValue} · {display}
+            {copy.workspaceValue}: {display}
           </p>
         </div>
         <Field orientation="horizontal" className="w-fit">
           <Switch id={`override-${field}`} checked={overridden(field)}
-            aria-label={`${copy.override} · ${copy[field]}`}
+            aria-label={`${copy.override}, ${copy[field]}`}
             onCheckedChange={(checked) => {
               setResult(null);
               setOverrides((current) => ({ ...current, [field]: checked }));
@@ -208,7 +208,7 @@ export function FormatDelivery({
         <ArrowLeft data-icon="inline-start" />
         {isProfile ? copy.backProfile : copy.back}
       </Button>
-      <WorkspaceHeading icon={Package}>
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{format.name}</p>
       </WorkspaceHeading>

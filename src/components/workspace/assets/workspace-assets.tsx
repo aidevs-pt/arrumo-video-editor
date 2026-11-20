@@ -15,7 +15,7 @@ import { MarkdownEditor } from "@/components/markdown/editor";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -230,12 +230,12 @@ export function WorkspaceAssets({ workspace }: {
   });
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={Images}>
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{copy.intro}</p>
       </WorkspaceHeading>
       <section aria-labelledby="asset-list-title" data-dragging={dragging && !busy}
-        className="flex flex-col gap-4 rounded-xl outline-offset-4 data-[dragging=true]:outline-2 data-[dragging=true]:outline-primary">
+        className="flex flex-col gap-4 outline-offset-4 data-[dragging=true]:outline-2 data-[dragging=true]:outline-primary">
         <h2 id="asset-list-title" className="sr-only">{copy.list}</h2>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs value={filter} onValueChange={setFilter}>
@@ -291,12 +291,12 @@ export function WorkspaceAssets({ workspace }: {
               <section key={key === null ? "ungrouped" : `group:${key}`} className="flex flex-col gap-2"
                 aria-label={showGroups ? key ?? copy.ungrouped : undefined}>
                 {showGroups && <h3 className="wrap-anywhere text-sm font-semibold">{key ?? copy.ungrouped}</h3>}
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-4">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-3">
                   {items.map((asset) => (
                     <li key={asset.id} className="min-w-0">
-                      <Card className="gap-3 pt-0">
+                      <Card className="gap-2.5 rounded-md p-1.5">
                         <AssetThumbnail workspaceId={workspace.id} assetId={asset.id} kind={asset.kind} />
-                        <CardContent className="flex min-w-0 flex-col gap-2">
+                        <CardContent className="flex min-w-0 flex-col gap-1.5 px-1.5">
                           <h3 title={asset.name} className="truncate font-semibold">{asset.name}</h3>
                           <div className="flex flex-wrap gap-1">
                             <Badge variant="secondary">{copy[asset.kind]}</Badge>
@@ -307,8 +307,8 @@ export function WorkspaceAssets({ workspace }: {
                           </div>
                           {asset.notes.trim() && <p className="line-clamp-2 wrap-anywhere text-sm text-muted-foreground">{asset.notes}</p>}
                         </CardContent>
-                        <CardFooter className="flex-wrap gap-2 py-2">
-                          <Checkbox aria-label={`${copy.selectAsset} · ${asset.name}`}
+                        <CardFooter className="flex-wrap gap-1 px-1.5 py-1">
+                          <Checkbox aria-label={`${copy.selectAsset}, ${asset.name}`}
                             checked={selected.has(asset.id)} disabled={busy !== null}
                             onCheckedChange={(checked) => setSelected((current) => {
                               const next = new Set(current);
@@ -317,13 +317,13 @@ export function WorkspaceAssets({ workspace }: {
                               return next;
                             })} />
                           <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
-                            aria-label={`${copy.edit} · ${asset.name}`}
+                            aria-label={`${copy.edit}, ${asset.name}`}
                             onClick={() => edit([asset])}>{copy.edit}</Button>
                           <AssetOrganizationDialog workspaceId={workspace.id} assetId={asset.id} name={asset.name}
                             organization={organizations[asset.id]} disabled={busy !== null}
                             onSave={(organization) => setOrganizations((current) => ({ ...current, [asset.id]: organization }))} />
                           <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
-                            aria-label={`${copy.replaceFile} · ${asset.name}`}
+                            aria-label={`${copy.replaceFile}, ${asset.name}`}
                             onClick={() => void replaceAsset(asset)}>{copy.replaceFile}</Button>
                           <ConfirmTitleDelete title={asset.name} disabled={busy !== null} copy={copy.removal}
                             onConfirm={(confirmedName) => invoke<boolean>("remove_asset", {
@@ -345,28 +345,28 @@ export function WorkspaceAssets({ workspace }: {
           </Empty>
         )}
       </section>
-      <Dialog open={editing !== null} onOpenChange={(open) => {
+      <Sheet open={editing !== null} onOpenChange={(open) => {
         if (!open && busy === null) { setEditing(null); setError(null); }
       }}>
-        {editing && <DialogContent showCloseButton={busy === null}>
-          <DialogHeader>
-            <DialogTitle>{editing.length === 1 ? copy.edit : copy.editSelected}</DialogTitle>
-            <DialogDescription>{editing.length === 1 ? editing[0].name :
-              copy.batchDescription.replace("{count}", String(editing.length))}</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={saveNotes}>
+        {editing && <SheetContent className="w-full overflow-y-auto sm:max-w-md" showCloseButton={busy === null}>
+          <SheetHeader>
+            <SheetTitle>{editing.length === 1 ? copy.edit : copy.editSelected}</SheetTitle>
+            <SheetDescription>{editing.length === 1 ? editing[0].name :
+              copy.batchDescription.replace("{count}", String(editing.length))}</SheetDescription>
+          </SheetHeader>
+          <form onSubmit={saveNotes} className="px-4">
             <FieldGroup>
               <MarkdownEditor id="asset-notes" label={copy.notes} value={notes}
                 disabled={busy !== null} onChange={setNotes} />
               {error === "notesError" && <Alert variant="destructive"><AlertDescription>{copy.notesError}</AlertDescription></Alert>}
-              <DialogFooter>
+              <SheetFooter className="px-0">
                 <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setEditing(null)}>{copy.cancel}</Button>
                 <Button type="submit" disabled={busy !== null}>{copy.save}</Button>
-              </DialogFooter>
+              </SheetFooter>
             </FieldGroup>
           </form>
-        </DialogContent>}
-      </Dialog>
+        </SheetContent>}
+      </Sheet>
     </WorkspaceShell>
   );
 }

@@ -84,7 +84,7 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId }: { 
   if (!video) {
     return (
       <>
-        <WorkspaceHeading icon={Film}><h1>{copy.details}</h1></WorkspaceHeading>
+        <WorkspaceHeading><h1>{copy.details}</h1></WorkspaceHeading>
         {loadError ? (
           <Alert variant="destructive">
             <AlertDescription>{copy.loadError}</AlertDescription>
@@ -159,7 +159,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId }: { worksp
   return (
     <>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-4">
-        <WorkspaceHeading icon={Film} className="mb-0 min-w-0 flex-1 border-0 pb-0">
+        <WorkspaceHeading className="mb-0 min-w-0 flex-1 border-0 pb-0">
           <h1>{savedTitle}</h1>
           <p>{copy.files}</p>
         </WorkspaceHeading>

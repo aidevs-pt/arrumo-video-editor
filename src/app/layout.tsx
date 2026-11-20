@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { getLocaleCatalog } from "@/lib/locale-catalog";
 import { LocaleProvider } from "@/lib/locale-provider";
-import { Geist } from "next/font/google";
+import { Anybody, Atkinson_Hyperlegible_Next } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-geist'});
+const anybody = Anybody({ subsets: ["latin"], axes: ["wdth"], variable: "--font-anybody" });
+const atkinson = Atkinson_Hyperlegible_Next({ subsets: ["latin"], adjustFontFallback: false, variable: "--font-atkinson" });
 
 export const metadata: Metadata = {
   title: "Arrumo Video Editor",
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={cn("font-sans", geist.variable)}><body><LocaleProvider catalog={getLocaleCatalog()}>{children}</LocaleProvider></body></html>;
+  return <html lang="en" className={cn("font-sans", anybody.variable, atkinson.variable)}><body><LocaleProvider catalog={getLocaleCatalog()}>{children}</LocaleProvider></body></html>;
 }

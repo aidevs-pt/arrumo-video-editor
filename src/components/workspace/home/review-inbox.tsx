@@ -55,15 +55,15 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" aria-label={attentionCount ? `${copy.notifications} · ${copy.notificationAttention}` : copy.notifications} className="relative">
+        <Button type="button" variant="ghost" size="icon" aria-label={attentionCount ? `${copy.notifications}, ${copy.notificationAttention}` : copy.notifications} className="relative">
           <Bell />
-          {attentionCount > 0 && <span aria-hidden="true" className="absolute end-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-background" />}
+          {attentionCount > 0 && <span aria-hidden="true" className="absolute end-1.5 top-1.5 size-2 rounded-[2px] bg-attention ring-2 ring-background" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1.5rem)]">
         <DropdownMenuLabel className="flex items-center justify-between gap-2">
           {copy.notifications}
-          {attentionCount > 0 && <Badge variant="secondary" className="tabular-nums">{attentionCount}</Badge>}
+          {attentionCount > 0 && <Badge variant="secondary" className="bg-attention text-ink tabular-nums">{attentionCount}</Badge>}
         </DropdownMenuLabel>
         {failed && <p className="p-2 text-sm text-muted-foreground">{messages.queue.loadError}</p>}
         {reviews.length + completions.length > 0 ? (
@@ -87,7 +87,7 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
                     onSelect={() => router.push(`/completed-video?workspace=${workspaceId}&run=${completion.run_id}`)}>
                     <CircleCheck aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{completion.title}</span>
                     {completion.unread && <>
-                      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-primary" />
+                      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-[2px] bg-attention" />
                       <span className="sr-only">{copy.unreadCompletion}</span>
                     </>}
                   </DropdownMenuItem>

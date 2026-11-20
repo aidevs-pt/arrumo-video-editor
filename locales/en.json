@@ -1,5 +1,28 @@
 {
+  "videoCatalog": {
+    "singleClip": "1 source clip",
+    "clipCount": "{count} source clips",
+    "generateThis": "Generate this video",
+    "generationNext": "Continue to generation",
+    "drop": "Drop recordings anywhere on this page",
+    "title": "Videos",
+    "drafts": "Drafts",
+    "generating": "Generating",
+    "completed": "Completed",
+    "generate": "Generate a video",
+    "description": "Your drafts, active runs, and finished videos.",
+    "continue": "Continue",
+    "scratch": "Start from scratch",
+    "recordingsHeading": "Drop your recordings, then group them into videos",
+    "scratchHeading": "Start a video from nothing",
+    "details": "Video details",
+    "back": "Back to videos",
+    "detailsNext": "Continue to details",
+    "source": "Source footage",
+    "enqueue": "Generate"
+  },
   "calendar": {
+    "today": "Today",
     "title": "Calendar",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
@@ -159,7 +182,33 @@
     "loadError": "Agent settings couldn’t be loaded.",
     "saveError": "The provider couldn’t be saved."
   },
+  "dashboard": {
+    "search": "Search workspace",
+    "searchHint": "Find a profile or video",
+    "noMatches": "No matches",
+    "oneReview": "1 video is waiting for you",
+    "manyReviews": "{count} videos are waiting for you",
+    "inProgress": "In progress",
+    "publishing": "Publishing this week",
+    "viewQueue": "View queue",
+    "viewProfiles": "View profiles",
+    "noActiveRuns": "No videos in progress."
+  },
+  "layers": {
+    "app": "App",
+    "workspace": "Workspace",
+    "profile": "Profile",
+    "video": "Video"
+  },
+  "settings": {
+    "general": "General",
+    "appearance": "Appearance",
+    "language": "Language"
+  },
   "studio": {
+    "videos": "Videos",
+    "home": "Home",
+    "library": "Library",
     "closeNavigation": "Close navigation",
     "notifications": "Notifications",
     "notificationAttention": "New activity",
@@ -415,6 +464,7 @@
     "disabled": "Disabled"
   },
   "profiles": {
+    "saved": "Changes saved.",
     "list": "Workspace profiles",
     "back": "Back to workspaces",
     "outputs": "Outputs",
@@ -509,6 +559,26 @@
     "submitted": "Submitted",
     "claimed": "Worker claimed run",
     "transition": "State changed"
+  },
+  "onboarding": {
+    "tagline": "Messy footage in. Brilliant video out.",
+    "agent": "Agent",
+    "services": "Services",
+    "workspace": "First workspace",
+    "language": "Language",
+    "agentTitle": "Which agent should edit your videos?",
+    "agentIntro": "Arrumo organizes your footage and settings. Choose the agent that will handle your editing. You can switch later.",
+    "connectionNote": "Arrumo connects to your agent through the local command line.",
+    "noAgents": "There are no agent plugins available.",
+    "servicesTitle": "Connect the services {agent} will use",
+    "servicesIntro": "Save keys for the services you want to use. Arrumo stores them in your system credential store. You can add more services in Settings.",
+    "workspaceTitle": "Your first workspace",
+    "workspaceIntro": "A workspace holds one brand, with its context, colors, assets, and the kinds of videos you make.",
+    "workspaceHint": "You can add brand context and profiles after creating your workspace.",
+    "stepCount": "Step {step} of 3",
+    "useAgent": "Use {agent}",
+    "next": "Continue",
+    "back": "Back"
   },
   "workspaces": {
     "missing": "This workspace could not be found.",
@@ -643,7 +713,8 @@
     "resultDetails": "Result data",
     "decision": "Decision",
     "selectDecision": "Choose a decision",
-    "submitDecision": "Submit decision",
+    "unsentReview": "Not sent yet",
+    "submitDecision": "Send 1 decision",
     "importSubtitles": "Import SRT",
     "subtitlesImported": "Subtitles imported.",
     "subtitleImportError": "Could not import subtitles. Choose a valid UTF-8 SRT with timings within the rendered video.",

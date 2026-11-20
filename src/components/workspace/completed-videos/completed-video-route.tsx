@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Film } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,7 +30,7 @@ export function CompletedVideoRoute() {
         <CompletedVideoDetail key={`${workspace.id}-${runId}-${formatId}`} workspaceId={workspace.id} runId={runId} initialFormatId={formatId} />
       ) : (
         <>
-          <WorkspaceHeading icon={Film}><h1>{messages.completedVideo.details}</h1></WorkspaceHeading>
+          <WorkspaceHeading><h1>{messages.completedVideo.details}</h1></WorkspaceHeading>
           <Alert variant="destructive"><AlertDescription>{messages.completedVideo.loadError}</AlertDescription></Alert>
         </>
       )}

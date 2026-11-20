@@ -12,6 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Use Tailwind utilities for component styles and compose shared shadcn primitives. Keep theme tokens and document-wide defaults in `src/app/globals.css`. Put recurring workspace layouts in `src/components/workspace`.
 
+Use the Azulejo DESIGN.md and the supplied screen and component references for typography, layout, controls, and states. Adapt the shared shadcn primitives to the design tokens.
+
 Store user-facing strings in `locales/<language-tag>.json` and read them through the locale provider. Use the English catalog as the key reference.
 
 ## Domain organization

@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Layers, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -111,7 +111,7 @@ function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope:
 
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={Layers}>
+      <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{copy.intro}</p>
       </WorkspaceHeading>
@@ -190,20 +190,20 @@ function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope:
         </div>
         : <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
           {items.map(({ id, settings }) => <li key={id} className="min-w-0">
-            <Card className="overflow-hidden pt-0">
+            <Card className="overflow-hidden gap-3 p-2">
               <AssetThumbnail workspaceId={workspaceId} kind={settings.thumbnail_asset_id ? "image" : "video"}
                 assetId={settings.thumbnail_asset_id ?? settings.preview_asset_id} />
-              <CardContent className="space-y-2">
+              <CardContent className="flex flex-col items-start gap-2 px-1.5">
                 <Badge variant="secondary">{copy[settings.kind]}</Badge>
                 <h2 className="wrap-anywhere font-semibold">{settings.title}</h2>
                 {settings.usage_markdown && <p className="whitespace-pre-wrap wrap-anywhere text-sm text-muted-foreground">{settings.usage_markdown}</p>}
               </CardContent>
-              <CardFooter className="flex-wrap gap-1">
+              <CardFooter className="flex-wrap gap-1 px-1.5">
                 <MotionPreviewDialog workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
                   itemId={id} title={settings.title} />
                 {(["edit", "duplicate"] as const).map((mode) => (
                   <Button key={mode} type="button" size="sm" variant="ghost" disabled={open}
-                    aria-label={`${copy[mode]} · ${settings.title}`}
+                    aria-label={`${copy[mode]}, ${settings.title}`}
                     onClick={() => {
                       setOperation({ mode, item: { id, settings } });
                       setSaveError(false);

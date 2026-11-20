@@ -1,5 +1,28 @@
 {
+  "videoCatalog": {
+    "singleClip": "1 gravação",
+    "clipCount": "{count} gravações",
+    "generateThis": "Gerar este vídeo",
+    "generationNext": "Continuar para a geração",
+    "drop": "Larga as gravações nesta página",
+    "title": "Vídeos",
+    "drafts": "Rascunhos",
+    "generating": "Em produção",
+    "completed": "Concluídos",
+    "generate": "Gerar um vídeo",
+    "description": "Os teus rascunhos, produções ativas e vídeos concluídos.",
+    "continue": "Continuar",
+    "scratch": "Começar do zero",
+    "recordingsHeading": "Adiciona as tuas gravações e agrupa-as em vídeos",
+    "scratchHeading": "Começa um vídeo do zero",
+    "details": "Detalhes do vídeo",
+    "back": "Voltar aos vídeos",
+    "detailsNext": "Continuar para os detalhes",
+    "source": "Gravações",
+    "enqueue": "Gerar"
+  },
   "calendar": {
+    "today": "Hoje",
     "title": "Calendário",
     "previousMonth": "Mês anterior",
     "nextMonth": "Mês seguinte",
@@ -159,7 +182,33 @@
     "loadError": "Não foi possível carregar as definições do agente.",
     "saveError": "Não foi possível guardar o fornecedor."
   },
+  "dashboard": {
+    "search": "Pesquisar no espaço",
+    "searchHint": "Encontra um perfil ou vídeo",
+    "noMatches": "Sem resultados",
+    "oneReview": "1 vídeo aguarda a tua revisão",
+    "manyReviews": "{count} vídeos aguardam a tua revisão",
+    "inProgress": "Em curso",
+    "publishing": "Publicações desta semana",
+    "viewQueue": "Ver fila",
+    "viewProfiles": "Ver perfis",
+    "noActiveRuns": "Não há vídeos em curso."
+  },
+  "layers": {
+    "app": "Aplicação",
+    "workspace": "Espaço de trabalho",
+    "profile": "Perfil",
+    "video": "Vídeo"
+  },
+  "settings": {
+    "general": "Geral",
+    "appearance": "Aspeto",
+    "language": "Idioma"
+  },
   "studio": {
+    "videos": "Vídeos",
+    "home": "Início",
+    "library": "Biblioteca",
     "closeNavigation": "Fechar navegação",
     "notifications": "Notificações",
     "notificationAttention": "Nova atividade",
@@ -415,6 +464,7 @@
     "disabled": "Desativado"
   },
   "profiles": {
+    "saved": "Alterações guardadas.",
     "list": "Perfis do espaço de trabalho",
     "back": "Voltar aos espaços de trabalho",
     "outputs": "Saídas",
@@ -509,6 +559,26 @@
     "submitted": "Enviada",
     "claimed": "Atribuída a um processo",
     "transition": "Estado atualizado"
+  },
+  "onboarding": {
+    "tagline": "De filmagens em bruto a vídeos brilhantes.",
+    "agent": "Agente",
+    "services": "Serviços",
+    "workspace": "Primeiro espaço",
+    "language": "Idioma",
+    "agentTitle": "Que agente deve editar os teus vídeos?",
+    "agentIntro": "O Arrumo organiza as tuas gravações e definições. Escolhe o agente que vai tratar da edição. Podes mudar mais tarde.",
+    "connectionNote": "O Arrumo liga-se ao teu agente através da linha de comandos local.",
+    "noAgents": "Não há plugins de agente disponíveis.",
+    "servicesTitle": "Liga os serviços que {agent} vai usar",
+    "servicesIntro": "Guarda as chaves dos serviços que queres usar. O Arrumo guarda-as no gestor de credenciais do sistema. Podes adicionar mais serviços nas Definições.",
+    "workspaceTitle": "O teu primeiro espaço de trabalho",
+    "workspaceIntro": "Um espaço de trabalho reúne uma marca, o seu contexto, cores, recursos e os tipos de vídeos que crias.",
+    "workspaceHint": "Podes adicionar o contexto da marca e os perfis depois de criar o espaço.",
+    "stepCount": "Passo {step} de 3",
+    "useAgent": "Usar {agent}",
+    "next": "Continuar",
+    "back": "Voltar"
   },
   "workspaces": {
     "missing": "Este espaço de trabalho não foi encontrado.",
@@ -643,7 +713,8 @@
     "resultDetails": "Dados do resultado",
     "decision": "Decisão",
     "selectDecision": "Escolhe uma decisão",
-    "submitDecision": "Enviar decisão",
+    "unsentReview": "Ainda por enviar",
+    "submitDecision": "Enviar 1 decisão",
     "importSubtitles": "Importar SRT",
     "subtitlesImported": "Legendas importadas.",
     "subtitleImportError": "Não foi possível importar as legendas. Escolhe um SRT válido em UTF-8 com tempos dentro da duração do vídeo.",

@@ -1,5 +1,28 @@
 {
+  "videoCatalog": {
+    "singleClip": "1 clip de origen",
+    "clipCount": "{count} clips de origen",
+    "generateThis": "Generar este vídeo",
+    "generationNext": "Continuar a la generación",
+    "drop": "Suelta las grabaciones en esta página",
+    "title": "Vídeos",
+    "drafts": "Borradores",
+    "generating": "En producción",
+    "completed": "Terminados",
+    "generate": "Generar un vídeo",
+    "description": "Tus borradores, producciones activas y vídeos terminados.",
+    "continue": "Continuar",
+    "scratch": "Empezar desde cero",
+    "recordingsHeading": "Añade tus grabaciones y agrúpalas en vídeos",
+    "scratchHeading": "Empieza un vídeo desde cero",
+    "details": "Detalles del vídeo",
+    "back": "Volver a vídeos",
+    "detailsNext": "Continuar a los detalles",
+    "source": "Material de origen",
+    "enqueue": "Generar"
+  },
   "calendar": {
+    "today": "Hoy",
     "title": "Calendario",
     "previousMonth": "Mes anterior",
     "nextMonth": "Mes siguiente",
@@ -159,7 +182,33 @@
     "loadError": "No se pudieron cargar los ajustes del agente.",
     "saveError": "No se pudo guardar el proveedor."
   },
+  "dashboard": {
+    "search": "Buscar en el espacio",
+    "searchHint": "Busca un perfil o vídeo",
+    "noMatches": "Sin resultados",
+    "oneReview": "1 vídeo espera tu revisión",
+    "manyReviews": "{count} vídeos esperan tu revisión",
+    "inProgress": "En curso",
+    "publishing": "Publicaciones de esta semana",
+    "viewQueue": "Ver cola",
+    "viewProfiles": "Ver perfiles",
+    "noActiveRuns": "No hay vídeos en curso."
+  },
+  "layers": {
+    "app": "Aplicación",
+    "workspace": "Espacio de trabajo",
+    "profile": "Perfil",
+    "video": "Vídeo"
+  },
+  "settings": {
+    "general": "General",
+    "appearance": "Apariencia",
+    "language": "Idioma"
+  },
   "studio": {
+    "videos": "Vídeos",
+    "home": "Inicio",
+    "library": "Biblioteca",
     "closeNavigation": "Cerrar navegación",
     "notifications": "Notificaciones",
     "notificationAttention": "Actividad nueva",
@@ -415,6 +464,7 @@
     "disabled": "Desactivado"
   },
   "profiles": {
+    "saved": "Cambios guardados.",
     "list": "Perfiles del espacio de trabajo",
     "back": "Volver a los espacios de trabajo",
     "outputs": "Salidas",
@@ -509,6 +559,26 @@
     "submitted": "Enviada",
     "claimed": "Asignada a un proceso",
     "transition": "Estado actualizado"
+  },
+  "onboarding": {
+    "tagline": "De material en bruto a vídeos brillantes.",
+    "agent": "Agente",
+    "services": "Servicios",
+    "workspace": "Primer espacio",
+    "language": "Idioma",
+    "agentTitle": "¿Qué agente debe editar tus vídeos?",
+    "agentIntro": "Arrumo organiza tus grabaciones y ajustes. Elige el agente que se encargará de la edición. Podrás cambiarlo después.",
+    "connectionNote": "Arrumo se conecta con tu agente a través de la línea de comandos local.",
+    "noAgents": "No hay plugins de agente disponibles.",
+    "servicesTitle": "Conecta los servicios que usará {agent}",
+    "servicesIntro": "Guarda las claves de los servicios que quieras usar. Arrumo las guarda en el almacén de credenciales del sistema. Puedes añadir más servicios en Ajustes.",
+    "workspaceTitle": "Tu primer espacio de trabajo",
+    "workspaceIntro": "Un espacio de trabajo reúne una marca, su contexto, colores, recursos y los tipos de vídeos que creas.",
+    "workspaceHint": "Puedes añadir el contexto de tu marca y los perfiles después de crear el espacio.",
+    "stepCount": "Paso {step} de 3",
+    "useAgent": "Usar {agent}",
+    "next": "Continuar",
+    "back": "Atrás"
   },
   "workspaces": {
     "missing": "No se encontró este espacio de trabajo.",
@@ -643,7 +713,8 @@
     "resultDetails": "Datos del resultado",
     "decision": "Decisión",
     "selectDecision": "Elige una decisión",
-    "submitDecision": "Enviar decisión",
+    "unsentReview": "Aún sin enviar",
+    "submitDecision": "Enviar 1 decisión",
     "importSubtitles": "Importar SRT",
     "subtitlesImported": "Subtítulos importados.",
     "subtitleImportError": "No se pudieron importar los subtítulos. Elige un SRT válido en UTF-8 con tiempos dentro de la duración del vídeo.",

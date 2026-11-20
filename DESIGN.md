@@ -1,28 +1,37 @@
-# Arrumo Video Studio
+# Arrumo — DESIGN.md (Azulejo)
 
-## Product and visual direction
+Visual system for Arrumo Video Editor (Tauri + Next.js + shadcn, themed per Impeccable). Canvas, page "Azulejo": https://claude.ai/artifact/Lb9j2eyiiR4TgJxyMA7GiT
+Replaces the first dark/coral direction, which was rejected for reading as AI-generated.
 
-Arrumo is a desktop production tool for directing Codex or Claude Code through repeatable video workflows. The five workspace references in `../reference-style` establish the visual system. Keep the supplied Arrumo icon and its SVG identifiers. Use white for the working canvas, a quiet gray rail and panel surface, ink-black type, and vermilion for the current destination, review attention, and primary commit.
+## Idea
+From the brief: Portuguese *arrumar* (put in order), video editing, the face logo. Cobalt azulejo blue is the brand and the agent's world; tram yellow appears only when something needs the user; the workspace is cool paper.
 
-Give each surface a clear job. The asset library puts media and usage notes first. Draft composition starts with clips and their order, then profile and guidance. A generation review leads with the current artifact and its decision, with stage progress and real activity nearby. A completed video leads with playback and export, with metadata, activity and feedback in secondary views.
+## Color (OKLCH tokens)
+- Cobalt `#2337B4` — brand, the one primary button per screen, the agent. Deep cobalt (cobalt mixed toward navy) floods the generation screen.
+- Tram yellow `oklch(85.5% .16 86)` — attention only: counts that need you, staged decisions, the playhead, warning banners, focus ring.
+- Ink `oklch(23% .05 268)` (navy, never #111) / secondary `oklch(40% .04 268)` / tertiary `oklch(50% .035 268)`.
+- Paper `oklch(97.6% .006 265)` (cool, never cream), sheet `oklch(99.4% .003 265)`, sunk `oklch(94.6% .011 265)`, mist lines `oklch(89.5% .015 265)`.
+- Decisions: approve `oklch(50% .13 150)`, changes = yellow, reject `oklch(52% .19 27)`; always with icon + word.
+- Profile colors are data only (squares, bars, calendar).
 
-## Desktop shell
+## Type
+- Anybody (variable width): headlines, wide and heavy like film title cards. H1 48px wght 850 wdth 135%; page H1 34px; H2 21px wdth 112%.
+- Atkinson Hyperlegible Next: everything else, 15px body, tabular numbers.
+- No monospace, no all-caps labels, no eyebrows, no "A · B · C" meta strings, no sparkle icons (the agent's icon is the face).
 
-- Use the shadcn Sidebar with grouped workspace and production navigation, a workspace switcher, and a color-coded profile hierarchy. On narrow windows, open navigation in a Sheet. Keep the toolbar and location breadcrumbs consistent across routes.
-- Keep Workspace settings (Context, Brand, Assets, Outputs) distinct from production (Drafts, Generations, Completed videos). The New video action opens the composer. Link attention items to the specific run.
-- Use a contextual inspector on wide displays. On setup screens this can show relevant workspace context. On a run, show its stage and activity. Keep primary controls available when the inspector stacks or is absent.
-- Use native window chrome. Use a contained scrolling region for long popups or media lists. Keep basic navigation and decisions keyboard accessible at the minimum window width.
+## Structure
+- Cobalt rail. The active item is a paper tab that joins the page it opens.
+- Lists with hairlines over card grids; sheets (12px) only for real groups; controls 8px; thumbnails 4px; toggles and markers squared.
+- Layer gauge: 4 stacked bars, one filled, + "App / Workspace / Profile / Video" next to every inherited value.
+- Thumbnails: flat field, condensed Anybody title, creator silhouette.
+- Steppers are segmented tracks (filled = done, cobalt = current).
 
-## Tokens and components
+## Inside the agent (the one bold moment)
+- Generation screens turn deep cobalt. The plan is an editing timeline (stage lanes, step clips, time ruler) with a yellow "now" playhead, the only thing that moves on its own (one 1.1s ease-out-quart slide on load).
+- The agent's current thought is shown as a subtitle caption next to the face mark, whose eyes look at the work.
+- The user's review sits on a paper sheet on top of the cobalt; reasoning, tool calls and the queue stay on cobalt.
 
-- Define semantic tokens in `src/app/globals.css`. The light palette uses white for content, `#f8f8f7` for navigation, `#f7f7f6` for forms, `#171719` for ink, and `#e2e2e3` for dividers.
-- Use `#c92c1b` for primary actions and the related tinted surface for selection. Reserve destructive styling for the destructive action. Use outline controls for secondary actions and ghost controls for low-emphasis inline actions.
-- Use Geist. The page title is 28 px, section titles are 16 px, normal interface text is 14 px, and compact metadata is 12–13 px. Allow labels to wrap. Use tabular numerals for counts and durations and keep prose near 65 characters per line.
-- Prefer the installed shadcn primitives for navigation, cards, tables, disclosures, forms, dialogs, selects, confirmation, feedback, and states. Compose them in their owning domain. Use shared variants and tokens for common treatment.
-- Use border, spacing, and typographic weight to separate groups. Use real media previews when available. Use a file-type icon when the format has no rendered preview.
-- Show real readiness, provider, and review states. Use Skeleton, Empty, or Alert with appropriate recovery. Keep stable file and entity names in accessible labels.
-- Use Motion for purposeful transitions and honor reduced motion. Keep user-facing strings in the English, Spanish, and Portuguese catalogs.
-
-## Release verification
-
-Exercise the first-run path, recorded and brief-only drafts, generation and review, playback and export, workspace switching, and error recovery with the real desktop host. Check keyboard navigation and window resizing. Visible agent connection and worker progress must come from the actual runtime. Outstanding orchestration, onboarding, provider, plugin, and release work is tracked in the root TODO.
+## Interaction
+- Decisions staged until "Send N decisions" in a navy tray; batch bar with a shared comment; comments show "not sent yet".
+- Motion only answers actions (120–160ms), except the playhead. Respect reduced motion.
+- Copy: sentence case, buttons name the result ("Generate a Tool reviews video", "Send 2 decisions", "Replace everything").

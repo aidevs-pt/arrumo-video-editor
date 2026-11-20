@@ -45,7 +45,10 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
     : section === "/generation-run" ? "generations"
     : section === "/profile" ? "profiles"
     : views.find((view) => section === `/${view}`);
-  const workspace = view || section === "/settings" ? workspaces.find((entry) => String(entry.id) === query.get("workspace")) : undefined;
+  const workspaceId = query.get("workspace");
+  const workspace = workspaceId
+    ? workspaces.find((entry) => String(entry.id) === workspaceId)
+    : !section && query.get("manage") !== "1" ? workspaces[0] : undefined;
   const profile = Number(query.get("profile"));
   const draftProfile = Number.isSafeInteger(profile) && profile > 0 ? profile : null;
 
@@ -74,9 +77,8 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
       workspaces, status, load, workspace, navigate, draftProfile,
       add: (entry) => setWorkspaces((current) => [...current, entry]),
     }}>
-      <WorkspaceFrame workspaces={workspaces} workspace={workspace ?? null} view={view ?? "profiles"}
-        onSelect={(entry) => router.push(entry ? workspaceHref("profiles", entry.id) : "/")}
-        onNavigate={navigate}>
+      {!section && !workspaces.length ? children : <WorkspaceFrame workspaces={workspaces} workspace={workspace ?? null} view={view ?? "profiles"}
+        onSelect={(entry) => router.push(entry ? `/?workspace=${entry.id}` : "/?manage=1")}>
         {!view || workspace ? children : (
           <WorkspaceShell>
             {status === "loading" ? <p role="status">{copy.loading}</p> : (
@@ -88,7 +90,7 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
             )}
           </WorkspaceShell>
         )}
-      </WorkspaceFrame>
+      </WorkspaceFrame>}
     </Catalog.Provider>
   );
 }
