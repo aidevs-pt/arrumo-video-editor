@@ -186,6 +186,10 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "assets": {
+    "filterGroup": "Filtrar por grupo",
+    "allGroups": "Todos os grupos",
+    "filterLabel": "Filtrar por etiqueta",
+    "allLabels": "Todas as etiquetas",
     "organize": "Organizar",
     "group": "Grupo",
     "labels": "Etiquetas, uma por linha",

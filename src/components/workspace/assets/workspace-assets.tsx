@@ -17,6 +17,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssetOrganizationDialog, type AssetOrganization } from "./asset-organization-dialog";
@@ -36,13 +37,15 @@ export function WorkspaceAssets({ workspace }: {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("");
+  const [labelFilter, setLabelFilter] = useState("");
   const [busy, setBusy] = useState<"import" | "save" | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number }>();
   const [error, setError] = useState<"importError" | "notesError" | null>(null);
   const [editing, setEditing] = useState<Asset[] | null>(null);
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
-  const { messages } = useLocale();
+  const { locale, messages } = useLocale();
   const copy = messages.assets;
 
   useEffect(() => { heading.current?.focus(); }, []);
@@ -118,7 +121,25 @@ export function WorkspaceAssets({ workspace }: {
 
   const selectedAssets = assets?.filter(({ id }) => selected.has(id)) ?? [];
   const selectedLabel = copy.selectionCount.replace("{count}", String(selectedAssets.length));
-  const visible = assets?.filter((asset) => filter === "all" || asset.kind === filter);
+  const metadata = Object.values(organizations);
+  const groups = [...new Set(metadata.flatMap(({ group }) => group ? [group] : []))]
+    .sort((left, right) => left.localeCompare(right, locale));
+  const labelNames = new Map<string, string>();
+  for (const { labels } of metadata) {
+    for (const label of labels) {
+      const key = label.toLowerCase();
+      if (!labelNames.has(key)) labelNames.set(key, label);
+    }
+  }
+  const labels = [...labelNames.values()].sort((left, right) => left.localeCompare(right, locale));
+  const activeGroup = groups.includes(groupFilter) ? groupFilter : "";
+  const activeLabel = labels.includes(labelFilter) ? labelFilter : "";
+  const visible = assets?.filter((asset) => {
+    const organization = organizations[asset.id];
+    return (filter === "all" || asset.kind === filter)
+      && (!activeGroup || organization?.group === activeGroup)
+      && (!activeLabel || organization?.labels.some((label) => label.toLowerCase() === activeLabel.toLowerCase()));
+  });
   return (
     <WorkspaceShell>
       <WorkspaceHeading icon={Images}>
@@ -138,6 +159,12 @@ export function WorkspaceAssets({ workspace }: {
             <Upload data-icon="inline-start" />{busy === "import" ? copy.picking : copy.pick}
           </Button>
         </div>
+        {(groups.length > 0 || labels.length > 0) && <div className="flex flex-wrap gap-2">
+          {groups.length > 0 && <AssetFilter label={copy.filterGroup} all={copy.allGroups}
+            options={groups} value={activeGroup} onChange={setGroupFilter} />}
+          {labels.length > 0 && <AssetFilter label={copy.filterLabel} all={copy.allLabels}
+            options={labels} value={activeLabel} onChange={setLabelFilter} />}
+        </div>}
         {selectedAssets.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2">
           <p role="status" className="me-auto px-1 text-sm tabular-nums">{selectedLabel}</p>
           <Button type="button" size="sm" variant="outline" disabled={busy !== null}
@@ -229,4 +256,21 @@ export function WorkspaceAssets({ workspace }: {
       </Dialog>
     </WorkspaceShell>
   );
+}
+
+function AssetFilter({ label, all, options, value, onChange }: {
+  label: string;
+  all: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return <Select value={value ? `value:${value}` : "all"} onValueChange={(next) =>
+    onChange(next === "all" ? "" : next.slice("value:".length))}>
+    <SelectTrigger aria-label={label} className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+    <SelectContent><SelectGroup>
+      <SelectItem value="all">{all}</SelectItem>
+      {options.map((option) => <SelectItem key={option} value={`value:${option}`}>{option}</SelectItem>)}
+    </SelectGroup></SelectContent>
+  </Select>;
 }
