@@ -21,6 +21,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { useWorkspaceCatalog } from "../home/workspace-router";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { DraftSourceClips } from "./draft-source-clips";
+import { RawFootageBatch } from "./raw-footage-batch";
 import { VideoCatalogHeader } from "../videos/video-catalog-header";
 import { cn } from "@/lib/utils";
 
@@ -220,7 +221,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
             <h1 ref={heading} tabIndex={-1}>{sourceStep
               ? mode === "recordings" ? catalog.recordingsHeading : catalog.scratchHeading
               : editing === null ? catalog.details : copy.edit}</h1>
-            {sourceStep && <p>{mode === "recordings" ? copy.sourcesHint : copy.intentHint}</p>}
+            {sourceStep && <p>{mode === "recordings" ? (editing === null ? messages.batch.intro : copy.sourcesHint) : copy.intentHint}</p>}
           </WorkspaceHeading>
         </>
       ) : <VideoCatalogHeader workspaceId={workspaceId} active={startInQueue ? "generations" : "drafts"} count={startInQueue ? undefined : drafts?.length} />}
@@ -238,7 +239,18 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
           <Skeleton className="h-52 w-full" />
         </div>
       ) : (
-        composing ? (
+        composing && sourceStep && mode === "recordings" && editing === null ? (
+          <RawFootageBatch workspaceId={workspaceId} clips={assets} pool={sources} profiles={profiles}
+            initialProfile={initialProfile} dragging={dragging} importing={pending === "importing"}
+            onImport={() => void importClips()} onPoolChange={setSources}
+            onScratch={() => { setMode("scratch"); setError(null); }}
+            onBack={() => { reset(); setTab("saved"); }}
+            onCreated={(created) => {
+              setDrafts((current) => [...(current ?? []), ...created]);
+              setSources([]);
+              edit(created[0]);
+            }} />
+        ) : composing ? (
           <form onSubmit={save} aria-busy={pending !== null} className="grid max-w-5xl gap-5">
             {sourceStep ? (
               mode === "recordings" ? (
