@@ -950,7 +950,10 @@
     "assetPlanAnywhere": "Em qualquer parte",
     "assetPlanEmpty": "Nada na sua biblioteca encaixa neste vídeo, por isso usa só as suas gravações.",
     "captionNeedsSubtitles": "Adicione legendas para cada formato e verifico cada ficheiro antes da entrega.",
-    "captionSubtitling": "A escrever as legendas; depois verifico cada ficheiro antes da entrega."
+    "captionSubtitling": "A escrever as legendas; depois verifico cada ficheiro antes da entrega.",
+    "finishedTitle": "O seu vídeo está pronto",
+    "finishedDescription": "Veja-o, descarregue os ficheiros de cada formato, agende-o e diga ao agente o que manter da próxima vez.",
+    "openFinished": "Abrir o vídeo terminado"
   },
   "markdownEditor": {
     "source": "Código Markdown",

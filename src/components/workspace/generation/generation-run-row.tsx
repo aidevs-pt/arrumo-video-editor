@@ -175,11 +175,6 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
           </AlertDialogContent>
         </AlertDialog>
       )}
-      {run.state === "completed" && (
-        <Button asChild size="sm" variant="outline">
-          <Link href={completedVideoHref(workspaceId, run.id)}>{messages.completedVideo.details}<ArrowUpRight data-icon="inline-end" /></Link>
-        </Button>
-      )}
     </div>
   );
 }

@@ -950,7 +950,10 @@
     "assetPlanAnywhere": "Anywhere",
     "assetPlanEmpty": "Nothing in your library fits this video, so it uses only your footage.",
     "captionNeedsSubtitles": "Add subtitles for every format, then I'll check each file before delivery.",
-    "captionSubtitling": "Writing the subtitles, then I'll check each file before delivery."
+    "captionSubtitling": "Writing the subtitles, then I'll check each file before delivery.",
+    "finishedTitle": "Your video is ready",
+    "finishedDescription": "Watch it, download the files for each format, schedule it and tell the agent what to keep doing next time.",
+    "openFinished": "Open the finished video"
   },
   "markdownEditor": {
     "source": "Markdown source",

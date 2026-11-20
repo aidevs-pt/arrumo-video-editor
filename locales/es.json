@@ -950,7 +950,10 @@
     "assetPlanAnywhere": "En cualquier parte",
     "assetPlanEmpty": "Nada de tu biblioteca encaja con este vídeo, así que usa solo tu grabación.",
     "captionNeedsSubtitles": "Añade subtítulos para cada formato y revisaré cada archivo antes de la entrega.",
-    "captionSubtitling": "Escribiendo los subtítulos; después revisaré cada archivo antes de la entrega."
+    "captionSubtitling": "Escribiendo los subtítulos; después revisaré cada archivo antes de la entrega.",
+    "finishedTitle": "Tu vídeo está listo",
+    "finishedDescription": "Míralo, descarga los archivos de cada formato, prográmalo y dile al agente qué mantener la próxima vez.",
+    "openFinished": "Abrir el vídeo terminado"
   },
   "markdownEditor": {
     "source": "Código Markdown",

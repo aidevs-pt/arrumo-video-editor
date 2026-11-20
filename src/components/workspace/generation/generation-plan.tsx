@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { isScriptSections, ScriptSectionReview } from "./script-section-review";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
@@ -27,6 +27,7 @@ import { MotionArtifactAction } from "./motion-artifact-action";
 import { SupplementalReview } from "./supplemental-review";
 import type { AutomaticSubtitles } from "./delivery-subtitles";
 import { MediaStageAction } from "./media-stage-action";
+import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
@@ -183,7 +184,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
           </ol>
         )}
       </section>
-      {currentStage && <div className="flex items-center gap-3 py-2 text-white">
+      {(currentStage || runState === "completed") && <div className="flex items-center gap-3 py-2 text-white">
         <span className="grid size-11 shrink-0 place-items-center rounded-md bg-attention" aria-hidden="true">
           <NextImage src="/arrumo-face.svg" width={26} height={26} alt="" />
         </span>
@@ -192,13 +193,24 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
             {awaiting ? copy.waitingFor.replace("{agent}", agent ?? copy.agentFallback) : <>{agent && <span>{agent}</span>}<span>{queue[runState]}</span></>}
           </p>
           <p className="max-w-[60ch] rounded-thumb bg-caption px-2.5 py-0.5 text-[clamp(1.125rem,2vw,1.4375rem)] leading-[1.35] font-bold text-balance wrap-anywhere">
-            {agentCaption(currentStage)}
+            {currentStage ? agentCaption(currentStage) : copy.captionDone}
           </p>
         </div>
       </div>}
       <div className="@container">
         <div className="grid items-start gap-5 @min-[52rem]:grid-cols-[minmax(0,1fr)_17rem]">
           <div className="flex min-w-0 flex-col gap-4">
+            {runState === "completed" && (
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle className="font-heading text-lg font-[850]">{copy.finishedTitle}</CardTitle>
+                  <CardDescription>{copy.finishedDescription}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button asChild><Link href={completedVideoHref(workspaceId, runId)}>{copy.openFinished}<ArrowUpRight data-icon="inline-end" /></Link></Button>
+                </CardContent>
+              </Card>
+            )}
             {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
               <Card size="sm">
                 <CardHeader><CardTitle className="font-heading text-lg font-[850]">{copy.assets}</CardTitle></CardHeader>
