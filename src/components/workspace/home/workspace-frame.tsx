@@ -46,6 +46,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onNavigate, child
     { view: "context", label: messages.profiles.context, icon: FileText },
     { view: "brand", label: messages.brand.title, icon: Palette },
     { view: "assets", label: messages.assets.title, icon: Images },
+    { view: "motion-library", label: messages.motionLibrary.title, icon: Layers },
     { view: "outputs", label: messages.outputs.title, icon: SlidersHorizontal },
   ] as const;
   const production = [

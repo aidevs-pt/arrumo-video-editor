@@ -1,5 +1,5 @@
 export type Workspace = { id: number; name: string };
-export type WorkspaceView = "profiles" | "context" | "brand" | "assets" | "outputs"
+export type WorkspaceView = "profiles" | "context" | "brand" | "assets" | "motion-library" | "outputs"
   | "drafts" | "generations" | "videos" | "calendar";
 
 export function workspaceHref(view: WorkspaceView, workspaceId: number, profile?: number) {

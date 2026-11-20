@@ -16,6 +16,7 @@ mod completed_video;
 mod delivery_stream;
 mod guided_preview;
 mod media_worker;
+mod motion_library;
 mod plugin_settings;
 
 type Store = Mutex<WorkspaceStore>;
@@ -775,6 +776,8 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            motion_library::list_motion_library,
+            motion_library::create_motion_library_item,
             list_workspaces,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,

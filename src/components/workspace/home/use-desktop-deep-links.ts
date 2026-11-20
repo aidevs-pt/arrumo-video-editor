@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent } from "react";
 import { calendarHref, completedVideoHref, profileHref, workspaceHref, type WorkspaceView } from "./workspace-links";
 
 const workspaceSections: readonly WorkspaceView[] = [
-  "profiles", "context", "brand", "assets", "outputs", "drafts", "generations", "videos", "calendar",
+  "profiles", "context", "brand", "assets", "motion-library", "outputs", "drafts", "generations", "videos", "calendar",
 ];
 
 function numericId(query: URLSearchParams, name: string) {

@@ -13,7 +13,7 @@ import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-l
 export { workspaceHref, completedVideoHref } from "./workspace-links";
 
 type Status = "loading" | "ready" | "error" | "browser";
-const views: WorkspaceView[] = ["profiles", "context", "brand", "assets", "outputs", "drafts", "generations", "videos", "calendar"];
+const views: WorkspaceView[] = ["profiles", "context", "brand", "assets", "motion-library", "outputs", "drafts", "generations", "videos", "calendar"];
 
 type WorkspaceCatalog = {
   workspaces: Workspace[];
