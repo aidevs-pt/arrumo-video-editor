@@ -3,17 +3,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Layers, Plus } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
+import { ConfirmTitleDelete } from "@/components/workspace/confirm-title-delete";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { workspaceHref, type Workspace } from "@/components/workspace/home/workspace-links";
 import { useLocale } from "@/lib/locale-provider";
@@ -29,6 +30,7 @@ type Profile = { id: number; name: string };
 
 export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) {
   const { messages } = useLocale();
+  const heading = useRef<HTMLHeadingElement>(null);
   const copy = messages.motionLibrary;
   const [catalog, setCatalog] = useState<{ assets: Asset[]; profiles: Profile[] }>();
   const [items, setItems] = useState<Item[]>();
@@ -89,7 +91,7 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
   return (
     <WorkspaceShell>
       <WorkspaceHeading icon={Layers}>
-        <h1>{copy.title}</h1>
+        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{copy.intro}</p>
       </WorkspaceHeading>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -161,6 +163,16 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
                 <h2 className="wrap-anywhere font-semibold">{settings.title}</h2>
                 {settings.usage_markdown && <p className="whitespace-pre-wrap wrap-anywhere text-sm text-muted-foreground">{settings.usage_markdown}</p>}
               </CardContent>
+              <CardFooter>
+                <ConfirmTitleDelete title={settings.title} disabled={open} copy={copy.deletion}
+                  onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
+                    workspaceId, itemId: id, confirmedTitle,
+                  })}
+                  onDelete={() => {
+                    setItems((current) => current?.filter((item) => item.id !== id));
+                    heading.current?.focus();
+                  }} />
+              </CardFooter>
             </Card>
           </li>)}
         </ul>}

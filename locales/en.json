@@ -186,6 +186,14 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "deletion": {
+      "deleteTitle": "Delete item",
+      "deleteDescription": "This removes the entry from the motion library. Its media stays in Assets.",
+      "confirmTitle": "Type the exact item name",
+      "deleteError": "Could not delete the entry. Reopen the library to check its current name.",
+      "cancelDelete": "Cancel",
+      "deleting": "Deleting…"
+    },
     "title": "Motion library",
     "intro": "Organize reusable animations and transitions by workspace or profile.",
     "scope": "Visibility",

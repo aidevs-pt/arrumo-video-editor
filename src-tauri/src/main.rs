@@ -778,6 +778,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             motion_library::list_motion_library,
             motion_library::create_motion_library_item,
+            motion_library::delete_motion_library_item,
             list_workspaces,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,

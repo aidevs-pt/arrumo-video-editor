@@ -186,6 +186,14 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "motionLibrary": {
+    "deletion": {
+      "deleteTitle": "Eliminar elemento",
+      "deleteDescription": "Se quitará el elemento de la biblioteca de movimiento. Sus archivos seguirán en Recursos.",
+      "confirmTitle": "Escribe el nombre exacto",
+      "deleteError": "No se pudo eliminar el elemento. Vuelve a abrir la biblioteca para comprobar su nombre.",
+      "cancelDelete": "Cancelar",
+      "deleting": "Eliminando…"
+    },
     "title": "Biblioteca de movimiento",
     "intro": "Organiza animaciones y transiciones reutilizables por espacio de trabajo o perfil.",
     "scope": "Visibilidad",

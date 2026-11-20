@@ -28,3 +28,17 @@ pub async fn create_motion_library_item(
         .create_motion_library_item(workspace_id, &settings)
         .map_err(|_| "motion_library_save_failed")
 }
+
+#[tauri::command]
+pub async fn delete_motion_library_item(
+    workspace_id: i64,
+    item_id: i64,
+    confirmed_title: String,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .delete_motion_library_item(workspace_id, item_id, &confirmed_title)
+        .map_err(|_| "motion_library_delete_failed")
+}
