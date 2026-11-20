@@ -12,7 +12,7 @@ export function profileHref(workspaceId: number, profileId: number) {
   return `/profile?workspace=${workspaceId}&profile=${profileId}`;
 }
 
-export type CompletedFile = "subtitles" | `text-${number}` | `media-${number}`;
+export type CompletedFile = "subtitles" | `text-${number}` | `media-${number}` | `attachment-${number}`;
 
 export function completedVideoHref(workspaceId: number, runId: number, formatId?: number, file?: CompletedFile) {
   const query = new URLSearchParams({ workspace: String(workspaceId), run: String(runId) });
@@ -32,9 +32,10 @@ export function calendarHref(workspaceId: number, profileId?: number, month?: st
 
 export function completedFile(value: string | null): CompletedFile | undefined {
   if (value === "subtitles") return value;
-  const match = value?.match(/^(text|media)-([1-9]\d*)$/);
+  const match = value?.match(/^(text|media|attachment)-([1-9]\d*)$/);
   if (!match) return;
   const index = Number(match[2]);
   if (!Number.isSafeInteger(index)) return;
+  if (match[1] === "attachment") return `attachment-${index}`;
   return match[1] === "text" ? `text-${index}` : `media-${index}`;
 }

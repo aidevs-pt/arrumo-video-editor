@@ -75,6 +75,8 @@ struct MediaReference {
 
 #[derive(Debug, Serialize)]
 pub struct SupplementalMedia {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachment_id: Option<i64>,
     pub asset_id: i64,
     pub format_id: Option<i64>,
     pub kind: String,
@@ -113,11 +115,11 @@ impl SupplementalMedia {
                     && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
             })
             .unwrap_or("bin");
-        format!(
-            "supplemental-media-{}.{}",
-            index + 1,
-            extension.to_ascii_lowercase()
-        )
+        let extension = extension.to_ascii_lowercase();
+        match self.attachment_id {
+            Some(id) => format!("attachment-{id}.{extension}"),
+            None => format!("supplemental-media-{}.{extension}", index + 1),
+        }
     }
 }
 
@@ -175,24 +177,30 @@ impl WorkspaceStore {
         workspace_id: i64,
         run_id: i64,
     ) -> rusqlite::Result<Vec<SupplementalMedia>> {
-        let mut references: Vec<MediaReference> =
+        let references: Vec<MediaReference> =
             self.completed_supplemental_field(workspace_id, run_id, "$.supplemental_media")?;
         let mut attached = self.0.prepare(
-            "SELECT media.asset_id, media.format_id FROM completed_media AS media
+            "SELECT media.id, media.asset_id, media.format_id, asset.kind, asset.name, asset.byte_size FROM completed_media AS media
+             JOIN workspace_assets AS asset ON asset.id = media.asset_id AND asset.workspace_id = ?1
              JOIN generation_runs AS run ON run.id = media.run_id
              WHERE run.workspace_id = ?1 AND run.id = ?2 AND run.state = 'completed'
              ORDER BY media.id",
         )?;
         let entries = attached.query_map(params![workspace_id, run_id], |row| {
-            Ok(MediaReference {
-                asset_id: row.get(0)?,
-                format_id: row.get(1)?,
+            Ok(SupplementalMedia {
+                attachment_id: Some(row.get(0)?),
+                asset_id: row.get(1)?,
+                format_id: row.get(2)?,
+                kind: row.get(3)?,
+                name: row.get(4)?,
+                byte_size: row.get(5)?,
             })
         })?;
+        let mut media = self.supplemental_media_metadata(workspace_id, references)?;
         for entry in entries {
-            references.push(entry?);
+            media.push(entry?);
         }
-        self.supplemental_media_metadata(workspace_id, references)
+        Ok(media)
     }
 
     pub fn attach_completed_media(
@@ -244,6 +252,20 @@ impl WorkspaceStore {
         Ok(true)
     }
 
+    pub fn detach_completed_media(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attachment_id: i64,
+    ) -> rusqlite::Result<bool> {
+        Ok(self.0.execute(
+            "DELETE FROM completed_media WHERE id = ?3 AND run_id = ?2
+             AND EXISTS (SELECT 1 FROM generation_runs
+                         WHERE id = ?2 AND workspace_id = ?1 AND state = 'completed')",
+            params![workspace_id, run_id, attachment_id],
+        )? != 0)
+    }
+
     pub fn pending_supplemental(
         &self,
         workspace_id: i64,
@@ -277,6 +299,7 @@ impl WorkspaceStore {
             .map(|entry| {
                 metadata.query_row(params![workspace_id, entry.asset_id], |row| {
                     Ok(SupplementalMedia {
+                        attachment_id: None,
                         asset_id: entry.asset_id,
                         format_id: entry.format_id,
                         kind: row.get(0)?,
@@ -299,6 +322,23 @@ impl WorkspaceStore {
             .completed_supplemental_media(workspace_id, run_id)?
             .into_iter()
             .nth(index)
+            .filter(|entry| entry.attachment_id.is_none())
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+        let file = entry.managed_file(database, workspace_id)?;
+        Ok((entry, file))
+    }
+
+    pub fn completed_attachment_file(
+        &self,
+        database: &std::path::Path,
+        workspace_id: i64,
+        run_id: i64,
+        attachment_id: i64,
+    ) -> Result<(SupplementalMedia, std::path::PathBuf), Box<dyn std::error::Error>> {
+        let entry = self
+            .completed_supplemental_media(workspace_id, run_id)?
+            .into_iter()
+            .find(|entry| entry.attachment_id == Some(attachment_id))
             .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
         let file = entry.managed_file(database, workspace_id)?;
         Ok((entry, file))

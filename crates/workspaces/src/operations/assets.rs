@@ -82,12 +82,26 @@ struct AttachCompletedMedia {
     asset_id: i64,
 }
 
-pub(super) fn definitions() -> [Value; 13] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DetachCompletedMedia {
+    workspace_id: i64,
+    run_id: i64,
+    attachment_id: i64,
+}
+
+pub(super) fn definitions() -> [Value; 14] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
     }, "required": ["workspaceId", "assetId", "role"], "additionalProperties": false});
     [
+        json!({"name": "detach_completed_media",
+            "description": "Remove a post-completion attachment from a verified output while retaining the managed asset.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "attachmentId": id
+            }, "required": ["workspaceId", "runId", "attachmentId"], "additionalProperties": false},
+            "annotations": {"destructiveHint": false, "idempotentHint": true}}),
         json!({"name": "attach_completed_media",
             "description": "Attach an existing managed asset to one verified output. Repeating a successful attachment returns added=false.",
             "inputSchema": {"type": "object", "properties": {
@@ -156,6 +170,13 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
+        "detach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid completed media arguments")
+            .and_then(|args: DetachCompletedMedia| {
+                store.detach_completed_media(args.workspace_id, args.run_id, args.attachment_id)
+                    .map(|removed| json!({"removed": removed}))
+                    .map_err(|_| "Could not detach completed media")
+            }),
         "attach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid completed media arguments")
             .and_then(|args: AttachCompletedMedia| {

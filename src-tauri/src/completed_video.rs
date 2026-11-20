@@ -256,7 +256,8 @@ pub async fn save_completed_subtitle_revision(
 pub async fn preview_completed_supplemental_media(
     workspace_id: i64,
     run_id: i64,
-    index: usize,
+    index: Option<usize>,
+    attachment_id: Option<i64>,
     app: AppHandle,
     stream: State<'_, crate::delivery_stream::DeliveryStream>,
 ) -> Result<String, &'static str> {
@@ -267,9 +268,14 @@ pub async fn preview_completed_supplemental_media(
         .map_err(|_| failed)?
         .join("workspaces.sqlite");
     let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
-    let (entry, file) = store
-        .completed_supplemental_media_file(&database, workspace_id, run_id, index)
-        .map_err(|_| failed)?;
+    let (entry, file) = match (index, attachment_id) {
+        (Some(index), None) => {
+            store.completed_supplemental_media_file(&database, workspace_id, run_id, index)
+        }
+        (None, Some(id)) => store.completed_attachment_file(&database, workspace_id, run_id, id),
+        _ => return Err(failed),
+    }
+    .map_err(|_| failed)?;
     let mime = crate::delivery_stream::managed_media_type(&entry.name).ok_or(failed)?;
     stream.open_media(file, mime).map_err(|_| failed)
 }

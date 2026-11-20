@@ -183,6 +183,7 @@ impl WorkspaceStore {
             include_str!("../migrations/044-subtitle-languages.sql"),
             include_str!("../migrations/045-bundled-plugin-grants.sql"),
             include_str!("../migrations/046-completed-media.sql"),
+            include_str!("../migrations/047-stable-completed-media.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

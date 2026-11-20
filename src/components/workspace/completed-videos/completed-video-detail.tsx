@@ -165,11 +165,16 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
   const textOutputs = video.supplemental_text;
   const mediaOutputs = video.supplemental_media;
   const mediaIndex = file?.startsWith("media-") ? Number(file.slice(6)) - 1 : undefined;
-  const mediaOutput = mediaIndex === undefined ? undefined : mediaOutputs[mediaIndex];
+  const attachmentId = file?.startsWith("attachment-") ? Number(file.slice(11)) : undefined;
+  const mediaOutput = attachmentId !== undefined
+    ? mediaOutputs.find((item) => item.attachment_id === attachmentId)
+    : mediaIndex === undefined ? undefined : mediaOutputs.filter((item) => item.attachment_id === undefined)[mediaIndex];
   const mediaLinks = mediaOutputs.map((item, index) => {
     const Icon = item.kind === "image" ? Image : item.kind === "audio" ? Music : Film;
-    return <Button key={`media-${index}`} asChild size="sm" variant="outline" className="max-w-full">
-      <Link href={completedVideoHref(workspaceId, runId, selected?.format_id, `media-${index + 1}`)}>
+    const mediaFile: CompletedFile = item.attachment_id !== undefined
+      ? `attachment-${item.attachment_id}` : `media-${index + 1}`;
+    return <Button key={mediaFile} asChild size="sm" variant="outline" className="max-w-full">
+      <Link href={completedVideoHref(workspaceId, runId, selected?.format_id, mediaFile)}>
         <Icon data-icon="inline-start" /><span className="truncate" title={item.name}>{item.name}</span>
       </Link>
     </Button>;
@@ -184,7 +189,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
       </Link>
     </Button>
   ));
-  if (textIndex !== undefined || mediaIndex !== undefined) {
+  if (textIndex !== undefined || mediaIndex !== undefined || attachmentId !== undefined) {
     const outputFormat = formats.find(({ format }) => format.id === (mediaOutput?.format_id ?? textOutput?.format_id))?.format;
     const filename = mediaOutput?.name ?? (textOutput && textIndex !== undefined ? textFilename(textOutput, textIndex) : copy.otherFiles);
     return <>
@@ -197,7 +202,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
           <Link href={completedVideoHref(workspaceId, runId, selected?.format_id)}>{copy.videoTab}</Link>
         </Button>
       </div>
-      {mediaOutput && mediaIndex !== undefined ? <SupplementalMediaPreview key={mediaIndex}
+      {mediaOutput ? <SupplementalMediaPreview key={file}
         workspaceId={workspaceId} runId={runId} index={mediaIndex} media={mediaOutput} />
         : textOutput ? <article className="max-w-3xl whitespace-pre-wrap wrap-anywhere rounded-lg border bg-card p-5">
         {textOutput.text}

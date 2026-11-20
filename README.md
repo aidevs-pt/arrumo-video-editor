@@ -461,5 +461,9 @@ To add a file produced after completion, import it into the run's workspace and 
 MCP and A2A expose the same operation as `attach_completed_media` with
 `workspaceId`, `runId`, `formatId`, and `assetId`. A repeated attachment
 returns false in the CLI or `{"added":false}` through MCP and A2A.
-Attachments appear in supplemental files and in the delivery ZIP. They retain
-the attached asset version until the completed run is deleted.
+Attachments appear in supplemental files with a stable `attachment_id`, which
+also identifies their delivery ZIP entry as `attachment-<id>.<extension>`.
+Use `detach-completed-media <workspace-id> <run-id> <attachment-id>` or
+`detach_completed_media` with `workspaceId`, `runId`, and `attachmentId`
+to remove the attachment while keeping the asset in the workspace. A repeated
+removal returns false. Other attachment links keep their IDs.

@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
 
-export type SupplementalMedia = { name: string; kind: "image" | "audio" | "video"; format_id: number | null };
+export type SupplementalMedia = { name: string; kind: "image" | "audio" | "video"; format_id: number | null; attachment_id?: number };
 
 export function SupplementalMediaPreview({ workspaceId, runId, index, media }: {
   workspaceId: number;
   runId: number;
-  index: number;
+  index?: number;
   media: SupplementalMedia;
 }) {
   const { messages } = useLocale();
@@ -20,12 +20,12 @@ export function SupplementalMediaPreview({ workspaceId, runId, index, media }: {
 
   useEffect(() => {
     let active = true;
-    invoke<string>("preview_completed_supplemental_media", { workspaceId, runId, index }).then(
+    invoke<string>("preview_completed_supplemental_media", { workspaceId, runId, index, attachmentId: media.attachment_id }).then(
       (result) => { if (active) setUrl(result); },
       () => { if (active) setFailed(true); },
     );
     return () => { active = false; };
-  }, [workspaceId, runId, index, attempt]);
+  }, [workspaceId, runId, index, media.attachment_id, attempt]);
 
   if (failed) return <Alert variant="destructive">
     <AlertDescription>{messages.completedVideo.previewError}</AlertDescription>
