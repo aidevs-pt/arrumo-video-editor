@@ -65,7 +65,15 @@ struct RemoveAssetInput {
     confirmed_name: String,
 }
 
-pub(super) fn definitions() -> [Value; 11] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReplaceAssetInput {
+    workspace_id: i64,
+    asset_id: i64,
+    source: String,
+}
+
+pub(super) fn definitions() -> [Value; 12] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -113,6 +121,11 @@ pub(super) fn definitions() -> [Value; 11] {
                 }, "additionalProperties": false}
             }, "required": ["workspaceId", "assetId", "settings"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "replace_workspace_asset", "description": "Replace an active workspace asset with a same-kind local file. Live references follow the new asset ID and captured run inputs keep the previous media.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "assetId": id, "source": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "assetId", "source"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true}}),
         json!({"name": "remove_workspace_asset", "description": "Remove an unused workspace asset and its managed copy after confirming its exact filename.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
@@ -211,6 +224,18 @@ pub(super) fn call(
                     .set_asset_organization(args.workspace_id, args.asset_id, args.settings)
                     .map(|settings| json!({"organization": settings}))
                     .map_err(|_| "Could not save asset group and labels")
+            }),
+        "replace_workspace_asset" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid asset replacement arguments")
+            .and_then(|args: ReplaceAssetInput| {
+                let source = Path::new(&args.source);
+                if !source.is_absolute() {
+                    return Err("Asset source must be an absolute local path");
+                }
+                store
+                    .replace_asset(&asset_root(database), args.workspace_id, args.asset_id, source)
+                    .map(|asset| json!({"asset": asset}))
+                    .map_err(|_| "Could not replace asset. Check the workspace, active asset ID, and replacement media kind")
             }),
         "remove_workspace_asset" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid asset removal arguments")

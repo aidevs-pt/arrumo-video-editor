@@ -269,6 +269,8 @@ Use `create_video_draft` and `update_video_draft` to save drafts before enqueuei
 
 Use `import_workspace_asset` with a workspace ID and an absolute local `source` path to copy a media file into managed storage. Use `list_workspace_assets` to find asset IDs for draft sources.
 
+Use `replace_workspace_asset` through MCP or A2A with `workspaceId`, the active `assetId`, and an absolute local `source` path to media of the same kind. The returned `asset` has a new ID. Use that ID for subsequent operations on the replacement.
+
 Use `remove_workspace_asset` through MCP or A2A with `workspaceId`, `assetId`, and the exact saved filename as `confirmedName`. It returns `removed: false` when the asset is missing, referenced, or the filename differs. Removing an asset leaves the original import in place.
 
 Use `import_thumbnail_reference` to import a local image with thumbnail reference notes. Use `set_asset_notes` with the workspace ID, asset ID, and Markdown notes to change the asset's usage guidance. Pass an empty string to clear the notes.
