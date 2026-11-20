@@ -948,7 +948,9 @@
     "assetPlanTitle": "O que {agent} acrescentaria",
     "assetPlanTitleFallback": "O que o agente acrescentaria",
     "assetPlanAnywhere": "Em qualquer parte",
-    "assetPlanEmpty": "Nada na sua biblioteca encaixa neste vídeo, por isso usa só as suas gravações."
+    "assetPlanEmpty": "Nada na sua biblioteca encaixa neste vídeo, por isso usa só as suas gravações.",
+    "captionNeedsSubtitles": "Adicione legendas para cada formato e verifico cada ficheiro antes da entrega.",
+    "captionSubtitling": "A escrever as legendas; depois verifico cada ficheiro antes da entrega."
   },
   "markdownEditor": {
     "source": "Código Markdown",

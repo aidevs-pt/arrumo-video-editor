@@ -13,7 +13,7 @@ type RunNotice = { run_id: number; title: string };
 type Inbox = { reviews: RunNotice[]; completions: (RunNotice & { unread: boolean })[] };
 
 type InboxState = { workspaceId: number; inbox?: Inbox; working?: number; failed: boolean };
-type RunState = { state: string; pending_review_id: number | null };
+type RunState = { state: string; pending_review_id: number | null; progress?: { stage: string } | null };
 
 const workingStates = new Set(["queued", "running"]);
 
@@ -31,7 +31,8 @@ export function useGenerationInbox(workspaceId: number | undefined) {
           invoke<Inbox>("generation_inbox", { workspaceId: id }),
           invoke<RunState[]>("list_generation_runs", { workspaceId: id }),
         ]);
-        const working = runs.filter((run) => workingStates.has(run.state) && run.pending_review_id === null).length;
+        const working = runs.filter((run) => workingStates.has(run.state) && run.pending_review_id === null
+          && !(run.state === "queued" && run.progress?.stage === "verify_delivery")).length;
         if (active) setState({ workspaceId: id, inbox: rows, working, failed: false });
       } catch {
         if (active) setState((current) => ({

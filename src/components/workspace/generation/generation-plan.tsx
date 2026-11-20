@@ -113,6 +113,10 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     const summary = awaiting?.result.summary;
     if (awaiting) return typeof summary === "string" && summary.trim() ? summary : copy.captionReview.replace("{stage}", stageName(stage));
     if (runState === "completed") return copy.captionDone;
+    if (stage === "verify_delivery" && runState === "queued") {
+      const automatic = Object.values(progress?.automatic_subtitles ?? {});
+      return automatic.includes("started") ? copy.captionSubtitling : copy.captionNeedsSubtitles;
+    }
     if (runState === "paused") return copy.captionPaused.replace("{stage}", stageName(stage));
     return (runState === "running" ? copy.captionRunning : copy.captionQueued).replace("{stage}", stageName(stage));
   }
@@ -197,7 +201,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
           <div className="flex min-w-0 flex-col gap-4">
             {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
               <Card size="sm">
-                <CardHeader><CardTitle>{copy.assets}</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="font-heading text-lg font-[850]">{copy.assets}</CardTitle></CardHeader>
                 <CardContent className="flex flex-col items-start gap-3">
                   <MotionArtifactAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
                   <MotionRendererAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
@@ -206,7 +210,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
             )}
             {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
               <Card size="sm">
-                <CardHeader><CardTitle>{copy[mediaStage]}</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="font-heading text-lg font-[850]">{copy[mediaStage]}</CardTitle></CardHeader>
                 <CardContent>
                   <MediaStageAction key={mediaStage} workspaceId={workspaceId} runId={runId} stage={mediaStage}
                     available={runState === "queued"} canImportSubtitles={runState === "queued" || runState === "failed"} formats={formats}

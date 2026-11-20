@@ -948,7 +948,9 @@
     "assetPlanTitle": "What {agent} would add",
     "assetPlanTitleFallback": "What the agent would add",
     "assetPlanAnywhere": "Anywhere",
-    "assetPlanEmpty": "Nothing in your library fits this video, so it uses only your footage."
+    "assetPlanEmpty": "Nothing in your library fits this video, so it uses only your footage.",
+    "captionNeedsSubtitles": "Add subtitles for every format, then I'll check each file before delivery.",
+    "captionSubtitling": "Writing the subtitles, then I'll check each file before delivery."
   },
   "markdownEditor": {
     "source": "Markdown source",
