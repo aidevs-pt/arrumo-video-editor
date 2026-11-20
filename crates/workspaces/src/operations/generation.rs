@@ -226,7 +226,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 34] {
+pub(super) fn definitions() -> [Value; 35] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -274,6 +274,9 @@ pub(super) fn definitions() -> [Value; 34] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel"]}
             }, "required": ["workspaceId", "runId", "action"], "additionalProperties": false}}),
+        json!({"name": "process_script_stage", "description": "Run the run's agent on its queued Script stage and submit the draft for review. Earlier drafts' review notes are included. The run fails with a reason if the agent cannot finish.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
+                "required": ["workspaceId", "runId"], "additionalProperties": false}}),
         json!({"name": "process_media_stage", "description": "Claim and execute one ready media stage. Pass previewEdit (or an empty object for whole clips) for preview rendering. Omit it for final rendering or verification.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "previewEdit": {"type": "object"}
@@ -460,6 +463,12 @@ pub(super) fn call(
                 .control_generation(args.workspace_id, args.run_id, args.action)
                 .map(|run| json!({"run": run_summary(&run)}))
                 .map_err(|_| "Could not change this run in its current state or workspace")
+        }),
+        "process_script_stage" => parse(arguments).and_then(|args: RunInput| {
+            store
+                .process_script_stage(args.workspace_id, args.run_id)
+                .map(|result_id| json!({"resultId": result_id}))
+                .map_err(|_| "The script could not be written. Check the run activity for the reason")
         }),
         "process_media_stage" => parse(arguments).and_then(|args: MediaStageInput| {
             store

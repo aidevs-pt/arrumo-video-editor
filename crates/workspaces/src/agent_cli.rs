@@ -70,7 +70,7 @@ pub fn check_agent_login(provider: &str) -> AgentLoginStatus {
     }
 }
 
-fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
+pub(crate) fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
     let executable = &plugin.cli.executable;
     let search_path = env::var_os("PATH")?;
     env::split_paths(&search_path)

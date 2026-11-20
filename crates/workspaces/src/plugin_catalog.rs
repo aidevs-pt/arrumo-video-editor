@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 6] = [1, 2, 3, 4, 5, 6];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 7] = [1, 2, 3, 4, 5, 6, 7];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -73,6 +73,63 @@ pub struct ProviderDescriptor {
 pub(crate) struct AgentCli {
     pub executable: String,
     pub auth_status_args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_run: Option<StructuredRun>,
+}
+
+/// A non-interactive agent run declared by the provider: the prompt goes to stdin and the answer
+/// must follow a JSON Schema passed through `{schema}` or `{schemaPath}`.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct StructuredRun {
+    pub args: Vec<String>,
+    pub result: StructuredResult,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct StructuredResult {
+    pub source: StructuredSource,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pointer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_pointer: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum StructuredSource {
+    OutputFile,
+    Stdout,
+}
+
+impl StructuredRun {
+    fn valid(&self) -> bool {
+        let has = |placeholder: &str| self.args.iter().any(|arg| arg == placeholder);
+        let pointer = |value: &str, allow_root: bool| {
+            value.len() <= 128
+                && (allow_root && value.is_empty()
+                    || value.starts_with('/')
+                        && value.split('/').skip(1).all(|part| !part.is_empty()))
+        };
+        (1..=40).contains(&self.args.len())
+            && self
+                .args
+                .iter()
+                .all(|arg| arg.len() <= 512 && !arg.contains('\0'))
+            && (has("{schema}") || has("{schemaPath}"))
+            && (self.result.source != StructuredSource::OutputFile || has("{outputPath}"))
+            && self
+                .result
+                .pointer
+                .as_deref()
+                .is_none_or(|value| pointer(value, true))
+            && self
+                .result
+                .error_pointer
+                .as_deref()
+                .is_none_or(|value| pointer(value, false))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -197,7 +254,12 @@ impl PluginManifest {
                     .cli
                     .auth_status_args
                     .iter()
-                    .all(|arg| identifier(arg)))
+                    .all(|arg| identifier(arg))
+                || provider
+                    .cli
+                    .structured_run
+                    .as_ref()
+                    .is_some_and(|run| manifest.schema_version < 7 || !run.valid()))
         {
             return Err(invalid_manifest("Invalid plugin agent provider descriptor").into());
         }

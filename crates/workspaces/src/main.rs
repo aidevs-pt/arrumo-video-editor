@@ -1207,6 +1207,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&result)?);
         }
+        [database, command, workspace, run] if command == "process-script-stage" => {
+            let result = WorkspaceStore::open(Path::new(database))?
+                .process_script_stage(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            println!(
+                "{}",
+                serde_json::to_string(&serde_json::json!({ "resultId": result }))?
+            );
+        }
         [database, command, workspace, run, edit @ ..]
             if command == "process-media-stage" && edit.len() <= 1 =>
         {
@@ -1475,7 +1483,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
-                "snapshot-database <new-sqlite-file> | watch-delivery-queue | process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
+                "snapshot-database <new-sqlite-file> | watch-delivery-queue | process-script-stage <workspace-id> <run-id> | process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
                 "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",

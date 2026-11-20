@@ -31,6 +31,17 @@ impl DesktopJobWorkers {
                 },
             )?;
         }
+        workers.spawn(
+            "arrumo-script-writer",
+            database.clone(),
+            Duration::from_secs(2),
+            |store| {
+                store
+                    .process_next_script_stage()
+                    .map(|result| result.is_some())
+                    .map_err(|_| ())
+            },
+        )?;
         let subtitles_database = database.clone();
         workers.spawn(
             "arrumo-delivery-subtitles",
