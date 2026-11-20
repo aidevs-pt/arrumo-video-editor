@@ -47,8 +47,17 @@ function FaceMark({ className = "size-8" }: { className?: string }) {
 
 function StudioLayout({ workspaces, workspace, view, onSelect, children }: Parameters<typeof WorkspaceFrame>[0]) {
   const { messages } = useLocale();
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, setOpen } = useSidebar();
   const pathname = usePathname().replace(/\/$/, "");
+
+  useEffect(() => {
+    // Medium windows keep the rail as icons so pages get their width; the person can still expand it.
+    const narrow = matchMedia("(max-width: 1099px)");
+    const apply = () => setOpen(!narrow.matches);
+    if (narrow.matches) apply();
+    narrow.addEventListener("change", apply);
+    return () => narrow.removeEventListener("change", apply);
+  }, [setOpen]);
   const query = useSearchParams();
   const copy = messages.studio;
   const inbox = useGenerationInbox(workspace?.id);

@@ -167,8 +167,8 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
       ) : (
         <div className={cn("grid items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]",
           selectedAssets.length > 0 && "xl:grid-cols-[13rem_minmax(0,1fr)_22rem]")}>
-          <nav aria-label={copy.kinds} className="flex flex-col gap-6">
-            <ul className="flex flex-col gap-1">
+          <nav aria-label={copy.kinds} className="flex flex-wrap items-start gap-x-6 gap-y-3 lg:flex-col lg:flex-nowrap lg:items-stretch lg:gap-6">
+            <ul className="flex flex-wrap gap-1 lg:flex-col">
               {(["all", ...kinds] as const).map((kind) => {
                 const Icon = kindIcons[kind];
                 const active = filter === kind && !groupFilter && !labelFilter;
@@ -187,7 +187,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
             </ul>
             {groups.length > 0 && <div>
               <h2 className="mb-1 px-3 text-sm font-semibold text-muted-foreground">{copy.groups}</h2>
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-wrap gap-1 lg:flex-col">
                 {groups.map((group) => (
                   <li key={group}>
                     <button type="button" aria-pressed={groupFilter === group} onClick={() => setGroupFilter(groupFilter === group ? null : group)}
