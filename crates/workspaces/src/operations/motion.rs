@@ -41,7 +41,22 @@ struct Delete {
     confirmed_title: String,
 }
 
-pub(super) fn definitions() -> [Value; 5] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReadShares {
+    workspace_id: i64,
+    item_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SetShares {
+    workspace_id: i64,
+    item_id: i64,
+    profile_ids: Vec<i64>,
+}
+
+pub(super) fn definitions() -> [Value; 7] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -73,6 +88,15 @@ pub(super) fn definitions() -> [Value; 5] {
         json!({"name": "delete_motion_library_item", "description": "Delete a library entry using its exact saved title and keep its managed media.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id, "confirmedTitle": title},
                 "required": ["workspaceId", "itemId", "confirmedTitle"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
+        json!({"name": "get_motion_library_shares", "description": "Read the additional profile recipients of a motion library item.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id},
+                "required": ["workspaceId", "itemId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_motion_library_shares", "description": "Replace a profile-scoped motion item's additional recipients. Pass an empty array to clear sharing.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "itemId": id, "profileIds": {"type": "array", "items": id, "uniqueItems": true}
+            }, "required": ["workspaceId", "itemId", "profileIds"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
     ]
 }
@@ -114,6 +138,16 @@ pub(super) fn call(
             store.delete_motion_library_item(args.workspace_id, args.item_id, &args.confirmed_title)
                 .map(|deleted| json!({"deleted": deleted}))
                 .map_err(|_| "Could not delete motion item")
+        }),
+        "get_motion_library_shares" => parse(arguments).and_then(|args: ReadShares| {
+            store.motion_library_shares(args.workspace_id, args.item_id)
+                .map(|ids| json!({"profileIds": ids}))
+                .map_err(|_| "Could not read shares. Check the workspace and item")
+        }),
+        "set_motion_library_shares" => parse(arguments).and_then(|args: SetShares| {
+            store.set_motion_library_shares(args.workspace_id, args.item_id, &args.profile_ids)
+                .map(|()| json!({"saved": true}))
+                .map_err(|_| "Could not save shares. Use distinct profiles in the workspace and omit the owning profile")
         }),
         _ => return None,
     })

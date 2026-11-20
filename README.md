@@ -377,3 +377,5 @@ Use `update-motion-item <workspace-id> <item-id> <settings-json>` to replace its
 MCP and A2A expose the same library through `list_motion_library`, `create_motion_library_item`, `update_motion_library_item`, `duplicate_motion_library_item`, and `delete_motion_library_item`. Use `workspaceId` and, where applicable, `profileId`, `itemId`, or `confirmedTitle` as top-level arguments. The nested `settings` uses the same field names as the CLI.
 
 Read a profile-scoped item's additional recipients with `motion-item-shares <workspace-id> <item-id>`. Replace the recipient list with `set-motion-item-shares <workspace-id> <item-id> <profile-ids-json>`. Use an empty array to clear sharing. The owning profile is implicit, and workspace-wide entries are already visible to every profile. Duplicating a profile item copies its recipients.
+
+In MCP and A2A, call `get_motion_library_shares` with `workspaceId` and `itemId`. Call `set_motion_library_shares` with those arguments and `profileIds` to replace the additional recipients, or pass an empty array to clear them.
