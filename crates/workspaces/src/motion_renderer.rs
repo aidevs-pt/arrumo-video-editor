@@ -5,7 +5,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use rusqlite::OptionalExtension;
+use serde::{Deserialize, Serialize};
+
 use crate::{MotionArtifact, WorkspaceStore};
+
+#[derive(Deserialize, Serialize)]
+pub(crate) struct CapturedMotionRenderer {
+    plugin_id: String,
+    package_sha256: String,
+}
 
 pub struct MotionWorkerPaths<'a> {
     pub worker: &'a Path,
@@ -24,6 +33,64 @@ pub fn configured_motion_worker(bundled_worker: Option<PathBuf>) -> Option<PathB
 }
 
 impl WorkspaceStore {
+    pub(crate) fn capture_motion_renderer(
+        &self,
+        id: &str,
+    ) -> rusqlite::Result<Option<CapturedMotionRenderer>> {
+        self.0
+            .query_row(
+                "SELECT package_sha256 FROM installed_plugin_manifests
+             WHERE plugin_id = ?1 AND package_bytes IS NOT NULL AND package_sha256 IS NOT NULL",
+                [id],
+                |row| {
+                    Ok(CapturedMotionRenderer {
+                        plugin_id: id.to_owned(),
+                        package_sha256: row.get(0)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn process_queued_motion_stage(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        worker: &Path,
+    ) -> Result<Option<i64>, Box<dyn Error>> {
+        let snapshot: Option<String> = self
+            .0
+            .query_row(
+                "SELECT snapshot_json FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2 AND state = 'queued'
+               AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'assets'",
+                rusqlite::params![workspace_id, run_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(snapshot) = snapshot else {
+            return Ok(None);
+        };
+        let snapshot: serde_json::Value = serde_json::from_str(&snapshot)?;
+        let Some(renderer) = snapshot
+            .get("motion_renderer")
+            .filter(|value| !value.is_null())
+        else {
+            return Ok(None);
+        };
+        let renderer: CapturedMotionRenderer = serde_json::from_value(renderer.clone())?;
+        self.render_run_motion_with_worker(
+            database,
+            workspace_id,
+            run_id,
+            &renderer.plugin_id,
+            &renderer.package_sha256,
+            worker,
+        )
+        .map(Some)
+    }
+
     pub fn render_run_motion_with_worker(
         &self,
         database: &Path,
@@ -68,6 +135,32 @@ impl WorkspaceStore {
         digest: &str,
         paths: &MotionWorkerPaths<'_>,
     ) -> Result<i64, Box<dyn Error>> {
+        let run = self
+            .generation_run(workspace_id, run_id)?
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+        let order = &run.snapshot["provider_orders"]["motion-render"];
+        if matches!(order["source"].as_str(), Some("app" | "workspace" | "run"))
+            && !order["effective"]
+                .as_array()
+                .is_some_and(|ids| ids.iter().any(|provider| provider.as_str() == Some(id)))
+        {
+            return Err(io::Error::other(
+                "The run's captured provider order excludes this renderer",
+            )
+            .into());
+        }
+        if let Some(renderer) = run
+            .snapshot
+            .get("motion_renderer")
+            .filter(|value| !value.is_null())
+        {
+            let renderer: CapturedMotionRenderer = serde_json::from_value(renderer.clone())?;
+            if renderer.plugin_id == id && !renderer.package_sha256.eq_ignore_ascii_case(digest) {
+                return Err(
+                    io::Error::other("The renderer digest differs from the run snapshot").into(),
+                );
+            }
+        }
         let bytes = self.reviewed_motion_renderer_package(id, digest)?;
         let attempt = self
             .claim_queued_motion_stage(workspace_id, run_id)?

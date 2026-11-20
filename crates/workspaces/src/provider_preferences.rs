@@ -38,7 +38,7 @@ pub struct ProviderPreferences {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct CapturedProviderOrder {
-    effective: Vec<String>,
+    pub(crate) effective: Vec<String>,
     source: PreferenceSource,
 }
 

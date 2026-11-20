@@ -230,8 +230,15 @@ impl WorkspaceStore {
                     error.to_string(),
                 )))
             })?;
+        let motion_renderer = provider_orders
+            .get("motion-render")
+            .and_then(|order| order.effective.first())
+            .map(|id| self.capture_motion_renderer(id))
+            .transpose()?
+            .flatten();
         Ok(json!({
             "schema_version": 1,
+            "motion_renderer": motion_renderer,
             "draft": draft,
             "options": options,
             "preview_settings": self.preview_settings()?,

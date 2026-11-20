@@ -900,6 +900,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run] if command == "process-motion-stage" => {
+            let database = Path::new(database);
+            let worker = arrumo_workspaces::configured_motion_worker(None).ok_or_else(|| {
+                io::Error::other("The host motion renderer worker is unavailable")
+            })?;
+            let result = WorkspaceStore::open(database)?.process_queued_motion_stage(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                &worker,
+            )?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
         [database, command, workspace, run, edit @ ..]
             if command == "process-media-stage" && edit.len() <= 1 =>
         {
@@ -1090,7 +1103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json> | submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",
