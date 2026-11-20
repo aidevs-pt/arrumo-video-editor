@@ -126,22 +126,7 @@ impl WorkspaceStore {
     }
 
     pub fn process_next_plugin_action_job(&self) -> io::Result<Option<PluginActionJob>> {
-        let next: Option<(String, Option<i64>)> = self
-            .0
-            .query_row(
-                "SELECT id, workspace_id FROM plugin_action_jobs
-             WHERE state = 'queued' OR (state = 'running' AND lease_until <= unixepoch())
-             ORDER BY created_at, rowid LIMIT 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()
-            .map_err(|_| job_error())?;
-        next.map(|(id, workspace)| {
-            let id = id.parse().map_err(|_| job_error())?;
-            self.process_plugin_action_job(workspace, id)
-        })
-        .transpose()
+        self.claim_and_run_plugin_action_job(None, None)
     }
 
     pub fn process_plugin_action_job(
@@ -149,42 +134,61 @@ impl WorkspaceStore {
         workspace_id: Option<i64>,
         id: Uuid,
     ) -> io::Result<PluginActionJob> {
-        let claim: Option<(String, String, String, String, i64)> = self
+        match self.claim_and_run_plugin_action_job(Some(id), workspace_id)? {
+            Some(job) => Ok(job),
+            None => self.plugin_action_job(workspace_id, id),
+        }
+    }
+
+    fn claim_and_run_plugin_action_job(
+        &self,
+        id: Option<Uuid>,
+        workspace_id: Option<i64>,
+    ) -> io::Result<Option<PluginActionJob>> {
+        let claim = self
             .0
             .query_row(
                 "UPDATE plugin_action_jobs
              SET state = 'running', attempt = attempt + 1, lease_until = unixepoch() + 120
-             WHERE id = ?1 AND workspace_id IS ?2 AND
-                (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
-             RETURNING plugin_id, action_id, package_sha256, input, attempt",
-                params![id.to_string(), workspace_id],
+             WHERE id = (
+                 SELECT id FROM plugin_action_jobs
+                 WHERE (?1 IS NULL OR (id = ?1 AND workspace_id IS ?2))
+                     AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
+                 ORDER BY created_at, rowid LIMIT 1
+             )
+             RETURNING id, workspace_id, plugin_id, action_id, package_sha256, input, attempt",
+                params![id.map(|id| id.to_string()), workspace_id],
                 |row| {
                     Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<i64>>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, i64>(6)?,
                     ))
                 },
             )
             .optional()
             .map_err(|_| job_error())?;
-        if let Some((plugin, action, digest, input, attempt)) = claim {
-            let input = serde_json::from_str::<Value>(&input).map_err(|_| job_error())?;
-            let (state, result) = match self.invoke_reviewed_plugin_action(&plugin, &action, &digest, workspace_id, &input) {
+        let Some((id, workspace_id, plugin, action, digest, input, attempt)) = claim else {
+            return Ok(None);
+        };
+        let input = serde_json::from_str::<Value>(&input).map_err(|_| job_error())?;
+        let (state, result) = match self.invoke_reviewed_plugin_action(&plugin, &action, &digest, workspace_id, &input) {
                 Ok(result) => ("completed", serde_json::to_string(&result).map_err(|_| job_error())?),
                 Err(_) => ("failed", serde_json::json!({"error": "Plugin action could not run for the reviewed package"}).to_string()),
             };
-            self.0
-                .execute(
-                    "UPDATE plugin_action_jobs SET state = ?4, result = ?5, lease_until = NULL
+        self.0
+            .execute(
+                "UPDATE plugin_action_jobs SET state = ?4, result = ?5, lease_until = NULL
                  WHERE id = ?1 AND workspace_id IS ?2 AND attempt = ?3 AND state = 'running'",
-                    params![id.to_string(), workspace_id, attempt, state, result],
-                )
-                .map_err(|_| job_error())?;
-        }
-        self.plugin_action_job(workspace_id, id)
+                params![id, workspace_id, attempt, state, result],
+            )
+            .map_err(|_| job_error())?;
+        let id = id.parse().map_err(|_| job_error())?;
+        self.plugin_action_job(workspace_id, id).map(Some)
     }
 }
 
@@ -206,4 +210,66 @@ fn read_job(row: &rusqlite::Row<'_>) -> rusqlite::Result<PluginActionJob> {
 
 fn job_error() -> io::Error {
     io::Error::other("Could not access plugin action job")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::Barrier, thread};
+
+    use super::*;
+
+    #[test]
+    fn workers_claim_one_attempt_and_recover_only_expired_leases() {
+        let directory = tempfile::tempdir().unwrap();
+        let database = directory.path().join("workspaces.sqlite");
+        let store = WorkspaceStore::open(&database).unwrap();
+        let other_worker = WorkspaceStore::open(&database).unwrap();
+        let queued = Uuid::new_v4();
+        let leased = Uuid::new_v4();
+        for id in [leased, queued] {
+            store.0.execute(
+                "INSERT INTO plugin_action_jobs (id, plugin_id, action_id, package_sha256, input)
+                 VALUES (?1, 'missing-plugin', 'example', ?2, '{}')",
+                params![id.to_string(), "0".repeat(64)],
+            ).unwrap();
+        }
+        store.0.execute(
+            "UPDATE plugin_action_jobs SET state = 'running', attempt = 1, lease_until = unixepoch() + 120
+             WHERE id = ?1",
+            [leased.to_string()],
+        ).unwrap();
+
+        let barrier = Barrier::new(2);
+        let claimed = thread::scope(|scope| {
+            let run = |worker: WorkspaceStore| {
+                barrier.wait();
+                worker.process_next_plugin_action_job().unwrap()
+            };
+            let first_worker = WorkspaceStore::open(&database).unwrap();
+            let first = scope.spawn(move || run(first_worker));
+            let second = scope.spawn(move || run(other_worker));
+            [first.join().unwrap(), second.join().unwrap()]
+        });
+        let claimed: Vec<_> = claimed.into_iter().flatten().collect();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].id, queued.to_string());
+        assert_eq!(claimed[0].attempt, 1);
+        assert_eq!(claimed[0].state, "failed");
+        assert_eq!(
+            store.plugin_action_job(None, leased).unwrap().state,
+            "running"
+        );
+
+        store
+            .0
+            .execute(
+                "UPDATE plugin_action_jobs SET lease_until = unixepoch() - 1 WHERE id = ?1",
+                [leased.to_string()],
+            )
+            .unwrap();
+        let recovered = store.process_next_plugin_action_job().unwrap().unwrap();
+        assert_eq!(recovered.id, leased.to_string());
+        assert_eq!(recovered.attempt, 2);
+        assert!(store.process_next_plugin_action_job().unwrap().is_none());
+    }
 }
