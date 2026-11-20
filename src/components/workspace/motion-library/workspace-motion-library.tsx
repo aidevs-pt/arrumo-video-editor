@@ -20,6 +20,7 @@ import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout"
 import { workspaceHref, type Workspace } from "@/components/workspace/home/workspace-links";
 import { useLocale } from "@/lib/locale-provider";
 
+import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
 
 type Kind = "animation" | "transition";
@@ -196,6 +197,8 @@ function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope:
                 {settings.usage_markdown && <p className="whitespace-pre-wrap wrap-anywhere text-sm text-muted-foreground">{settings.usage_markdown}</p>}
               </CardContent>
               <CardFooter className="flex-wrap gap-1">
+                <MotionPreviewDialog workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
+                  itemId={id} title={settings.title} />
                 {(["edit", "duplicate"] as const).map((mode) => (
                   <Button key={mode} type="button" size="sm" variant="ghost" disabled={open}
                     aria-label={`${copy[mode]} · ${settings.title}`}

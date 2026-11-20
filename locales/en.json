@@ -186,6 +186,11 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "playPreview": "Play preview",
+    "previewDescription": "The video loops during playback. Play linked sound separately.",
+    "loadingPreview": "Loading preview…",
+    "previewError": "Could not play the preview. Check that the video is available and supported on this device.",
+    "soundPreviewError": "Could not play the linked sound.",
     "share": "Share with profiles",
     "shareDescription": "Choose which other profiles can use this item. Its owning profile always has access.",
     "loadingShares": "Loading recipients…",

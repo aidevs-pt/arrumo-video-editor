@@ -381,3 +381,5 @@ Read a profile-scoped item's additional recipients with `motion-item-shares <wor
 In MCP and A2A, call `get_motion_library_shares` with `workspaceId` and `itemId`. Call `set_motion_library_shares` with those arguments and `profileIds` to replace the additional recipients, or pass an empty array to clear them.
 
 In the desktop Motion library, select a profile to see its entries alongside workspace-wide items. Use **Share with profiles** on a profile-scoped item to add or remove recipients. A link such as `arrumo://open/motion-library?workspace=1&profile=2` opens that profile's library view.
+
+Use **Play preview** to open a looping video preview and audition linked sound separately. Playback depends on the desktop webview supporting the media codec.

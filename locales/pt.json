@@ -186,6 +186,11 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "motionLibrary": {
+    "playPreview": "Reproduzir pré-visualização",
+    "previewDescription": "O vídeo repete-se durante a reprodução. Podes ouvir o som associado em separado.",
+    "loadingPreview": "A carregar pré-visualização…",
+    "previewError": "Não foi possível reproduzir a pré-visualização. Verifica se o vídeo está disponível e é compatível com este dispositivo.",
+    "soundPreviewError": "Não foi possível reproduzir o som associado.",
     "share": "Partilhar com perfis",
     "shareDescription": "Escolhe que outros perfis podem usar este elemento. O perfil proprietário tem sempre acesso.",
     "loadingShares": "A carregar destinatários…",
