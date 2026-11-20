@@ -459,6 +459,8 @@
     "filterEmpty": "No runs in this view.",
     "emptyDescription": "Queue a draft to start a production run.",
     "emptyActivity": "No activity has been recorded.",
+    "saveMotion": "Save motion to library",
+    "saveMotionHint": "Save accepted animations and transitions for reuse. Turn this off for one-off media.",
     "autopilotHint": "Automatically proceed through review stages.",
     "runDetail": "Generation run",
     "openRun": "Open run",

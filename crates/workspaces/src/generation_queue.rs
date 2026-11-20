@@ -7,14 +7,31 @@ use serde_json::{Value, json};
 use crate::WorkspaceStore;
 use crate::format_deliveries::read_settings;
 
-#[derive(Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RunOptions {
     #[serde(default)]
     pub autopilot: bool,
+    #[serde(default = "default_save_motion_to_library")]
+    pub save_motion_to_library: bool,
     pub platform: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub provider_overrides: BTreeMap<String, Vec<String>>,
+}
+
+fn default_save_motion_to_library() -> bool {
+    true
+}
+
+impl Default for RunOptions {
+    fn default() -> Self {
+        Self {
+            autopilot: false,
+            save_motion_to_library: default_save_motion_to_library(),
+            platform: None,
+            provider_overrides: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]

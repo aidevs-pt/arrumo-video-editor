@@ -166,7 +166,28 @@ impl WorkspaceStore {
         }) {
             return Err(rusqlite::Error::InvalidQuery);
         }
-        let existing = tx.query_row(
+        let position = usize::try_from(index).map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let settings = result
+            .get("motion_items")
+            .and_then(|items| items.get(position))
+            .ok_or(rusqlite::Error::InvalidQuery)?;
+        let settings: MotionLibrarySettings = serde_json::from_value(settings.clone())
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        let item =
+            self.save_captured_motion_item(workspace_id, run_id, result_id, index, &settings)?;
+        tx.commit()?;
+        Ok(item)
+    }
+
+    pub(crate) fn save_captured_motion_item(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+        index: i64,
+        settings: &MotionLibrarySettings,
+    ) -> rusqlite::Result<MotionLibraryItem> {
+        let existing = self.0.query_row(
             "SELECT id, workspace_id, profile_id, kind, title, usage_markdown,
                     preview_asset_id, thumbnail_asset_id, sound_asset_id
              FROM motion_library WHERE workspace_id = ?1 AND source_result_id = ?2 AND source_motion_index = ?3",
@@ -176,20 +197,12 @@ impl WorkspaceStore {
         if let Some(item) = existing {
             return Ok(item);
         }
-        let position = usize::try_from(index).map_err(|_| rusqlite::Error::InvalidQuery)?;
-        let settings = result
-            .get("motion_items")
-            .and_then(|items| items.get(position))
-            .ok_or(rusqlite::Error::InvalidQuery)?;
-        let settings: MotionLibrarySettings = serde_json::from_value(settings.clone())
-            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
-        let item = self.insert_motion_library_item(workspace_id, &settings, true)?;
-        tx.execute(
+        let item = self.insert_motion_library_item(workspace_id, settings, true)?;
+        self.0.execute(
             "UPDATE motion_library SET source_run_id = ?2, source_result_id = ?3, source_motion_index = ?4
              WHERE id = ?1",
             params![item.id, run_id, result_id, index],
         )?;
-        tx.commit()?;
         Ok(item)
     }
 

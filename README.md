@@ -389,3 +389,5 @@ An Assets stage result can include a `motion_items` array. Each entry uses the s
 Use `save-motion-result <workspace-id> <run-id> <result-id> <index>` to save one accepted Assets stage motion result to the library. The index is zero-based. Repeating the command returns the existing entry while it remains in the library. Saved entries retain the run and result IDs and share the exact managed media, including earlier versions that were replaced after the run.
 
 In MCP and A2A, call `save_motion_result` with `workspaceId`, `runId`, `resultId`, and the zero-based `index` in the accepted Assets result's `motion_items` array. The response includes the saved `item`.
+
+Accepted motion results are saved to the library by default when an Assets stage advances, including in autopilot. Set `save_motion_to_library` to `false` in the run options or turn off **Save motion to library** when queuing a desktop run. You can still save an item manually from its accepted result.

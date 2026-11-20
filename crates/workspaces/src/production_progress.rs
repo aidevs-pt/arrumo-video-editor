@@ -116,6 +116,9 @@ impl WorkspaceStore {
             params![workspace_id, run_id, next_state, advance, pending],
             |_| Ok(()),
         )?;
+        if stage == ProductionStage::Assets && !step.review_required {
+            self.persist_accepted_motion_items(workspace_id, run_id, id)?;
+        }
         publish()?;
         tx.commit()?;
         Ok(id)
@@ -149,7 +152,42 @@ impl WorkspaceStore {
             params![run_id, result_id, decision.as_str(), notes],
             |_| Ok(()),
         )?;
+        if decision == ReviewDecision::Approved {
+            self.persist_accepted_motion_items(workspace_id, run_id, result_id)?;
+        }
         tx.commit()
+    }
+
+    fn persist_accepted_motion_items(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+    ) -> rusqlite::Result<()> {
+        let items: Option<String> = self.0.query_row(
+            "SELECT CASE
+                 WHEN json_extract(run.plan_json, '$.steps[' || result.stage_index || '].stage') = 'assets'
+                   AND coalesce(json_extract(run.snapshot_json, '$.options.save_motion_to_library'), 1) = 1
+                 THEN json_extract(result.result_json, '$.motion_items')
+             END
+             FROM production_results AS result JOIN generation_runs AS run ON run.id = result.run_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2 AND result.id = ?3",
+            params![workspace_id, run_id, result_id],
+            |row| row.get(0),
+        )?;
+        if let Some(items) = items {
+            let settings: Vec<crate::MotionLibrarySettings> = read_settings(Some(items), 0)?;
+            for (index, item) in settings.iter().enumerate() {
+                self.save_captured_motion_item(
+                    workspace_id,
+                    run_id,
+                    result_id,
+                    index as i64,
+                    item,
+                )?;
+            }
+        }
+        Ok(())
     }
 
     pub fn production_progress(

@@ -64,6 +64,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
     const fields = new FormData(event.currentTarget);
     const options = {
       autopilot: fields.has("autopilot"),
+      save_motion_to_library: fields.has("save-motion"),
       platform: String(fields.get("platform") ?? "").trim() || null,
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
     };
@@ -127,6 +128,14 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
                       <div className="flex flex-col gap-1">
                         <FieldLabel htmlFor="run-autopilot">{copy.autopilot}</FieldLabel>
                         <FieldDescription id="run-autopilot-description">{copy.autopilotHint}</FieldDescription>
+                      </div>
+                    </Field>
+                    <Field orientation="horizontal">
+                      <Switch id="run-save-motion" name="save-motion" defaultChecked disabled={pending}
+                        aria-describedby="run-save-motion-description" />
+                      <div className="flex flex-col gap-1">
+                        <FieldLabel htmlFor="run-save-motion">{copy.saveMotion}</FieldLabel>
+                        <FieldDescription id="run-save-motion-description">{copy.saveMotionHint}</FieldDescription>
                       </div>
                     </Field>
                     <RunProviders workspaceId={workspaceId} disabled={pending} />

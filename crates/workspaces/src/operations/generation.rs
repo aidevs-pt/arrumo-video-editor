@@ -233,7 +233,7 @@ pub(super) fn definitions() -> [Value; 31] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "draftId": id, "requestKey": {"type": "string", "minLength": 1, "maxLength": 128},
                 "options": {"type": "object", "properties": {
-                    "autopilot": {"type": "boolean"}, "platform": {"type": ["string", "null"]},
+                    "autopilot": {"type": "boolean"}, "save_motion_to_library": {"type": "boolean", "default": true}, "platform": {"type": ["string", "null"]},
                     "provider_overrides": {"type": "object", "additionalProperties": {
                         "type": "array", "items": {"type": "string"}, "uniqueItems": true
                     }}
