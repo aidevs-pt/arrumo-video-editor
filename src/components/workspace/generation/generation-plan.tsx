@@ -327,7 +327,8 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const staged = textDecisions.length + mediaDecisions.length;
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
-    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && (key !== "preview_videos" || previews.length === 0)
+    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript"
+      && !(previews.length > 0 && isCutList(result.result.cuts) && (key === "cuts" || key === "cut_notes")) && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
@@ -456,7 +457,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             ))}
           </ul>
         )}
-        {previews.length > 0 && <div className="grid items-start gap-4 md:grid-cols-2">{previews.map(({ filename, formatId }, index) => (
+        {previews.length > 0 && <div className={cn("grid items-start gap-4", previews.length > 1 && "md:grid-cols-2")}>{previews.map(({ filename, formatId }, index) => (
           <div key={filename} className="grid min-w-0 gap-2">
             <GuidedPreview workspaceId={workspaceId} runId={runId}
               resultId={result.id} filename={filename} formatId={formatId} initiallyOpen={index === 0}
@@ -464,6 +465,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             {hasPreviewReview && reviewControls("media", index, formats.find((format) => format.id === formatId)?.name ?? filename)}
           </div>
         ))}</div>}
+        {previews.length > 0 && <CutList cuts={result.result.cuts} notes={result.result.cut_notes} agent={agent} />}
         {Object.keys(source).length > 0 && (
           <Collapsible defaultOpen={!markdown && !hasSupplemental && previews.length === 0}>
             <CollapsibleTrigger asChild>
@@ -531,6 +533,47 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         </Button>
       </div>
     </Card>
+  );
+}
+
+type Cut = { asset_id: number; start_ms: number; end_ms: number };
+
+function isCutList(value: unknown): value is Cut[] {
+  return Array.isArray(value) && value.length > 0 && value.every((cut) =>
+    cut && typeof cut.start_ms === "number" && typeof cut.end_ms === "number");
+}
+
+function clock(ms: number) {
+  const seconds = ms / 1000;
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, "0")}`;
+}
+
+function CutList({ cuts, notes, agent }: { cuts: unknown; notes: unknown; agent?: string }) {
+  const { messages: { productionPlan: copy } } = useLocale();
+  if (!isCutList(cuts)) return null;
+  const details = Array.isArray(notes) ? notes : [];
+  const total = cuts.reduce((sum, cut) => sum + cut.end_ms - cut.start_ms, 0);
+  return (
+    <section aria-labelledby="cut-list" className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 id="cut-list" className="font-bold">{agent ? copy.cutsTitle.replace("{agent}", agent) : copy.cutsTitleFallback}</h3>
+        <p className="text-sm text-muted-foreground tabular-nums">
+          {copy.cutsSummary.replace("{count}", String(cuts.length)).replace("{duration}", clock(total))}</p>
+      </div>
+      <ol className="flex flex-col divide-y rounded-lg border">
+        {cuts.map((cut, index) => {
+          const detail = details[index] && typeof details[index] === "object" ? details[index] : {};
+          return (
+            <li key={index} className="grid gap-x-4 gap-y-0.5 px-3 py-2 text-sm sm:grid-cols-[2rem_minmax(0,12rem)_8rem_minmax(0,1fr)]">
+              <span className="font-bold tabular-nums text-muted-foreground">{index + 1}</span>
+              <span className="truncate font-semibold" title={detail.clip}>{detail.clip ?? `#${cut.asset_id}`}</span>
+              <span className="tabular-nums">{clock(cut.start_ms)}–{clock(cut.end_ms)}</span>
+              <span className="min-w-0 wrap-anywhere text-muted-foreground">{detail.purpose}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 

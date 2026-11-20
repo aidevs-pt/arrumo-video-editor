@@ -929,7 +929,7 @@
     "reject": "Rechazar",
     "revise": "Pedir cambios",
     "reviewError": "No se pudo guardar la decisión. El resultado puede haber cambiado.",
-    "sendNothing": "Enviar decisión",
+    "sendNothing": "Nada que enviar todavía",
     "stagedOne": "1 decisión preparada. Puedes cambiarla. Nada llega a {agent} hasta que la envíes.",
     "agentFallback": "el agente",
     "captionReview": "{stage}: listo para tu revisión.",
@@ -941,7 +941,10 @@
     "draftTitle": "{stage}, borrador v{version}",
     "reviewHint": "Aprueba, pide cambios o rechaza. No se envía nada hasta que pulses Enviar.",
     "noTranscript": "Escrito sin oír {clips}. Añade una clave de transcripción y pide cambios para redactarlo a partir de lo que dijiste.",
-    "addKey": "Añadir una clave"
+    "addKey": "Añadir una clave",
+    "cutsTitle": "Lo que {agent} conservó",
+    "cutsTitleFallback": "Lo que conservó el agente",
+    "cutsSummary": "{count} cortes, {duration} en total"
   },
   "markdownEditor": {
     "source": "Código Markdown",
