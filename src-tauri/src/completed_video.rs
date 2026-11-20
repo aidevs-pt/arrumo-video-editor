@@ -253,6 +253,27 @@ pub async fn save_completed_subtitle_revision(
 }
 
 #[tauri::command]
+pub async fn attach_completed_media(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    asset_id: i64,
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "store_unavailable")?
+        .join("workspaces.sqlite");
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .attach_completed_media(&database, workspace_id, run_id, format_id, asset_id)
+        .map_err(|_| "attach_completed_media_failed")
+}
+
+#[tauri::command]
 pub async fn detach_completed_media(
     workspace_id: i64,
     run_id: i64,

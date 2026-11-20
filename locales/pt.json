@@ -671,6 +671,13 @@
     "save": "Guardar versão"
   },
   "completedVideo": {
+    "attachFile": "Anexar ficheiro",
+    "attachFileDescription": "Escolha um recurso do espaço de trabalho para incluir em {format}.",
+    "attachNoAssets": "Não há recursos disponíveis. Importe primeiro um ficheiro em Recursos.",
+    "attachAssetLabel": "Recurso do espaço de trabalho",
+    "attachAssetPlaceholder": "Escolha um recurso",
+    "attachLoadError": "Não foi possível carregar os recursos.",
+    "attachSaveError": "Não foi possível anexar o ficheiro. Confirme que ainda está disponível em Recursos.",
     "detachAttachment": "Remover ficheiro",
     "detachAttachmentTitle": "Remover {name}?",
     "detachAttachmentDescription": "O ficheiro será removido desta entrega e do respetivo ZIP. Continuará nos recursos do espaço de trabalho.",

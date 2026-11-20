@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
 
-export type SupplementalMedia = { name: string; kind: "image" | "audio" | "video"; format_id: number | null; attachment_id?: number };
+export type SupplementalMedia = { asset_id: number; name: string; kind: "image" | "audio" | "video"; format_id: number | null; attachment_id?: number };
 
 export function SupplementalMediaPreview({ workspaceId, runId, index, media }: {
   workspaceId: number;

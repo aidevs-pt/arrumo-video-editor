@@ -468,4 +468,4 @@ Use `detach-completed-media <workspace-id> <run-id> <attachment-id>` or
 to remove the attachment while keeping the asset in the workspace. A repeated
 removal returns false. Other attachment links keep their IDs.
 
-In the desktop file viewer, **Detach file** removes a post-completion attachment from the delivery and returns to the video. The managed file remains in workspace Assets.
+In the desktop Video tab, select the output format and use **Attach file** under **Other files in this video** to choose a managed workspace asset. In the desktop file viewer, **Detach file** removes a post-completion attachment from the delivery and returns to the video. The managed file remains in workspace Assets.

@@ -23,6 +23,7 @@ import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { completedVideoHref, workspaceHref, type CompletedFile } from "../home/workspace-links";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
+import { AttachCompletedMedia } from "./attach-completed-media";
 import { DetachCompletedMedia } from "./detach-completed-media";
 import { OutputDateField } from "./output-date-field";
 import { SupplementalMediaPreview, type SupplementalMedia } from "./supplemental-media-preview";
@@ -112,13 +113,14 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, file
     );
   }
   return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} file={file}
+    onAttach={() => setAttempt((current) => current + 1)}
     onDetach={(id) => setVideo((current) => current && ({
       ...current,
       supplemental_media: current.supplemental_media.filter((item) => item.attachment_id !== id),
     }))} />;
 }
 
-function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onDetach }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile; onDetach: (id: number) => void }) {
+function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAttach, onDetach }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile; onAttach: () => void; onDetach: (id: number) => void }) {
   const { locale, messages: { completedVideo: copy, queue } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
@@ -336,8 +338,13 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onDe
           ) : (
             <Empty><EmptyHeader><EmptyTitle>{copy.noOutputs}</EmptyTitle><EmptyDescription>{copy.previewError}</EmptyDescription></EmptyHeader></Empty>
           )}
-          {(textLinks.length > 0 || mediaLinks.length > 0) && <section className="mt-6 border-t pt-4">
-            <h2 className="mb-3 text-[1.3125rem]">{copy.otherFiles}</h2>
+          {(selected || textLinks.length > 0 || mediaLinks.length > 0) && <section className="mt-6 border-t pt-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[1.3125rem]">{copy.otherFiles}</h2>
+              {selected && <AttachCompletedMedia key={selected.format_id} workspaceId={workspaceId} runId={runId}
+                formatId={selected.format_id} formatName={outputName(selected)} onAttached={onAttach}
+                attached={mediaOutputs.filter((item) => item.format_id === selected.format_id).map((item) => item.asset_id)} />}
+            </div>
             <div className="flex flex-wrap gap-2">{textLinks}{mediaLinks}</div>
           </section>}
         </TabsContent>

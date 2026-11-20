@@ -671,6 +671,13 @@
     "save": "Save version"
   },
   "completedVideo": {
+    "attachFile": "Attach file",
+    "attachFileDescription": "Choose a workspace asset to include with {format}.",
+    "attachNoAssets": "There are no available assets. Import a file in workspace Assets first.",
+    "attachAssetLabel": "Workspace asset",
+    "attachAssetPlaceholder": "Choose an asset",
+    "attachLoadError": "Could not load workspace assets.",
+    "attachSaveError": "Could not attach the file. Check that it is still available in Assets.",
     "detachAttachment": "Detach file",
     "detachAttachmentTitle": "Detach {name}?",
     "detachAttachmentDescription": "The file will leave this delivery and its ZIP export. It will stay in workspace Assets.",
