@@ -186,6 +186,10 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "runItems": "Animations and transitions",
+    "saveRunItem": "Save to library",
+    "openSavedItem": "Open motion library",
+    "runItemError": "Could not save this item. Check its media and try again.",
     "playPreview": "Play preview",
     "previewDescription": "The video loops during playback. Play linked sound separately.",
     "loadingPreview": "Loading preview…",

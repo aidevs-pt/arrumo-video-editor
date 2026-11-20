@@ -20,6 +20,7 @@ import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { workspaceHref } from "../home/workspace-links";
+import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
 import { OutputDateField } from "./output-date-field";
 import { CompletedOutputPreview } from "./completed-output-preview";
@@ -50,8 +51,8 @@ type CompletedVideo = {
       formats?: { format: Format }[];
     };
   };
-  plan: { steps: { stage: Stage }[] };
-  production: { results: FeedbackResult[] };
+  plan: { steps: { stage: Stage; review_required: boolean }[] };
+  production: { stage_index: number; results: (FeedbackResult & MotionStageResult)[] };
   activity: Activity[];
   feedback: VideoFeedback[];
   title: string;
@@ -223,6 +224,8 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId }: { worksp
           )}
         </TabsContent>
         <TabsContent value="details" forceMount className="flex flex-col gap-5 data-[state=inactive]:hidden">
+          <RunMotionResults workspaceId={workspaceId} runId={runId} results={video.production.results}
+            steps={video.plan.steps} stageIndex={video.production.stage_index} />
           <Card>
             <CardHeader><CardTitle>{copy.detailsTab}</CardTitle></CardHeader>
             <CardContent className="flex flex-col gap-4">

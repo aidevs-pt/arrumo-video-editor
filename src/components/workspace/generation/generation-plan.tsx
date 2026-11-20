@@ -18,11 +18,12 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
+import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
-type StageResult = { id: number; result: Record<string, unknown> };
+type StageResult = MotionStageResult;
 type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
 type Decision = "approved" | "revise" | "rejected";
 type ReviewDraft = { decision: Decision | ""; notes: string };
@@ -146,6 +147,8 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
           </CardContent>
         </Card>
       )}
+      {progress && plan && <RunMotionResults workspaceId={workspaceId} runId={runId}
+        results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
       {awaiting && currentStage && (
         <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting}
           reviewing={reviewing} reviewError={reviewError} onReview={review} />

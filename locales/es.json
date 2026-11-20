@@ -186,6 +186,10 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "motionLibrary": {
+    "runItems": "Animaciones y transiciones",
+    "saveRunItem": "Guardar en la biblioteca",
+    "openSavedItem": "Abrir biblioteca de movimiento",
+    "runItemError": "No se pudo guardar este elemento. Comprueba los recursos e inténtalo de nuevo.",
     "playPreview": "Reproducir vista previa",
     "previewDescription": "El vídeo se repite durante la reproducción. Puedes escuchar el sonido por separado.",
     "loadingPreview": "Cargando vista previa…",

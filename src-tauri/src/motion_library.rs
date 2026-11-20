@@ -168,3 +168,18 @@ pub async fn preview_motion_library_item(
             .transpose()?,
     })
 }
+
+#[tauri::command]
+pub async fn save_motion_result(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    index: i64,
+    store: State<'_, Store>,
+) -> Result<MotionLibraryItem, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .save_motion_result(workspace_id, run_id, result_id, index)
+        .map_err(|_| "motion_result_save_failed")
+}
