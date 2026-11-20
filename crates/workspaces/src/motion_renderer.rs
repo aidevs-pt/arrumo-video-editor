@@ -52,6 +52,31 @@ impl WorkspaceStore {
             .optional()
     }
 
+    pub fn process_next_motion_stage(
+        &self,
+        database: &Path,
+        worker: &Path,
+    ) -> Result<Option<i64>, Box<dyn Error>> {
+        let candidate: Option<(i64, i64)> = self.0.query_row(
+            "SELECT run.workspace_id, run.id FROM generation_runs run
+             JOIN installed_plugin_manifests plugin
+               ON plugin.plugin_id = json_extract(run.snapshot_json, '$.motion_renderer.plugin_id')
+              AND plugin.package_sha256 = json_extract(run.snapshot_json, '$.motion_renderer.package_sha256')
+             WHERE plugin.package_bytes IS NOT NULL
+               AND (run.state = 'queued' OR (run.state = 'running' AND run.lease_until <= unixepoch()))
+               AND json_extract(run.plan_json, '$.steps[' || run.stage_index || '].stage') = 'assets'
+             ORDER BY run.id LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        match candidate {
+            Some((workspace_id, run_id)) => {
+                self.process_queued_motion_stage(database, workspace_id, run_id, worker)
+            }
+            None => Ok(None),
+        }
+    }
+
     pub fn process_queued_motion_stage(
         &self,
         database: &Path,
@@ -63,7 +88,8 @@ impl WorkspaceStore {
             .0
             .query_row(
                 "SELECT snapshot_json FROM generation_runs
-             WHERE workspace_id = ?1 AND id = ?2 AND state = 'queued'
+             WHERE workspace_id = ?1 AND id = ?2
+               AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
                AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'assets'",
                 rusqlite::params![workspace_id, run_id],
                 |row| row.get(0),

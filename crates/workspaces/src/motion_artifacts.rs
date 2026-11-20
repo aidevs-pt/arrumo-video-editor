@@ -38,7 +38,8 @@ impl WorkspaceStore {
             .query_row(
                 "UPDATE generation_runs SET state = 'running', attempt = attempt + 1,
                  lease_until = unixepoch() + ?3
-             WHERE workspace_id = ?1 AND id = ?2 AND state = 'queued'
+             WHERE workspace_id = ?1 AND id = ?2
+               AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
                AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'assets'
              RETURNING attempt",
                 params![

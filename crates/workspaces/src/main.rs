@@ -900,6 +900,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command] if command == "watch-motion-queue" => {
+            let database = Path::new(database);
+            let worker = arrumo_workspaces::configured_motion_worker(None).ok_or_else(|| {
+                io::Error::other("The host motion renderer worker is unavailable")
+            })?;
+            let store = WorkspaceStore::open(database)?;
+            loop {
+                match store.process_next_motion_stage(database, &worker) {
+                    Ok(Some(result)) => println!("{result}"),
+                    Ok(None) => std::thread::sleep(std::time::Duration::from_secs(2)),
+                    Err(_) => {
+                        eprintln!(
+                            "Arrumo could not dispatch the selected motion stage. Check the run and renderer installation."
+                        );
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                    }
+                }
+            }
+        }
         [database, command, workspace, run] if command == "process-motion-stage" => {
             let database = Path::new(database);
             let worker = arrumo_workspaces::configured_motion_worker(None).ok_or_else(|| {
@@ -1103,7 +1122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json> | submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | watch-motion-queue | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",
