@@ -471,3 +471,5 @@ removal returns false. Other attachment links keep their IDs.
 In the desktop Video tab, select the output format and use **Attach file** under **Other files in this video** to choose a managed workspace asset. In the desktop file viewer, **Detach file** removes a post-completion attachment from the delivery and returns to the video. The managed file remains in workspace Assets.
 
 Use `synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file>` to send UTF-8 text on stdin to a trusted bundled speech provider. The output extension must match the adapter's response format. The editor resolves the configured workspace credential with app fallback, validates the returned audio with FFprobe, and saves it without overwriting an existing file. This command makes one provider request per invocation.
+
+The local CLI command `verified-video-source <workspace-id> <run-id> <format-id>` prints the verified MP4 path as JSON for workflows running on the same machine.
