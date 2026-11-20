@@ -10,6 +10,7 @@ mod agent_settings;
 mod asset_cleanup;
 mod asset_organization;
 mod assets;
+mod automatic_subtitles;
 mod brand_assets;
 mod clip_render;
 mod completed_video;
@@ -193,6 +194,7 @@ impl WorkspaceStore {
             include_str!("../migrations/047-stable-completed-media.sql"),
             include_str!("../migrations/048-variant-content-identity.sql"),
             include_str!("../migrations/049-plugin-action-jobs.sql"),
+            include_str!("../migrations/050-automatic-delivery-subtitles.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

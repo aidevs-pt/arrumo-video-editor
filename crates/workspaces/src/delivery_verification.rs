@@ -757,8 +757,20 @@ mod transcription_tests {
             .unwrap();
         assert!(status.success());
 
-        let cues = store
-            .generate_delivery_subtitles_with(
+        assert!(!store.process_next_automatic_subtitles(&database).unwrap());
+        store.0.execute(
+            "UPDATE generation_runs SET snapshot_json = json_set(snapshot_json, '$.options.generate_delivery_subtitles', json('true')) WHERE id = ?1",
+            [run.id],
+        ).unwrap();
+        assert!(store.process_next_automatic_subtitles_with(&database, |claimed_workspace, claimed_run, claimed_format| {
+            assert_eq!((claimed_workspace, claimed_run, claimed_format), (workspace, run.id, format_id));
+            let state: String = store.0.query_row(
+                "SELECT state FROM automatic_delivery_subtitles WHERE run_id = ?1 AND format_id = ?2",
+                params![run.id, format_id],
+                |row| row.get(0),
+            ).unwrap();
+            assert_eq!(state, "started");
+            store.generate_delivery_subtitles_with(
                 &database,
                 workspace,
                 run.id,
@@ -782,8 +794,7 @@ mod transcription_tests {
                     })
                 },
             )
-            .unwrap();
-        assert_eq!(cues, 1);
+        }).unwrap());
 
         let srt = directory.join("5.srt");
         let expected = "1\n00:00:00,125 --> 00:00:00,750\nFixture audio\n\n";
@@ -800,6 +811,24 @@ mod transcription_tests {
                 .is_err()
         );
         assert_eq!(fs::read_to_string(&srt).unwrap(), expected);
+        fs::remove_file(&srt).unwrap();
+        store
+            .0
+            .execute(
+                "UPDATE automatic_delivery_subtitles SET state = 'started' WHERE run_id = ?1",
+                [run.id],
+            )
+            .unwrap();
+        drop(store);
+        let store = WorkspaceStore::open(&database).unwrap();
+        assert!(
+            !store
+                .process_next_automatic_subtitles_with(&database, |_, _, _| {
+                    panic!("Restart must not resend an interrupted provider request")
+                })
+                .unwrap()
+        );
+        fs::write(&srt, expected).unwrap();
         assert!(store.process_next_ready_delivery(&database).unwrap());
         let verified = store.verified_delivery(workspace, run.id).unwrap();
         assert_eq!(verified.verified_outputs[0].subtitle_cues, 1);

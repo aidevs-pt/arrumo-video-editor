@@ -12,6 +12,8 @@ use crate::format_deliveries::read_settings;
 pub struct RunOptions {
     #[serde(default)]
     pub autopilot: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub generate_delivery_subtitles: bool,
     #[serde(default = "default_save_motion_to_library")]
     pub save_motion_to_library: bool,
     pub platform: Option<String>,
@@ -27,6 +29,7 @@ impl Default for RunOptions {
     fn default() -> Self {
         Self {
             autopilot: false,
+            generate_delivery_subtitles: false,
             save_motion_to_library: default_save_motion_to_library(),
             platform: None,
             provider_overrides: BTreeMap::new(),
