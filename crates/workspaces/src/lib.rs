@@ -161,6 +161,7 @@ impl WorkspaceStore {
             include_str!("../migrations/037-asset-replacements.sql"),
             include_str!("../migrations/038-motion-library.sql"),
             include_str!("../migrations/039-motion-profile-sharing.sql"),
+            include_str!("../migrations/040-motion-result-origin.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

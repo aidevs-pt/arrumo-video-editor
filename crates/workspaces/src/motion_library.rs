@@ -1,7 +1,7 @@
-use rusqlite::{Row, Transaction, TransactionBehavior, params};
+use rusqlite::{OptionalExtension, Row, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 
-use crate::WorkspaceStore;
+use crate::{GenerationPlan, ProductionStage, WorkspaceStore, format_deliveries::read_settings};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -106,6 +106,68 @@ impl WorkspaceStore {
             ],
             read_item,
         )
+    }
+
+    pub fn save_motion_result(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+        index: i64,
+    ) -> rusqlite::Result<MotionLibraryItem> {
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let (stage_index, decision, plan, result): (
+            i64,
+            Option<String>,
+            GenerationPlan,
+            serde_json::Value,
+        ) = tx.query_row(
+            "SELECT result.stage_index, result.decision, run.plan_json, result.result_json
+                 FROM production_results AS result
+                 JOIN generation_runs AS run ON run.id = result.run_id
+                 WHERE run.workspace_id = ?1 AND run.id = ?2 AND result.id = ?3
+                   AND result.stage_index < run.stage_index",
+            params![workspace_id, run_id, result_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    read_settings(row.get(2)?, 2)?,
+                    read_settings(row.get(3)?, 3)?,
+                ))
+            },
+        )?;
+        if !plan.steps.get(stage_index as usize).is_some_and(|step| {
+            step.stage == ProductionStage::Assets
+                && (decision.as_deref() == Some("approved")
+                    || (!step.review_required && decision.is_none()))
+        }) {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let existing = tx.query_row(
+            "SELECT id, workspace_id, profile_id, kind, title, usage_markdown,
+                    preview_asset_id, thumbnail_asset_id, sound_asset_id
+             FROM motion_library WHERE workspace_id = ?1 AND source_result_id = ?2 AND source_motion_index = ?3",
+            params![workspace_id, result_id, index],
+            read_item,
+        ).optional()?;
+        if let Some(item) = existing {
+            return Ok(item);
+        }
+        let settings = result
+            .get("motion_items")
+            .and_then(|items| items.get(index as usize))
+            .ok_or(rusqlite::Error::InvalidQuery)?;
+        let settings: MotionLibrarySettings = serde_json::from_value(settings.clone())
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        let item = self.create_motion_library_item(workspace_id, &settings)?;
+        tx.execute(
+            "UPDATE motion_library SET source_run_id = ?2, source_result_id = ?3, source_motion_index = ?4
+             WHERE id = ?1",
+            params![item.id, run_id, result_id, index],
+        )?;
+        tx.commit()?;
+        Ok(item)
     }
 
     pub fn update_motion_library_item(

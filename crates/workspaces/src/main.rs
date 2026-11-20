@@ -463,6 +463,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run, result, index] if command == "save-motion-result" => {
+            let item = WorkspaceStore::open(Path::new(database))?.save_motion_result(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(result)?.parse()?,
+                utf8(index)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
         [database, command, workspace, profile] if command == "motion-library" => {
             let profile = match utf8(profile)? {
                 "workspace" => None,

@@ -385,3 +385,5 @@ In the desktop Motion library, select a profile to see its entries alongside wor
 Use **Play preview** to open a looping video preview and audition linked sound separately. Playback depends on the desktop webview supporting the media codec.
 
 An Assets stage result can include a `motion_items` array. Each entry uses the same settings fields as `create-motion-item` and refers to managed assets and, optionally, a profile in the run's workspace. The host rejects the entire submission if a reference is invalid. Saved results protect their referenced media from cleanup until the run is removed.
+
+Use `save-motion-result <workspace-id> <run-id> <result-id> <index>` to save one accepted Assets stage motion result to the library. The index is zero-based. Repeating the command returns the existing entry while it remains in the library. Saved entries retain the run and result IDs and share the managed media.
