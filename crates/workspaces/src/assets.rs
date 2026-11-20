@@ -360,7 +360,7 @@ mod replacement_tests {
                 },
             )
             .unwrap();
-        store
+        let run = store
             .enqueue_video_draft(
                 workspace,
                 draft.id,
@@ -410,5 +410,16 @@ mod replacement_tests {
                 .replace_asset(&root, workspace, old.id, &edited)
                 .is_err()
         );
+        assert_eq!(store.recover_asset_cleanup(&database).unwrap(), 0);
+        assert!(asset_path(&root, workspace, old.id).is_file());
+        assert!(
+            store
+                .delete_generation(&database, workspace, run.id, &draft.settings.title)
+                .unwrap()
+        );
+        assert_eq!(store.recover_asset_cleanup(&database).unwrap(), 0);
+        assert!(!asset_path(&root, workspace, old.id).exists());
+        assert!(asset_path(&root, workspace, new.id).is_file());
+        assert_eq!(fs::read(original).unwrap(), b"original");
     }
 }

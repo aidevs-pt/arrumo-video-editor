@@ -76,6 +76,20 @@ impl WorkspaceStore {
                 remaining += 1;
             }
         }
+        let superseded: Vec<(i64, i64, String)> = self
+            .0
+            .prepare("SELECT workspace_id, id, name FROM workspace_assets WHERE superseded = 1")?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (workspace_id, asset_id, name) in superseded {
+            // Use the same reference checks and durable cleanup record as explicit removal.
+            if self
+                .remove_workspace_asset(database, workspace_id, asset_id, &name)
+                .is_err()
+            {
+                remaining += 1;
+            }
+        }
         Ok(remaining)
     }
 
