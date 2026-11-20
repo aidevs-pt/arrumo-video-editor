@@ -151,6 +151,7 @@ pub async fn add_completed_video_feedback(
 pub struct DeliveryPreview {
     video_url: String,
     subtitles: String,
+    revision: i64,
 }
 
 #[tauri::command]
@@ -172,13 +173,66 @@ pub async fn preview_completed_output(
         .map_err(|_| "delivery_preview_failed")?;
     let subtitles = store
         .completed_subtitles(&database, workspace_id, run_id, format_id, None)
-        .map_err(|_| "delivery_preview_failed")?
-        .subtitles;
+        .map_err(|_| "delivery_preview_failed")?;
     let video_url = stream
         .open(video_path)
         .map_err(|_| "delivery_preview_failed")?;
     Ok(DeliveryPreview {
         video_url,
-        subtitles,
+        subtitles: subtitles.subtitles,
+        revision: subtitles.revision,
     })
+}
+
+#[tauri::command]
+pub async fn read_completed_subtitle_revision(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    revision: i64,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::SubtitleRevision, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .completed_subtitles(&database, workspace_id, run_id, format_id, Some(revision))
+            .map_err(|_| "subtitle_revision_read_failed")
+    })
+    .await
+    .map_err(|_| "subtitle_revision_read_failed")?
+}
+
+#[tauri::command]
+pub async fn save_completed_subtitle_revision(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    expected_revision: i64,
+    subtitles: String,
+    app: AppHandle,
+) -> Result<i64, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .revise_completed_subtitles(
+                workspace_id,
+                run_id,
+                format_id,
+                expected_revision,
+                &subtitles,
+            )
+            .map_err(|_| "subtitle_revision_save_failed")
+    })
+    .await
+    .map_err(|_| "subtitle_revision_save_failed")?
 }

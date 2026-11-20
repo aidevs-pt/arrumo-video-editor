@@ -650,6 +650,20 @@
     "cancel": "Cancelar",
     "saveError": "No se pudo guardar la observación."
   },
+  "subtitleRevisions": {
+    "previous": "Versión anterior de subtítulos",
+    "next": "Versión siguiente de subtítulos",
+    "original": "Original",
+    "version": "Versión {number}",
+    "edit": "Editar subtítulos",
+    "description": "Guarda una nueva versión de este archivo SRT. El original verificado permanece en el historial.",
+    "source": "Texto SRT",
+    "readError": "No se pudo cargar esta versión de los subtítulos.",
+    "saveError": "No se pudo guardar. Comprueba los tiempos del SRT o vuelve a abrir el visor para cargar la última versión.",
+    "saved": "Versión de subtítulos guardada.",
+    "cancel": "Cancelar",
+    "save": "Guardar versión"
+  },
   "completedVideo": {
     "scheduleDate": "Fecha programada",
     "saveDate": "Guardar fecha",

@@ -650,6 +650,20 @@
     "cancel": "Cancel",
     "saveError": "Feedback couldn’t be saved."
   },
+  "subtitleRevisions": {
+    "previous": "Previous subtitle version",
+    "next": "Next subtitle version",
+    "original": "Original",
+    "version": "Version {number}",
+    "edit": "Edit subtitles",
+    "description": "Save a new version of this SRT file. The verified original stays in history.",
+    "source": "SRT text",
+    "readError": "Could not load this subtitle version.",
+    "saveError": "Could not save. Check the SRT timing or reopen the viewer to get the latest version.",
+    "saved": "Subtitle version saved.",
+    "cancel": "Cancel",
+    "save": "Save version"
+  },
   "completedVideo": {
     "scheduleDate": "Schedule date",
     "saveDate": "Save date",

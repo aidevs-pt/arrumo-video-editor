@@ -650,6 +650,20 @@
     "cancel": "Cancelar",
     "saveError": "Não foi possível guardar a observação."
   },
+  "subtitleRevisions": {
+    "previous": "Versão anterior das legendas",
+    "next": "Próxima versão das legendas",
+    "original": "Original",
+    "version": "Versão {number}",
+    "edit": "Editar legendas",
+    "description": "Guarda uma nova versão deste ficheiro SRT. O original verificado permanece no histórico.",
+    "source": "Texto SRT",
+    "readError": "Não foi possível carregar esta versão das legendas.",
+    "saveError": "Não foi possível guardar. Verifica os tempos do SRT ou volta a abrir o visualizador para carregar a última versão.",
+    "saved": "Versão das legendas guardada.",
+    "cancel": "Cancelar",
+    "save": "Guardar versão"
+  },
   "completedVideo": {
     "scheduleDate": "Data agendada",
     "saveDate": "Guardar data",

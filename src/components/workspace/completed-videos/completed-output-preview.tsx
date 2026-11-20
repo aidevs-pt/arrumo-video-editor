@@ -7,7 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/locale-provider";
 
-type DeliveryPreview = { video_url: string; subtitles: string };
+import { SubtitleRevisionControls, type SubtitleRevision } from "./subtitle-revision-controls";
+
+type DeliveryPreview = SubtitleRevision & { video_url: string };
 type Cue = { timestamp: string; finish: string; start: number; end: number; text: string };
 
 function seconds(timestamp: string) {
@@ -41,8 +43,10 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(-1);
   const [seekable, setSeekable] = useState(false);
+  const [historical, setHistorical] = useState<SubtitleRevision>();
+  const displayed = historical ?? preview;
   const [query, setQuery] = useState("");
-  const cues = useMemo(() => showTranscript && preview ? readCues(preview.subtitles) : [], [preview, showTranscript]);
+  const cues = useMemo(() => showTranscript && displayed ? readCues(displayed.subtitles) : [], [displayed, showTranscript]);
 
   const filter = query.trim().toLocaleLowerCase();
   const caption = cues.find((cue) => time >= cue.start && time < cue.end);
@@ -65,6 +69,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
           <AlertAction>
             <Button variant="outline" size="sm" onClick={() => {
               setPreview(undefined);
+              setHistorical(undefined);
               setSeekable(false);
               setTime(-1);
               setError(undefined);
@@ -90,6 +95,9 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
       )}
       {showTranscript && preview && <section className="min-w-0" aria-labelledby="delivery-transcript">
         <h2 id="delivery-transcript" className="mb-3 text-[1.3125rem]">{copy.subtitleText}</h2>
+        <SubtitleRevisionControls workspaceId={workspaceId} runId={runId} formatId={formatId}
+          latest={preview} current={displayed ?? preview} onRead={setHistorical}
+          onSave={(revision) => { setHistorical(undefined); setPreview({ ...preview, ...revision }); }} />
         {cues.length > 0 && <Input type="search" className="mb-3" aria-label={copy.findSubtitles}
           placeholder={copy.findSubtitles} value={query} onChange={(event) => setQuery(event.target.value)} />}
         {cues.length ? <ol className="max-h-[60vh] divide-y overflow-auto border-y">
@@ -111,7 +119,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
               </button> : <div className="flex gap-3 p-3 text-sm">{content}</div>}
             </li>;
           })}
-        </ol> : <p className="max-h-[60vh] overflow-auto whitespace-pre-wrap text-sm">{preview.subtitles}</p>}
+        </ol> : <p className="max-h-[60vh] overflow-auto whitespace-pre-wrap text-sm">{displayed?.subtitles}</p>}
       </section>}
     </div>
   );

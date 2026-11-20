@@ -874,6 +874,8 @@ fn main() {
             completed_video::replay_completed_video,
             completed_video::add_completed_video_feedback,
             completed_video::preview_completed_output,
+            completed_video::read_completed_subtitle_revision,
+            completed_video::save_completed_subtitle_revision,
             guided_preview::open_guided_preview,
             media_worker::process_desktop_media_stage,
             media_worker::submit_desktop_motion_artifacts,
