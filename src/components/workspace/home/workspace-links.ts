@@ -12,7 +12,7 @@ export function profileHref(workspaceId: number, profileId: number) {
   return `/profile?workspace=${workspaceId}&profile=${profileId}`;
 }
 
-export function completedVideoHref(workspaceId: number, runId: number, formatId?: number, file?: "subtitles") {
+export function completedVideoHref(workspaceId: number, runId: number, formatId?: number, file?: "subtitles" | `text-${number}`) {
   const query = new URLSearchParams({ workspace: String(workspaceId), run: String(runId) });
   if (formatId !== undefined) query.set("format", String(formatId));
   if (file) query.set("file", file);
@@ -26,4 +26,12 @@ export function isCalendarMonth(value?: string | null): value is string {
 export function calendarHref(workspaceId: number, profileId?: number, month?: string | null) {
   const href = workspaceHref("calendar", workspaceId, profileId);
   return isCalendarMonth(month) ? `${href}&month=${month}` : href;
+}
+
+export function completedFile(value: string | null): "subtitles" | `text-${number}` | undefined {
+  if (value === "subtitles") return value;
+  if (value?.startsWith("text-") && /^[1-9]\d*$/.test(value.slice(5))) {
+    const index = Number(value.slice(5));
+    if (Number.isSafeInteger(index)) return `text-${index}`;
+  }
 }

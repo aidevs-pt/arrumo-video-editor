@@ -1,6 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useEffectEvent } from "react";
-import { calendarHref, completedVideoHref, profileHref, workspaceHref, type WorkspaceView } from "./workspace-links";
+import { calendarHref, completedFile, completedVideoHref, profileHref, workspaceHref, type WorkspaceView } from "./workspace-links";
 
 const workspaceSections: readonly WorkspaceView[] = [
   "profiles", "context", "brand", "assets", "motion-library", "outputs", "drafts", "generations", "videos", "calendar",
@@ -25,7 +25,7 @@ function internalRoute(value: string) {
   } else if (url.pathname === "/generation-run" || url.pathname === "/completed-video") {
     const run = numericId(query, "run");
     if (run) return url.pathname === "/completed-video"
-      ? completedVideoHref(workspace, run, numericId(query, "format"), query.get("file") === "subtitles" ? "subtitles" : undefined)
+      ? completedVideoHref(workspace, run, numericId(query, "format"), completedFile(query.get("file")))
       : `/generation-run?workspace=${workspace}&run=${run}`;
   } else if (url.pathname === "/calendar") {
     return calendarHref(workspace, numericId(query, "profile"), query.get("month"));

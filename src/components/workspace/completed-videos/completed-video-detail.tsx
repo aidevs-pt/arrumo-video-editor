@@ -43,6 +43,9 @@ type Activity = {
   created_at: number;
   detail: string | null;
 };
+type TextOutput = { kind: "title" | "description" | "tags"; format_id: number | null; text: string };
+type CompletedFile = "subtitles" | `text-${number}`;
+
 type CompletedVideo = {
   run: {
     id: number;
@@ -58,10 +61,11 @@ type CompletedVideo = {
   feedback: VideoFeedback[];
   title: string;
   delivery: { verified_outputs: Output[] };
+  supplemental_text: TextOutput[];
   output_dates: Record<number, string>;
 };
 
-export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, showSubtitles }: { workspaceId: number; runId: number; initialFormatId: number; showSubtitles: boolean }) {
+export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, file }: { workspaceId: number; runId: number; initialFormatId: number; file?: CompletedFile }) {
   const { messages: { completedVideo: copy, queue } } = useLocale();
   const [video, setVideo] = useState<CompletedVideo>();
   const [loadError, setLoadError] = useState(false);
@@ -105,10 +109,10 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, show
       </>
     );
   }
-  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} showSubtitles={showSubtitles} />;
+  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} file={file} />;
 }
 
-function CompletedVideoContent({ workspaceId, video, initialFormatId, showSubtitles }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; showSubtitles: boolean }) {
+function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile }) {
   const { locale, messages: { completedVideo: copy, queue } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
@@ -157,7 +161,37 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, showSubtit
     }
   }
 
-  if (showSubtitles && selected) {
+  const textOutputs = video.supplemental_text;
+  const textIndex = file?.startsWith("text-") ? Number(file.slice(5)) - 1 : undefined;
+  const textOutput = textIndex === undefined ? undefined : textOutputs[textIndex];
+  const textFilename = (item: TextOutput, index: number) => `supplemental-${item.kind}-${index + 1}.txt`;
+  const textLinks = textOutputs.map((item, index) => (
+    <Button key={index} asChild size="sm" variant="outline">
+      <Link href={completedVideoHref(workspaceId, runId, selected?.format_id, `text-${index + 1}`)}>
+        <FileText data-icon="inline-start" />{copy[`supplemental_${item.kind}`]} {index + 1}
+      </Link>
+    </Button>
+  ));
+  if (textIndex !== undefined) {
+    const textFormat = formats.find(({ format }) => format.id === textOutput?.format_id)?.format;
+    return <>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <WorkspaceHeading className="mb-0">
+          <h1>{textOutput ? textFilename(textOutput, textIndex) : copy.otherFiles}</h1>
+          <p>{savedTitle}{textFormat && ` / ${textFormat.name}`}</p>
+        </WorkspaceHeading>
+        <Button asChild size="sm" variant="outline">
+          <Link href={completedVideoHref(workspaceId, runId, selected?.format_id)}>{copy.videoTab}</Link>
+        </Button>
+      </div>
+      {textOutput ? <article className="max-w-3xl whitespace-pre-wrap wrap-anywhere rounded-lg border bg-card p-5">
+        {textOutput.text}
+      </article> : <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription></Alert>}
+      <div className="mt-6 flex flex-wrap gap-2">{textLinks}</div>
+    </>;
+  }
+
+  if (file === "subtitles" && selected) {
     return <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <WorkspaceHeading className="mb-0">
@@ -187,6 +221,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, showSubtit
               </Link>
             </Button>
           ))}
+          {textLinks}
           <Button variant="outline" size="sm" disabled={Boolean(action)} onClick={() => void exportZip()}>
             <Archive data-icon="inline-start" />{action === "export" ? copy.exporting : copy.exportZip}
           </Button>
@@ -268,6 +303,10 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, showSubtit
           ) : (
             <Empty><EmptyHeader><EmptyTitle>{copy.noOutputs}</EmptyTitle><EmptyDescription>{copy.previewError}</EmptyDescription></EmptyHeader></Empty>
           )}
+          {textLinks.length > 0 && <section className="mt-6 border-t pt-4">
+            <h2 className="mb-3 text-[1.3125rem]">{copy.otherFiles}</h2>
+            <div className="flex flex-wrap gap-2">{textLinks}</div>
+          </section>}
         </TabsContent>
         <TabsContent value="details" forceMount className="flex flex-col gap-5 data-[state=inactive]:hidden">
           <RunMotionResults workspaceId={workspaceId} runId={runId} results={video.production.results}

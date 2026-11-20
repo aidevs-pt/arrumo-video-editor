@@ -110,6 +110,12 @@ impl WorkspaceStore {
             }
             crate::motion_library::validate_motion_results(tx, workspace_id, items)?;
         }
+        if let Some(entries) = result.get("supplemental_text") {
+            if stage != ProductionStage::SupplementalOutputs {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            crate::supplemental_text::validate_supplemental_text(tx, run_id, entries)?;
+        }
         let id = tx.query_row(
             "INSERT INTO production_results (run_id, stage_index, attempt, result_json)
              VALUES (?1, ?2, ?3, ?4) RETURNING id",

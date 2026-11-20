@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
+import { completedFile } from "../home/workspace-links";
 import { CompletedVideoDetail } from "./completed-video-detail";
 
 export function CompletedVideoRoute() {
@@ -27,7 +28,7 @@ export function CompletedVideoRoute() {
         </Link>
       </Button>
       {/^[1-9]\d*$/.test(rawRun) && Number.isSafeInteger(runId) ? (
-        <CompletedVideoDetail key={`${workspace.id}-${runId}-${formatId}`} workspaceId={workspace.id} runId={runId} initialFormatId={formatId} showSubtitles={query.get("file") === "subtitles"} />
+        <CompletedVideoDetail key={`${workspace.id}-${runId}-${formatId}`} workspaceId={workspace.id} runId={runId} initialFormatId={formatId} file={completedFile(query.get("file"))} />
       ) : (
         <>
           <WorkspaceHeading><h1>{messages.completedVideo.details}</h1></WorkspaceHeading>

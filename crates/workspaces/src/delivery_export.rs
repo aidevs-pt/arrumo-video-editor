@@ -39,6 +39,7 @@ impl WorkspaceStore {
                 Ok((output, edited))
             })
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let supplemental = self.completed_supplemental_text(workspace_id, run_id)?;
         snapshot.commit()?;
 
         let source_dir = delivery_directory(database, workspace_id, run_id);
@@ -77,6 +78,10 @@ impl WorkspaceStore {
                     return Err(io::Error::other("A delivery file changed during export").into());
                 }
             }
+        }
+        for (index, entry) in supplemental.iter().enumerate() {
+            archive.start_file(entry.filename(index), SimpleFileOptions::default())?;
+            archive.write_all(entry.text.as_bytes())?;
         }
         archive.finish()?.sync_all()?;
         pending.persist_noclobber(destination)?;
