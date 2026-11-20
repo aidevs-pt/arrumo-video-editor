@@ -51,6 +51,12 @@ cargo run --locked -- ./workspaces.sqlite create "My studio"
 cargo run --locked -- ./workspaces.sqlite list
 ```
 
+Use `arrumo-workspaces <database-path> snapshot-database <new-sqlite-file>`
+to capture committed SQLite state, including writes in the source WAL. The
+command creates a new file and reports its SHA-256 and byte length. The
+snapshot includes SQLite records and stored plugin ZIPs. Managed media,
+delivery files, and system-store credentials require separate backup steps.
+
 To create and list profiles for workspace ID 1:
 
 ```sh

@@ -15,6 +15,7 @@ mod brand_assets;
 mod clip_render;
 mod completed_video;
 mod completed_video_feedback;
+mod database_snapshot;
 mod delivery_captions;
 mod delivery_cleanup;
 mod delivery_export;
@@ -67,6 +68,7 @@ pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
 pub use completed_video_feedback::CompletedVideoFeedback;
+pub use database_snapshot::DatabaseSnapshot;
 pub use delivery_cleanup::DeliveryCleanupReport;
 pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
 pub use format_deliveries::{
