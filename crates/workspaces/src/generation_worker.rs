@@ -63,7 +63,7 @@ impl WorkspaceStore {
             .optional()
     }
 
-    pub(crate) fn renew_generation_lease(
+    pub fn renew_generation_lease(
         &self,
         workspace_id: i64,
         run_id: i64,

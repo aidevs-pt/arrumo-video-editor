@@ -29,25 +29,12 @@ pub struct MotionArtifact {
 }
 
 impl WorkspaceStore {
-    pub fn motion_stage_is_queued(&self, workspace_id: i64, run_id: i64) -> rusqlite::Result<bool> {
-        self.0.query_row(
-            "SELECT EXISTS (SELECT 1 FROM generation_runs
-             WHERE workspace_id = ?1 AND id = ?2 AND state = 'queued'
-               AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'assets')",
-            params![workspace_id, run_id],
-            |row| row.get(0),
-        )
-    }
-
-    pub fn publish_queued_motion_artifacts(
+    pub fn claim_queued_motion_stage(
         &self,
-        database: &Path,
         workspace_id: i64,
         run_id: i64,
-        artifacts: &[MotionArtifact],
-    ) -> Result<Option<i64>, Box<dyn Error + Send + Sync>> {
-        let attempt: Option<i64> = self
-            .0
+    ) -> rusqlite::Result<Option<i64>> {
+        self.0
             .query_row(
                 "UPDATE generation_runs SET state = 'running', attempt = attempt + 1,
                  lease_until = unixepoch() + ?3
@@ -61,7 +48,17 @@ impl WorkspaceStore {
                 ],
                 |row| row.get(0),
             )
-            .optional()?;
+            .optional()
+    }
+
+    pub fn publish_queued_motion_artifacts(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        artifacts: &[MotionArtifact],
+    ) -> Result<Option<i64>, Box<dyn Error + Send + Sync>> {
+        let attempt = self.claim_queued_motion_stage(workspace_id, run_id)?;
         let Some(attempt) = attempt else {
             return Ok(None);
         };
