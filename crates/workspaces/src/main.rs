@@ -1,15 +1,15 @@
 use std::{
     env,
     error::Error,
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     fs::File,
     io::{self, IsTerminal, Read},
     path::Path,
 };
 
 use arrumo_workspaces::{
-    BrandAssetRole, MAX_PLUGIN_MANIFEST_BYTES, RunControl, THIRD_PARTY_PLUGIN_NOTICE,
-    WorkspaceStore, asset_root,
+    BrandAssetRole, MAX_PLUGIN_MANIFEST_BYTES, MotionWorkerPaths, RunControl,
+    THIRD_PARTY_PLUGIN_NOTICE, WorkspaceStore, asset_root,
 };
 
 fn utf8(value: &OsStr) -> io::Result<&str> {
@@ -37,72 +37,6 @@ fn read_plugin_invocation_input() -> Result<serde_json::Value, Box<dyn Error>> {
     serde_json::from_slice(&input).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "Expected JSON plugin input").into()
     })
-}
-
-fn run_motion_worker(
-    bytes: &[u8],
-    digest: &str,
-    worker: &OsStr,
-    output: &OsStr,
-    toolchain: &[OsString],
-    mut check_lease: impl FnMut() -> rusqlite::Result<()>,
-) -> Result<Vec<u8>, Box<dyn Error>> {
-    if !cfg!(target_os = "linux") {
-        return Err(io::Error::other("The local motion renderer worker requires Linux").into());
-    }
-    let worker = Path::new(worker).canonicalize()?;
-    if !worker.is_file() {
-        return Err(io::Error::other("The SDK worker must be a regular script file").into());
-    }
-    let job = tempfile::tempdir()?;
-    let package = job.path().join("renderer.zip");
-    std::fs::write(&package, bytes)?;
-    let mut runner = std::process::Command::new("python3");
-    runner
-        .args(["-E", "-B"])
-        .arg(worker)
-        .arg(package)
-        .arg("--sha256")
-        .arg(digest.to_ascii_lowercase())
-        .arg("--output")
-        .arg(output)
-        .stdin(std::process::Stdio::null())
-        .stderr(std::process::Stdio::inherit());
-    if let Some(path) = toolchain.first() {
-        runner.arg("--toolchain").arg(path);
-    }
-    let reply = job.path().join("artifacts.json");
-    let mut child = runner.stdout(File::create(&reply)?).spawn()?;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) => {
-                if let Err(error) = check_lease() {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(error.into());
-                }
-                std::thread::sleep(std::time::Duration::from_millis(250));
-            }
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(error.into());
-            }
-        }
-    };
-    if !status.success() {
-        return Err(io::Error::other("The SDK renderer worker failed").into());
-    }
-    const MAX_WORKER_RESPONSE: u64 = 1024 * 1024;
-    let mut bytes = Vec::new();
-    File::open(reply)?
-        .take(MAX_WORKER_RESPONSE + 1)
-        .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_WORKER_RESPONSE {
-        return Err(io::Error::other("The SDK renderer response exceeded its size limit").into());
-    }
-    Ok(bytes)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -368,17 +302,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             toolchain @ ..,
         ] if command == "run-installed-motion-renderer" && toolchain.len() <= 1 => {
             let digest = utf8(digest)?;
-            let bytes = WorkspaceStore::open(Path::new(database))?
-                .reviewed_motion_renderer_package(utf8(id)?, digest)?;
-            use std::io::Write;
-            io::stdout().write_all(&run_motion_worker(
-                &bytes,
+            let result = WorkspaceStore::open(Path::new(database))?.render_installed_motion(
+                utf8(id)?,
                 digest,
-                worker,
-                output,
-                toolchain,
-                || Ok(()),
-            )?)?;
+                &MotionWorkerPaths {
+                    worker: Path::new(worker),
+                    output: Path::new(output),
+                    toolchain: toolchain.first().map(Path::new),
+                },
+            )?;
+            use std::io::Write;
+            io::stdout().write_all(&result)?;
         }
         [
             database,
@@ -397,42 +331,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             let id = utf8(id)?;
             let digest = utf8(digest)?;
             let store = WorkspaceStore::open(database)?;
-            let bytes = store.reviewed_motion_renderer_package(id, digest)?;
-            let attempt = store
-                .claim_queued_motion_stage(workspace_id, run_id)?
-                .ok_or_else(|| io::Error::other("The selected run has no queued Assets stage"))?;
-            let rendered = (|| -> Result<i64, Box<dyn Error>> {
-                let mut last_renewal = std::time::Instant::now();
-                let result = run_motion_worker(&bytes, digest, worker, output, toolchain, || {
-                    if last_renewal.elapsed() >= std::time::Duration::from_secs(5) {
-                        store.renew_generation_lease(workspace_id, run_id, attempt)?;
-                        last_renewal = std::time::Instant::now();
-                    }
-                    Ok(())
-                })?;
-                let artifacts: Vec<arrumo_workspaces::MotionArtifact> =
-                    serde_json::from_slice(&result)?;
-                store.reviewed_motion_renderer_package(id, digest)?;
-                store.renew_generation_lease(workspace_id, run_id, attempt)?;
-                Ok(store
-                    .submit_motion_artifacts(database, workspace_id, run_id, attempt, &artifacts)
-                    .map_err(io::Error::other)?)
-            })();
-            let result_id = match rendered {
-                Ok(result_id) => result_id,
-                Err(error) => {
-                    match store.fail_generation(
-                        workspace_id,
-                        run_id,
-                        attempt,
-                        "Motion rendering or publication failed.",
-                    ) {
-                        Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                        Err(failure) => return Err(failure.into()),
-                    }
-                    return Err(error);
-                }
-            };
+            let result_id = store.render_run_motion(
+                database,
+                workspace_id,
+                run_id,
+                id,
+                digest,
+                &MotionWorkerPaths {
+                    worker: Path::new(worker),
+                    output: Path::new(output),
+                    toolchain: toolchain.first().map(Path::new),
+                },
+            )?;
             println!("{result_id}");
         }
         [database, command, id] if command == "remove-plugin-manifest" => {
