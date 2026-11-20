@@ -466,7 +466,7 @@ pub(super) fn call(
         }),
         "process_script_stage" => parse(arguments).and_then(|args: RunInput| {
             store
-                .process_script_stage(args.workspace_id, args.run_id)
+                .process_script_stage(database, args.workspace_id, args.run_id)
                 .map(|result_id| json!({"resultId": result_id}))
                 .map_err(|_| "The script could not be written. Check the run activity for the reason")
         }),

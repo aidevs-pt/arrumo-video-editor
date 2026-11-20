@@ -1208,8 +1208,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{}", serde_json::to_string(&result)?);
         }
         [database, command, workspace, run] if command == "process-script-stage" => {
-            let result = WorkspaceStore::open(Path::new(database))?
-                .process_script_stage(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            let result = WorkspaceStore::open(Path::new(database))?.process_script_stage(
+                Path::new(database),
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+            )?;
             println!(
                 "{}",
                 serde_json::to_string(&serde_json::json!({ "resultId": result }))?

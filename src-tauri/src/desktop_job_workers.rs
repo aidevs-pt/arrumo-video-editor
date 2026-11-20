@@ -31,13 +31,14 @@ impl DesktopJobWorkers {
                 },
             )?;
         }
+        let script_database = database.clone();
         workers.spawn(
             "arrumo-script-writer",
             database.clone(),
             Duration::from_secs(2),
-            |store| {
+            move |store| {
                 store
-                    .process_next_script_stage()
+                    .process_next_script_stage(&script_database)
                     .map(|result| result.is_some())
                     .map_err(|_| ())
             },

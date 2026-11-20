@@ -54,6 +54,7 @@ mod profile_formats;
 mod profile_organization;
 mod provider_preferences;
 mod script_stage;
+mod source_transcripts;
 mod speech_synthesis;
 mod subtitle_revisions;
 mod supplemental_delivery;
@@ -204,6 +205,7 @@ impl WorkspaceStore {
             include_str!("../migrations/049-plugin-action-jobs.sql"),
             include_str!("../migrations/050-automatic-delivery-subtitles.sql"),
             include_str!("../migrations/051-profile-organization.sql"),
+            include_str!("../migrations/052-source-transcripts.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
