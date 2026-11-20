@@ -790,6 +790,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .production_progress(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
             println!("{}", serde_json::to_string(&progress)?);
         }
+        [database, command, workspace, run, attempt, artifacts]
+            if command == "submit-motion-artifacts" =>
+        {
+            let database = Path::new(database);
+            let id = WorkspaceStore::open(database)?
+                .submit_motion_artifacts(
+                    database,
+                    utf8(workspace)?.parse()?,
+                    utf8(run)?.parse()?,
+                    utf8(attempt)?.parse()?,
+                    &serde_json::from_str::<Vec<arrumo_workspaces::MotionArtifact>>(utf8(
+                        artifacts,
+                    )?)?,
+                )
+                .map_err(io::Error::other)?;
+            println!("{id}");
+        }
         [database, command, workspace, run, attempt, stage, result]
             if command == "submit-stage" =>
         {
@@ -1018,7 +1035,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
                 "production-progress <workspace-id> <run-id> | ",
-                "submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
+                "submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json> | submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
                 "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",

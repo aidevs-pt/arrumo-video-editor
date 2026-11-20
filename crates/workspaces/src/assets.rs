@@ -158,81 +158,98 @@ impl WorkspaceStore {
         thumbnail_reference: bool,
         replacing: Option<i64>,
     ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
-        let name = source
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid asset filename"))?;
-        let kind = media_kind(source)?;
-        let notes = if thumbnail_reference {
-            if kind != "image" {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Reference must be an image",
-                )
-                .into());
-            }
-            "Thumbnail reference"
-        } else {
-            ""
-        };
-        if !source.metadata()?.is_file() {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Asset must be a file").into());
-        }
-        let mut input = File::open(source)?;
-        let length = i64::try_from(input.metadata()?.len())?;
         let transaction = self
             .0
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let previous_notes: String;
-        let notes = if let Some(asset_id) = replacing {
-            previous_notes = transaction.query_row(
-                "SELECT notes FROM workspace_assets
-                 WHERE workspace_id = ?1 AND id = ?2 AND kind = ?3 AND superseded = 0",
-                params![workspace_id, asset_id, kind],
-                |row| row.get(0),
-            )?;
-            &previous_notes
-        } else {
-            notes
-        };
-        let asset = transaction.query_row(
-            "INSERT INTO workspace_assets (workspace_id, name, kind, byte_size, notes)
-             VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id, workspace_id, name, kind, byte_size, notes",
-            params![workspace_id, name, kind, length, notes],
-            read_asset,
+        let asset = copy_asset_in(
+            &transaction,
+            media_root,
+            workspace_id,
+            source,
+            thumbnail_reference,
+            replacing,
         )?;
-        if let Some(previous) = replacing {
-            replace_live_references(&transaction, workspace_id, previous, asset.id)?;
-        }
-        let directory = media_root.join(workspace_id.to_string());
-        fs::create_dir_all(&directory)?;
-        let target = asset_path(media_root, workspace_id, asset.id);
-        // This ID has no committed row. An interrupted import may have left its file here.
-        match fs::remove_file(&target) {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
-        }
-
-        let mut output = File::create_new(&target)?;
-        let copied = (|| -> io::Result<()> {
-            if io::copy(&mut input, &mut output)? != length as u64 {
-                return Err(io::Error::other("Asset size changed during import"));
-            }
-            output.sync_all()?;
-            #[cfg(unix)]
-            File::open(&directory)?.sync_all()?;
-            Ok(())
-        })();
-        drop(output);
-        if let Err(error) = copied {
-            let _ = fs::remove_file(&target);
-            return Err(error.into());
-        }
         // A commit error can have an uncertain outcome, so leave the file for recovery.
         transaction.commit()?;
         Ok(asset)
     }
+}
+
+pub(crate) fn copy_asset_in(
+    transaction: &Transaction<'_>,
+    media_root: &Path,
+    workspace_id: i64,
+    source: &Path,
+    thumbnail_reference: bool,
+    replacing: Option<i64>,
+) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
+    let name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid asset filename"))?;
+    let kind = media_kind(source)?;
+    let notes = if thumbnail_reference {
+        if kind != "image" {
+            return Err(
+                io::Error::new(io::ErrorKind::InvalidInput, "Reference must be an image").into(),
+            );
+        }
+        "Thumbnail reference"
+    } else {
+        ""
+    };
+    if !source.metadata()?.is_file() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Asset must be a file").into());
+    }
+    let mut input = File::open(source)?;
+    let length = i64::try_from(input.metadata()?.len())?;
+    let previous_notes: String;
+    let notes = if let Some(asset_id) = replacing {
+        previous_notes = transaction.query_row(
+            "SELECT notes FROM workspace_assets
+                 WHERE workspace_id = ?1 AND id = ?2 AND kind = ?3 AND superseded = 0",
+            params![workspace_id, asset_id, kind],
+            |row| row.get(0),
+        )?;
+        &previous_notes
+    } else {
+        notes
+    };
+    let asset = transaction.query_row(
+        "INSERT INTO workspace_assets (workspace_id, name, kind, byte_size, notes)
+             VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id, workspace_id, name, kind, byte_size, notes",
+        params![workspace_id, name, kind, length, notes],
+        read_asset,
+    )?;
+    if let Some(previous) = replacing {
+        replace_live_references(transaction, workspace_id, previous, asset.id)?;
+    }
+    let directory = media_root.join(workspace_id.to_string());
+    fs::create_dir_all(&directory)?;
+    let target = asset_path(media_root, workspace_id, asset.id);
+    // This ID has no committed row. An interrupted import may have left its file here.
+    match fs::remove_file(&target) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+
+    let mut output = File::create_new(&target)?;
+    let copied = (|| -> io::Result<()> {
+        if io::copy(&mut input, &mut output)? != length as u64 {
+            return Err(io::Error::other("Asset size changed during import"));
+        }
+        output.sync_all()?;
+        #[cfg(unix)]
+        File::open(&directory)?.sync_all()?;
+        Ok(())
+    })();
+    drop(output);
+    if let Err(error) = copied {
+        let _ = fs::remove_file(&target);
+        return Err(error.into());
+    }
+    Ok(asset)
 }
 
 fn replace_live_references(

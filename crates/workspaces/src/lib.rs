@@ -24,6 +24,7 @@ mod generation_queue;
 mod generation_worker;
 mod mcp;
 mod media_worker;
+mod motion_artifacts;
 mod motion_library;
 mod operations;
 mod output_formats;
@@ -67,6 +68,7 @@ pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions}
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use mcp::serve_mcp;
 pub use media_worker::MediaWork;
+pub use motion_artifacts::MotionArtifact;
 pub use motion_library::{MotionKind, MotionLibraryItem, MotionLibrarySettings};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use output_schedule::ScheduledOutput;

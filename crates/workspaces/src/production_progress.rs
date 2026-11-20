@@ -61,10 +61,26 @@ impl WorkspaceStore {
         result: &Value,
         publish: impl FnOnce() -> rusqlite::Result<()>,
     ) -> rusqlite::Result<i64> {
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let id =
+            self.record_production_result(&tx, workspace_id, run_id, attempt, stage, result)?;
+        publish()?;
+        tx.commit()?;
+        Ok(id)
+    }
+
+    pub(crate) fn record_production_result(
+        &self,
+        tx: &Transaction<'_>,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        stage: ProductionStage,
+        result: &Value,
+    ) -> rusqlite::Result<i64> {
         if !result.is_object() || stage == ProductionStage::VerifyDelivery {
             return Err(rusqlite::Error::InvalidQuery);
         }
-        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let (index, plan): (i64, GenerationPlan) = tx.query_row(
             "SELECT stage_index, plan_json FROM generation_runs
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
@@ -92,7 +108,7 @@ impl WorkspaceStore {
             if stage != ProductionStage::Assets {
                 return Err(rusqlite::Error::InvalidQuery);
             }
-            crate::motion_library::validate_motion_results(&tx, workspace_id, items)?;
+            crate::motion_library::validate_motion_results(tx, workspace_id, items)?;
         }
         let id = tx.query_row(
             "INSERT INTO production_results (run_id, stage_index, attempt, result_json)
@@ -119,8 +135,6 @@ impl WorkspaceStore {
         if stage == ProductionStage::Assets && !step.review_required {
             self.persist_accepted_motion_items(workspace_id, run_id, id, None)?;
         }
-        publish()?;
-        tx.commit()?;
         Ok(id)
     }
 
