@@ -57,7 +57,15 @@ struct OrganizationInput {
     settings: AssetOrganization,
 }
 
-pub(super) fn definitions() -> [Value; 10] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RemoveAssetInput {
+    workspace_id: i64,
+    asset_id: i64,
+    confirmed_name: String,
+}
+
+pub(super) fn definitions() -> [Value; 11] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -105,6 +113,11 @@ pub(super) fn definitions() -> [Value; 10] {
                 }, "additionalProperties": false}
             }, "required": ["workspaceId", "assetId", "settings"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "remove_workspace_asset", "description": "Remove an unused workspace asset and its managed copy after confirming its exact filename.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "assetId", "confirmedName"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
     ]
 }
 
@@ -198,6 +211,21 @@ pub(super) fn call(
                     .set_asset_organization(args.workspace_id, args.asset_id, args.settings)
                     .map(|settings| json!({"organization": settings}))
                     .map_err(|_| "Could not save asset group and labels")
+            }),
+        "remove_workspace_asset" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid asset removal arguments")
+            .and_then(|args: RemoveAssetInput| {
+                store
+                    .remove_workspace_asset(
+                        database,
+                        args.workspace_id,
+                        args.asset_id,
+                        &args.confirmed_name,
+                    )
+                    .map(|removed| json!({"removed": removed}))
+                    .map_err(
+                        |_| "Could not finish asset removal. Retry with the same IDs and filename",
+                    )
             }),
         _ => return None,
     })
