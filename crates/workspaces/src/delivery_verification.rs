@@ -503,6 +503,23 @@ impl WorkspaceStore {
         let directory = video
             .parent()
             .ok_or_else(|| io::Error::other("Missing delivery directory"))?;
+        // Lock a separate file so the encoder can still read the video on Windows.
+        let generation_lock = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(directory.join(format!(".subtitles-{format_id}.lock")))?;
+        match generation_lock.try_lock() {
+            Ok(()) => {}
+            Err(fs::TryLockError::WouldBlock) => {
+                return Err(io::Error::other(
+                    "Subtitle generation is already running for this output",
+                )
+                .into());
+            }
+            Err(fs::TryLockError::Error(error)) => return Err(error.into()),
+        }
         let subtitle_path = directory.join(format!("{format_id}.srt"));
         match subtitle_path.symlink_metadata() {
             Ok(_) => return Err(io::Error::other("Delivery subtitles already exist").into()),

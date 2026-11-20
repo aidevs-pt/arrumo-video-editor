@@ -185,6 +185,14 @@ struct SubtitleInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GenerateSubtitlesInput {
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DeleteDraftInput {
     workspace_id: i64,
     draft_id: i64,
@@ -218,7 +226,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 33] {
+pub(super) fn definitions() -> [Value; 34] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -270,6 +278,11 @@ pub(super) fn definitions() -> [Value; 33] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "previewEdit": {"type": "object"}
             }, "required": ["workspaceId", "runId"], "additionalProperties": false}}),
+        json!({"name": "generate_delivery_subtitles", "description": "Send audio from one managed rendered output to a transcription provider selected in the run snapshot. Validate and publish a timed SRT only when no subtitle file exists.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "formatId": id
+            }, "required": ["workspaceId", "runId", "formatId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": false, "destructiveHint": false, "openWorldHint": true}}),
         json!({"name": "import_delivery_subtitles", "description": "Validate and import a local SRT for a rendered output at the delivery verification stage.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "formatId": id, "source": {"type": "string", "minLength": 1}
@@ -453,6 +466,12 @@ pub(super) fn call(
                 .process_media_stage(database, args.workspace_id, args.run_id, args.preview_edit.as_ref())
                 .map(|work| json!({"work": work}))
                 .map_err(|_| "Media processing failed. Check the edit and run activity")
+        }),
+        "generate_delivery_subtitles" => parse(arguments).and_then(|args: GenerateSubtitlesInput| {
+            store
+                .generate_delivery_subtitles(database, args.workspace_id, args.run_id, args.format_id)
+                .map(|cues| json!({"cues": cues}))
+                .map_err(|_| "Could not generate delivery subtitles. Check the run, output, and timed transcription provider")
         }),
         "import_delivery_subtitles" => parse(arguments).and_then(|args: SubtitleInput| {
             let source = Path::new(&args.source);
