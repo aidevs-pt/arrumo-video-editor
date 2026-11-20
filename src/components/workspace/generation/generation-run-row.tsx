@@ -4,7 +4,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowUpRight, Check, Circle, Clock3, ListVideo, Pause, Play, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -12,7 +12,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 import { GenerationPlan } from "./generation-plan";
@@ -26,7 +25,7 @@ export type Run = {
   state: RunState;
   pending_review_id: number | null;
   display_title: string | null;
-  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean } };
+  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean }; agent_settings?: { effective_provider?: string | null } };
 };
 
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
@@ -47,14 +46,16 @@ export function RunStatus({ run }: { run: Run }) {
     : review ? "default"
     : run.state === "running" || run.state === "completed" ? "secondary" : "outline";
   return (
-    <Badge variant={variant} className="h-auto min-h-5.5 shrink-0 whitespace-normal">
+    <Badge variant={variant} className={review
+      ? "h-auto min-h-5.5 shrink-0 whitespace-normal bg-attention text-[oklch(23%_.05_268)]"
+      : "h-auto min-h-5.5 shrink-0 whitespace-normal"}>
       {run.state === "completed" ? <Check aria-hidden="true" /> : <Circle aria-hidden="true" />}
       {review ? messages.productionPlan.awaitingReview : messages.queue[run.state]}
     </Badge>
   );
 }
 
-export function GenerationRunRow({ run, workspaceId }: { run: Run; workspaceId: number }) {
+export function GenerationRunRow({ run, workspaceId, actions }: { run: Run; workspaceId: number; actions?: ReactNode }) {
   const { messages } = useLocale();
   const completed = run.state === "completed";
   const title = runTitle(run);
@@ -77,6 +78,7 @@ export function GenerationRunRow({ run, workspaceId }: { run: Run; workspaceId: 
             <ArrowUpRight data-icon="inline-end" />
           </Link>
         </Button>
+        {actions}
       </div>
     </li>
   );
@@ -94,7 +96,7 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
   const canResume = run.state === "paused" && run.pending_review_id === null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 [&_a[data-variant=outline]]:text-foreground [&_button[data-variant=outline]]:text-foreground">
       <RunStatus run={run} />
       {canPause && (
         <Button type="button" size="sm" variant="outline" disabled={disabled}
@@ -136,16 +138,13 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
 
 export function GenerationRunPanels({ run, workspaceId }: { run: Run; workspaceId: number }) {
   return (
-    <div className="@container">
-      <div className="grid grid-cols-1 items-start gap-5 @min-[54rem]:grid-cols-[minmax(0,1fr)_16rem]">
-        <GenerationPlan workspaceId={workspaceId} runId={run.id}
-          pendingReviewId={runNeedsReview(run) ? run.pending_review_id : null}
-          runState={run.state} hasSources={Boolean(run.snapshot.draft.source_ids?.length)}
-          saveMotionDefault={run.snapshot.options?.save_motion_to_library ?? true}
-          formats={run.snapshot.formats?.map((entry) => entry.format) ?? []} />
-        <GenerationActivity run={run} workspaceId={workspaceId} />
-      </div>
-    </div>
+    <GenerationPlan workspaceId={workspaceId} runId={run.id}
+      pendingReviewId={runNeedsReview(run) ? run.pending_review_id : null}
+      agentId={run.snapshot.agent_settings?.effective_provider}
+      runState={run.state} hasSources={Boolean(run.snapshot.draft.source_ids?.length)}
+      saveMotionDefault={run.snapshot.options?.save_motion_to_library ?? true}
+      formats={run.snapshot.formats?.map((entry) => entry.format) ?? []}
+      activity={<GenerationActivity run={run} workspaceId={workspaceId} />} />
   );
 }
 
@@ -173,9 +172,9 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
   }, [run.id, run.state, workspaceId]);
 
   return (
-    <Card aria-label={copy.activity}>
-      <CardHeader><CardTitle className="flex items-center gap-2"><Clock3 className="size-4" aria-hidden="true" />{copy.activity}</CardTitle></CardHeader>
-      <CardContent>
+    <aside aria-label={copy.activity} className="flex min-w-0 flex-col gap-3 border-t border-white/20 pt-3 text-white">
+      <h2 className="flex items-center gap-2 text-base"><Clock3 className="size-4" aria-hidden="true" />{copy.activity}</h2>
+      <div>
         {historyError && <Alert variant="destructive"><AlertDescription>{copy.activityError}</AlertDescription></Alert>}
         {!activity && !historyError && <Skeleton className="h-14" aria-label={copy.loading} />}
         {activity?.length ? (
@@ -184,18 +183,18 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
               const date = new Date(event.created_at * 1000);
               return (
                 <li className="relative ms-1 border-s pb-4 ps-4 last:border-transparent last:pb-0" key={index}>
-                  <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-full bg-muted-foreground ring-4 ring-card rtl:translate-x-1/2" aria-hidden="true" />
+                  <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-sm bg-white/60 ring-4 ring-agent rtl:translate-x-1/2" aria-hidden="true" />
                   <p className="font-medium">{copy[event.kind]}</p>
-                  <p className="text-xs text-muted-foreground">{copy[event.state]} · <time dateTime={date.toISOString()}>
+                  <p className="flex flex-wrap gap-x-2 text-xs text-white/75"><span>{copy[event.state]}</span><time dateTime={date.toISOString()}>
                     {new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(date)}
                   </time></p>
-                  {event.detail && <p className="mt-1 wrap-anywhere whitespace-pre-wrap text-sm text-muted-foreground">{event.detail}</p>}
+                  {event.detail && <p className="mt-1 wrap-anywhere whitespace-pre-wrap text-sm text-white/85">{event.detail}</p>}
                 </li>
               );
             })}
           </ol>
-        ) : activity && <p className="text-sm text-muted-foreground">{copy.emptyActivity}</p>}
-      </CardContent>
-    </Card>
+        ) : activity && <p className="text-sm text-white/75">{copy.emptyActivity}</p>}
+      </div>
+    </aside>
   );
 }

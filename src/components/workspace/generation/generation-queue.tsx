@@ -14,15 +14,18 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GenerationRunRow, runNeedsReview, type Run } from "./generation-run-row";
+import { GenerationRunRow, runNeedsReview, runTitle, type Run } from "./generation-run-row";
 
 import { RunProviders } from "./run-providers";
+import { VideoCatalogHeader } from "../videos/video-catalog-header";
+import { ConfirmTitleDelete } from "../confirm-title-delete";
 
 type Draft = { id: number; title: string };
-export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }: {
+export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogView = false, onBack }: {
   workspaceId: number;
   drafts: Draft[];
   initialDraftId: number | null;
+  catalogView?: boolean;
 
   onBack: () => void;
 }) {
@@ -90,18 +93,25 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
     }
   }
 
-  const groups = runs ? [
-    { id: "all", label: copy.runs, runs: [...runs].reverse() },
-    { id: "review", label: copy.reviewFilter, runs: runs.filter(runNeedsReview).reverse() },
-    { id: "completed", label: copy.completed, runs: runs.filter((run) => run.state === "completed").reverse() },
+  const activeRuns = runs?.filter((run) => run.state !== "completed");
+  const groups = activeRuns ? [
+    { id: "all", label: copy.runs, runs: [...activeRuns].reverse() },
+    { id: "review", label: copy.reviewFilter, runs: activeRuns.filter(runNeedsReview).reverse() },
   ] : [];
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" disabled={pending} onClick={onBack}>
-        <ArrowLeft data-icon="inline-start" />{copy.back}
-      </Button>
-      <WorkspaceHeading icon={ListVideo}><h1 ref={heading} tabIndex={-1}>{copy.title}</h1></WorkspaceHeading>
+      {catalogView ? <VideoCatalogHeader workspaceId={workspaceId} active="generations" count={activeRuns?.length} /> : (
+        <>
+          <WorkspaceHeading>
+            <h1 ref={heading} tabIndex={-1}>{selected?.title ?? copy.title}</h1>
+            {selected && <p>{copy.options}</p>}
+          </WorkspaceHeading>
+          <Button type="button" variant="ghost" disabled={pending} onClick={onBack}>
+            <ArrowLeft data-icon="inline-start" />{copy.back}
+          </Button>
+        </>
+      )}
       <div className="flex flex-col gap-4">
         {loadError && (
           <Alert variant="destructive">
@@ -114,7 +124,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
         )}
         {selected && runs && (
           <Card size="sm">
-            <CardHeader><CardTitle>{copy.options} · {selected.title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{messages.videoCatalog.details}</CardTitle></CardHeader>
             <CardContent>
               <form key={selected.id} onSubmit={submit} aria-busy={pending}>
                 <fieldset disabled={pending}>
@@ -141,7 +151,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
                     <RunProviders workspaceId={workspaceId} disabled={pending} />
                     {submitError && <Alert variant="destructive"><AlertDescription>{copy.submitError}</AlertDescription></Alert>}
                     <Button className="self-start" type="submit" disabled={pending}>
-                      <Plus data-icon="inline-start" />{pending ? copy.submitting : copy.submit}
+                      <Plus data-icon="inline-start" />{pending ? copy.submitting : messages.videoCatalog.generateThis}
                     </Button>
                   </FieldGroup>
                 </fieldset>
@@ -149,7 +159,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
             </CardContent>
           </Card>
         )}
-        {runs ? (
+        {runs && (catalogView || !selected) ? (
           <Tabs defaultValue="all" className="min-w-0 gap-4">
             <TabsList variant="line" className="max-w-full justify-start overflow-x-auto" aria-label={copy.filterRuns}>
               {groups.map(({ id, label, runs: group }) => (
@@ -159,8 +169,17 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
             {groups.map(({ id, runs: group }) => (
               <TabsContent value={id} key={id}>
                 {group.length ? (
-                  <WorkspaceRows compact>
-                    {group.map((run) => <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId} />)}
+                  <WorkspaceRows compact className="rounded-none border-x-0 bg-transparent [&>li]:px-1">
+                    {group.map((run) => (
+                      <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId} actions={(
+                        <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy} compact
+                          onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", { workspaceId, runId: run.id, confirmedTitle })}
+                          onDelete={() => {
+                            setRuns((current) => current?.filter((entry) => entry.id !== run.id));
+                            setAttempt((current) => current + 1);
+                          }} />
+                      )} />
+                    ))}
                   </WorkspaceRows>
                 ) : (
                   <Empty className="border">
@@ -177,7 +196,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, onBack }:
               </TabsContent>
             ))}
           </Tabs>
-        ) : !loadError && <Skeleton className="min-h-36" aria-label={copy.loading} />}
+        ) : !runs && !loadError && <Skeleton className="min-h-36" aria-label={copy.loading} />}
       </div>
     </WorkspaceShell>
   );

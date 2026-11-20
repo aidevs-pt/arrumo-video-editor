@@ -5,16 +5,15 @@ import { ArrowUpRight, Film, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useWorkspaceCatalog } from "@/components/workspace/home/workspace-router";
 import { completedVideoHref, workspaceHref } from "@/components/workspace/home/workspace-links";
-import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
+import { VideoCatalogHeader } from "./video-catalog-header";
 
 type Run = {
   id: number;
@@ -53,10 +52,7 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
 
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={Film}>
-        <h1>{copy.completedVideos}</h1>
-        <p>{copy.completedHint}</p>
-      </WorkspaceHeading>
+      <VideoCatalogHeader workspaceId={workspaceId} active="videos" count={runs?.length} />
       {failed ? (
         <Alert variant="destructive">
           <AlertDescription>{messages.queue.loadError}</AlertDescription>
@@ -86,30 +82,22 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
             <Input type="search" className="ps-8" aria-label={copy.searchCompleted} placeholder={copy.searchCompleted}
               value={search} onChange={(event) => setSearch(event.target.value)} />
           </div>
-          <div className="overflow-hidden rounded-xl border">
-            <Table>
-              <TableHeader className="bg-muted/50"><TableRow>
-                <TableHead className="ps-4">{messages.completedVideo.title}</TableHead>
-                <TableHead>{messages.drafts.profile}</TableHead>
-                <TableHead className="text-end pe-4">{messages.queue.completed}</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {filtered.map((run) => (
-                  <TableRow key={run.id}>
-                    <TableCell className="min-w-32 ps-4 whitespace-normal">
-                      <Link className="inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
-                        href={completedVideoHref(workspaceId, run.id)}>
-                        {title(run)}<ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      </Link>
-                    </TableCell>
-                    <TableCell className="whitespace-normal text-muted-foreground">{run.snapshot.profile?.name ?? messages.drafts.noProfile}</TableCell>
-                    <TableCell className="text-end pe-4"><Badge variant="secondary">{messages.queue.completed}</Badge></TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && <TableRow><TableCell colSpan={3} className="p-4 text-muted-foreground">{copy.noSearchMatches}</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </div>
+          <ul className="divide-y border-y" aria-label={copy.completedVideos}>
+            {filtered.map((run) => (
+              <li key={run.id}>
+                <Link className="group flex items-center gap-3 px-1 py-3 hover:bg-muted/60 sm:gap-4"
+                  href={completedVideoHref(workspaceId, run.id)}>
+                  <VideoPlaceholder />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="wrap-anywhere font-semibold">{title(run)}</span>
+                    <span className="text-sm text-muted-foreground">{run.snapshot.profile?.name ?? messages.drafts.noProfile}</span>
+                  </span>
+                  <ArrowUpRight className="me-2 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+            {filtered.length === 0 && <li className="p-4 text-muted-foreground">{copy.noSearchMatches}</li>}
+          </ul>
         </div>
       )}
     </WorkspaceShell>
@@ -118,4 +106,12 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
 
 function title(run: Run) {
   return run.display_title ?? run.snapshot.draft.title;
+}
+
+function VideoPlaceholder() {
+  return (
+    <span className="grid aspect-video w-22 shrink-0 place-items-center rounded-sm bg-muted text-muted-foreground sm:w-28" aria-hidden="true">
+      <Film className="size-4" />
+    </span>
+  );
 }

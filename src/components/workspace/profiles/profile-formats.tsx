@@ -1,12 +1,10 @@
 "use client";
 
 import { useLocale } from "@/lib/locale-provider";
-import Link from "next/link";
-import { workspaceHref } from "@/components/workspace/home/workspace-links";
-import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, Monitor, PanelsTopLeft } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Monitor } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -14,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { FormatDelivery } from "@/components/workspace/outputs/format-delivery";
 
 type ProfileFormat = {
@@ -27,16 +26,15 @@ type ProfileFormat = {
 };
 
 export function ProfileFormats({
-  workspaceId, profile, onBack, onOutputs,
+  workspaceId, profile, header, onOutputs,
 }: {
   workspaceId: number;
   profile: { id: number; name: string };
 
-  onBack: () => void;
+  header: ReactNode;
   onOutputs: () => void;
 }) {
   const [deliveryFormat, setDeliveryFormat] = useState<ProfileFormat | null>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
   const [formats, setFormats] = useState<ProfileFormat[]>();
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -45,7 +43,6 @@ export function ProfileFormats({
   const { messages } = useLocale();
   const copy = messages.profileFormats;
 
-  useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
     let current = true;
     invoke<ProfileFormat[]>("list_profile_formats", { workspaceId, profileId: profile.id }).then(
@@ -96,18 +93,11 @@ export function ProfileFormats({
 
   return (
     <WorkspaceShell>
-      <Button type="button" variant="ghost" onClick={onBack} disabled={pending !== null}>
-        <ArrowLeft data-icon="inline-start" />
-        {copy.back}
-      </Button>
-      <Button type="button" variant="outline" onClick={onOutputs} disabled={pending !== null}>{copy.manage}</Button>
-      <Button asChild variant="outline">
-        <Link href={workspaceHref("calendar", workspaceId, profile.id)}>{messages.calendar.title}</Link>
-      </Button>
-      <WorkspaceHeading icon={PanelsTopLeft}>
-        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
-        <p>{profile.name}</p>
-      </WorkspaceHeading>
+      {header}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-heading text-xl font-bold">{copy.title}</h2>
+        <Button type="button" variant="outline" onClick={onOutputs} disabled={pending !== null}>{copy.manage}</Button>
+      </div>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -126,7 +116,7 @@ export function ProfileFormats({
       ) : (
         <>
           <p id="format-inheritance" className="text-sm text-muted-foreground">{copy.inherit}</p>
-          <WorkspaceRows className="mt-[18px]">
+          <WorkspaceRows className="mt-4 rounded-none border-x-0 bg-transparent [&>li]:px-1">
             {formats.map((format) => (
               <li key={format.id}>
                 <form onSubmit={(event) => void save(event, format.id)} aria-labelledby={`profile-format-${format.id}`}
@@ -149,14 +139,20 @@ export function ProfileFormats({
                         <Input id={`profile-format-width-${format.id}`} name="width" type="number" min={1} max={4294967295}
                           aria-describedby="format-inheritance" placeholder={String(format.workspace_width)}
                           defaultValue={format.overrides.width ?? ""} />
-                        <FieldDescription>{messages.delivery.workspaceValue} · {format.workspace_width}</FieldDescription>
+                        <FieldDescription className="flex flex-wrap items-center gap-2">
+                          <LayerGauge layer={format.overrides.width === null ? "workspace" : "profile"} />
+                          <span>{messages.delivery.workspaceValue} ({format.workspace_width})</span>
+                        </FieldDescription>
                       </Field>
                       <Field>
                         <FieldLabel htmlFor={`profile-format-height-${format.id}`}>{copy.height}</FieldLabel>
                         <Input id={`profile-format-height-${format.id}`} name="height" type="number" min={1} max={4294967295}
                           aria-describedby="format-inheritance" placeholder={String(format.workspace_height)}
                           defaultValue={format.overrides.height ?? ""} />
-                        <FieldDescription>{messages.delivery.workspaceValue} · {format.workspace_height}</FieldDescription>
+                        <FieldDescription className="flex flex-wrap items-center gap-2">
+                          <LayerGauge layer={format.overrides.height === null ? "workspace" : "profile"} />
+                          <span>{messages.delivery.workspaceValue} ({format.workspace_height})</span>
+                        </FieldDescription>
                       </Field>
                       <Button type="submit" aria-label={`${copy.save} · ${format.name}`}>{copy.save}</Button>
                     </FieldGroup>

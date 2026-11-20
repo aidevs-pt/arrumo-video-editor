@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete }: {
+export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false }: {
   title: string;
   disabled: boolean;
+  compact?: boolean;
   copy: {
     deleteTitle: string;
     deleteDescription: string;
@@ -58,8 +59,9 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete 
       }
     }}>
       <AlertDialogTrigger asChild>
-        <Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label={`${copy.deleteTitle} · ${title}`}>
-          <Trash2 data-icon="inline-start" />{copy.deleteTitle}
+        <Button type="button" size={compact ? "icon-sm" : "sm"} variant="ghost" disabled={disabled} title={compact ? copy.deleteTitle : undefined}
+          aria-label={`${copy.deleteTitle} · ${title}`}>
+          <Trash2 data-icon="inline-start" />{!compact && copy.deleteTitle}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

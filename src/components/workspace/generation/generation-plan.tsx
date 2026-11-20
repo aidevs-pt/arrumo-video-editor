@@ -1,21 +1,21 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Clapperboard, FileText, Image, ListChecks, PackageCheck, Video } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { Check, ChevronDown, Clapperboard, PencilLine, X } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import NextImage from "next/image";
+import dynamic from "next/dynamic";
+import { motion, useReducedMotion } from "motion/react";
 import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
@@ -31,37 +31,49 @@ type StageProgress = { stage_index: number; pending_review_id: number | null; re
 type Decision = "approved" | "revise" | "rejected";
 type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[] };
 
-const stages = {
-  script: FileText,
-  assets: Image,
-  preview: Video,
-  supplemental_outputs: PackageCheck,
-  final_render: Clapperboard,
-  verify_delivery: Check,
-};
-const decisionLabels = { approved: "approve", revise: "revise", rejected: "reject" } as const;
+const ScriptReviewText = dynamic(() => import("./script-review-text"), { ssr: false });
+
+const decisions = [
+  { value: "approved", label: "approve", icon: Check, fill: "bg-approval text-white hover:bg-approval hover:text-white", marker: "bg-approval" },
+  { value: "revise", label: "revise", icon: PencilLine, fill: "bg-attention text-ink hover:bg-attention hover:text-ink", marker: "bg-attention" },
+  { value: "rejected", label: "reject", icon: X, fill: "bg-destructive text-white hover:bg-destructive hover:text-white", marker: "bg-destructive" },
+] as const;
 const emptyDraft: ReviewDraft = { decision: "", notes: "" };
 
 function isDecision(value: unknown): value is Decision {
   return value === "approved" || value === "revise" || value === "rejected";
 }
 
-export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, hasSources, formats, saveMotionDefault }: {
+export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, hasSources, formats, saveMotionDefault, activity, agentId }: {
   workspaceId: number;
   runId: number;
   pendingReviewId: number | null;
-  runState: string;
+  runState: "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
   hasSources: boolean;
   formats: DeliveryFormat[];
   saveMotionDefault: boolean;
+  activity: ReactNode;
+  agentId?: string | null;
 }) {
-  const { messages: { productionPlan: copy } } = useLocale();
+  const { messages: { productionPlan: copy, queue } } = useLocale();
+  const reduceMotion = useReducedMotion();
+  const timeline = useRef<HTMLElement>(null);
+  const [agent, setAgent] = useState<string>();
   const [progress, setProgress] = useState<StageProgress>();
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState(false);
   const [plan, setPlan] = useState<Plan | null>();
   const [loadError, setLoadError] = useState(false);
   const awaiting = progress?.results.find((entry) => entry.id === progress.pending_review_id);
+
+  useEffect(() => {
+    if (!agentId) return;
+    let active = true;
+    invoke<{ id: string; label: string }[]>("list_agent_plugins").then((providers) => {
+      if (active) setAgent(providers.find((provider) => provider.id === agentId)?.label);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [agentId]);
 
   useEffect(() => {
     if (reviewing) return;
@@ -98,6 +110,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     try {
       await invoke("review_production_result", { workspaceId, runId, resultId, decision, notes, saveMotionIndexes });
       setProgress((current) => current && { ...current, pending_review_id: null });
+      timeline.current?.focus();
       return true;
     } catch {
       setReviewError(true);
@@ -109,82 +122,108 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Card size="sm">
-        <CardHeader><CardTitle className="flex items-center gap-2"><ListChecks className="size-4" aria-hidden="true" />{copy.title}</CardTitle></CardHeader>
-        <CardContent className="@container flex flex-col gap-3">
-          {loadError && <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription></Alert>}
-          {plan === undefined && !loadError && <Skeleton className="h-14" aria-label={copy.loading} />}
-          {plan === null && <p role="status" className="text-sm text-muted-foreground">{copy.waiting}</p>}
-          {plan && (
-            <>
-              <Progress value={plan.steps.length ? Math.min(100, (progress?.stage_index ?? 0) * 100 / plan.steps.length) : 0} aria-label={copy.title} className="h-1" />
-              <ol className="grid grid-cols-2 items-stretch gap-1 @min-[30rem]:grid-cols-3 @min-[36rem]:grid-flow-col @min-[36rem]:auto-cols-fr @min-[36rem]:grid-cols-none @min-[36rem]:grid-rows-1">
-                {plan.steps.map((step, index) => {
-                  const complete = progress !== undefined && index < progress.stage_index;
-                  const current = index === progress?.stage_index;
-                  const Icon = stages[step.stage];
-                  return (
-                    <li key={step.stage} aria-current={current ? "step" : undefined} className={cn(
-                      "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm @min-[36rem]:flex-col @min-[36rem]:gap-1.5 @min-[36rem]:text-center",
-                      current ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-                    )}>
-                      <Badge variant={current ? "default" : complete ? "secondary" : "outline"} className="min-w-6 justify-center">
-                        {complete ? <Check aria-hidden="true" /> : <Icon aria-hidden="true" />}
-                      </Badge>
-                      <span className={cn("wrap-anywhere", current && "font-semibold")}>{copy[step.stage]}</span>
-                      {complete && <span className="sr-only">{copy.stageComplete}</span>}
-                      {step.review_required && current && <span className="sr-only">{copy.reviewRequired}</span>}
-                    </li>
-                  );
-                })}
-              </ol>
-            </>
-          )}
-        </CardContent>
-      </Card>
-      {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
-        <Card size="sm">
-          <CardHeader><CardTitle>{copy.assets}</CardTitle></CardHeader>
-          <CardContent className="flex flex-col items-start gap-3">
-            <MotionArtifactAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
-            <MotionRendererAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
-          </CardContent>
-        </Card>
-      )}
-      {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
-        <Card size="sm">
-          <CardHeader><CardTitle>{copy[mediaStage]}</CardTitle></CardHeader>
-          <CardContent>
-            <MediaStageAction key={mediaStage} workspaceId={workspaceId} runId={runId} stage={mediaStage}
-              available={runState === "queued"} canImportSubtitles={runState === "queued" || runState === "failed"} formats={formats} />
-          </CardContent>
-        </Card>
-      )}
-      {progress && plan && <RunMotionResults workspaceId={workspaceId} runId={runId}
-        results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
-      {awaiting && currentStage && (
-        <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting}
-          reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault} />
-      )}
+      <section ref={timeline} tabIndex={-1} aria-label={copy.title} className="flex min-w-0 flex-col gap-2 rounded-sm focus:outline-2 focus:outline-attention">
+        {loadError && <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription></Alert>}
+        {plan === undefined && !loadError && <Skeleton className="h-14 bg-white/15" aria-label={copy.loading} />}
+        {plan === null && <p role="status" className="border-y border-white/20 py-3 text-sm text-white/80">{copy.waiting}</p>}
+        {plan && (
+          <ol className="grid grid-cols-2 gap-x-1 gap-y-3 sm:grid-cols-3 xl:grid-cols-[repeat(var(--stage-count),minmax(0,1fr))]"
+            style={{ "--stage-count": plan.steps.length } as CSSProperties}>
+            {plan.steps.map((step, index) => {
+              const complete = index < (progress?.stage_index ?? 0);
+              const current = index === progress?.stage_index;
+              const activeColor = runState === "paused" ? "bg-white" : "bg-attention";
+              return (
+                <li key={step.stage} aria-current={current ? "step" : undefined}
+                  className="relative flex min-w-0 flex-col gap-1.5 pt-1.5 pb-2.5">
+                  <span className={cn("h-[30px] rounded-xs border", complete
+                    ? "border-white/85 bg-white/85" : current ? "border-transparent bg-attention" : "border-white/35")} aria-hidden="true" />
+                  <span className={cn("min-w-0 px-1 text-xs font-bold wrap-anywhere",
+                    current ? "text-attention" : "text-white/85")}>{copy[step.stage]}</span>
+                  <span className="absolute inset-x-0 bottom-0 h-1.5 border-t border-white/30 bg-[repeating-linear-gradient(to_right,transparent_0,transparent_calc(25%_-_1px),rgb(255_255_255_/_20%)_calc(25%_-_1px),rgb(255_255_255_/_20%)_25%)]" aria-hidden="true" />
+                  {complete && <span className="sr-only">{copy.stageComplete}</span>}
+                  {step.review_required && current && <span className="sr-only">{copy.reviewRequired}</span>}
+                  {current && (
+                    <motion.span aria-hidden="true"
+                      className={cn("pointer-events-none absolute -top-1 bottom-0 start-0 w-[3px]", activeColor)}
+                      initial={reduceMotion ? false : { x: -16 }}
+                      animate={{ x: 0 }}
+                      transition={{ duration: reduceMotion ? 0 : 1.1, ease: [0.165, 0.84, 0.44, 1] }} />
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+      {currentStage && <div className="flex items-center gap-3 py-2 text-white">
+        <NextImage src="/arrumo-icon.svg" width={44} height={44} alt="" className="shrink-0 rounded-lg" />
+        <div className="flex min-w-0 flex-col items-start gap-1" role="status">
+          <p className={cn("flex flex-wrap gap-x-2 text-sm font-bold", awaiting ? "text-attention" : "text-white/80")}>
+            {agent && <span>{agent}</span>}
+            <span>{awaiting ? copy.awaitingReview : queue[runState]}</span>
+          </p>
+          <p className="rounded-[4px] bg-[#0d1229d1] px-2.5 py-0.5 text-[23px] leading-[31px] font-bold wrap-anywhere">
+            {copy[currentStage]}
+          </p>
+        </div>
+      </div>}
+      <div className="@container">
+        <div className="grid items-start gap-5 @min-[52rem]:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="flex min-w-0 flex-col gap-4">
+            {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
+              <Card size="sm">
+                <CardHeader><CardTitle>{copy.assets}</CardTitle></CardHeader>
+                <CardContent className="flex flex-col items-start gap-3">
+                  <MotionArtifactAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
+                  <MotionRendererAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
+                </CardContent>
+              </Card>
+            )}
+            {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
+              <Card size="sm">
+                <CardHeader><CardTitle>{copy[mediaStage]}</CardTitle></CardHeader>
+                <CardContent>
+                  <MediaStageAction key={mediaStage} workspaceId={workspaceId} runId={runId} stage={mediaStage}
+                    available={runState === "queued"} canImportSubtitles={runState === "queued" || runState === "failed"} formats={formats} />
+                </CardContent>
+              </Card>
+            )}
+            {progress && plan && <RunMotionResults workspaceId={workspaceId} runId={runId}
+              results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
+            {awaiting && currentStage && (
+              <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting} formats={formats}
+                reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault} />
+            )}
+          </div>
+          {activity}
+        </div>
+      </div>
     </div>
   );
 }
 
-function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError, onReview, saveMotionDefault }: {
+function StageReview({ workspaceId, runId, stage, result, formats, reviewing, reviewError, onReview, saveMotionDefault }: {
   workspaceId: number;
   runId: number;
   stage: Stage;
   result: StageResult;
+  formats: DeliveryFormat[];
   reviewing: boolean;
   reviewError: boolean;
   onReview: (resultId: number, decision: Decision, notes: string, saveMotionIndexes?: number[]) => Promise<boolean>;
   saveMotionDefault: boolean;
 }) {
-  const { messages: { productionPlan: copy } } = useLocale();
+  const { messages: { productionPlan: copy, motionLibrary } } = useLocale();
   const motionItems = stage === "assets" && Array.isArray(result.result.motion_items)
     ? result.result.motion_items.flatMap((item: unknown, index: number) => (
       item && typeof item === "object" && "title" in item && typeof item.title === "string"
-        ? [{ index, title: item.title }] : []
+        ? [{
+          index,
+          title: item.title,
+          usage: "usage_markdown" in item && typeof item.usage_markdown === "string" ? item.usage_markdown : "",
+          kind: "kind" in item && item.kind === "transition" ? "transition" as const : "animation" as const,
+        }] : []
     )) : [];
   const draftKey = `arrumo:review:${workspaceId}:${runId}:${result.id}`;
   const [draft, setDraft] = useState<ReviewDraft>(() => {
@@ -206,7 +245,8 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
   const markdown = typeof result.result.markdown === "string" ? result.result.markdown : undefined;
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
-    key !== "markdown" && (key !== "preview_videos" || previews.length === 0)));
+    key !== "markdown" && (key !== "preview_videos" || previews.length === 0)
+    && (key !== "motion_items" || motionItems.length === 0)));
 
   function updateDraft(next: ReviewDraft) {
     setDraft(next);
@@ -223,17 +263,34 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{copy[stage]}</CardTitle>
+    <Card className="overflow-visible rounded-[14px]">
+      <CardHeader className="border-b">
+        <CardTitle className="text-xl font-bold">{copy[stage]}</CardTitle>
         <CardDescription>{copy.awaitingReview}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {markdown && <p className="max-w-[72ch] wrap-anywhere whitespace-pre-wrap text-sm leading-relaxed">{markdown}</p>}
-        {previews.map(({ filename, formatId }) => (
+        {markdown && <ScriptReviewText markdown={markdown} />}
+        {motionItems.length > 0 && (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {motionItems.map(({ index, title, usage, kind }) => (
+              <li key={index} className="min-w-0 rounded-lg border">
+                <div className="flex min-h-20 items-center gap-2 rounded-t-lg bg-secondary px-3">
+                  <Clapperboard className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="text-sm">{motionLibrary[kind]}</span>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="font-semibold wrap-anywhere">{title}</p>
+                  {usage && <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">{usage}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {previews.length > 0 && <div className="grid items-start gap-4 md:grid-cols-2">{previews.map(({ filename, formatId }, index) => (
           <GuidedPreview key={filename} workspaceId={workspaceId} runId={runId}
-            resultId={result.id} filename={filename} formatId={formatId} />
-        ))}
+            resultId={result.id} filename={filename} formatId={formatId} initiallyOpen={index === 0}
+            label={formats.find((format) => format.id === formatId)?.name ?? filename} />
+        ))}</div>}
         {Object.keys(source).length > 0 && (
           <Collapsible defaultOpen={!markdown && previews.length === 0}>
             <CollapsibleTrigger asChild>
@@ -242,7 +299,7 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(source, null, 2)}</pre>
+              <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 font-sans text-sm wrap-anywhere whitespace-pre-wrap">{JSON.stringify(source, null, 2)}</pre>
             </CollapsibleContent>
           </Collapsible>
         )}
@@ -251,20 +308,16 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
           <fieldset disabled={reviewing}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor={`review-decision-${runId}`}>{copy.decision}</FieldLabel>
-                <Select value={draft.decision} disabled={reviewing}
-                  onValueChange={(value) => { if (isDecision(value)) updateDraft({ ...draft, decision: value }); }}>
-                  <SelectTrigger id={`review-decision-${runId}`} className="max-w-full">
-                    <SelectValue placeholder={copy.selectDecision} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {Object.entries(decisionLabels).map(([value, label]) => (
-                        <SelectItem value={value} key={value}>{copy[label]}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-2">
+                  {decisions.map(({ value, label, icon: Icon, fill }) => {
+                    const selected = draft.decision === value;
+                    return <Button key={value} type="button" size="sm" variant="outline" aria-pressed={selected}
+                      onClick={() => updateDraft({ ...draft, decision: selected ? "" : value })}
+                      className={cn(selected && fill)}>
+                      <Icon data-icon="inline-start" />{copy[label]}
+                    </Button>;
+                  })}
+                </div>
               </Field>
               <Field>
                 <FieldLabel htmlFor={`review-notes-${runId}`}>{copy.reviewNotes}</FieldLabel>
@@ -287,10 +340,17 @@ function StageReview({ workspaceId, runId, stage, result, reviewing, reviewError
                 </fieldset>
               )}
               {reviewError && <Alert variant="destructive"><AlertDescription>{copy.reviewError}</AlertDescription></Alert>}
-              <Button type="submit" disabled={!draft.decision || reviewing}
-                variant={draft.decision === "rejected" ? "destructive" : "default"} className="self-start">
-                {copy.submitDecision}
-              </Button>
+              <div className="sticky bottom-4 z-[1] flex flex-wrap items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
+                <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || draft.notes) && "font-bold text-attention")} role="status">
+                  {draft.decision && <span aria-hidden="true"
+                    className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
+                  {draft.decision || draft.notes ? copy.unsentReview : copy.selectDecision}
+                </p>
+                <Button type="submit" disabled={!draft.decision || reviewing}
+                  className="ms-auto bg-attention text-[oklch(23%_.05_268)] hover:bg-[oklch(90%_.13_86)]">
+                  {copy.submitDecision}
+                </Button>
+              </div>
             </FieldGroup>
           </fieldset>
         </form>

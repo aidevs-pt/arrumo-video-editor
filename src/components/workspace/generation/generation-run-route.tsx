@@ -1,14 +1,14 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ListVideo } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
-import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceShell } from "@/components/workspace/layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
@@ -66,30 +66,33 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
 
   const problem = runId === null || run === null ? copy.missingRun : loadError ? copy.loadError : undefined;
   return (
-    <WorkspaceShell>
-      <Button asChild variant="ghost">
-        <Link href={workspaceHref("generations", workspaceId)}>
-          <ArrowLeft data-icon="inline-start" />{copy.title}
-        </Link>
-      </Button>
-      <WorkspaceHeading icon={ListVideo}><h1>{run ? runTitle(run) : copy.runDetail}</h1></WorkspaceHeading>
-      {problem && <Alert variant="destructive"><AlertDescription>{problem}</AlertDescription></Alert>}
-      {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}
-      {run ? (
-        <div className="flex flex-col gap-5">
-          <GenerationRunControls run={run} workspaceId={workspaceId} disabled={pending} onControl={control} />
-          {run.state !== "completed" && (
-            <div>
-              <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy}
+    <div className="min-h-[calc(100svh-3.5rem)] bg-agent text-white">
+      <WorkspaceShell className="flex max-w-[94rem] flex-col gap-5">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col items-start gap-3">
+            <Button asChild variant="ghost" size="sm" className="-ms-2 text-white/80 hover:bg-white/10 hover:text-white">
+              <Link href={workspaceHref("generations", workspaceId)}><ArrowLeft data-icon="inline-start" />{copy.title}</Link>
+            </Button>
+            <h1 className="max-w-[28ch] text-3xl leading-tight font-[850] wrap-anywhere sm:text-[2.125rem]">
+              {run ? runTitle(run) : copy.runDetail}
+            </h1>
+          </div>
+          {run && (
+            <div className="flex flex-wrap items-center gap-2 self-end">
+              <GenerationRunControls run={run} workspaceId={workspaceId} disabled={pending} onControl={control} />
+              {run.state !== "completed" && <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy}
                 onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", {
                   workspaceId, runId: run.id, confirmedTitle,
                 })}
-                onDelete={() => router.replace(workspaceHref("generations", workspaceId))} />
+                onDelete={() => router.replace(workspaceHref("generations", workspaceId))} />}
             </div>
           )}
-          <GenerationRunPanels run={run} workspaceId={workspaceId} />
-        </div>
-      ) : !problem && <Skeleton className="min-h-40" aria-label={copy.loading} />}
-    </WorkspaceShell>
+        </header>
+        {problem && <Alert variant="destructive"><AlertDescription>{problem}</AlertDescription></Alert>}
+        {controlError && <Alert variant="destructive"><AlertDescription>{copy.controlError}</AlertDescription></Alert>}
+        {run ? <GenerationRunPanels run={run} workspaceId={workspaceId} />
+          : !problem && <Skeleton className="min-h-40 bg-white/15" aria-label={copy.loading} />}
+      </WorkspaceShell>
+    </div>
   );
 }
