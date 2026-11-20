@@ -483,6 +483,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(io::Error::other)?;
             println!("{}", serde_json::to_string(&asset)?);
         }
+        [database, command, workspace, asset, name] if command == "remove-asset" => {
+            let database = Path::new(database);
+            let removed = WorkspaceStore::open(database)?.remove_workspace_asset(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(asset)?.parse()?,
+                utf8(name)?,
+            )?;
+            println!("{removed}");
+        }
         [database, command, workspace, asset] if command == "asset-organization" => {
             let settings = WorkspaceStore::open(Path::new(database))?
                 .asset_organization(utf8(workspace)?.parse()?, utf8(asset)?.parse()?)?;
@@ -900,7 +910,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "set-profile-delivery <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "assets <workspace-id> | import-asset <workspace-id> <source-path> | ",
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
-                "asset-organization <workspace-id> <asset-id> | set-asset-organization <workspace-id> <asset-id> <settings-json> | ",
+                "remove-asset <workspace-id> <asset-id> <confirmed-name> | asset-organization <workspace-id> <asset-id> | set-asset-organization <workspace-id> <asset-id> <settings-json> | ",
                 "set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown> | set-asset-notes <workspace-id> <asset-id> <notes> | ",
                 "context <workspace-id> | set-context <workspace-id> <markdown> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",

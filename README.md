@@ -357,3 +357,5 @@ Open the desktop calendar at a specific month and profile with a link such as `a
 Use `set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown>` in the CLI, or `set_batch_asset_notes` in MCP and A2A, to replace notes for multiple workspace assets together. A missing or foreign asset rolls back the entire update.
 
 Read asset labels and grouping with `asset-organization <workspace-id> <asset-id>` or `get_asset_organization` through MCP and A2A. Replace them with `set-asset-organization <workspace-id> <asset-id> <settings-json>` or `set_asset_organization`. Settings contain an optional `group` and a `labels` array. An empty settings object clears both without changing the asset or its references.
+
+Use `remove-asset <workspace-id> <asset-id> <confirmed-name>` to remove an unused asset and its managed file. Use the exact saved filename. Draft sources, brand assignments, thumbnail references, and captured run references protect their assets from removal. If file cleanup is interrupted, repeat the same command to finish it.

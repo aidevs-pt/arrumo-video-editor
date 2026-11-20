@@ -1,0 +1,153 @@
+use std::{error::Error, fs, io, path::Path};
+
+use rusqlite::{Transaction, TransactionBehavior, params};
+
+use crate::{WorkspaceStore, asset_path, asset_root};
+
+impl WorkspaceStore {
+    pub fn remove_workspace_asset(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        asset_id: i64,
+        confirmed_name: &str,
+    ) -> Result<bool, Box<dyn Error>> {
+        let source = asset_path(
+            &asset_root(&database.canonicalize()?),
+            workspace_id,
+            asset_id,
+        );
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let pending: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM pending_asset_cleanup
+                            WHERE workspace_id = ?1 AND asset_id = ?2 AND confirmed_name = ?3)",
+            params![workspace_id, asset_id, confirmed_name],
+            |row| row.get(0),
+        )?;
+        if !pending {
+            let deleted = tx.execute(
+                "WITH captured_settings(document) AS (
+                    SELECT snapshot_json FROM generation_runs WHERE workspace_id = ?1
+                    UNION ALL
+                    SELECT delivery.settings_json FROM format_deliveries AS delivery
+                        JOIN output_formats AS format ON format.id = delivery.format_id
+                        WHERE format.workspace_id = ?1
+                    UNION ALL
+                    SELECT settings_json FROM profile_deliveries WHERE workspace_id = ?1
+                 )
+                 DELETE FROM workspace_assets
+                 WHERE workspace_id = ?1 AND id = ?2 AND name = ?3
+                   AND NOT EXISTS (SELECT 1 FROM workspace_brand_assets WHERE workspace_id = ?1 AND asset_id = ?2)
+                   AND NOT EXISTS (SELECT 1 FROM video_draft_sources WHERE workspace_id = ?1 AND asset_id = ?2)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM captured_settings, json_tree(document) AS reference
+                       WHERE reference.type = 'integer' AND reference.atom = ?2
+                         AND (replace(reference.path, char(34), '') = '$.draft.source_ids'
+                           OR replace(reference.path, char(34), '') LIKE '%.thumbnail_reference_ids'
+                           OR (replace(reference.path, char(34), '') LIKE '$.brand_assets[%]' AND reference.key = 'asset_id'))
+                   )",
+                params![workspace_id, asset_id, confirmed_name],
+            )?;
+            if deleted == 0 {
+                return Ok(false);
+            }
+            check_asset_file(&source)?;
+            tx.execute(
+                "INSERT INTO pending_asset_cleanup (workspace_id, asset_id, confirmed_name) VALUES (?1, ?2, ?3)",
+                params![workspace_id, asset_id, confirmed_name],
+            )?;
+        }
+        tx.commit()?;
+
+        if check_asset_file(&source)? {
+            match fs::remove_file(source) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        self.0.execute(
+            "DELETE FROM pending_asset_cleanup WHERE workspace_id = ?1 AND asset_id = ?2",
+            params![workspace_id, asset_id],
+        )?;
+        Ok(true)
+    }
+}
+
+fn check_asset_file(source: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(source) {
+        Ok(metadata) if metadata.is_file() && source.canonicalize()? == source => Ok(true),
+        Ok(_) => Err(io::Error::other("Invalid managed asset file")),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{DraftSettings, RunOptions, SupplementalOutputs};
+
+    #[test]
+    fn captured_thumbnail_references_survive_live_settings_changes() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspaces.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let source = temp.path().join("reference.png");
+        fs::write(&source, b"fixture").unwrap();
+        let asset = store
+            .import_asset(&asset_root(&database), workspace, &source)
+            .unwrap();
+        let format = store.list_output_formats(workspace).unwrap()[0].id;
+        store
+            .set_format_delivery(
+                workspace,
+                format,
+                &SupplementalOutputs {
+                    thumbnail_reference_ids: vec![asset.id],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert!(
+            !store
+                .remove_workspace_asset(&database, workspace, asset.id, &asset.name)
+                .unwrap()
+        );
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Fixture".into(),
+                    intent: "Test references".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "snapshot", &RunOptions::default())
+            .unwrap();
+        store
+            .set_format_delivery(workspace, format, &SupplementalOutputs::default())
+            .unwrap();
+        assert!(
+            !store
+                .remove_workspace_asset(&database, workspace, asset.id, &asset.name)
+                .unwrap()
+        );
+        assert!(
+            store
+                .delete_generation(&database, workspace, run.id, &draft.settings.title)
+                .unwrap()
+        );
+        assert!(
+            store
+                .remove_workspace_asset(&database, workspace, asset.id, &asset.name)
+                .unwrap()
+        );
+        assert!(source.exists());
+        assert!(!asset_path(&asset_root(&database), workspace, asset.id).exists());
+    }
+}

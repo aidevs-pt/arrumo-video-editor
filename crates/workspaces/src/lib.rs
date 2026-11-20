@@ -7,6 +7,7 @@ mod a2a;
 mod agent_cli;
 mod agent_plugins;
 mod agent_settings;
+mod asset_cleanup;
 mod asset_organization;
 mod assets;
 mod brand_assets;
@@ -154,6 +155,7 @@ impl WorkspaceStore {
             include_str!("../migrations/033-delivery-cleanup.sql"),
             include_str!("../migrations/034-output-schedules.sql"),
             include_str!("../migrations/035-asset-organization.sql"),
+            include_str!("../migrations/036-asset-cleanup.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
