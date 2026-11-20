@@ -36,6 +36,8 @@ impl WorkspaceStore {
                  WHERE workspace_id = ?1 AND id = ?2 AND name = ?3
                    AND NOT EXISTS (SELECT 1 FROM workspace_brand_assets WHERE workspace_id = ?1 AND asset_id = ?2)
                    AND NOT EXISTS (SELECT 1 FROM video_draft_sources WHERE workspace_id = ?1 AND asset_id = ?2)
+                   AND NOT EXISTS (SELECT 1 FROM motion_library WHERE workspace_id = ?1
+                                   AND ?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id))
                    AND NOT EXISTS (
                        SELECT 1 FROM captured_settings, json_tree(document) AS reference
                        WHERE reference.type = 'integer' AND reference.atom = ?2

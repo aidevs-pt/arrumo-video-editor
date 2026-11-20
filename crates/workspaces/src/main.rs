@@ -463,6 +463,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, profile] if command == "motion-library" => {
+            let profile = match utf8(profile)? {
+                "workspace" => None,
+                value => Some(value.parse()?),
+            };
+            let items = WorkspaceStore::open(Path::new(database))?
+                .list_motion_library(utf8(workspace)?.parse()?, profile)?;
+            println!("{}", serde_json::to_string(&items)?);
+        }
+        [database, command, workspace, settings] if command == "create-motion-item" => {
+            let item = WorkspaceStore::open(Path::new(database))?.create_motion_library_item(
+                utf8(workspace)?.parse()?,
+                &serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
         [database, command, workspace] if command == "assets" => {
             let assets = WorkspaceStore::open(Path::new(database))?
                 .list_assets(utf8(workspace)?.parse()?)?;

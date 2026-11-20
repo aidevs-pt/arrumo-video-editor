@@ -233,6 +233,9 @@ fn replace_live_references(
         "UPDATE video_draft_sources SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
         "UPDATE workspace_brand_assets SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
         "UPDATE asset_organization SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
+        "UPDATE motion_library SET preview_asset_id = ?3 WHERE workspace_id = ?1 AND preview_asset_id = ?2",
+        "UPDATE motion_library SET thumbnail_asset_id = ?3 WHERE workspace_id = ?1 AND thumbnail_asset_id = ?2",
+        "UPDATE motion_library SET sound_asset_id = ?3 WHERE workspace_id = ?1 AND sound_asset_id = ?2",
     ] {
         tx.execute(statement, ids)?;
     }

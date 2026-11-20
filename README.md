@@ -365,3 +365,9 @@ Read asset labels and grouping with `asset-organization <workspace-id> <asset-id
 Use `replace-asset <workspace-id> <asset-id> <source-path>` to import a same-kind replacement. It returns the new asset ID, carries forward usage notes and organization, and updates draft, brand, and thumbnail references. The previous media stays available to generation runs that captured it. Original files remain in place.
 
 Use `remove-asset <workspace-id> <asset-id> <confirmed-name>` to remove an unused asset and its managed file. Use the exact saved filename. Draft sources, brand assignments, thumbnail references, and captured run references protect their assets from removal. If file cleanup is interrupted, repeat the same command to finish it. At startup, the desktop app retries pending asset cleanup and reclaims superseded managed files without remaining references.
+
+### Animation and transition library
+
+Use `create-motion-item <workspace-id> <settings-json>` to register existing managed media as a reusable library item. The settings accept `kind` (`animation` or `transition`), `title`, `usage_markdown`, and `preview_asset_id` (video). Optional `thumbnail_asset_id` (image) and `sound_asset_id` (audio) refer to assets in the same workspace. Omit `profile_id` for workspace-wide use.
+
+Use `motion-library <workspace-id> workspace` for workspace-wide items, or pass a profile ID to include items scoped to that profile. Several entries can refer to the same media without copying it.

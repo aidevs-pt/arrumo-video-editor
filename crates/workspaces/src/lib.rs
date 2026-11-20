@@ -24,6 +24,7 @@ mod generation_queue;
 mod generation_worker;
 mod mcp;
 mod media_worker;
+mod motion_library;
 mod operations;
 mod output_formats;
 mod output_schedule;
@@ -66,6 +67,7 @@ pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions}
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use mcp::serve_mcp;
 pub use media_worker::MediaWork;
+pub use motion_library::{MotionKind, MotionLibraryItem, MotionLibrarySettings};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use output_schedule::ScheduledOutput;
 pub use plugin_actions::InstalledPluginAction;
@@ -157,6 +159,7 @@ impl WorkspaceStore {
             include_str!("../migrations/035-asset-organization.sql"),
             include_str!("../migrations/036-asset-cleanup.sql"),
             include_str!("../migrations/037-asset-replacements.sql"),
+            include_str!("../migrations/038-motion-library.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
