@@ -1,14 +1,12 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Plus } from "lucide-react";
+import { Copy, Pencil, Plus, Volume2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -19,6 +17,7 @@ import { ConfirmTitleDelete } from "@/components/workspace/confirm-title-delete"
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { workspaceHref, type Workspace } from "@/components/workspace/home/workspace-links";
 import { useLocale } from "@/lib/locale-provider";
+import { cn } from "@/lib/utils";
 
 import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
@@ -53,6 +52,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
   const [operation, setOperation] = useState<{ mode: "edit" | "duplicate"; item: Item }>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [chosenId, setChosenId] = useState<number | null>(null);
   const workspaceId = workspace.id;
 
   useEffect(() => {
@@ -110,6 +110,9 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
   const dialogTitle = operation ? copy[operation.mode] : copy.add;
   const videos = catalog?.assets.filter(({ kind }) => kind === "video") ?? [];
   const Shell = embedded ? Fragment : WorkspaceShell;
+  const chosen = items?.find((item) => item.id === chosenId);
+  const scopeName = (profileId: number | null) => profileId === null ? copy.workspaceScope
+    : catalog?.profiles.find((profile) => profile.id === profileId)?.name ?? copy.workspaceScope;
 
   return (
     <Shell>
@@ -190,44 +193,68 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
           <p className="text-sm text-muted-foreground">{videos.length ? copy.empty : copy.importFirst}</p>
           {!videos.length && <Button asChild variant="outline" className="mt-3"><Link href={workspaceHref("assets", workspaceId)}>{messages.assets.title}</Link></Button>}
         </div>
-        : <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
-          {items.map(({ id, settings }) => <li key={id} className="min-w-0">
-            <Card className="overflow-hidden gap-3 p-2">
-              <AssetThumbnail workspaceId={workspaceId} kind={settings.thumbnail_asset_id ? "image" : "video"}
-                assetId={settings.thumbnail_asset_id ?? settings.preview_asset_id} />
-              <CardContent className="flex flex-col items-start gap-2 px-1.5">
-                <Badge variant="secondary">{copy[settings.kind]}</Badge>
-                <h2 className="wrap-anywhere font-semibold">{settings.title}</h2>
-                {settings.usage_markdown && <p className="whitespace-pre-wrap wrap-anywhere text-sm text-muted-foreground">{settings.usage_markdown}</p>}
-              </CardContent>
-              <CardFooter className="flex-wrap gap-1 px-1.5">
-                <MotionPreviewDialog workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
-                  itemId={id} title={settings.title} />
-                {(["edit", "duplicate"] as const).map((mode) => (
-                  <Button key={mode} type="button" size="sm" variant="ghost" disabled={open}
-                    aria-label={`${copy[mode]}, ${settings.title}`}
-                    onClick={() => {
-                      setOperation({ mode, item: { id, settings } });
-                      setSaveError(false);
-                      setOpen(true);
-                    }}>{copy[mode]}</Button>
-                ))}
-                {settings.profile_id !== null && catalog && <MotionShareDialog
-                  workspaceId={workspaceId} itemId={id} title={settings.title}
-                  ownerId={settings.profile_id} profiles={catalog.profiles} disabled={open}
-                  onSave={() => setAttempt((value) => value + 1)} />}
-                <ConfirmTitleDelete title={settings.title} disabled={open} copy={copy.deletion}
-                  onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
-                    workspaceId, itemId: id, confirmedTitle,
-                  })}
-                  onDelete={() => {
-                    setItems((current) => current?.filter((item) => item.id !== id));
-                    heading.current?.focus();
-                  }} />
-              </CardFooter>
-            </Card>
-          </li>)}
-        </ul>}
+        : <div className={cn("grid items-start gap-6", chosen && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
+            {items.map(({ id, settings }) => <li key={id} className="min-w-0">
+              <button type="button" aria-pressed={chosen?.id === id} onClick={() => setChosenId(chosenId === id ? null : id)}
+                className={cn("flex h-full w-full flex-col gap-3 rounded-xl border-2 border-border bg-card p-2 text-start transition-colors duration-150 hover:border-line-strong",
+                  chosen?.id === id && "border-primary hover:border-primary")}>
+                <AssetThumbnail workspaceId={workspaceId} kind={settings.thumbnail_asset_id ? "image" : "video"}
+                  assetId={settings.thumbnail_asset_id ?? settings.preview_asset_id} className="w-full bg-ink/90" />
+                <span className="flex flex-col items-start gap-2 px-1.5 pb-1.5">
+                  <span className="flex w-full items-center gap-2 font-semibold wrap-anywhere">
+                    <span className="min-w-0 flex-1">{settings.title}</span>
+                    {settings.sound_asset_id && <Volume2 className="size-4 shrink-0 text-muted-foreground" aria-label={copy.audio} />}
+                  </span>
+                  <span className="flex flex-wrap gap-1.5">
+                    <span className="rounded-md border px-2 py-0.5 text-sm">{copy[settings.kind]}</span>
+                    <span className="rounded-md bg-secondary px-2 py-0.5 text-sm font-semibold">{scopeName(settings.profile_id)}</span>
+                  </span>
+                  {settings.usage_markdown && <span className="line-clamp-2 text-sm text-muted-foreground wrap-anywhere">{settings.usage_markdown}</span>}
+                </span>
+              </button>
+            </li>)}
+          </ul>
+          {chosen && <aside className="flex flex-col gap-4 rounded-xl border bg-card p-5 xl:sticky xl:top-20" aria-labelledby="motion-panel-title">
+            <div className="flex items-start justify-between gap-2">
+              <h2 id="motion-panel-title" className="min-w-0 text-[1.5rem] leading-tight wrap-anywhere">{chosen.settings.title}</h2>
+              <Button variant="ghost" size="icon-sm" aria-label={copy.close} onClick={() => setChosenId(null)}><X /></Button>
+            </div>
+            <AssetThumbnail workspaceId={workspaceId} kind={chosen.settings.thumbnail_asset_id ? "image" : "video"}
+              assetId={chosen.settings.thumbnail_asset_id ?? chosen.settings.preview_asset_id} className="w-full bg-ink/90" />
+            <MotionPreviewDialog workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
+              itemId={chosen.id} title={chosen.settings.title} />
+            {chosen.settings.usage_markdown && <div>
+              <h3 className="mb-1 font-bold">{copy.usage}</h3>
+              <p className="whitespace-pre-wrap text-muted-foreground wrap-anywhere">{chosen.settings.usage_markdown}</p>
+            </div>}
+            <p className="flex flex-wrap items-center gap-2 font-bold">{copy.sharedWith}
+              <span className="rounded-md bg-secondary px-2 py-0.5 text-sm">{scopeName(chosen.settings.profile_id)}</span></p>
+            <div className="flex flex-wrap gap-2 border-t pt-4">
+              {(["edit", "duplicate"] as const).map((mode) => (
+                <Button key={mode} type="button" variant="outline" disabled={open}
+                  onClick={() => {
+                    setOperation({ mode, item: chosen });
+                    setSaveError(false);
+                    setOpen(true);
+                  }}>{mode === "edit" ? <Pencil data-icon="inline-start" /> : <Copy data-icon="inline-start" />}{copy[mode]}</Button>
+              ))}
+              {chosen.settings.profile_id !== null && catalog && <MotionShareDialog
+                workspaceId={workspaceId} itemId={chosen.id} title={chosen.settings.title}
+                ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}
+                onSave={() => setAttempt((value) => value + 1)} />}
+              <ConfirmTitleDelete title={chosen.settings.title} disabled={open} copy={copy.deletion}
+                onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
+                  workspaceId, itemId: chosen.id, confirmedTitle,
+                })}
+                onDelete={() => {
+                  setItems((current) => current?.filter((item) => item.id !== chosen.id));
+                  setChosenId(null);
+                  heading.current?.focus();
+                }} />
+            </div>
+          </aside>}
+        </div>}
     </Shell>
   );
 }

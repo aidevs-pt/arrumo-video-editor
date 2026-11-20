@@ -63,7 +63,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
     : view === "calendar" ? messages.calendar.title
     : workspaceSection ? copy.workspaceSettings
     : view === "assets" ? messages.assets.title
-    : view === "motion-library" ? messages.motionLibrary.title
+    : view === "motion-library" ? messages.profileHub.animations
     : messages.profiles.title;
 
   function choose(entry: Workspace | null) {
@@ -138,7 +138,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
                   <SidebarMenuItem><NavLink href={workspaceHref("assets", workspace.id)} active={view === "assets" && !onProfile} label={messages.assets.title} icon={Images} /></SidebarMenuItem>
                   <SidebarMenuItem>
                     <NavLink href={workspaceHref("motion-library", workspace.id)}
-                      active={view === "motion-library" && !onProfile && !query.get("profile")} label={messages.motionLibrary.title} icon={WandSparkles} />
+                      active={view === "motion-library" && !onProfile && !query.get("profile")} label={messages.profileHub.animations} icon={WandSparkles} />
                   </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>

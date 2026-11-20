@@ -306,10 +306,10 @@
       "cancelDelete": "Cancelar",
       "deleting": "Eliminando…"
     },
-    "title": "Animaciones",
-    "intro": "Organiza animaciones y transiciones reutilizables por espacio de trabajo o perfil.",
+    "title": "Animaciones y transiciones",
+    "intro": "Superposiciones y transiciones que el agente puede usar en cualquier vídeo. Por dentro son código; tú solo ves el bucle.",
     "scope": "Visibilidad",
-    "workspaceScope": "Todo el espacio de trabajo",
+    "workspaceScope": "Espacio de trabajo",
     "add": "Añadir elemento",
     "addDescription": "Elige un vídeo gestionado y, si quieres, una miniatura y sonido.",
     "name": "Nombre",
@@ -321,7 +321,7 @@
     "audio": "Sonido",
     "chooseVideo": "Elige un vídeo",
     "none": "Ninguno",
-    "usage": "Notas de uso",
+    "usage": "Cuándo usarla",
     "save": "Guardar elemento",
     "cancel": "Cancelar",
     "saving": "Guardando…",
@@ -329,8 +329,10 @@
     "loadError": "No se pudo cargar la biblioteca de movimiento.",
     "loading": "Cargando la biblioteca de movimiento…",
     "retry": "Reintentar",
-    "empty": "No hay elementos en esta vista.",
-    "importFirst": "Importa un vídeo en Recursos para añadir tu primer elemento."
+    "empty": "Aún no hay animaciones ni transiciones aquí.",
+    "importFirst": "Importa un vídeo en Recursos para añadir tu primer elemento.",
+    "close": "Cerrar detalles",
+    "sharedWith": "Compartido con"
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",

@@ -306,10 +306,10 @@
       "cancelDelete": "Cancelar",
       "deleting": "A eliminar…"
     },
-    "title": "Animações",
-    "intro": "Organiza animações e transições reutilizáveis por espaço de trabalho ou perfil.",
+    "title": "Animações e transições",
+    "intro": "Sobreposições e transições que o agente pode usar em qualquer vídeo. Por dentro são código; só vê o ciclo.",
     "scope": "Visibilidade",
-    "workspaceScope": "Todo o espaço de trabalho",
+    "workspaceScope": "Espaço de trabalho",
     "add": "Adicionar elemento",
     "addDescription": "Escolhe um vídeo gerido e, opcionalmente, uma miniatura e som.",
     "name": "Nome",
@@ -321,7 +321,7 @@
     "audio": "Som",
     "chooseVideo": "Escolhe um vídeo",
     "none": "Nenhum",
-    "usage": "Notas de utilização",
+    "usage": "Quando usar",
     "save": "Guardar elemento",
     "cancel": "Cancelar",
     "saving": "A guardar…",
@@ -329,8 +329,10 @@
     "loadError": "Não foi possível carregar a biblioteca de movimento.",
     "loading": "A carregar a biblioteca de movimento…",
     "retry": "Tentar novamente",
-    "empty": "Sem elementos nesta vista.",
-    "importFirst": "Importa um vídeo em Recursos para adicionar o primeiro elemento."
+    "empty": "Ainda não há animações nem transições aqui.",
+    "importFirst": "Importa um vídeo em Recursos para adicionar o primeiro elemento.",
+    "close": "Fechar detalhes",
+    "sharedWith": "Partilhado com"
   },
   "assets": {
     "replaceFile": "Substituir ficheiro",

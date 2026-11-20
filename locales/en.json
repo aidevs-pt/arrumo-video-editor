@@ -306,10 +306,10 @@
       "cancelDelete": "Cancel",
       "deleting": "Deleting…"
     },
-    "title": "Animations",
-    "intro": "Organize reusable animations and transitions by workspace or profile.",
+    "title": "Animations and transitions",
+    "intro": "Overlays and transitions the agent can drop into any video. Each is code under the hood; you only see the loop.",
     "scope": "Visibility",
-    "workspaceScope": "Workspace-wide",
+    "workspaceScope": "Workspace",
     "add": "Add item",
     "addDescription": "Choose a managed video and optional thumbnail and sound.",
     "name": "Name",
@@ -321,7 +321,7 @@
     "audio": "Sound",
     "chooseVideo": "Choose a video",
     "none": "None",
-    "usage": "Usage notes",
+    "usage": "When to use it",
     "save": "Save item",
     "cancel": "Cancel",
     "saving": "Saving…",
@@ -329,8 +329,10 @@
     "loadError": "Could not load the motion library.",
     "loading": "Loading motion library…",
     "retry": "Retry",
-    "empty": "No motion items in this view.",
-    "importFirst": "Import a video in Assets to add your first motion item."
+    "empty": "No animations or transitions here yet.",
+    "importFirst": "Import a video in Assets to add your first motion item.",
+    "close": "Close details",
+    "sharedWith": "Shared with"
   },
   "assets": {
     "replaceFile": "Replace file",

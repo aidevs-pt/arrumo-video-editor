@@ -18,7 +18,7 @@ export function WorkspaceSettingsHeading({ workspace, current, headingRef }: {
     ["brand", messages.brand.title],
     ["assets", messages.assets.title],
     ["outputs", messages.outputs.title],
-    ["motion-library", messages.motionLibrary.title],
+    ["motion-library", messages.profileHub.animations],
   ] as const;
   return <>
     <WorkspaceHeading className="mb-3">
