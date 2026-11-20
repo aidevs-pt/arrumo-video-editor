@@ -371,3 +371,5 @@ Use `remove-asset <workspace-id> <asset-id> <confirmed-name>` to remove an unuse
 Use `create-motion-item <workspace-id> <settings-json>` to register existing managed media as a reusable library item. The settings accept `kind` (`animation` or `transition`), `title`, `usage_markdown`, and `preview_asset_id` (video). Optional `thumbnail_asset_id` (image) and `sound_asset_id` (audio) refer to assets in the same workspace. Omit `profile_id` for workspace-wide use.
 
 Use `motion-library <workspace-id> workspace` for workspace-wide items, or pass a profile ID to include items scoped to that profile. Several entries can refer to the same media without copying it.
+
+Use `update-motion-item <workspace-id> <item-id> <settings-json>` to replace its settings with the same fields as creation. Use `duplicate-motion-item <workspace-id> <item-id> <title>` to create a new entry with the source scope, usage notes, and media. Use `delete-motion-item <workspace-id> <item-id> <confirmed-title>` with the exact saved title. Deletion removes the library entry and keeps its assets in the workspace.

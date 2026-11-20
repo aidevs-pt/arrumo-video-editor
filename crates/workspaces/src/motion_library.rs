@@ -38,6 +38,13 @@ pub struct MotionLibraryItem {
     pub settings: MotionLibrarySettings,
 }
 
+const VALID_MEDIA: &str = "EXISTS (SELECT 1 FROM workspace_assets
+                           WHERE workspace_id = ?1 AND id = ?6 AND kind = 'video' AND superseded = 0)
+               AND (?7 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
+                           WHERE workspace_id = ?1 AND id = ?7 AND kind = 'image' AND superseded = 0))
+               AND (?8 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
+                           WHERE workspace_id = ?1 AND id = ?8 AND kind = 'audio' AND superseded = 0))";
+
 impl WorkspaceStore {
     pub fn create_motion_library_item(
         &self,
@@ -45,18 +52,15 @@ impl WorkspaceStore {
         settings: &MotionLibrarySettings,
     ) -> rusqlite::Result<MotionLibraryItem> {
         self.0.query_row(
-            "INSERT INTO motion_library
+            &format!(
+                "INSERT INTO motion_library
                 (workspace_id, profile_id, kind, title, usage_markdown,
                  preview_asset_id, thumbnail_asset_id, sound_asset_id)
              SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
-             WHERE EXISTS (SELECT 1 FROM workspace_assets
-                           WHERE workspace_id = ?1 AND id = ?6 AND kind = 'video' AND superseded = 0)
-               AND (?7 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
-                           WHERE workspace_id = ?1 AND id = ?7 AND kind = 'image' AND superseded = 0))
-               AND (?8 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
-                           WHERE workspace_id = ?1 AND id = ?8 AND kind = 'audio' AND superseded = 0))
+             WHERE {VALID_MEDIA}
              RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
-                       preview_asset_id, thumbnail_asset_id, sound_asset_id",
+                       preview_asset_id, thumbnail_asset_id, sound_asset_id"
+            ),
             params![
                 workspace_id,
                 settings.profile_id,
@@ -69,6 +73,70 @@ impl WorkspaceStore {
             ],
             read_item,
         )
+    }
+
+    pub fn update_motion_library_item(
+        &self,
+        workspace_id: i64,
+        item_id: i64,
+        settings: &MotionLibrarySettings,
+    ) -> rusqlite::Result<MotionLibraryItem> {
+        self.0.query_row(
+            &format!(
+                "UPDATE motion_library
+                 SET profile_id = ?2, kind = ?3, title = ?4, usage_markdown = ?5,
+                     preview_asset_id = ?6, thumbnail_asset_id = ?7, sound_asset_id = ?8
+                 WHERE workspace_id = ?1 AND id = ?9 AND {VALID_MEDIA}
+                 RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
+                           preview_asset_id, thumbnail_asset_id, sound_asset_id"
+            ),
+            params![
+                workspace_id,
+                settings.profile_id,
+                settings.kind.as_str(),
+                settings.title.trim(),
+                settings.usage_markdown,
+                settings.preview_asset_id,
+                settings.thumbnail_asset_id,
+                settings.sound_asset_id,
+                item_id,
+            ],
+            read_item,
+        )
+    }
+
+    pub fn duplicate_motion_library_item(
+        &self,
+        workspace_id: i64,
+        item_id: i64,
+        title: &str,
+    ) -> rusqlite::Result<MotionLibraryItem> {
+        self.0.query_row(
+            "INSERT INTO motion_library
+                (workspace_id, profile_id, kind, title, usage_markdown,
+                 preview_asset_id, thumbnail_asset_id, sound_asset_id)
+             SELECT workspace_id, profile_id, kind, ?3, usage_markdown,
+                    preview_asset_id, thumbnail_asset_id, sound_asset_id
+             FROM motion_library WHERE workspace_id = ?1 AND id = ?2
+             RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
+                       preview_asset_id, thumbnail_asset_id, sound_asset_id",
+            params![workspace_id, item_id, title.trim()],
+            read_item,
+        )
+    }
+
+    pub fn delete_motion_library_item(
+        &self,
+        workspace_id: i64,
+        item_id: i64,
+        confirmed_title: &str,
+    ) -> rusqlite::Result<bool> {
+        self.0
+            .execute(
+                "DELETE FROM motion_library WHERE workspace_id = ?1 AND id = ?2 AND title = ?3",
+                params![workspace_id, item_id, confirmed_title],
+            )
+            .map(|count| count != 0)
     }
 
     pub fn list_motion_library(

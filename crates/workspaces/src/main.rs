@@ -479,6 +479,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&item)?);
         }
+        [database, command, workspace, item, settings] if command == "update-motion-item" => {
+            let item = WorkspaceStore::open(Path::new(database))?.update_motion_library_item(
+                utf8(workspace)?.parse()?,
+                utf8(item)?.parse()?,
+                &serde_json::from_str(utf8(settings)?)?,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
+        [database, command, workspace, item, title] if command == "duplicate-motion-item" => {
+            let item = WorkspaceStore::open(Path::new(database))?.duplicate_motion_library_item(
+                utf8(workspace)?.parse()?,
+                utf8(item)?.parse()?,
+                utf8(title)?,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
+        [database, command, workspace, item, title] if command == "delete-motion-item" => {
+            let deleted = WorkspaceStore::open(Path::new(database))?.delete_motion_library_item(
+                utf8(workspace)?.parse()?,
+                utf8(item)?.parse()?,
+                utf8(title)?,
+            )?;
+            println!("{deleted}");
+        }
         [database, command, workspace] if command == "assets" => {
             let assets = WorkspaceStore::open(Path::new(database))?
                 .list_assets(utf8(workspace)?.parse()?)?;
