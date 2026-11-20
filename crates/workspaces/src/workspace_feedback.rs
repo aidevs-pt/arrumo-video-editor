@@ -56,10 +56,44 @@ impl WorkspaceStore {
     }
 }
 
+impl WorkspaceStore {
+    /// Removes a feedback card. Returns whether the card existed in this workspace.
+    pub fn remove_workspace_feedback(
+        &self,
+        workspace_id: i64,
+        feedback_id: i64,
+    ) -> rusqlite::Result<bool> {
+        Ok(self.0.execute(
+            "DELETE FROM workspace_feedback WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, feedback_id],
+        )? > 0)
+    }
+}
+
 fn read_feedback(row: &Row<'_>) -> rusqlite::Result<WorkspaceFeedback> {
     Ok(WorkspaceFeedback {
         id: row.get(0)?,
         title: row.get(1)?,
         markdown: row.get(2)?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::WorkspaceStore;
+
+    #[test]
+    fn removal_is_scoped_to_the_owning_workspace() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let studio = store.create("Studio").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        let card = store
+            .add_workspace_feedback(studio, "Pacing", "Cut silences at 0.35 s")
+            .unwrap();
+        assert!(!store.remove_workspace_feedback(other, card.id).unwrap());
+        assert_eq!(store.list_workspace_feedback(studio).unwrap().len(), 1);
+        assert!(store.remove_workspace_feedback(studio, card.id).unwrap());
+        assert!(store.list_workspace_feedback(studio).unwrap().is_empty());
+        assert!(!store.remove_workspace_feedback(studio, card.id).unwrap());
+    }
 }

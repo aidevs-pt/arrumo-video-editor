@@ -796,6 +796,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&card)?);
         }
+        [database, command, workspace, id] if command == "remove-feedback" => {
+            let removed = WorkspaceStore::open(Path::new(database))?
+                .remove_workspace_feedback(utf8(workspace)?.parse()?, utf8(id)?.parse()?)?;
+            if !removed {
+                return Err("No matching feedback card".into());
+            }
+        }
         [database, command, workspace] if command == "brand-colors" => {
             let colors = WorkspaceStore::open(Path::new(database))?
                 .brand_colors(utf8(workspace)?.parse()?)?;
@@ -1433,6 +1440,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "context <workspace-id> | set-context <workspace-id> <markdown> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
                 "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",
+                "remove-feedback <workspace-id> <feedback-id> | ",
                 "brand-colors <workspace-id> | set-brand-colors <workspace-id> <colors-json> | ",
                 "brand-assets <workspace-id> | ",
                 "attach-brand-asset <workspace-id> <asset-id> <identity|style> | ",

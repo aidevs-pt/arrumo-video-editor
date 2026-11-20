@@ -464,6 +464,19 @@ async fn update_workspace_feedback(
 }
 
 #[tauri::command]
+async fn remove_workspace_feedback(
+    workspace_id: i64,
+    feedback_id: i64,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .remove_workspace_feedback(workspace_id, feedback_id)
+        .map_err(|_| "feedback_remove_failed")
+}
+
+#[tauri::command]
 async fn get_brand_colors(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -887,6 +900,7 @@ fn main() {
             set_workspace_context,
             list_workspace_feedback,
             update_workspace_feedback,
+            remove_workspace_feedback,
             get_brand_colors,
             set_brand_colors,
             list_brand_assets,

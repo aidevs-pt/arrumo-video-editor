@@ -118,12 +118,19 @@ struct UpdateFeedbackInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FeedbackIdInput {
+    workspace_id: i64,
+    feedback_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BrandColorsInput {
     workspace_id: i64,
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 21] {
+pub(super) fn definitions() -> [Value; 22] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -215,6 +222,10 @@ pub(super) fn definitions() -> [Value; 21] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "feedbackId": id, "title": name, "markdown": text
             }, "required": ["workspaceId", "feedbackId", "title", "markdown"], "additionalProperties": false}}),
+        json!({"name": "remove_workspace_feedback", "description": "Remove a workspace feedback card so future runs no longer read it.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "feedbackId": id},
+                "required": ["workspaceId", "feedbackId"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "get_brand_colors", "description": "Read the workspace's saved brand palette.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "set_brand_colors", "description": "Replace the workspace brand palette with an ordered list of hex colors.",
@@ -375,6 +386,12 @@ pub(super) fn call(
                 )
                 .map(|card| json!({"card": card}))
                 .map_err(|_| "Could not update workspace feedback")
+        }),
+        "remove_workspace_feedback" => parse(arguments).and_then(|args: FeedbackIdInput| {
+            store
+                .remove_workspace_feedback(args.workspace_id, args.feedback_id)
+                .map(|removed| json!({"removed": removed}))
+                .map_err(|_| "Could not remove workspace feedback")
         }),
         "get_brand_colors" => parse(arguments).and_then(|args: WorkspaceInput| {
             store
