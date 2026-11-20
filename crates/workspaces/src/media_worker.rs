@@ -14,6 +14,35 @@ pub struct MediaWork {
 }
 
 impl WorkspaceStore {
+    /// Renders the next queued Final render from recorded footage, using the approved preview.
+    pub fn process_next_final_render(&self, database: &Path) -> Result<bool, Box<dyn Error>> {
+        let candidates: Vec<(i64, i64)> = self
+            .0
+            .prepare(
+                "SELECT workspace_id, id FROM generation_runs
+                 WHERE (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
+                   AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'final_render'
+                   AND json_array_length(snapshot_json, '$.draft.source_ids') > 0
+                 ORDER BY id",
+            )?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (workspace_id, run_id) in candidates {
+            if self
+                .process_media_stage_at(
+                    database,
+                    workspace_id,
+                    run_id,
+                    ProductionStage::FinalRender,
+                )?
+                .is_some()
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub fn process_media_stage(
         &self,
         database: &Path,

@@ -77,6 +77,17 @@ impl DesktopJobWorkers {
                     .map_err(|_| ())
             },
         )?;
+        let render_database = database.clone();
+        workers.spawn(
+            "arrumo-final-render",
+            database.clone(),
+            Duration::from_secs(2),
+            move |store| {
+                store
+                    .process_next_final_render(&render_database)
+                    .map_err(|_| ())
+            },
+        )?;
         let subtitles_database = database.clone();
         workers.spawn(
             "arrumo-delivery-subtitles",
