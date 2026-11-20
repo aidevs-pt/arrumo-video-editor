@@ -14,6 +14,7 @@ mod brand_assets;
 mod clip_render;
 mod completed_video;
 mod completed_video_feedback;
+mod delivery_captions;
 mod delivery_cleanup;
 mod delivery_export;
 mod delivery_verification;

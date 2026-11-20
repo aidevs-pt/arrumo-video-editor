@@ -13,7 +13,7 @@ use serde_json::Value;
 
 use crate::WorkspaceStore;
 
-const MAX_AUDIO_BYTES: u64 = 32 * 1024 * 1024;
+pub(crate) const MAX_AUDIO_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -108,6 +108,16 @@ impl WorkspaceStore {
             .provider_preferences("transcription", Some(workspace_id))
             .map_err(|_| io::Error::other("Could not resolve transcription providers"))?
             .effective;
+        self.transcribe_ordered_wav(workspace_id, order, audio, false)
+    }
+
+    pub(crate) fn transcribe_ordered_wav(
+        &self,
+        workspace_id: i64,
+        order: Vec<String>,
+        audio: impl Read,
+        timed: bool,
+    ) -> io::Result<ProviderTranscript> {
         if order.is_empty() {
             return Err(io::Error::other("No transcription providers selected"));
         }
@@ -117,7 +127,9 @@ impl WorkspaceStore {
             let Some(adapter) = find_bundled_transcription_adapter(&provider)? else {
                 continue;
             };
-            if bytes.len() as u64 > adapter.max_audio_bytes {
+            if bytes.len() as u64 > adapter.max_audio_bytes
+                || (timed && adapter.response.words.is_none())
+            {
                 continue;
             }
             let Some(secret) =

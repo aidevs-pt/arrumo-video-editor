@@ -482,6 +482,87 @@ fn inspect_variant(path: &Path) -> Result<VideoProbe, Box<dyn Error + Send + Syn
 }
 
 impl WorkspaceStore {
+    pub fn generate_delivery_subtitles(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+    ) -> Result<usize, Box<dyn Error>> {
+        let snapshot = self.subtitle_import_snapshot(workspace_id, run_id)?;
+        let order: Vec<String> = serde_json::from_value(
+            serde_json::from_str::<serde_json::Value>(&snapshot)?
+                ["provider_orders"]["transcription"]["effective"].clone(),
+        ).map_err(|_| io::Error::other("The run has no captured transcription provider order"))?;
+        if order.is_empty() {
+            return Err(io::Error::other("The run has no selected transcription provider").into());
+        }
+        let format = delivery_subtitle_format(&snapshot, format_id)?;
+        let video_name = format!("{format_id}.mp4");
+        let video = managed_delivery_file(database, workspace_id, run_id, &video_name)?;
+        let directory = video
+            .parent()
+            .ok_or_else(|| io::Error::other("Missing delivery directory"))?;
+        let subtitle_path = directory.join(format!("{format_id}.srt"));
+        match subtitle_path.symlink_metadata() {
+            Ok(_) => return Err(io::Error::other("Delivery subtitles already exist").into()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        let duration = verified_video_duration(directory, &video_name, &format)?;
+        let wave_limit = crate::transcription::MAX_AUDIO_BYTES;
+        if duration * 32_000.0 + 4096.0 > wave_limit as f64 {
+            return Err(io::Error::other(
+                "The delivery audio exceeds the transcription size limit",
+            )
+            .into());
+        }
+        let job = tempfile::tempdir()?;
+        let wave = job.path().join("delivery.wav");
+        let status = Command::new("ffmpeg")
+            .args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "file",
+                "-f",
+                "mov",
+                "-i",
+            ])
+            .arg(&video)
+            .args([
+                "-map",
+                "0:a:0",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-c:a",
+                "pcm_s16le",
+                "-fs",
+            ])
+            .arg(wave_limit.to_string())
+            .arg(&wave)
+            .stdin(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()?;
+        if !status.success() || wave.metadata()?.len() >= wave_limit {
+            return Err(io::Error::other("Could not extract bounded delivery audio").into());
+        }
+        let transcript =
+            self.transcribe_ordered_wav(workspace_id, order, fs::File::open(wave)?, true)?;
+        let subtitles =
+            crate::delivery_captions::render_srt(&transcript.transcript.words, duration)?;
+        self.publish_delivery_subtitles(
+            [workspace_id, run_id, format_id],
+            directory,
+            duration,
+            &subtitles,
+            false,
+        )
+    }
+
     pub fn import_delivery_subtitles(
         &self,
         database: &Path,
@@ -490,14 +571,8 @@ impl WorkspaceStore {
         format_id: i64,
         source: &Path,
     ) -> Result<usize, Box<dyn Error>> {
-        use std::io::Write;
         let snapshot = self.subtitle_import_snapshot(workspace_id, run_id)?;
-        let format = serde_json::from_str::<Snapshot>(&snapshot)?
-            .formats
-            .into_iter()
-            .map(|entry| entry.format)
-            .find(|format| format.id == format_id)
-            .ok_or_else(|| io::Error::other("Format is not in the run snapshot"))?;
+        let format = delivery_subtitle_format(&snapshot, format_id)?;
         let video = format!("{format_id}.mp4");
         let video_path = managed_delivery_file(database, workspace_id, run_id, &video)?;
         let directory = video_path
@@ -509,6 +584,24 @@ impl WorkspaceStore {
             return Err(io::Error::other("Choose an SRT file").into());
         }
         let subtitles = crate::read_subtitle_file(source)?;
+        self.publish_delivery_subtitles(
+            [workspace_id, run_id, format_id],
+            directory,
+            duration,
+            &subtitles,
+            true,
+        )
+    }
+
+    fn publish_delivery_subtitles(
+        &self,
+        [workspace_id, run_id, format_id]: [i64; 3],
+        directory: &Path,
+        duration: f64,
+        subtitles: &str,
+        replace: bool,
+    ) -> Result<usize, Box<dyn Error>> {
+        use std::io::Write;
 
         let mut incoming = tempfile::NamedTempFile::new_in(directory)?;
         incoming.write_all(subtitles.as_bytes())?;
@@ -521,7 +614,12 @@ impl WorkspaceStore {
         incoming.as_file().sync_all()?;
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         self.subtitle_import_snapshot(workspace_id, run_id)?;
-        incoming.persist(directory.join(format!("{format_id}.srt")))?;
+        let destination = directory.join(format!("{format_id}.srt"));
+        if replace {
+            incoming.persist(destination)?;
+        } else {
+            incoming.persist_noclobber(destination)?;
+        }
         tx.commit()?;
         Ok(cues)
     }
@@ -535,4 +633,13 @@ impl WorkspaceStore {
             |row| row.get(0),
         )
     }
+}
+
+fn delivery_subtitle_format(snapshot: &str, format_id: i64) -> Result<Format, Box<dyn Error>> {
+    serde_json::from_str::<Snapshot>(snapshot)?
+        .formats
+        .into_iter()
+        .map(|entry| entry.format)
+        .find(|format| format.id == format_id)
+        .ok_or_else(|| io::Error::other("Format is not in the run snapshot").into())
 }

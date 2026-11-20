@@ -1252,6 +1252,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run, format] if command == "generate-delivery-subtitles" => {
+            let database = Path::new(database);
+            let cues = WorkspaceStore::open(database)?.generate_delivery_subtitles(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(format)?.parse()?,
+            )?;
+            println!("{cues}");
+        }
         [database, command, workspace, run, format, source]
             if command == "import-delivery-subtitles" =>
         {
@@ -1357,7 +1367,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
-                "import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
+                "generate-delivery-subtitles <workspace-id> <run-id> <format-id> | import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
                 "export-delivery <workspace-id> <run-id> <destination-zip> | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"

@@ -153,6 +153,13 @@ Workspace Context uses the editorcn rich-text toolbar with Tiptap Markdown. Use 
 
 A leased worker can use `submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json>` to record the current plan step. A guided run waits for `review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes>`. Approval advances to the next stage. Rejection and revision requeue the current stage and preserve review history. Use `production-progress <workspace-id> <run-id>` to read results and decisions. Delivery verification has a separate completion path.
 
+Use `generate-delivery-subtitles <workspace-id> <run-id> <format-id>` to
+transcribe a rendered format while the run is at delivery verification. This
+command sends the format's extracted audio to a configured transcription
+provider from the run's captured order. It requires FFmpeg, ffprobe, and a
+provider that returns word timestamps. It validates the generated SRT before
+publishing it and preserves any existing subtitle file.
+
 Delivery verification requires `ffprobe` on PATH. At the `verify_delivery` stage, place each configured format's final files under `<database>.deliveries/<workspace-id>/<run-id>/`, named `<format-id>.mp4` and `<format-id>.srt`. Run `verify-delivery <workspace-id> <run-id> <attempt>` to check each video’s dimensions and duration and its subtitle cues. A successful verification records metadata and completes the run while the lease is still active. While the desktop is open, it automatically verifies eligible runs once every captured output format has a managed MP4 and SRT. Runs with missing files stay queued so you can import the remaining subtitles.
 
 A leased worker on the Preview stage can use `render-preview <workspace-id> <run-id> <attempt> <edit-json>` for recorded-source runs. Pass the Preview result object as the edit. The renderer uses the optional cuts below and writes one MP4 per frozen output format, capped at the longest edge saved in the run snapshot. The recorded result includes these filenames in `preview_videos`. Files are stored in the run's delivery directory with the attempt number in the name so revisions retain separate artifacts.
