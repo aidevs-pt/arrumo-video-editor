@@ -31,6 +31,17 @@ impl DesktopJobWorkers {
                 },
             )?;
         }
+        let delivery_database = database.clone();
+        workers.spawn(
+            "arrumo-delivery-verification",
+            database.clone(),
+            Duration::from_secs(2),
+            move |store| {
+                store
+                    .process_next_ready_delivery(&delivery_database)
+                    .map_err(|_| ())
+            },
+        )?;
         workers.spawn(
             "arrumo-plugin-jobs",
             database,

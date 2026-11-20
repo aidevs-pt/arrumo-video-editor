@@ -83,6 +83,47 @@ pub fn delivery_directory(database: &Path, workspace_id: i64, run_id: i64) -> Pa
 }
 
 impl WorkspaceStore {
+    pub fn process_next_ready_delivery(&self, database: &Path) -> Result<bool, Box<dyn Error>> {
+        let mut query = self.0.prepare(
+            "SELECT workspace_id, id, COALESCE(json_extract(snapshot_json, '$.formats'), '[]')
+             FROM generation_runs
+             WHERE (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
+               AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'verify_delivery'
+             ORDER BY id",
+        )?;
+        let candidates = query
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get::<_, String>(2)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(query);
+        for (workspace_id, run_id, formats) in candidates {
+            let formats: Vec<DeliveryFormat> = serde_json::from_str(&formats)?;
+            if formats.is_empty() {
+                continue;
+            }
+            let files_ready = formats.iter().all(|entry| {
+                let id = entry.format.id;
+                [format!("{id}.mp4"), format!("{id}.srt")]
+                    .iter()
+                    .all(|name| managed_delivery_file(database, workspace_id, run_id, name).is_ok())
+            });
+            if files_ready
+                && self
+                    .process_media_stage_at(
+                        database,
+                        workspace_id,
+                        run_id,
+                        ProductionStage::VerifyDelivery,
+                    )?
+                    .is_some()
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub(crate) fn verified_delivery(
         &self,
         workspace_id: i64,
