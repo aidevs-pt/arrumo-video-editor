@@ -60,15 +60,8 @@ impl WorkspaceStore {
             .0
             .unchecked_transaction()
             .map_err(|_| io::Error::other("Could not read plugin surface permissions"))?;
-        let manifest: Vec<u8> = tx
-            .query_row(
-                "SELECT manifest FROM installed_plugin_manifests
-             WHERE plugin_id = ?1 AND package_sha256 = ?2",
-                rusqlite::params![plugin_id, package_sha256],
-                |row| row.get(0),
-            )
-            .map_err(|_| io::Error::other("Plugin package unavailable or changed"))?;
-        let surface = parse_surface(&manifest, surface_id)?;
+        let package = self.resolve_plugin_package(plugin_id, Some(package_sha256))?;
+        let surface = find_surface(package.manifest, surface_id)?;
         if !surface
             .permissions
             .contains(&PluginPermission::WorkspaceContextRead)
@@ -101,17 +94,9 @@ impl WorkspaceStore {
         surface_id: &str,
         package_sha256: &str,
     ) -> io::Result<String> {
-        let (manifest, bytes): (Vec<u8>, Vec<u8>) = self
-            .0
-            .query_row(
-                "SELECT manifest, package_bytes FROM installed_plugin_manifests
-             WHERE plugin_id = ?1 AND package_sha256 = ?2",
-                rusqlite::params![plugin_id, package_sha256],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .map_err(|_| io::Error::other("Plugin package unavailable or changed"))?;
-        let surface = parse_surface(&manifest, surface_id)?;
-        let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
+        let package = self.resolve_plugin_package(plugin_id, Some(package_sha256))?;
+        let surface = find_surface(package.manifest, surface_id)?;
+        let mut archive = zip::ZipArchive::new(Cursor::new(package.bytes))
             .map_err(|_| io::Error::other("Invalid plugin ZIP"))?;
         let file = archive
             .by_name(&surface.document)
@@ -130,9 +115,7 @@ impl WorkspaceStore {
     }
 }
 
-fn parse_surface(manifest: &[u8], surface_id: &str) -> io::Result<PluginSurface> {
-    let manifest =
-        PluginManifest::parse(manifest).map_err(|_| io::Error::other("Plugin manifest invalid"))?;
+fn find_surface(manifest: PluginManifest, surface_id: &str) -> io::Result<PluginSurface> {
     manifest
         .code
         .into_iter()

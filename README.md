@@ -19,6 +19,10 @@ The first desktop screen creates and lists workspaces. It uses the system langua
 
 In the Arrumo workspace layout, the build reads the sibling `plugin-registry/catalog.json` and loads entries marked `default` from the sibling `plugins/<id>` checkouts. The checkouts may be symlinks. Set `ARRUMO_PLUGIN_REGISTRY` and `ARRUMO_PLUGIN_SOURCE_ROOT` to use a different registry file or checkout location. The build embeds the selected artifacts from those inputs without tracking copies in the editor repository.
 
+For local debug builds, place an SDK-built `plugin.zip` in a selected sibling plugin checkout. The host validates the ZIP and requires its manifest to match the checkout before exposing its actions or frontend surfaces. Workspace context still requires a grant for that package digest.
+
+For registry release builds, set `ARRUMO_PLUGIN_RELEASE_ROOT` to a directory containing the staged `<id>.zip` files. Each staged ZIP must match exactly one release SHA-256 in the selected registry and its manifest must match the corresponding checkout. The bundled catalog retains the release version, source repository and package URL. Release builds only embed executable ZIPs from this verified staging path.
+
 Use `ARRUMO_CORE_ONLY=1` for isolated host verification without private checkout access. That build starts with an empty default catalog.
 
 ## Workspace CLI

@@ -223,11 +223,11 @@ fn bundled_transcription_adapter(plugin_id: &str) -> io::Result<TranscriptionAda
 }
 
 fn find_bundled_transcription_adapter(plugin_id: &str) -> io::Result<Option<TranscriptionAdapter>> {
-    for (manifest, (_, source)) in crate::plugin_catalog::bundled_manifests()
+    for (manifest, source) in crate::plugin_catalog::bundled_manifests()
         .iter()
         .zip(crate::plugin_catalog::BUNDLED)
     {
-        let Some(source) = source.filter(|_| manifest.id == plugin_id) else {
+        let Some(source) = source.transcription.filter(|_| manifest.id == plugin_id) else {
             continue;
         };
         let adapter: TranscriptionAdapter = serde_json::from_slice(source)

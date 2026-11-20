@@ -205,6 +205,13 @@ impl PluginManifest {
     }
 }
 
+pub(crate) struct BundledSource {
+    manifest: &'static [u8],
+    pub transcription: Option<&'static [u8]>,
+    package: Option<&'static [u8]>,
+    release: Option<&'static str>,
+}
+
 include!(concat!(env!("OUT_DIR"), "/bundled_plugins.rs"));
 
 pub(crate) fn bundled_manifests() -> &'static [PluginManifest] {
@@ -212,9 +219,69 @@ pub(crate) fn bundled_manifests() -> &'static [PluginManifest] {
     MANIFESTS.get_or_init(|| {
         BUNDLED
             .iter()
-            .map(|(bytes, _)| PluginManifest::parse(bytes).expect("valid bundled plugin manifest"))
+            .map(|source| {
+                PluginManifest::parse(source.manifest).expect("valid bundled plugin manifest")
+            })
             .collect()
     })
+}
+
+type BundledPackage = (
+    &'static PluginManifest,
+    &'static [u8],
+    &'static PluginPackageInfo,
+);
+
+pub(crate) fn bundled_package(id: &str) -> Result<Option<BundledPackage>, &'static str> {
+    static PACKAGES: OnceLock<Vec<Result<Option<PluginPackageInfo>, &'static str>>> =
+        OnceLock::new();
+    let Some(index) = bundled_manifests()
+        .iter()
+        .position(|manifest| manifest.id == id)
+    else {
+        return Ok(None);
+    };
+    let packages = PACKAGES.get_or_init(|| {
+        BUNDLED
+            .iter()
+            .map(|source| {
+                source
+                    .package
+                    .map(|bytes| {
+                        use crate::plugin_package::{package_sha256, read_package_manifest};
+
+                        let manifest = read_package_manifest(bytes)
+                            .map_err(|_| "Invalid bundled plugin ZIP")?;
+                        let packaged: serde_json::Value = serde_json::from_slice(&manifest)
+                            .map_err(|_| "Invalid bundled package manifest")?;
+                        let checkout: serde_json::Value =
+                            serde_json::from_slice(source.manifest)
+                                .map_err(|_| "Invalid bundled checkout manifest")?;
+                        if packaged != checkout {
+                            return Err("Bundled package manifest differs from the checkout");
+                        }
+                        Ok(PluginPackageInfo {
+                            sha256: package_sha256(bytes)
+                                .map_err(|_| "Could not hash bundled package")?,
+                            byte_length: bytes.len() as i64,
+                            release: source
+                                .release
+                                .map(serde_json::from_str)
+                                .transpose()
+                                .map_err(|_| "Invalid bundled release provenance")?,
+                        })
+                    })
+                    .transpose()
+            })
+            .collect()
+    });
+    match &packages[index] {
+        Ok(Some(info)) => Ok(BUNDLED[index]
+            .package
+            .map(|bytes| (&bundled_manifests()[index], bytes, info))),
+        Ok(None) => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 impl WorkspaceStore {
@@ -304,12 +371,17 @@ impl WorkspaceStore {
         let mut plugins: Vec<_> = bundled_manifests()
             .iter()
             .cloned()
-            .map(|manifest| CatalogPlugin {
-                bundled: true,
-                manifest,
-                package: None,
+            .map(|manifest| {
+                let package = bundled_package(&manifest.id)
+                    .map_err(io::Error::other)?
+                    .map(|(_, _, info)| info.clone());
+                Ok(CatalogPlugin {
+                    bundled: true,
+                    manifest,
+                    package,
+                })
             })
-            .collect();
+            .collect::<io::Result<_>>()?;
         let mut query = self.0.prepare(
             "SELECT manifest, package_sha256, length(package_bytes), release_source
              FROM installed_plugin_manifests ORDER BY plugin_id",
@@ -342,11 +414,17 @@ impl WorkspaceStore {
                     })
                 })
                 .transpose()?;
-            plugins.push(CatalogPlugin {
-                bundled: false,
-                manifest: PluginManifest::parse(&manifest)?,
-                package,
-            });
+            let manifest = PluginManifest::parse(&manifest)?;
+            if !bundled_manifests()
+                .iter()
+                .any(|plugin| plugin.id == manifest.id)
+            {
+                plugins.push(CatalogPlugin {
+                    bundled: false,
+                    manifest,
+                    package,
+                });
+            }
         }
         Ok(plugins)
     }

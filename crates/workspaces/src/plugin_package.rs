@@ -1,10 +1,12 @@
 use std::{
+    borrow::Cow,
     collections::HashSet,
     error::Error,
     fmt::Write as _,
     io::{self, Cursor, Read},
 };
 
+use rusqlite::OptionalExtension;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use zip::ZipArchive;
@@ -27,7 +29,57 @@ pub struct PluginPackageInfo {
     pub release: Option<RegistryReleaseSource>,
 }
 
+pub(crate) struct ResolvedPluginPackage {
+    pub manifest: PluginManifest,
+    pub bytes: Cow<'static, [u8]>,
+    pub sha256: String,
+}
+
 impl WorkspaceStore {
+    pub(crate) fn resolve_plugin_package(
+        &self,
+        id: &str,
+        expected_sha256: Option<&str>,
+    ) -> io::Result<ResolvedPluginPackage> {
+        let unavailable = || io::Error::other("Plugin package unavailable or changed");
+        let package = match crate::plugin_catalog::bundled_package(id).map_err(io::Error::other)? {
+            Some((manifest, bytes, info)) => ResolvedPluginPackage {
+                manifest: manifest.clone(),
+                bytes: Cow::Borrowed(bytes),
+                sha256: info.sha256.clone(),
+            },
+            None => {
+                if crate::plugin_catalog::bundled_manifests()
+                    .iter()
+                    .any(|manifest| manifest.id == id)
+                {
+                    return Err(unavailable());
+                }
+                let (manifest, bytes, sha256): (Vec<u8>, Vec<u8>, String) = self.0
+                    .query_row(
+                        "SELECT manifest, package_bytes, package_sha256 FROM installed_plugin_manifests
+                         WHERE plugin_id = ?1 AND package_bytes IS NOT NULL",
+                        [id],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    )
+                    .optional()
+                    .map_err(|_| unavailable())?
+                    .ok_or_else(unavailable)?;
+                ResolvedPluginPackage {
+                    manifest: PluginManifest::parse(&manifest).map_err(|_| unavailable())?,
+                    bytes: Cow::Owned(bytes),
+                    sha256,
+                }
+            }
+        };
+        if package.manifest.id != id
+            || expected_sha256.is_some_and(|expected| expected != package.sha256)
+        {
+            return Err(unavailable());
+        }
+        Ok(package)
+    }
+
     pub fn reviewed_motion_renderer_package(
         &self,
         plugin_id: &str,
@@ -38,13 +90,10 @@ impl WorkspaceStore {
                 invalid_package("Expected SHA-256 must contain 64 hexadecimal digits").into(),
             );
         }
-        let (manifest, bytes): (Vec<u8>, Vec<u8>) = self.0.query_row(
-            "SELECT manifest, package_bytes FROM installed_plugin_manifests
-             WHERE plugin_id = ?1 AND package_sha256 = ?2 AND package_bytes IS NOT NULL",
-            rusqlite::params![plugin_id, expected_sha256.to_ascii_lowercase()],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
-        let manifest = PluginManifest::parse(&manifest)?;
+        let package =
+            self.resolve_plugin_package(plugin_id, Some(&expected_sha256.to_ascii_lowercase()))?;
+        let manifest = package.manifest;
+        let bytes = package.bytes;
         if manifest.id != plugin_id || !manifest.capabilities.contains_key("motion-render") {
             return Err(
                 invalid_package("Installed package does not declare motion rendering").into(),
@@ -54,7 +103,7 @@ impl WorkspaceStore {
         if !actual.eq_ignore_ascii_case(expected_sha256) {
             return Err(invalid_package("Installed renderer package digest mismatch").into());
         }
-        Ok(bytes)
+        Ok(bytes.into_owned())
     }
 
     pub fn install_plugin_zip(&self, archive: impl Read) -> Result<CatalogPlugin, Box<dyn Error>> {
@@ -106,7 +155,7 @@ impl WorkspaceStore {
     }
 }
 
-fn package_sha256(bytes: &[u8]) -> Result<String, std::fmt::Error> {
+pub(crate) fn package_sha256(bytes: &[u8]) -> Result<String, std::fmt::Error> {
     let mut sha256 = String::with_capacity(64);
     for byte in Sha256::digest(bytes) {
         write!(sha256, "{byte:02x}")?;
@@ -114,7 +163,7 @@ fn package_sha256(bytes: &[u8]) -> Result<String, std::fmt::Error> {
     Ok(sha256)
 }
 
-fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut archive = ZipArchive::new(Cursor::new(bytes))?;
     if archive.len() > MAX_ARCHIVE_ENTRIES {
         return Err(invalid_package("Plugin package has more than 512 entries").into());

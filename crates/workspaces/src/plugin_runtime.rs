@@ -9,7 +9,7 @@ use wasmtime::{
     component::{Component, Linker},
 };
 
-use crate::{PluginActionScope, PluginManifest, WorkspaceStore};
+use crate::{PluginActionScope, WorkspaceStore};
 
 const MAX_COMPONENT_BYTES: u64 = 4 * 1024 * 1024;
 pub const MAX_PLUGIN_IO_BYTES: usize = 64 * 1024;
@@ -40,25 +40,10 @@ impl WorkspaceStore {
             .0
             .unchecked_transaction()
             .map_err(|_| io::Error::other("Could not read plugin invocation state"))?;
-        let (manifest, package, digest): (Vec<u8>, Vec<u8>, String) = tx
-            .query_row(
-                "SELECT manifest, package_bytes, package_sha256 FROM installed_plugin_manifests
-                 WHERE plugin_id = ?1 AND package_bytes IS NOT NULL",
-                [plugin_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .map_err(|_| io::Error::other("Installed plugin package unavailable"))?;
-        let manifest = PluginManifest::parse(&manifest)
-            .map_err(|_| io::Error::other("Installed plugin manifest invalid"))?;
-        if manifest.id != plugin_id {
-            return Err(io::Error::other("Installed plugin identity mismatch"));
-        }
-        let input = if let Some((action_id, expected_digest)) = action {
-            if expected_digest.is_some_and(|expected| expected != digest) {
-                return Err(io::Error::other(
-                    "Plugin package changed after action review",
-                ));
-            }
+        let package =
+            self.resolve_plugin_package(plugin_id, action.and_then(|(_, digest)| digest))?;
+        let manifest = package.manifest;
+        let input = if let Some((action_id, _)) = action {
             let action = manifest
                 .actions
                 .as_ref()
@@ -109,7 +94,7 @@ impl WorkspaceStore {
             .code
             .and_then(|code| code.backend)
             .ok_or_else(|| io::Error::other("Plugin has no backend component"))?;
-        let mut archive = zip::ZipArchive::new(Cursor::new(package))
+        let mut archive = zip::ZipArchive::new(Cursor::new(package.bytes))
             .map_err(|_| io::Error::other("Installed plugin ZIP invalid"))?;
         let entry = archive
             .by_name(&backend.component)
