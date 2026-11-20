@@ -1112,6 +1112,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{deleted}");
         }
+        [database, command, workspace, run, format, asset]
+            if command == "attach-completed-media" =>
+        {
+            let database = Path::new(database);
+            let added = WorkspaceStore::open(database)?.attach_completed_media(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(format)?.parse()?,
+                utf8(asset)?.parse()?,
+            )?;
+            println!("{added}");
+        }
         [database, command, workspace, run] if command == "completed-video" => {
             let video = WorkspaceStore::open(Path::new(database))?
                 .completed_video(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
@@ -1253,7 +1266,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
                 "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
-                "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | ",
+                "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",

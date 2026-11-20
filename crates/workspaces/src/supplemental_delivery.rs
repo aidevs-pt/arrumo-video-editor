@@ -1,4 +1,4 @@
-use rusqlite::{OptionalExtension, params};
+use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -175,9 +175,73 @@ impl WorkspaceStore {
         workspace_id: i64,
         run_id: i64,
     ) -> rusqlite::Result<Vec<SupplementalMedia>> {
-        let references: Vec<MediaReference> =
+        let mut references: Vec<MediaReference> =
             self.completed_supplemental_field(workspace_id, run_id, "$.supplemental_media")?;
+        let mut attached = self.0.prepare(
+            "SELECT media.asset_id, media.format_id FROM completed_media AS media
+             JOIN generation_runs AS run ON run.id = media.run_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2 AND run.state = 'completed'
+             ORDER BY media.id",
+        )?;
+        let entries = attached.query_map(params![workspace_id, run_id], |row| {
+            Ok(MediaReference {
+                asset_id: row.get(0)?,
+                format_id: row.get(1)?,
+            })
+        })?;
+        for entry in entries {
+            references.push(entry?);
+        }
         self.supplemental_media_metadata(workspace_id, references)
+    }
+
+    pub fn attach_completed_media(
+        &self,
+        database: &std::path::Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+        asset_id: i64,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let transaction = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let delivery = self.verified_delivery(workspace_id, run_id)?;
+        if !delivery
+            .verified_outputs
+            .iter()
+            .any(|output| output.format_id == format_id)
+        {
+            return Err(rusqlite::Error::QueryReturnedNoRows.into());
+        }
+        let exists: bool = transaction.query_row(
+            "SELECT EXISTS (SELECT 1 FROM completed_media WHERE run_id = ?1 AND format_id = ?2 AND asset_id = ?3)",
+            params![run_id, format_id, asset_id], |row| row.get(0),
+        )?;
+        if exists {
+            return Ok(false);
+        }
+        let asset = self
+            .supplemental_media_metadata(
+                workspace_id,
+                vec![MediaReference {
+                    asset_id,
+                    format_id: Some(format_id),
+                }],
+            )?
+            .pop()
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+        asset.managed_file(database, workspace_id)?;
+        let added = transaction.execute(
+            "INSERT INTO completed_media (run_id, format_id, asset_id)
+             SELECT ?1, ?2, id FROM workspace_assets
+             WHERE id = ?3 AND workspace_id = ?4 AND superseded = 0 AND byte_size > 0
+               AND (SELECT count(*) FROM completed_media WHERE run_id = ?1) < 100",
+            params![run_id, format_id, asset_id, workspace_id],
+        )?;
+        if added == 0 {
+            return Err(rusqlite::Error::InvalidQuery.into());
+        }
+        transaction.commit()?;
+        Ok(true)
     }
 
     pub fn pending_supplemental(

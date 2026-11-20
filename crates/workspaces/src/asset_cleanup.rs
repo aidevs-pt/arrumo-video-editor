@@ -52,6 +52,7 @@ impl WorkspaceStore {
                        WHERE run.workspace_id = ?1 AND item.type = 'object'
                          AND json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.asset_id') = ?2
                    )
+                   AND NOT EXISTS (SELECT 1 FROM completed_media WHERE asset_id = ?2)
                    AND NOT EXISTS (SELECT 1 FROM motion_library WHERE workspace_id = ?1
                                    AND ?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id))
                    AND NOT EXISTS (

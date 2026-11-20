@@ -73,12 +73,27 @@ struct ReplaceAssetInput {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 12] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AttachCompletedMedia {
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    asset_id: i64,
+}
+
+pub(super) fn definitions() -> [Value; 13] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
     }, "required": ["workspaceId", "assetId", "role"], "additionalProperties": false});
     [
+        json!({"name": "attach_completed_media",
+            "description": "Attach an existing managed asset to one verified output. Repeating a successful attachment returns added=false.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "formatId": id, "assetId": id
+            }, "required": ["workspaceId", "runId", "formatId", "assetId"], "additionalProperties": false},
+            "annotations": {"destructiveHint": false, "idempotentHint": true}}),
         json!({"name": "list_workspace_assets", "description": "List managed assets and their IDs in a workspace.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
                 "required": ["workspaceId"], "additionalProperties": false},
@@ -141,6 +156,13 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
+        "attach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid completed media arguments")
+            .and_then(|args: AttachCompletedMedia| {
+                store.attach_completed_media(database, args.workspace_id, args.run_id, args.format_id, args.asset_id)
+                    .map(|added| json!({"added": added}))
+                    .map_err(|_| "Could not attach media to the verified output")
+            }),
         "list_workspace_assets" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid workspace asset arguments")
             .and_then(|args: ListInput| {

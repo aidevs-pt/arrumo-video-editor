@@ -455,3 +455,11 @@ Use `review-preview-formats <workspace-id> <run-id> <result-id> <decisions-json>
 Desktop Preview review offers individual and selected-format batch decisions for rendered previews that cover all frozen formats. Approved formats are preselected after a partial revision. You can attach a note to a format before Send, or include an optional `note` in each CLI format decision.
 
 MCP and A2A expose the same operation as `review_preview_formats`. A worker claim after a selective review includes `preview_revision`, with the source result ID, shared notes, and only the unresolved formats. Each entry includes the decision, optional format note, previous preview filename, and effective cuts. The request survives lease takeover. To produce the replacement files, use the managed renderer through `render-preview` or the desktop.
+
+To add a file produced after completion, import it into the run's workspace and use
+`attach-completed-media <workspace-id> <run-id> <format-id> <asset-id>`.
+MCP and A2A expose the same operation as `attach_completed_media` with
+`workspaceId`, `runId`, `formatId`, and `assetId`. A repeated attachment
+returns false in the CLI or `{"added":false}` through MCP and A2A.
+Attachments appear in supplemental files and in the delivery ZIP. They retain
+the attached asset version until the completed run is deleted.
