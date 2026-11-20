@@ -242,6 +242,8 @@ fn run_motion_worker(
     let package = job.path().join("renderer.zip");
     std::fs::write(&package, bytes)?;
     let mut runner = std::process::Command::new("python3");
+    #[cfg(target_os = "linux")]
+    stop_worker_on_host_exit(&mut runner);
     runner
         .args(["-E", "-B"])
         .arg(worker)
@@ -292,4 +294,24 @@ fn run_motion_worker(
         return Err(io::Error::other("The SDK renderer response exceeded its size limit").into());
     }
     Ok(bytes)
+}
+
+#[cfg(target_os = "linux")]
+fn stop_worker_on_host_exit(command: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+
+    let host_pid = std::process::id() as libc::pid_t;
+    // The child runs this between fork and exec. Use only syscalls and
+    // construct errors without allocating in the forked process.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) == -1 {
+                return Err(io::Error::last_os_error());
+            }
+            if libc::getppid() != host_pid {
+                return Err(io::Error::from_raw_os_error(libc::ESRCH));
+            }
+            Ok(())
+        });
+    }
 }

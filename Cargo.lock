@@ -104,6 +104,7 @@ name = "arrumo-workspaces"
 version = "0.1.0"
 dependencies = [
  "keyring",
+ "libc",
  "rcgen",
  "reqwest",
  "rusqlite",
