@@ -428,7 +428,9 @@ finds the bundled SDK worker or an explicit `ARRUMO_MOTION_SDK_WORKER`. It
 automatically starts eligible Assets stages using the renderer captured at
 queue time. The result appears in the run's existing review or autopilot flow.
 If the host exits mid-render, Linux stops the SDK worker. Arrumo can recover
-the stage once the original attempt lease expires.
+the stage once the original attempt lease expires. Desktop and queue-worker
+startup remove abandoned managed motion scratch beside the database. File
+locks protect scratch directories still in use by another Arrumo process.
 
 Run `watch-motion-queue` as a foreground Linux worker with `ARRUMO_MOTION_SDK_WORKER` configured. It polls the shared database, starts the oldest eligible Assets stage with a captured installed package, and prints each published result ID. Multiple worker processes use the same attempt lease, so only one can publish a particular stage. An expired Assets lease can be reclaimed after a restart. Runs whose captured renderer package is missing or has changed stay queued while other eligible runs proceed.
 

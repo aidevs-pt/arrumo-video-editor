@@ -8,7 +8,7 @@ use std::{
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 
-use crate::{MotionArtifact, WorkspaceStore};
+use crate::{MotionArtifact, WorkspaceStore, motion_scratch::MotionScratch};
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct CapturedMotionRenderer {
@@ -127,9 +127,9 @@ impl WorkspaceStore {
         worker: &Path,
     ) -> Result<i64, Box<dyn Error>> {
         let toolchain = std::env::var_os("ARRUMO_MOTION_TOOLCHAIN").map(PathBuf::from);
-        let job = tempfile::tempdir()?;
-        self.render_run_motion(
-            database,
+        let job = MotionScratch::create(database)?;
+        self.render_run_motion_in(
+            (database, job.path()),
             workspace_id,
             run_id,
             id,
@@ -149,12 +149,33 @@ impl WorkspaceStore {
         paths: &MotionWorkerPaths<'_>,
     ) -> Result<Vec<u8>, Box<dyn Error>> {
         let bytes = self.reviewed_motion_renderer_package(id, digest)?;
-        run_motion_worker(&bytes, digest, paths, || Ok(()))
+        let scratch = tempfile::tempdir()?;
+        run_motion_worker(&bytes, digest, paths, scratch.path(), || Ok(()))
     }
 
     pub fn render_run_motion(
         &self,
         database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        id: &str,
+        digest: &str,
+        paths: &MotionWorkerPaths<'_>,
+    ) -> Result<i64, Box<dyn Error>> {
+        let scratch = MotionScratch::create(database)?;
+        self.render_run_motion_in(
+            (database, scratch.path()),
+            workspace_id,
+            run_id,
+            id,
+            digest,
+            paths,
+        )
+    }
+
+    fn render_run_motion_in(
+        &self,
+        (database, scratch): (&Path, &Path),
         workspace_id: i64,
         run_id: i64,
         id: &str,
@@ -193,7 +214,7 @@ impl WorkspaceStore {
             .ok_or_else(|| io::Error::other("The selected run has no queued Assets stage"))?;
         let rendered = (|| -> Result<i64, Box<dyn Error>> {
             let mut last_renewal = std::time::Instant::now();
-            let result = run_motion_worker(&bytes, digest, paths, || {
+            let result = run_motion_worker(&bytes, digest, paths, scratch, || {
                 if last_renewal.elapsed() >= std::time::Duration::from_secs(5) {
                     self.renew_generation_lease(workspace_id, run_id, attempt)?;
                     last_renewal = std::time::Instant::now();
@@ -229,6 +250,7 @@ fn run_motion_worker(
     bytes: &[u8],
     digest: &str,
     paths: &MotionWorkerPaths<'_>,
+    scratch: &Path,
     mut check_lease: impl FnMut() -> rusqlite::Result<()>,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     if !cfg!(target_os = "linux") {
@@ -238,14 +260,14 @@ fn run_motion_worker(
     if !worker.is_file() {
         return Err(io::Error::other("The SDK worker must be a regular script file").into());
     }
-    let job = tempfile::tempdir()?;
-    let package = job.path().join("renderer.zip");
+    let package = scratch.join("renderer.zip");
     std::fs::write(&package, bytes)?;
     let mut runner = std::process::Command::new("python3");
     #[cfg(target_os = "linux")]
     stop_worker_on_host_exit(&mut runner);
     runner
         .args(["-E", "-B"])
+        .env("TMPDIR", scratch.canonicalize()?)
         .arg(worker)
         .arg(package)
         .arg("--sha256")
@@ -257,7 +279,7 @@ fn run_motion_worker(
     if let Some(path) = paths.toolchain {
         runner.arg("--toolchain").arg(path);
     }
-    let reply = job.path().join("artifacts.json");
+    let reply = scratch.join("worker-reply.json");
     let mut child = runner.stdout(File::create(&reply)?).spawn()?;
     let status = loop {
         match child.try_wait() {

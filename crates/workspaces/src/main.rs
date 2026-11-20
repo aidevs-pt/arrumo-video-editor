@@ -1071,6 +1071,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 io::Error::other("The host motion renderer worker is unavailable")
             })?;
             let store = WorkspaceStore::open(database)?;
+            if arrumo_workspaces::recover_motion_scratch(database).is_err() {
+                eprintln!("Arrumo could not retry pending motion scratch cleanup.");
+            }
             loop {
                 match store.process_next_motion_stage(database, &worker) {
                     Ok(Some(result)) => println!("{result}"),

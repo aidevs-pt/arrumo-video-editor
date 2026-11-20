@@ -770,6 +770,9 @@ fn main() {
                     eprintln!("Arrumo could not open the store to retry managed file cleanup.");
                     return;
                 };
+                if arrumo_workspaces::recover_motion_scratch(&database).is_err() {
+                    eprintln!("Arrumo could not retry pending motion scratch cleanup.");
+                }
                 match store.recover_all_delivery_cleanup(&database) {
                     Ok(report) if report.pending_run_ids.is_empty() => {}
                     Ok(report) => eprintln!(
