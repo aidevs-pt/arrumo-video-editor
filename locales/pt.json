@@ -31,7 +31,17 @@
     "loadError": "Não foi possível carregar os vídeos agendados.",
     "loading": "A carregar o calendário…",
     "empty": "Sem vídeos agendados",
-    "emptyHint": "Define uma data num vídeo concluído para o adicionar ao calendário."
+    "emptyHint": "Defina uma data numa saída concluída ou arraste-a de Por agendar.",
+    "intro": "Todas as saídas agendadas de {workspace}, coloridas por perfil.",
+    "profileIntro": "Todas as saídas agendadas de {profile}.",
+    "filters": "Mostrar no calendário",
+    "landscape": "Horizontal",
+    "portrait": "Vertical",
+    "unscheduled": "Por agendar",
+    "unscheduledHint": "Arraste um para um dia para o agendar, ou abra-o para escolher uma data.",
+    "allScheduled": "Todas as saídas concluídas têm data.",
+    "dragLabel": "Arraste {title} para um dia",
+    "scheduleError": "Não foi possível guardar essa data."
   },
   "pluginActions": {
     "recentJobs": "Tarefas recentes",

@@ -31,7 +31,17 @@
     "loadError": "No se pudieron cargar los vídeos programados.",
     "loading": "Cargando calendario…",
     "empty": "No hay vídeos programados",
-    "emptyHint": "Indica una fecha en un vídeo completado para añadirlo al calendario."
+    "emptyHint": "Pon una fecha a una salida terminada o arrástrala desde Sin programar.",
+    "intro": "Todas las salidas programadas de {workspace}, coloreadas por perfil.",
+    "profileIntro": "Todas las salidas programadas de {profile}.",
+    "filters": "Mostrar en el calendario",
+    "landscape": "Horizontal",
+    "portrait": "Vertical",
+    "unscheduled": "Sin programar",
+    "unscheduledHint": "Arrastra uno a un día para programarlo, o ábrelo para elegir una fecha.",
+    "allScheduled": "Todas las salidas terminadas tienen fecha.",
+    "dragLabel": "Arrastra {title} a un día",
+    "scheduleError": "No se pudo guardar esa fecha."
   },
   "pluginActions": {
     "recentJobs": "Tareas recientes",

@@ -31,7 +31,17 @@
     "loadError": "Could not load scheduled videos.",
     "loading": "Loading calendar…",
     "empty": "No videos scheduled",
-    "emptyHint": "Set a date on a completed output to add it to the calendar."
+    "emptyHint": "Set a date on a finished output, or drag one from Not scheduled yet.",
+    "intro": "Every scheduled output across {workspace}, colored by profile.",
+    "profileIntro": "Every scheduled {profile} output.",
+    "filters": "Show on the calendar",
+    "landscape": "Landscape",
+    "portrait": "Portrait",
+    "unscheduled": "Not scheduled yet",
+    "unscheduledHint": "Drag one onto a day to schedule it, or open it to pick a date.",
+    "allScheduled": "Every finished output has a date.",
+    "dragLabel": "Drag {title} to a day",
+    "scheduleError": "That date couldn't be saved."
   },
   "pluginActions": {
     "recentJobs": "Recent jobs",
