@@ -174,7 +174,7 @@ impl WorkspaceStore {
     }
 }
 
-fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::Result<()> {
+pub(crate) fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::Result<()> {
     let extension = Path::new(name)
         .extension()
         .and_then(|value| value.to_str())

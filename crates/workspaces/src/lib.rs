@@ -46,6 +46,7 @@ mod production_progress;
 mod profile_deliveries;
 mod profile_formats;
 mod provider_preferences;
+mod speech_synthesis;
 mod subtitle_revisions;
 mod supplemental_delivery;
 mod supplemental_review;

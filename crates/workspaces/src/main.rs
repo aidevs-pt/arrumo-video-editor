@@ -77,6 +77,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             let plugins = WorkspaceStore::open(Path::new(database))?.plugin_catalog()?;
             println!("{}", serde_json::to_string(&plugins)?);
         }
+        [database, command, workspace, provider, voice, output]
+            if command == "synthesize-speech" =>
+        {
+            let mut text = String::new();
+            io::stdin().take(40_001).read_to_string(&mut text)?;
+            if text.len() > 40_000 {
+                return Err(io::Error::other("Speech input exceeds 40,000 bytes").into());
+            }
+            WorkspaceStore::open(Path::new(database))?.synthesize_speech_to_file(
+                utf8(workspace)?.parse()?,
+                utf8(provider)?,
+                utf8(voice)?,
+                &text,
+                Path::new(output),
+            )?;
+        }
         [database, command, workspace, wav] if command == "transcribe-wav" => {
             let transcript = WorkspaceStore::open(Path::new(database))?
                 .transcribe_preferred_wav(utf8(workspace)?.parse()?, File::open(wav)?)?;
@@ -1266,7 +1282,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-settings <plugin-id> <app|workspace-id> | set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json> | clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id> | ",
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
-                "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | ",
+                "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file> (text on stdin) | ",
                 "a2a <port> (bearer token on stdin) | mcp | plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",

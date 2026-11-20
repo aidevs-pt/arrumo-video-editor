@@ -64,16 +64,9 @@ fn main() {
             let manifest = manifest
                 .canonicalize()
                 .expect("resolve default plugin manifest");
-            let adapter = directory.join("transcription.json");
             println!("cargo:rerun-if-changed={}", directory.display());
-            let adapter = if adapter.is_file() {
-                let adapter = adapter
-                    .canonicalize()
-                    .expect("resolve default plugin adapter");
-                format!("Some(include_bytes!({adapter:?}))")
-            } else {
-                "None".into()
-            };
+            let transcription = optional_adapter(&directory, "transcription.json");
+            let speech_synthesis = optional_adapter(&directory, "speech-synthesis.json");
             let (package, source) = default_package(
                 &output,
                 release_root.as_deref(),
@@ -82,11 +75,21 @@ fn main() {
                 plugin,
                 &checkout,
             );
-            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {adapter}, package: {package}, release: {source} }},\n"));
+            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, speech_synthesis: {speech_synthesis}, package: {package}, release: {source} }},\n"));
         }
     }
     index.push_str("];\n");
     fs::write(output.join("bundled_plugins.rs"), index).expect("write bundled plugin index");
+}
+
+fn optional_adapter(directory: &Path, name: &str) -> String {
+    let path = directory.join(name);
+    if !path.is_file() {
+        return "None".into();
+    }
+    let path = path.canonicalize().expect("resolve default plugin adapter");
+    println!("cargo:rerun-if-changed={}", path.display());
+    format!("Some(include_bytes!({path:?}))")
 }
 
 fn default_package(

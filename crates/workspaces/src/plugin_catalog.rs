@@ -208,6 +208,7 @@ impl PluginManifest {
 pub(crate) struct BundledSource {
     manifest: &'static [u8],
     pub transcription: Option<&'static [u8]>,
+    pub speech_synthesis: Option<&'static [u8]>,
     package: Option<&'static [u8]>,
     release: Option<&'static str>,
 }
