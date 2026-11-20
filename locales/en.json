@@ -671,6 +671,9 @@
     "save": "Save version"
   },
   "completedVideo": {
+    "importVariant": "Import alternate MP4",
+    "importingVariant": "Importing MP4…",
+    "importVariantError": "Could not import this MP4. Choose a video with audio that matches the selected output’s resolution and duration.",
     "attachFile": "Attach file",
     "attachFileDescription": "Choose a workspace asset to include with {format}.",
     "attachNoAssets": "There are no available assets. Import a file in workspace Assets first.",

@@ -24,6 +24,7 @@ import { completedVideoHref, workspaceHref, type CompletedFile } from "../home/w
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
 import { AttachCompletedMedia } from "./attach-completed-media";
+import { ImportVideoVariant } from "./import-video-variant";
 import { DetachCompletedMedia } from "./detach-completed-media";
 import { OutputDateField } from "./output-date-field";
 import { SupplementalMediaPreview, type SupplementalMedia } from "./supplemental-media-preview";
@@ -341,9 +342,13 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
           {(selected || textLinks.length > 0 || mediaLinks.length > 0) && <section className="mt-6 border-t pt-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[1.3125rem]">{copy.otherFiles}</h2>
-              {selected && <AttachCompletedMedia key={selected.format_id} workspaceId={workspaceId} runId={runId}
-                formatId={selected.format_id} formatName={outputName(selected)} onAttached={onAttach}
-                attached={mediaOutputs.filter((item) => item.format_id === selected.format_id).map((item) => item.asset_id)} />}
+              {selected && <div className="flex flex-wrap items-start gap-2">
+                <AttachCompletedMedia key={selected.format_id} workspaceId={workspaceId} runId={runId}
+                  formatId={selected.format_id} formatName={outputName(selected)} onAttached={onAttach}
+                  attached={mediaOutputs.filter((item) => item.format_id === selected.format_id).map((item) => item.asset_id)} />
+                <ImportVideoVariant key={`import-${selected.format_id}`} workspaceId={workspaceId} runId={runId}
+                  formatId={selected.format_id} onImported={onAttach} />
+              </div>}
             </div>
             <div className="flex flex-wrap gap-2">{textLinks}{mediaLinks}</div>
           </section>}

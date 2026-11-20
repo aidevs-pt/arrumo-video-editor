@@ -671,6 +671,9 @@
     "save": "Guardar versão"
   },
   "completedVideo": {
+    "importVariant": "Importar MP4 alternativo",
+    "importingVariant": "A importar MP4…",
+    "importVariantError": "Não foi possível importar este MP4. Escolha um vídeo com áudio que corresponda à resolução e à duração da saída selecionada.",
     "attachFile": "Anexar ficheiro",
     "attachFileDescription": "Escolha um recurso do espaço de trabalho para incluir em {format}.",
     "attachNoAssets": "Não há recursos disponíveis. Importe primeiro um ficheiro em Recursos.",

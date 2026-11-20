@@ -491,3 +491,6 @@ audio track before committing the asset and attachment together.
 MCP and A2A expose the same import as `import_completed_video_variant` with
 `workspaceId`, `runId`, `formatId`, and an absolute local `source` path.
 Identical bytes submitted again to the same run and format return the original managed asset. Detaching the file allows a fresh import. Attachments created before digest tracking retain their existing links.
+
+The desktop Video tab exposes this verification under **Import alternate MP4**.
+Select the intended output format before opening the file picker.

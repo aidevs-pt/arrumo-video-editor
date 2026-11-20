@@ -253,6 +253,41 @@ pub async fn save_completed_subtitle_revision(
 }
 
 #[tauri::command]
+pub async fn import_completed_video_variant(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    picker_title: String,
+    app: AppHandle,
+) -> Result<bool, &'static str> {
+    let failed = "video_variant_import_failed";
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(source) = app
+            .dialog()
+            .file()
+            .set_title(picker_title)
+            .add_filter("MP4", &["mp4"])
+            .blocking_pick_file()
+        else {
+            return Ok(false);
+        };
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| failed)?
+            .join("workspaces.sqlite");
+        let source = source.into_path().map_err(|_| failed)?;
+        WorkspaceStore::open(&database)
+            .map_err(|_| failed)?
+            .import_completed_video_variant(&database, workspace_id, run_id, format_id, &source)
+            .map_err(|_| failed)?;
+        Ok(true)
+    })
+    .await
+    .map_err(|_| failed)?
+}
+
+#[tauri::command]
 pub async fn attach_completed_media(
     workspace_id: i64,
     run_id: i64,
