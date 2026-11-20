@@ -10,6 +10,10 @@ Create, review, and export a video. [English](docs/user/en/first-video.md) · [E
 
 Connect through CLI, MCP, or A2A. [English](docs/developer/en/connect.md) · [Español](docs/developer/es/connect.md) · [Português](docs/developer/pt/connect.md)
 
+## Official plugins
+
+Find setup and capability guides in the [official plugin documentation index](https://github.com/aidevs-pt/arrumo-plugin-registry#plugin-guides).
+
 ## Desktop development
 
 Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node, and the pnpm version in `package.json`.

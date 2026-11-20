@@ -70,4 +70,4 @@ For operation names and schemas, send the same message with `list_operations`. A
 
 ## Reference
 
-See the [editor reference](../../../README.md) for generation, review, media, and plugin commands. See the [Plugin SDK](https://github.com/aidevs-pt/arrumo-plugin-sdk) for plugin authoring and the [official registry](https://github.com/aidevs-pt/arrumo-plugin-registry) for default plugin repositories and release metadata.
+See the [editor reference](../../../README.md) for generation, review, media, and plugin commands. See the [Plugin SDK](https://github.com/aidevs-pt/arrumo-plugin-sdk) for plugin authoring and the [official registry](https://github.com/aidevs-pt/arrumo-plugin-registry/blob/main/docs/en/plugins.md) for default plugin repositories and release metadata.

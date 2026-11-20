@@ -70,4 +70,4 @@ Para consultar los nombres y esquemas de las operaciones, envía el mismo mensaj
 
 ## Referencia
 
-Consulta la [referencia del editor](../../../README.md) para los comandos de generación, revisión, archivos multimedia y plugins. El [SDK de plugins](https://github.com/aidevs-pt/arrumo-plugin-sdk) explica cómo crearlos y el [registro oficial](https://github.com/aidevs-pt/arrumo-plugin-registry) enlaza los repositorios y los metadatos de las versiones.
+Consulta la [referencia del editor](../../../README.md) para los comandos de generación, revisión, archivos multimedia y plugins. El [SDK de plugins](https://github.com/aidevs-pt/arrumo-plugin-sdk) explica cómo crearlos y el [registro oficial](https://github.com/aidevs-pt/arrumo-plugin-registry/blob/main/docs/es/plugins.md) enlaza los repositorios y los metadatos de las versiones.

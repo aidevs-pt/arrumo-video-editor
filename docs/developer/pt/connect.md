@@ -70,4 +70,4 @@ Para descobrir os nomes e esquemas das operações, envia a mesma mensagem com `
 
 ## Referência
 
-Consulta a [referência do editor](../../../README.md) para os comandos de geração, revisão, multimédia e plugins. O [SDK de plugins](https://github.com/aidevs-pt/arrumo-plugin-sdk) explica como os criar e o [registo oficial](https://github.com/aidevs-pt/arrumo-plugin-registry) liga aos repositórios e aos metadados das versões.
+Consulta a [referência do editor](../../../README.md) para os comandos de geração, revisão, multimédia e plugins. O [SDK de plugins](https://github.com/aidevs-pt/arrumo-plugin-sdk) explica como os criar e o [registo oficial](https://github.com/aidevs-pt/arrumo-plugin-registry/blob/main/docs/pt/plugins.md) liga aos repositórios e aos metadados das versões.
