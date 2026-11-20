@@ -42,3 +42,31 @@ pub async fn delete_motion_library_item(
         .delete_motion_library_item(workspace_id, item_id, &confirmed_title)
         .map_err(|_| "motion_library_delete_failed")
 }
+
+#[tauri::command]
+pub async fn update_motion_library_item(
+    workspace_id: i64,
+    item_id: i64,
+    settings: MotionLibrarySettings,
+    store: State<'_, Store>,
+) -> Result<MotionLibraryItem, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .update_motion_library_item(workspace_id, item_id, &settings)
+        .map_err(|_| "motion_library_save_failed")
+}
+
+#[tauri::command]
+pub async fn duplicate_motion_library_item(
+    workspace_id: i64,
+    item_id: i64,
+    title: String,
+    store: State<'_, Store>,
+) -> Result<MotionLibraryItem, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .duplicate_motion_library_item(workspace_id, item_id, &title)
+        .map_err(|_| "motion_library_save_failed")
+}

@@ -38,6 +38,7 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [open, setOpen] = useState(false);
+  const [operation, setOperation] = useState<{ mode: "edit" | "duplicate"; item: Item }>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const workspaceId = workspace.id;
@@ -60,24 +61,31 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
     event.preventDefault();
     if (saving) return;
     const form = new FormData(event.currentTarget);
+    const title = String(form.get("title")).trim();
     const settings: Settings = {
-      title: String(form.get("title")).trim(),
+      title,
       kind: form.get("kind") === "transition" ? "transition" : "animation",
       usage_markdown: String(form.get("usage")),
-      profile_id: scope ? Number(scope) : null,
+      profile_id: operation ? operation.item.settings.profile_id : scope ? Number(scope) : null,
       preview_asset_id: Number(form.get("video")),
       thumbnail_asset_id: Number(form.get("image")) || null,
       sound_asset_id: Number(form.get("audio")) || null,
     };
-    if (!settings.title || !settings.preview_asset_id) {
+    if (!title || (operation?.mode !== "duplicate" && !settings.preview_asset_id)) {
       setSaveError(true);
       return;
     }
     setSaving(true);
     setSaveError(false);
     try {
-      const item = await invoke<Item>("create_motion_library_item", { workspaceId, settings });
-      setItems((current) => [...(current ?? []), item]);
+      const item = operation?.mode === "duplicate"
+        ? await invoke<Item>("duplicate_motion_library_item", { workspaceId, itemId: operation.item.id, title })
+        : operation
+          ? await invoke<Item>("update_motion_library_item", { workspaceId, itemId: operation.item.id, settings })
+          : await invoke<Item>("create_motion_library_item", { workspaceId, settings });
+      setItems((current) => operation?.mode === "edit"
+        ? current?.map((entry) => entry.id === item.id ? item : entry)
+        : [...(current ?? []), item]);
       setOpen(false);
     } catch {
       setSaveError(true);
@@ -86,6 +94,8 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
     }
   }
 
+  const existing = operation?.item.settings;
+  const dialogTitle = operation ? copy[operation.mode] : copy.add;
   const videos = catalog?.assets.filter(({ kind }) => kind === "video") ?? [];
 
   return (
@@ -113,30 +123,43 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
           setOpen(next);
         }}>
           <DialogTrigger asChild>
-            <Button disabled={!items || !videos.length}><Plus data-icon="inline-start" />{copy.add}</Button>
+            <Button disabled={!items || !videos.length} onClick={() => setOperation(undefined)}><Plus data-icon="inline-start" />{copy.add}</Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[85dvh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{copy.add}</DialogTitle><DialogDescription>{copy.addDescription}</DialogDescription></DialogHeader>
+          <DialogContent className="max-h-[85dvh] overflow-y-auto" onCloseAutoFocus={(event) => {
+            if (!operation) return;
+            event.preventDefault();
+            heading.current?.focus();
+          }}>
+            <DialogHeader>
+              <DialogTitle>{dialogTitle}</DialogTitle>
+              <DialogDescription>{operation ? copy[`${operation.mode}Description`] : copy.addDescription}</DialogDescription>
+            </DialogHeader>
             <form className="flex flex-col gap-4" onSubmit={save}>
-              <Field><FieldLabel htmlFor="motion-title">{copy.name}</FieldLabel><Input id="motion-title" name="title" required /></Field>
-              <Field><FieldLabel htmlFor="motion-kind">{copy.kind}</FieldLabel>
-                <NativeSelect id="motion-kind" name="kind">
-                  <NativeSelectOption value="animation">{copy.animation}</NativeSelectOption>
-                  <NativeSelectOption value="transition">{copy.transition}</NativeSelectOption>
-                </NativeSelect>
-              </Field>
-              {(["video", "image", "audio"] as const).map((kind) => (
-                <Field key={kind}>
-                  <FieldLabel htmlFor={`motion-${kind}`}>{copy[kind]}</FieldLabel>
-                  <NativeSelect id={`motion-${kind}`} name={kind} required={kind === "video"} defaultValue={kind === "video" && videos.length === 1 ? videos[0].id : ""}>
-                    <NativeSelectOption value="">{kind === "video" ? copy.chooseVideo : copy.none}</NativeSelectOption>
-                    {catalog?.assets.filter((asset) => asset.kind === kind).map((asset) =>
-                      <NativeSelectOption key={asset.id} value={asset.id}>{asset.name}</NativeSelectOption>
-                    )}
+              <Field><FieldLabel htmlFor="motion-title">{copy.name}</FieldLabel><Input id="motion-title" name="title" defaultValue={operation?.mode === "duplicate" ? "" : existing?.title} required /></Field>
+              {operation?.mode !== "duplicate" && <>
+                <Field><FieldLabel htmlFor="motion-kind">{copy.kind}</FieldLabel>
+                  <NativeSelect id="motion-kind" name="kind" defaultValue={existing?.kind}>
+                    <NativeSelectOption value="animation">{copy.animation}</NativeSelectOption>
+                    <NativeSelectOption value="transition">{copy.transition}</NativeSelectOption>
                   </NativeSelect>
                 </Field>
-              ))}
-              <Field><FieldLabel htmlFor="motion-usage">{copy.usage}</FieldLabel><Textarea id="motion-usage" name="usage" /></Field>
+                {([
+                  ["video", existing?.preview_asset_id ?? (videos.length === 1 ? videos[0].id : "")],
+                  ["image", existing?.thumbnail_asset_id ?? ""],
+                  ["audio", existing?.sound_asset_id ?? ""],
+                ] as const).map(([kind, assetId]) => (
+                  <Field key={kind}>
+                    <FieldLabel htmlFor={`motion-${kind}`}>{copy[kind]}</FieldLabel>
+                    <NativeSelect id={`motion-${kind}`} name={kind} required={kind === "video"} defaultValue={assetId}>
+                      <NativeSelectOption value="">{kind === "video" ? copy.chooseVideo : copy.none}</NativeSelectOption>
+                      {catalog?.assets.filter((asset) => asset.kind === kind).map((asset) =>
+                        <NativeSelectOption key={asset.id} value={asset.id}>{asset.name}</NativeSelectOption>
+                      )}
+                    </NativeSelect>
+                  </Field>
+                ))}
+                <Field><FieldLabel htmlFor="motion-usage">{copy.usage}</FieldLabel><Textarea id="motion-usage" name="usage" defaultValue={existing?.usage_markdown} /></Field>
+              </>}
               {saveError && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
               <DialogFooter>
                 <Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>{copy.cancel}</Button>
@@ -163,7 +186,16 @@ export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) 
                 <h2 className="wrap-anywhere font-semibold">{settings.title}</h2>
                 {settings.usage_markdown && <p className="whitespace-pre-wrap wrap-anywhere text-sm text-muted-foreground">{settings.usage_markdown}</p>}
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex-wrap gap-1">
+                {(["edit", "duplicate"] as const).map((mode) => (
+                  <Button key={mode} type="button" size="sm" variant="ghost" disabled={open}
+                    aria-label={`${copy[mode]} · ${settings.title}`}
+                    onClick={() => {
+                      setOperation({ mode, item: { id, settings } });
+                      setSaveError(false);
+                      setOpen(true);
+                    }}>{copy[mode]}</Button>
+                ))}
                 <ConfirmTitleDelete title={settings.title} disabled={open} copy={copy.deletion}
                   onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
                     workspaceId, itemId: id, confirmedTitle,

@@ -186,6 +186,10 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "edit": "Edit item",
+    "editDescription": "Update the title, usage notes, or linked media.",
+    "duplicate": "Duplicate item",
+    "duplicateDescription": "Give the copy a name. It keeps the source scope, sharing, and media.",
     "deletion": {
       "deleteTitle": "Delete item",
       "deleteDescription": "This removes the entry from the motion library. Its media stays in Assets.",

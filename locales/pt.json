@@ -186,6 +186,10 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "motionLibrary": {
+    "edit": "Editar elemento",
+    "editDescription": "Atualiza o nome, as notas de utilização ou os recursos associados.",
+    "duplicate": "Duplicar elemento",
+    "duplicateDescription": "Dá um nome à cópia. Mantém o âmbito, as partilhas e os recursos do original.",
     "deletion": {
       "deleteTitle": "Eliminar elemento",
       "deleteDescription": "O elemento será removido da biblioteca de movimento. Os ficheiros permanecem em Recursos.",
