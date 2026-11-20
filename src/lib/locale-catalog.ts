@@ -1,11 +1,22 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import english from "../../locales/en.json";
-import { defaultLocale, type LocaleCatalog, type LocaleMessages } from "./locales";
+import { type LocaleCatalog, type LocaleMessages } from "./locales";
+
+const requiredLocales = ["en", "es", "pt"];
+
+function placeholders(message: string): string[] {
+  return (message.match(/\{[A-Za-z][A-Za-z0-9_]*\}/g) ?? []).sort();
+}
 
 function validateTranslations(value: unknown, reference: unknown, location: string): void {
   if (typeof reference === "string") {
     if (typeof value !== "string") throw new Error(`Expected translation string at ${location}`);
+    const expected = placeholders(reference);
+    const actual = placeholders(value);
+    if (actual.length !== expected.length || actual.some((token, index) => token !== expected[index])) {
+      throw new Error(`Translation placeholders differ at ${location}: expected ${expected.join(", ") || "none"}`);
+    }
     return;
   }
   if (!value || typeof value !== "object" || Array.isArray(value) || !reference || typeof reference !== "object") {
@@ -34,6 +45,8 @@ export function getLocaleCatalog(): LocaleCatalog {
     entries.push([locale, messages as LocaleMessages]);
   }
   const catalog = Object.fromEntries(entries);
-  if (!Object.hasOwn(catalog, defaultLocale)) throw new Error("Missing English locale");
+  for (const locale of requiredLocales) {
+    if (!Object.hasOwn(catalog, locale)) throw new Error(`Missing required locale: ${locale}`);
+  }
   return catalog;
 }
