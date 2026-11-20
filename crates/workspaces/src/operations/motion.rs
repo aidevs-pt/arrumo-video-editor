@@ -76,7 +76,16 @@ struct SubmitArtifacts {
     artifacts: Vec<MotionArtifact>,
 }
 
-pub(super) fn definitions() -> [Value; 9] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RenderRun {
+    workspace_id: i64,
+    run_id: i64,
+    plugin_id: String,
+    package_sha256: String,
+}
+
+pub(super) fn definitions() -> [Value; 10] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -123,6 +132,11 @@ pub(super) fn definitions() -> [Value; 9] {
                 "workspaceId": id, "runId": id, "resultId": id, "index": {"type": "integer", "minimum": 0}
             }, "required": ["workspaceId", "runId", "resultId", "index"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "render_run_motion", "description": "Render and submit a queued Assets stage with an installed motion renderer. Requires the Linux host's configured SDK worker.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "pluginId": title,
+                "packageSha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+            }, "required": ["workspaceId", "runId", "pluginId", "packageSha256"], "additionalProperties": false}}),
         json!({"name": "submit_motion_artifacts", "description": "Import finished local renderer files and submit an Assets result under the current run lease.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "attempt": id,
@@ -192,6 +206,16 @@ pub(super) fn call(
             store.save_motion_result(args.workspace_id, args.run_id, args.result_id, args.index)
                 .map(|item| json!({"item": item}))
                 .map_err(|_| "Could not save motion result. Check the run, accepted result, item index, and media references")
+        }),
+        "render_run_motion" => parse(arguments).and_then(|args: RenderRun| {
+            if !crate::configured_motion_renderer_available() {
+                return Err("The host motion renderer worker is unavailable");
+            }
+            store.render_configured_run_motion(
+                database, args.workspace_id, args.run_id, &args.plugin_id, &args.package_sha256,
+            )
+            .map(|id| json!({"resultId": id}))
+            .map_err(|_| "Could not render motion. Check the queued Assets stage, installed package digest, and host worker")
         }),
         "submit_motion_artifacts" => parse(arguments).and_then(|args: SubmitArtifacts| {
             store.submit_motion_artifacts(database, args.workspace_id, args.run_id, args.attempt, &args.artifacts)

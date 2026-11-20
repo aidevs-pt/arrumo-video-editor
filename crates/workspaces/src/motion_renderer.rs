@@ -2,7 +2,7 @@ use std::{
     error::Error,
     fs::File,
     io::{self, Read},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use crate::{MotionArtifact, WorkspaceStore};
@@ -13,7 +13,45 @@ pub struct MotionWorkerPaths<'a> {
     pub toolchain: Option<&'a Path>,
 }
 
+fn configured_motion_worker() -> Option<PathBuf> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let path = PathBuf::from(std::env::var_os("ARRUMO_MOTION_SDK_WORKER")?);
+    (path.is_absolute() && path.is_file()).then_some(path)
+}
+
+pub fn configured_motion_renderer_available() -> bool {
+    configured_motion_worker().is_some()
+}
+
 impl WorkspaceStore {
+    pub fn render_configured_run_motion(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        id: &str,
+        digest: &str,
+    ) -> Result<i64, Box<dyn Error>> {
+        let worker = configured_motion_worker()
+            .ok_or_else(|| io::Error::other("The host motion renderer worker is unavailable"))?;
+        let toolchain = std::env::var_os("ARRUMO_MOTION_TOOLCHAIN").map(PathBuf::from);
+        let job = tempfile::tempdir()?;
+        self.render_run_motion(
+            database,
+            workspace_id,
+            run_id,
+            id,
+            digest,
+            &MotionWorkerPaths {
+                worker: &worker,
+                output: &job.path().join("output"),
+                toolchain: toolchain.as_deref(),
+            },
+        )
+    }
+
     pub fn render_installed_motion(
         &self,
         id: &str,

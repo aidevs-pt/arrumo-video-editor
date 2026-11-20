@@ -12,7 +12,6 @@ arrumo-workspaces = { path = "../crates/workspaces" }
 base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tempfile = "3.27.0"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 http-range = "0.1.6"

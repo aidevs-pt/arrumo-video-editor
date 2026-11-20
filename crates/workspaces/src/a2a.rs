@@ -81,13 +81,35 @@ pub fn serve_a2a(
     ready.flush()?;
     drop(ready);
     let mut streams = Vec::new();
+    let mut render_requests = Vec::new();
     for mut request in server.incoming_requests() {
         let version = header(&request, "A2A-Version").map(str::to_owned);
         let (status, body) = match read_request(&token, &host, &endpoint, &mut request) {
             Err(response) => response,
             Ok(body) => {
                 let rpc = serde_json::from_slice::<Rpc>(&body).ok();
-                if let Some(rpc) = rpc.filter(|rpc| {
+                if rpc.as_ref().is_some_and(is_motion_render_request) {
+                    render_requests
+                        .retain(|worker: &std::thread::JoinHandle<()>| !worker.is_finished());
+                    if render_requests.len() >= 2 {
+                        (
+                            503,
+                            json!({"error": "Too many active motion render requests"}),
+                        )
+                    } else {
+                        let path = database.to_path_buf();
+                        render_requests.push(std::thread::spawn(move || {
+                            let (status, response) = match WorkspaceStore::open(&path) {
+                                Ok(mut store) => {
+                                    (200, dispatch(&mut store, &path, version.as_deref(), &body))
+                                }
+                                Err(_) => (503, json!({"error": "Workspace store unavailable"})),
+                            };
+                            respond(request, status, response);
+                        }));
+                        continue;
+                    }
+                } else if let Some(rpc) = rpc.filter(|rpc| {
                     matches!(
                         rpc.method.as_str(),
                         "SubscribeToTask" | "SendStreamingMessage"
@@ -117,16 +139,29 @@ pub fn serve_a2a(
                 }
             }
         };
-        let mut response = Response::from_string(body.to_string())
-            .with_status_code(status)
-            .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
-            .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap());
-        if status == 401 {
-            response.add_header(Header::from_bytes("WWW-Authenticate", "Bearer").unwrap());
-        }
-        let _ = request.respond(response);
+        respond(request, status, body);
     }
     Ok(())
+}
+
+fn is_motion_render_request(rpc: &Rpc) -> bool {
+    rpc.method == "SendMessage"
+        && rpc
+            .params
+            .pointer("/message/parts/0/data/operation")
+            .and_then(Value::as_str)
+            == Some("render_run_motion")
+}
+
+fn respond(request: Request, status: u16, body: Value) {
+    let mut response = Response::from_string(body.to_string())
+        .with_status_code(status)
+        .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+        .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap());
+    if status == 401 {
+        response.add_header(Header::from_bytes("WWW-Authenticate", "Bearer").unwrap());
+    }
+    let _ = request.respond(response);
 }
 
 fn read_request(
