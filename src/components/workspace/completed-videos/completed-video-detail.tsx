@@ -23,6 +23,7 @@ import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { completedVideoHref, workspaceHref, type CompletedFile } from "../home/workspace-links";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
+import { DetachCompletedMedia } from "./detach-completed-media";
 import { OutputDateField } from "./output-date-field";
 import { SupplementalMediaPreview, type SupplementalMedia } from "./supplemental-media-preview";
 import { CompletedOutputPreview } from "./completed-output-preview";
@@ -110,10 +111,14 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, file
       </>
     );
   }
-  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} file={file} />;
+  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} file={file}
+    onDetach={(id) => setVideo((current) => current && ({
+      ...current,
+      supplemental_media: current.supplemental_media.filter((item) => item.attachment_id !== id),
+    }))} />;
 }
 
-function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile }) {
+function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onDetach }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile; onDetach: (id: number) => void }) {
   const { locale, messages: { completedVideo: copy, queue } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
@@ -198,9 +203,17 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
           <h1>{filename}</h1>
           <p>{savedTitle}{outputFormat && ` / ${outputFormat.name}`}</p>
         </WorkspaceHeading>
-        <Button asChild size="sm" variant="outline">
-          <Link href={completedVideoHref(workspaceId, runId, selected?.format_id)}>{copy.videoTab}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href={completedVideoHref(workspaceId, runId, selected?.format_id)}>{copy.videoTab}</Link>
+          </Button>
+          {attachmentId !== undefined && mediaOutput && <DetachCompletedMedia key={attachmentId}
+            workspaceId={workspaceId} runId={runId} attachmentId={attachmentId} name={mediaOutput.name}
+            onDetached={() => {
+              onDetach(attachmentId);
+              router.replace(completedVideoHref(workspaceId, runId, selected?.format_id));
+            }} />}
+        </div>
       </div>
       {mediaOutput ? <SupplementalMediaPreview key={file}
         workspaceId={workspaceId} runId={runId} index={mediaIndex} media={mediaOutput} />

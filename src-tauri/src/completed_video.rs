@@ -253,6 +253,20 @@ pub async fn save_completed_subtitle_revision(
 }
 
 #[tauri::command]
+pub async fn detach_completed_media(
+    workspace_id: i64,
+    run_id: i64,
+    attachment_id: i64,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .detach_completed_media(workspace_id, run_id, attachment_id)
+        .map_err(|_| "detach_completed_media_failed")
+}
+
+#[tauri::command]
 pub async fn preview_completed_supplemental_media(
     workspace_id: i64,
     run_id: i64,

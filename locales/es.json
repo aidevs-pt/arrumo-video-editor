@@ -671,6 +671,10 @@
     "save": "Guardar versión"
   },
   "completedVideo": {
+    "detachAttachment": "Quitar archivo",
+    "detachAttachmentTitle": "¿Quitar {name}?",
+    "detachAttachmentDescription": "El archivo se quitará de esta entrega y de su ZIP. Seguirá en los recursos del espacio de trabajo.",
+    "detachAttachmentError": "No se pudo quitar el archivo. Inténtalo de nuevo.",
     "scheduleDate": "Fecha programada",
     "saveDate": "Guardar fecha",
     "clearDate": "Quitar fecha",
