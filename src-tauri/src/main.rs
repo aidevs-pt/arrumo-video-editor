@@ -875,6 +875,7 @@ fn main() {
             completed_video::add_completed_video_feedback,
             completed_video::preview_completed_output,
             completed_video::preview_completed_supplemental_media,
+            guided_preview::preview_pending_supplemental,
             completed_video::read_completed_subtitle_revision,
             completed_video::save_completed_subtitle_revision,
             guided_preview::open_guided_preview,

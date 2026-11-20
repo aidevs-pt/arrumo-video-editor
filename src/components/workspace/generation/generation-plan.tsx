@@ -22,6 +22,7 @@ import type { DeliveryFormat } from "./delivery-subtitles";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import { MotionRendererAction } from "./motion-renderer-action";
 import { MotionArtifactAction } from "./motion-artifact-action";
+import { SupplementalReview } from "./supplemental-review";
 import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
@@ -247,9 +248,12 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   const selectedMotion = draft.motionIndexes ?? (saveMotionDefault ? motionItems.map(({ index }) => index) : []);
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
   const markdown = typeof result.result.markdown === "string" ? result.result.markdown : undefined;
+  const hasSupplemental = stage === "supplemental_outputs"
+    && (Array.isArray(result.result.supplemental_text) || Array.isArray(result.result.supplemental_media));
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
     key !== "markdown" && (key !== "preview_videos" || previews.length === 0)
-    && (key !== "motion_items" || motionItems.length === 0)));
+    && (key !== "motion_items" || motionItems.length === 0)
+    && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
   function updateDraft(next: ReviewDraft) {
     setDraft(next);
@@ -273,6 +277,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {markdown && <ScriptReviewText markdown={markdown} />}
+        {hasSupplemental && <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats} />}
         {motionItems.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {motionItems.map(({ index, title, usage, kind }) => (
@@ -295,7 +300,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
             label={formats.find((format) => format.id === formatId)?.name ?? filename} />
         ))}</div>}
         {Object.keys(source).length > 0 && (
-          <Collapsible defaultOpen={!markdown && previews.length === 0}>
+          <Collapsible defaultOpen={!markdown && !hasSupplemental && previews.length === 0}>
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" size="sm" className="group">
                 {copy.resultDetails}<ChevronDown data-icon="inline-end" className="group-data-[state=open]:rotate-180" />

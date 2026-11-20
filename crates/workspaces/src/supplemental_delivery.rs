@@ -83,6 +83,26 @@ pub struct SupplementalMedia {
 }
 
 impl SupplementalMedia {
+    pub fn managed_file(
+        &self,
+        database: &std::path::Path,
+        workspace_id: i64,
+    ) -> std::io::Result<std::path::PathBuf> {
+        let file = crate::asset_path(
+            &crate::asset_root(&database.canonicalize()?),
+            workspace_id,
+            self.asset_id,
+        );
+        let metadata = file.symlink_metadata()?;
+        if !metadata.is_file()
+            || file.canonicalize()? != file
+            || Some(metadata.len()) != u64::try_from(self.byte_size).ok()
+        {
+            return Err(std::io::Error::other("Supplemental media is unavailable"));
+        }
+        Ok(file)
+    }
+
     pub(crate) fn filename(&self, index: usize) -> String {
         let extension = std::path::Path::new(&self.name)
             .extension()
@@ -129,6 +149,18 @@ pub(crate) fn validate_supplemental_media(
     Ok(())
 }
 
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct PendingPayload {
+    supplemental_text: Vec<SupplementalText>,
+    supplemental_media: Vec<MediaReference>,
+}
+
+pub struct PendingSupplemental {
+    pub text: Vec<SupplementalText>,
+    pub media: Vec<SupplementalMedia>,
+}
+
 impl WorkspaceStore {
     pub(crate) fn completed_supplemental_text(
         &self,
@@ -145,6 +177,34 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<Vec<SupplementalMedia>> {
         let references: Vec<MediaReference> =
             self.completed_supplemental_field(workspace_id, run_id, "$.supplemental_media")?;
+        self.supplemental_media_metadata(workspace_id, references)
+    }
+
+    pub fn pending_supplemental(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+    ) -> rusqlite::Result<PendingSupplemental> {
+        let result: PendingPayload = self.0.query_row(
+            "SELECT result.result_json FROM generation_runs run
+             JOIN production_results result ON result.run_id = run.id AND result.id = run.pending_review_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2 AND result.id = ?3 AND run.state = 'paused'
+               AND json_extract(run.plan_json, '$.steps[' || result.stage_index || '].stage') = 'supplemental_outputs'",
+            params![workspace_id, run_id, result_id],
+            |row| read_settings(row.get(0)?, 0),
+        )?;
+        Ok(PendingSupplemental {
+            text: result.supplemental_text,
+            media: self.supplemental_media_metadata(workspace_id, result.supplemental_media)?,
+        })
+    }
+
+    fn supplemental_media_metadata(
+        &self,
+        workspace_id: i64,
+        references: Vec<MediaReference>,
+    ) -> rusqlite::Result<Vec<SupplementalMedia>> {
         let mut metadata = self.0.prepare(
             "SELECT kind, name, byte_size FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2",
         )?;
@@ -176,18 +236,7 @@ impl WorkspaceStore {
             .into_iter()
             .nth(index)
             .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
-        let file = crate::asset_path(
-            &crate::asset_root(&database.canonicalize()?),
-            workspace_id,
-            entry.asset_id,
-        );
-        let metadata = file.symlink_metadata()?;
-        if !metadata.is_file()
-            || file.canonicalize()? != file
-            || metadata.len() != u64::try_from(entry.byte_size)?
-        {
-            return Err(std::io::Error::other("Supplemental media is unavailable").into());
-        }
+        let file = entry.managed_file(database, workspace_id)?;
         Ok((entry, file))
     }
 

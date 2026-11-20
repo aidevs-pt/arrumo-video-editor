@@ -729,6 +729,7 @@
     "replayMode": "Definições a usar"
   },
   "productionPlan": {
+    "sharedSupplemental": "Partilhado entre formatos",
     "keepMotionItems": "Guardar elementos na biblioteca de movimento",
     "resultDetails": "Dados do resultado",
     "decision": "Decisão",

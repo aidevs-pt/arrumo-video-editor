@@ -729,6 +729,7 @@
     "replayMode": "Settings to use"
   },
   "productionPlan": {
+    "sharedSupplemental": "Shared across formats",
     "keepMotionItems": "Save selected items to the Motion library",
     "resultDetails": "Result data",
     "decision": "Decision",
