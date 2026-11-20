@@ -630,7 +630,16 @@
     "controlError": "Não foi possível atualizar a execução. O estado pode ter mudado.",
     "submitted": "Enviada",
     "claimed": "Atribuída a um processo",
-    "transition": "Estado atualizado"
+    "transition": "Estado atualizado",
+    "activitySubmitted": "Adicionado à fila",
+    "activityStarted": "O trabalho começou",
+    "activityQueued": "De volta à fila",
+    "activityRunning": "A trabalhar",
+    "activityReview": "À espera da sua revisão",
+    "activityPaused": "Em pausa",
+    "activityFailed": "Parou com um problema",
+    "activityCompleted": "Concluído",
+    "activityCancelled": "Cancelado"
   },
   "onboarding": {
     "tagline": "De filmagens em bruto a vídeos brilhantes.",

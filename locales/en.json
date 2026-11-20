@@ -630,7 +630,16 @@
     "controlError": "The run could not be updated. Its state may have changed.",
     "submitted": "Submitted",
     "claimed": "Worker claimed run",
-    "transition": "State changed"
+    "transition": "State changed",
+    "activitySubmitted": "Added to the queue",
+    "activityStarted": "Work started",
+    "activityQueued": "Back in the queue",
+    "activityRunning": "Working",
+    "activityReview": "Waiting for your review",
+    "activityPaused": "Paused",
+    "activityFailed": "Stopped with a problem",
+    "activityCompleted": "Finished",
+    "activityCancelled": "Cancelled"
   },
   "onboarding": {
     "tagline": "Messy footage in. Brilliant video out.",

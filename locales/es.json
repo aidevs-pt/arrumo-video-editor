@@ -630,7 +630,16 @@
     "controlError": "No se pudo actualizar la ejecución. Puede que su estado haya cambiado.",
     "submitted": "Enviada",
     "claimed": "Asignada a un proceso",
-    "transition": "Estado actualizado"
+    "transition": "Estado actualizado",
+    "activitySubmitted": "Añadido a la cola",
+    "activityStarted": "Empezó el trabajo",
+    "activityQueued": "De vuelta en la cola",
+    "activityRunning": "Trabajando",
+    "activityReview": "Esperando tu revisión",
+    "activityPaused": "En pausa",
+    "activityFailed": "Se detuvo por un problema",
+    "activityCompleted": "Terminado",
+    "activityCancelled": "Cancelado"
   },
   "onboarding": {
     "tagline": "De material en bruto a vídeos brillantes.",

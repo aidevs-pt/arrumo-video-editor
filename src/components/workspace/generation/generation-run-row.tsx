@@ -178,6 +178,10 @@ export function GenerationRunPanels({ run, workspaceId }: { run: Run; workspaceI
   );
 }
 
+function sameDay(date: Date) {
+  return date.toDateString() === new Date().toDateString();
+}
+
 function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: number }) {
   const [activity, setActivity] = useState<Activity[]>();
   const [historyError, setHistoryError] = useState(false);
@@ -201,6 +205,19 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
     return () => { active = false; clearTimeout(timer); };
   }, [run.id, run.state, workspaceId]);
 
+  function activityLabel(event: Activity, awaitingReview: boolean) {
+    if (event.kind === "submitted") return copy.activitySubmitted;
+    if (event.kind === "claimed") return copy.activityStarted;
+    switch (event.state) {
+      case "queued": return copy.activityQueued;
+      case "running": return copy.activityRunning;
+      case "paused": return awaitingReview ? copy.activityReview : copy.activityPaused;
+      case "failed": return copy.activityFailed;
+      case "completed": return copy.activityCompleted;
+      case "cancelled": return copy.activityCancelled;
+    }
+  }
+
   return (
     <aside aria-label={copy.activity} className="flex min-w-0 flex-col gap-3 border-t border-white/20 pt-3 text-white">
       <h2 className="flex items-center gap-2 text-base"><Clock3 className="size-4" aria-hidden="true" />{copy.activity}</h2>
@@ -214,9 +231,9 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
               return (
                 <li className="relative ms-1 border-s pb-4 ps-4 last:border-transparent last:pb-0" key={index}>
                   <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-sm bg-white/60 ring-4 ring-agent rtl:translate-x-1/2" aria-hidden="true" />
-                  <p className="font-medium">{copy[event.kind]}</p>
-                  <p className="flex flex-wrap gap-x-2 text-xs text-white/75"><span>{copy[event.state]}</span><time dateTime={date.toISOString()}>
-                    {new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(date)}
+                  <p className="font-medium">{activityLabel(event, index === 0 && run.pending_review_id !== null)}</p>
+                  <p className="text-xs text-white/75"><time dateTime={date.toISOString()}>
+                    {new Intl.DateTimeFormat(locale, sameDay(date) ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }).format(date)}
                   </time></p>
                   {event.detail && <p className="mt-1 wrap-anywhere whitespace-pre-wrap text-sm text-white/85">{event.detail}</p>}
                 </li>

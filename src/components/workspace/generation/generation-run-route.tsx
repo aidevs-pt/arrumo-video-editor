@@ -80,7 +80,7 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
         <header className="grid items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
           <div className="flex min-w-0 flex-col items-start gap-3">
             <Button asChild variant="ghost" size="sm" className="-ms-2 text-white/80 hover:bg-white/10 hover:text-white">
-              <Link href={workspaceHref("generations", workspaceId)}><ArrowLeft data-icon="inline-start" />{copy.title}</Link>
+              <Link href={workspaceHref("generations", workspaceId)}><ArrowLeft data-icon="inline-start" />{messages.studio.videos}</Link>
             </Button>
             {profile && <span className="flex items-center gap-2 text-sm font-semibold text-white/90">
               <span aria-hidden="true" className="size-3 rounded-[3px] ring-1 ring-white/60" style={{ backgroundColor: profile.color ?? "transparent" }} />
