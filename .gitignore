@@ -13,3 +13,5 @@
 *.sqlite.media/
 
 *.sqlite.deliveries/
+
+/src-tauri/motion-worker/

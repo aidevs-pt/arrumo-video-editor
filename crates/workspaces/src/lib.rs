@@ -71,7 +71,7 @@ pub use mcp::serve_mcp;
 pub use media_worker::MediaWork;
 pub use motion_artifacts::MotionArtifact;
 pub use motion_library::{MotionKind, MotionLibraryItem, MotionLibrarySettings};
-pub use motion_renderer::{MotionWorkerPaths, configured_motion_renderer_available};
+pub use motion_renderer::{MotionWorkerPaths, configured_motion_worker};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use output_schedule::ScheduledOutput;
 pub use plugin_actions::InstalledPluginAction;

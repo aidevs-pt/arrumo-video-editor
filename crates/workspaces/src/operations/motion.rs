@@ -208,11 +208,10 @@ pub(super) fn call(
                 .map_err(|_| "Could not save motion result. Check the run, accepted result, item index, and media references")
         }),
         "render_run_motion" => parse(arguments).and_then(|args: RenderRun| {
-            if !crate::configured_motion_renderer_available() {
-                return Err("The host motion renderer worker is unavailable");
-            }
-            store.render_configured_run_motion(
-                database, args.workspace_id, args.run_id, &args.plugin_id, &args.package_sha256,
+            let worker = crate::configured_motion_worker(None)
+                .ok_or("The host motion renderer worker is unavailable")?;
+            store.render_run_motion_with_worker(
+                database, args.workspace_id, args.run_id, &args.plugin_id, &args.package_sha256, &worker,
             )
             .map(|id| json!({"resultId": id}))
             .map_err(|_| "Could not render motion. Check the queued Assets stage, installed package digest, and host worker")

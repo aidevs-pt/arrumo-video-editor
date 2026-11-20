@@ -1,5 +1,5 @@
 use arrumo_workspaces::{ProductionStage, WorkspaceStore};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, path::BaseDirectory};
 
 #[tauri::command]
 pub async fn process_desktop_media_stage(
@@ -83,9 +83,20 @@ pub async fn submit_desktop_motion_artifacts(
     .map_err(|_| "motion_artifacts_failed")?
 }
 
+fn desktop_motion_worker(app: &AppHandle) -> Option<std::path::PathBuf> {
+    let resource = app
+        .path()
+        .resolve(
+            "motion-worker/tools/run_motion_package.py",
+            BaseDirectory::Resource,
+        )
+        .ok();
+    arrumo_workspaces::configured_motion_worker(resource)
+}
+
 #[tauri::command]
-pub fn desktop_motion_renderer_available() -> bool {
-    arrumo_workspaces::configured_motion_renderer_available()
+pub fn desktop_motion_renderer_available(app: AppHandle) -> bool {
+    desktop_motion_worker(&app).is_some()
 }
 
 #[tauri::command]
@@ -97,9 +108,7 @@ pub async fn render_desktop_run_motion(
     app: AppHandle,
 ) -> Result<i64, &'static str> {
     tauri::async_runtime::spawn_blocking(move || {
-        if !desktop_motion_renderer_available() {
-            return Err("motion_renderer_unavailable");
-        }
+        let worker = desktop_motion_worker(&app).ok_or("motion_renderer_unavailable")?;
         let database = app
             .path()
             .app_local_data_dir()
@@ -107,7 +116,14 @@ pub async fn render_desktop_run_motion(
             .join("workspaces.sqlite");
         WorkspaceStore::open(&database)
             .map_err(|_| "store_unavailable")?
-            .render_configured_run_motion(&database, workspace_id, run_id, &plugin_id, &digest)
+            .render_run_motion_with_worker(
+                &database,
+                workspace_id,
+                run_id,
+                &plugin_id,
+                &digest,
+                &worker,
+            )
             .map_err(|_| "motion_renderer_failed")
     })
     .await
