@@ -7,6 +7,7 @@ use crate::WorkspaceStore;
 
 mod assets;
 mod generation;
+mod jobs;
 mod motion;
 mod providers;
 mod settings;
@@ -57,6 +58,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     ];
     tools.extend(generation::definitions());
     tools.extend(assets::definitions());
+    tools.extend(jobs::definitions());
     tools.extend(motion::definitions());
     tools.extend(setup::definitions());
     tools.extend(providers::definitions());
@@ -97,6 +99,7 @@ pub(crate) fn invoke(
              .map_err(|_| "Plugin action could not run. Check the installed revision, scope and permissions")
         }
         _ => assets::call(store, database, name, &arguments)
+            .or_else(|| jobs::call(store, name, &arguments))
             .or_else(|| motion::call(store, database, name, &arguments))
             .or_else(|| setup::call(store, name, &arguments))
             .or_else(|| providers::call(store, name, &arguments))

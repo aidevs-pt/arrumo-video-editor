@@ -208,6 +208,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             let actions = WorkspaceStore::open(Path::new(database))?.plugin_actions()?;
             println!("{}", serde_json::to_string(&actions)?);
         }
+        [database, command] if command == "queue-plugin-action-job" => {
+            let request = serde_json::from_value(read_plugin_invocation_input()?)?;
+            let job =
+                WorkspaceStore::open(Path::new(database))?.queue_plugin_action_job(&request)?;
+            println!("{}", serde_json::to_string(&job)?);
+        }
+        [database, command, scope, id]
+            if command == "plugin-action-job" || command == "process-plugin-action-job" =>
+        {
+            let store = WorkspaceStore::open(Path::new(database))?;
+            let workspace = plugin_workspace(scope)?;
+            let id = utf8(id)?.parse()?;
+            let job = if command == "plugin-action-job" {
+                store.plugin_action_job(workspace, id)?
+            } else {
+                store.process_plugin_action_job(workspace, id)?
+            };
+            println!("{}", serde_json::to_string(&job)?);
+        }
         [database, command, plugin_id, action_id, scope] if command == "invoke-plugin-action" => {
             let input = read_plugin_invocation_input()?;
             let result = WorkspaceStore::open(Path::new(database))?.invoke_plugin_action(
@@ -1320,7 +1339,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | speech-provider-status <workspace-id> <plugin-id> | synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file> (text on stdin) | ",
-                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
+                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | queue-plugin-action-job (JSON on stdin) | plugin-action-job <app|workspace-id> <job-id> | process-plugin-action-job <app|workspace-id> <job-id> | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",

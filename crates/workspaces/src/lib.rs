@@ -30,6 +30,7 @@ mod motion_renderer;
 mod operations;
 mod output_formats;
 mod output_schedule;
+mod plugin_action_jobs;
 mod plugin_actions;
 mod plugin_catalog;
 mod plugin_credentials;
@@ -79,6 +80,7 @@ pub use motion_library::{MotionKind, MotionLibraryItem, MotionLibrarySettings};
 pub use motion_renderer::{MotionWorkerPaths, configured_motion_worker};
 pub use output_formats::{OutputFormat, OutputFormatSettings};
 pub use output_schedule::ScheduledOutput;
+pub use plugin_action_jobs::{PluginActionJob, PluginActionJobRequest};
 pub use plugin_actions::InstalledPluginAction;
 pub use plugin_catalog::{
     CatalogPlugin, MAX_PLUGIN_MANIFEST_BYTES, PluginManifest, SUPPORTED_PLUGIN_MANIFEST_SCHEMAS,
@@ -187,6 +189,7 @@ impl WorkspaceStore {
             include_str!("../migrations/046-completed-media.sql"),
             include_str!("../migrations/047-stable-completed-media.sql"),
             include_str!("../migrations/048-variant-content-identity.sql"),
+            include_str!("../migrations/049-plugin-action-jobs.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

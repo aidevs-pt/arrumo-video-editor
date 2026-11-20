@@ -494,3 +494,19 @@ Identical bytes submitted again to the same run and format return the original m
 
 The desktop Video tab exposes this verification under **Import alternate MP4**.
 Select the intended output format before opening the file picker.
+
+### Durable plugin actions
+
+Send a JSON object with `id` (a caller-generated UUID), `pluginId`,
+`actionId`, `packageSha256`, `input`, and `workspaceId` for workspace
+actions to `queue-plugin-action-job` on stdin. Repeating the same request
+returns the existing job. Reusing the UUID with changed input or scope fails.
+
+Read a job with `plugin-action-job <app|workspace-id> <job-id>`. Run a queued
+job with `process-plugin-action-job <app|workspace-id> <job-id>`. Processing
+checks the reviewed package again, retains the result, and can reclaim a job
+after its two-minute lease expires. MCP and A2A expose these as
+`queue_plugin_action_job`, `get_plugin_action_job`, and
+`process_plugin_action_job`. These jobs run declared Wasm actions in the
+existing sandbox. Job requests persist their input, so include only the data
+the action needs.
