@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ChevronLeft, ChevronRight, RectangleHorizontal, RectangleVertical, Square } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -43,18 +43,20 @@ function asDate(day: Date) {
   return day.toISOString().slice(0, 10);
 }
 
-export function WorkspaceCalendar() {
+/** `monthHref` keeps month navigation inside the page that embeds the calendar. */
+export function WorkspaceCalendar({ monthHref }: { monthHref?: (month: string) => string } = {}) {
   const { workspace, draftProfile } = useWorkspaceCatalog();
   const query = useSearchParams();
   if (!workspace) return null;
-  return <CalendarContent key={workspace.id}
+  return <CalendarContent key={workspace.id} monthHref={monthHref}
     workspaceId={workspace.id} profileId={draftProfile} monthQuery={query.get("month")} />;
 }
 
-function CalendarContent({ workspaceId, profileId, monthQuery }: {
+function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
   workspaceId: number;
   profileId: number | null;
   monthQuery: string | null;
+  monthHref?: (month: string) => string;
 }) {
   const { locale, messages } = useLocale();
   const copy = messages.calendar;
@@ -77,7 +79,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
 
   function showMonth(offset: number) {
     const next = asDate(utcDate(year, monthIndex + offset, 1)).slice(0, 7);
-    router.push(calendarHref(workspaceId, profileId ?? undefined, next), { scroll: false });
+    router.push(monthHref?.(next) ?? calendarHref(workspaceId, profileId ?? undefined, next), { scroll: false });
   }
 
   useEffect(() => {
@@ -109,8 +111,9 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
   const weekday = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
   const dayLabel = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" });
 
+  const Shell = monthHref ? Fragment : WorkspaceShell;
   return (
-    <WorkspaceShell>
+    <Shell>
       <section aria-label={copy.title}>
         <div className="mb-4 flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -123,18 +126,18 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
                 disabled={year >= 9999 && monthIndex === 11}
                 onClick={() => showMonth(1)}><ChevronRight /></Button>
               <Button size="sm" variant="outline" onClick={() => router.push(
-                calendarHref(workspaceId, profileId ?? undefined, today.slice(0, 7)), { scroll: false },
+                monthHref?.(today.slice(0, 7)) ?? calendarHref(workspaceId, profileId ?? undefined, today.slice(0, 7)), { scroll: false },
               )}>{copy.today}</Button>
             </div>
           </div>
-          <Select value={profileId === null ? "all" : String(profileId)}
+          {!monthHref && <Select value={profileId === null ? "all" : String(profileId)}
             onValueChange={(value) => router.push(calendarHref(workspaceId, value === "all" ? undefined : Number(value), start.slice(0, 7)), { scroll: false })}>
             <SelectTrigger aria-label={copy.profileFilter} className="w-full sm:w-56"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>
               <SelectItem value="all">{copy.allProfiles}</SelectItem>
               {profiles.map((profile) => <SelectItem key={profile.id} value={String(profile.id)}>{profile.name}</SelectItem>)}
             </SelectGroup></SelectContent>
-          </Select>
+          </Select>}
         </div>
         <div>
           {failed ? <Alert variant="destructive">
@@ -169,7 +172,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
           )}
         </div>
       </section>
-    </WorkspaceShell>
+    </Shell>
   );
 }
 

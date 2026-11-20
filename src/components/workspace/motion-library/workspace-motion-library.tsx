@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,14 +32,15 @@ type Item = { id: number; settings: Settings };
 type Asset = { id: number; name: string; kind: "video" | "image" | "audio" };
 type Profile = { id: number; name: string };
 
-export function WorkspaceMotionLibrary({ workspace }: { workspace: Workspace }) {
+/** With `profileId`, the library is fixed to that profile and renders inside the profile page. */
+export function WorkspaceMotionLibrary({ workspace, profileId }: { workspace: Workspace; profileId?: number }) {
   const query = useSearchParams();
-  const requested = query.get("profile") ?? "";
+  const requested = profileId ? String(profileId) : query.get("profile") ?? "";
   const scope = /^[1-9]\d*$/.test(requested) && Number.isSafeInteger(Number(requested)) ? requested : "";
-  return <MotionLibraryScope key={scope} workspace={workspace} scope={scope} />;
+  return <MotionLibraryScope key={scope} workspace={workspace} scope={scope} embedded={profileId !== undefined} />;
 }
 
-function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope: string }) {
+function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspace; scope: string; embedded: boolean }) {
   const router = useRouter();
   const { messages } = useLocale();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -108,15 +109,16 @@ function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope:
   const existing = operation?.item.settings;
   const dialogTitle = operation ? copy[operation.mode] : copy.add;
   const videos = catalog?.assets.filter(({ kind }) => kind === "video") ?? [];
+  const Shell = embedded ? Fragment : WorkspaceShell;
 
   return (
-    <WorkspaceShell>
-      <WorkspaceHeading>
+    <Shell>
+      {embedded ? <p className="mb-4 max-w-[65ch] text-muted-foreground">{copy.intro}</p> : <WorkspaceHeading>
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{copy.intro}</p>
-      </WorkspaceHeading>
+      </WorkspaceHeading>}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <Field className="w-auto">
+        <Field className={embedded ? "hidden" : "w-auto"}>
           <FieldLabel htmlFor="motion-scope">{copy.scope}</FieldLabel>
           <NativeSelect id="motion-scope" value={scope} disabled={!catalog || open}
             onChange={(event) => {
@@ -226,6 +228,6 @@ function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope:
             </Card>
           </li>)}
         </ul>}
-    </WorkspaceShell>
+    </Shell>
   );
 }

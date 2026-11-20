@@ -28,8 +28,9 @@ type CatalogEntry = { id: number; name: string };
 type Asset = CatalogEntry & { kind: string };
 type Draft = { id: number; title: string; intent: string; profile_id: number | null; source_ids: number[] };
 
-export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = false, startComposing = false, startFromScratch = false, onBack }: {
+export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = false, startComposing = false, startFromScratch = false, openDraft, onBack }: {
   workspace: CatalogEntry;
+  openDraft?: number;
   startInQueue?: boolean;
   startComposing?: boolean;
   startFromScratch?: boolean;
@@ -51,6 +52,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
   const [title, setTitle] = useState("");
   const titleInput = useRef<HTMLInputElement>(null);
   const newDraft = useRef<Omit<Draft, "id"> | null>(null);
+  const openedDraft = useRef(false);
   const [profile, setProfile] = useState(initialProfile);
   const [intent, setIntent] = useState("");
   const [sources, setSources] = useState<number[]>([]);
@@ -78,6 +80,11 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
       setDrafts(items);
       setAssets(media.filter((asset) => asset.kind === "video"));
       setProfiles(entries);
+      const requested = items.find((draft) => draft.id === openDraft);
+      if (requested && !openedDraft.current) {
+        openedDraft.current = true;
+        edit(requested);
+      }
     }, () => { if (active) setLoadError(true); });
     return () => { active = false; };
   }, [workspaceId, attempt]);
@@ -372,9 +379,12 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
 
 export function WorkspaceDraftsRoute({ queue = false }: { queue?: boolean }) {
   const { workspace, draftProfile, navigate } = useWorkspaceCatalog();
-  const requestedCompose = useSearchParams().get("compose");
+  const query = useSearchParams();
+  const requestedCompose = query.get("compose");
+  const openDraft = Number(query.get("draft")) || undefined;
   const compose = requestedCompose === "1" || requestedCompose === "scratch" || draftProfile !== null;
-  return workspace ? <WorkspaceDrafts key={`${workspace.id}-${queue}-${draftProfile}-${requestedCompose}`}
+  return workspace ? <WorkspaceDrafts key={`${workspace.id}-${queue}-${draftProfile}-${requestedCompose}-${openDraft}`}
     workspace={workspace} initialProfile={draftProfile} startInQueue={queue} startComposing={compose} startFromScratch={requestedCompose === "scratch"}
+    openDraft={openDraft}
     onBack={() => navigate("drafts")} /> : null;
 }
