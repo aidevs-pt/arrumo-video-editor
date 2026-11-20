@@ -186,6 +186,14 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "removal": {
+      "deleteTitle": "Remove asset",
+      "deleteDescription": "This removes the managed copy from the workspace. The original file stays where you imported it from.",
+      "confirmTitle": "Type the filename exactly",
+      "deleteError": "The asset could not be removed. Check whether a draft, brand assignment, thumbnail setting, or generation run still uses it.",
+      "cancelDelete": "Cancel",
+      "deleting": "Removing…"
+    },
     "groupView": "Group assets",
     "ungrouped": "Ungrouped",
     "filterGroup": "Filter by group",

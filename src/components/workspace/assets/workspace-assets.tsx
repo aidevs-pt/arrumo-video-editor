@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssetOrganizationDialog, type AssetOrganization } from "./asset-organization-dialog";
+import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { AssetThumbnail } from "./asset-thumbnail";
 
 const kinds = ["image", "audio", "video"] as const;
@@ -68,6 +69,17 @@ export function WorkspaceAssets({ workspace }: {
     );
     return () => { active = false; };
   }, [workspace.id, attempt]);
+
+  function onAssetRemoved(assetId: number) {
+    setAssets((rows) => rows?.filter((asset) => asset.id !== assetId));
+    setOrganizations(({ [assetId]: _removed, ...remaining }) => remaining);
+    setSelected((current) => {
+      const remaining = new Set(current);
+      remaining.delete(assetId);
+      return remaining;
+    });
+    heading.current?.focus();
+  }
 
   async function importFiles() {
     if (busy) return;
@@ -244,6 +256,11 @@ export function WorkspaceAssets({ workspace }: {
                           <AssetOrganizationDialog workspaceId={workspace.id} assetId={asset.id} name={asset.name}
                             organization={organizations[asset.id]} disabled={busy !== null}
                             onSave={(organization) => setOrganizations((current) => ({ ...current, [asset.id]: organization }))} />
+                          <ConfirmTitleDelete title={asset.name} disabled={busy !== null} copy={copy.removal}
+                            onConfirm={(confirmedName) => invoke<boolean>("remove_asset", {
+                              workspaceId: workspace.id, assetId: asset.id, confirmedName,
+                            })}
+                            onDelete={() => onAssetRemoved(asset.id)} />
                         </CardFooter>
                       </Card>
                     </li>

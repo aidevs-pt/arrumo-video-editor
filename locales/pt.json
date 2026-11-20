@@ -186,6 +186,14 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "assets": {
+    "removal": {
+      "deleteTitle": "Remover recurso",
+      "deleteDescription": "A cópia gerida será removida do espaço de trabalho. O ficheiro original mantém-se na sua localização.",
+      "confirmTitle": "Escreve o nome exato do ficheiro",
+      "deleteError": "Não foi possível remover o recurso. Verifica se ainda está em uso num rascunho, numa associação de marca, numa definição de miniaturas ou numa geração.",
+      "cancelDelete": "Cancelar",
+      "deleting": "A remover…"
+    },
     "groupView": "Agrupar recursos",
     "ungrouped": "Sem grupo",
     "filterGroup": "Filtrar por grupo",

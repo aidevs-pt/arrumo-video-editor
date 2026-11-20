@@ -186,6 +186,14 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "removal": {
+      "deleteTitle": "Quitar recurso",
+      "deleteDescription": "Se eliminará la copia gestionada del espacio de trabajo. El archivo original seguirá en su ubicación.",
+      "confirmTitle": "Escribe el nombre exacto del archivo",
+      "deleteError": "No se pudo quitar el recurso. Comprueba si sigue en uso en un borrador, una asignación de marca, una configuración de miniaturas o una generación.",
+      "cancelDelete": "Cancelar",
+      "deleting": "Quitando…"
+    },
     "groupView": "Agrupar recursos",
     "ungrouped": "Sin grupo",
     "filterGroup": "Filtrar por grupo",
