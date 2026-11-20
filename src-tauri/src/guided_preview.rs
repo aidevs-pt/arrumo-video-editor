@@ -88,3 +88,19 @@ pub async fn review_supplemental_items(
         .review_supplemental_items(workspace_id, run_id, result_id, &review, &notes)
         .map_err(|_| "production_review_failed")
 }
+
+#[tauri::command]
+pub async fn review_preview_formats(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    decisions: Vec<arrumo_workspaces::PreviewFormatDecision>,
+    notes: String,
+    store: State<'_, crate::Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .review_preview_formats(workspace_id, run_id, result_id, &decisions, &notes)
+        .map_err(|_| "production_review_failed")
+}

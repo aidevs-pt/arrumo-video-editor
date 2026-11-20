@@ -13,6 +13,8 @@ use crate::{
 pub struct PreviewFormatDecision {
     pub format_id: i64,
     pub decision: SupplementalDecision,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 pub(crate) fn preview_files(result: &Value) -> rusqlite::Result<BTreeMap<i64, String>> {
@@ -65,7 +67,12 @@ impl WorkspaceStore {
             .iter()
             .map(|entry| (entry.format_id, entry.decision))
             .collect::<BTreeMap<_, _>>();
-        if files.is_empty()
+        if decisions.iter().any(|entry| {
+            entry
+                .note
+                .as_ref()
+                .is_some_and(|note| note.len() > 4096 || note.contains('\0'))
+        }) || files.is_empty()
             || decisions_map.len() != decisions.len()
             || !files.keys().eq(decisions_map.keys())
         {
