@@ -861,7 +861,8 @@
     "noActivity": "No activity recorded",
     "noFeedback": "No feedback yet",
     "exporting": "Exporting…",
-    "replayMode": "Settings to use"
+    "replayMode": "Settings to use",
+    "notScheduled": "Not scheduled yet."
   },
   "productionPlan": {
     "addItemNote": "Add note",

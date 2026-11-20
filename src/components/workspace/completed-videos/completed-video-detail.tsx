@@ -21,6 +21,7 @@ import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { completedVideoHref, workspaceHref, type CompletedFile } from "../home/workspace-links";
+import { useStudioTrail } from "../home/studio-trail";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
 import { AttachCompletedMedia } from "./attach-completed-media";
@@ -122,7 +123,7 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, file
 }
 
 function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAttach, onDetach }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile; onAttach: () => void; onDetach: (id: number) => void }) {
-  const { locale, messages: { completedVideo: copy, queue } } = useLocale();
+  const { locale, messages: { completedVideo: copy, queue, studio } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
   const [savedTitle, setSavedTitle] = useState(video.title);
@@ -131,6 +132,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const [error, setError] = useState<"renameError" | "exportError">();
   const [notice, setNotice] = useState<"saved" | "exported">();
   const [outputDates, setOutputDates] = useState(video.output_dates);
+  useStudioTrail([{ label: studio.videos, href: workspaceHref("videos", workspaceId) }, { label: savedTitle }]);
   const [formatId, setFormatId] = useState(video.delivery.verified_outputs.find((output) => output.format_id === initialFormatId)?.format_id
     ?? video.delivery.verified_outputs[0]?.format_id);
   const selected = video.delivery.verified_outputs.find((output) => output.format_id === formatId);

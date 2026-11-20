@@ -47,6 +47,7 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
             setDate(event.target.value);
             setStatus(undefined);
           }} />
+        {!savedDate && <p className="text-sm text-muted-foreground">{copy.notScheduled}</p>}
       </Field>
       <div className="flex flex-wrap gap-1">
         <Button type="submit" size="sm" variant="outline" disabled={pending || !date || date === savedDate}>

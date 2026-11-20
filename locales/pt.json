@@ -861,7 +861,8 @@
     "noActivity": "Sem atividade registada",
     "noFeedback": "Ainda sem comentários",
     "exporting": "A exportar…",
-    "replayMode": "Definições a usar"
+    "replayMode": "Definições a usar",
+    "notScheduled": "Ainda não agendado."
   },
   "productionPlan": {
     "addItemNote": "Adicionar nota",
