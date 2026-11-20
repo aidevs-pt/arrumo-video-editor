@@ -331,7 +331,7 @@ fn review_task(
     }
     if !matches!(
         data.operation.as_str(),
-        "review_production_result" | "review_supplemental_items"
+        "review_production_result" | "review_supplemental_items" | "review_preview_formats"
     ) {
         return Err((-32004, "Task messages support review decisions"));
     }

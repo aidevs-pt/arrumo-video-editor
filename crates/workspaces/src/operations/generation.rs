@@ -4,8 +4,8 @@ use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use crate::{
-    DraftSettings, GenerationRun, ProductionStage, ReplayMode, ReviewDecision, RunControl,
-    RunOptions, SupplementalReview, WorkspaceStore,
+    DraftSettings, GenerationRun, PreviewFormatDecision, ProductionStage, ReplayMode,
+    ReviewDecision, RunControl, RunOptions, SupplementalReview, WorkspaceStore,
 };
 
 #[derive(Deserialize)]
@@ -49,6 +49,17 @@ struct ReviewInput {
     #[serde(default)]
     notes: String,
     save_motion_indexes: Option<Vec<usize>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PreviewReviewInput {
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    decisions: Vec<PreviewFormatDecision>,
+    #[serde(default)]
+    notes: String,
 }
 
 #[derive(Deserialize)]
@@ -207,7 +218,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 32] {
+pub(super) fn definitions() -> [Value; 33] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -324,7 +335,7 @@ pub(super) fn definitions() -> [Value; 32] {
             }, "required": ["workspaceId", "runId", "attempt", "detail"], "additionalProperties": false}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
-        json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, current step, and any pending supplemental replacements.",
+        json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, current step, and any pending Preview or Supplemental Outputs replacements.",
             "inputSchema": workspace}),
         json!({"name": "checkpoint_generation", "description": "Save progress and renew the lease for the current attempt.",
             "inputSchema": {"type": "object", "properties": {
@@ -335,6 +346,14 @@ pub(super) fn definitions() -> [Value; 32] {
                 "workspaceId": id, "runId": id, "attempt": id,
                 "stage": {"enum": ["script", "assets", "preview", "supplemental_outputs", "final_render"]}, "result": {"type": "object"}
             }, "required": ["workspaceId", "runId", "attempt", "stage", "result"], "additionalProperties": false}}),
+        json!({"name": "review_preview_formats",
+            "description": "Submit one decision per frozen format for a pending rendered Preview. Only unresolved formats are rerendered.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "resultId": id, "notes": {"type": "string"},
+                "decisions": {"type": "array", "minItems": 1, "items": {"type": "object", "properties": {
+                    "format_id": id, "decision": {"enum": ["approved", "revise", "rejected"]}, "note": {"type": "string", "maxLength": 4096}
+                }, "required": ["format_id", "decision"], "additionalProperties": false}}
+            }, "required": ["workspaceId", "runId", "resultId", "decisions"], "additionalProperties": false}}),
         json!({"name": "review_supplemental_items",
             "description": "Submit one decision per item in the pending supplemental result. Arrays follow submission order. Only unresolved items need replacement.",
             "inputSchema": {"type": "object", "properties": {
@@ -576,6 +595,11 @@ pub(super) fn call(
                 .map_err(
                     |_| "Could not submit result. Check the workspace, current lease and stage",
                 )
+        }),
+        "review_preview_formats" => parse(arguments).and_then(|args: PreviewReviewInput| {
+            store.review_preview_formats(args.workspace_id, args.run_id, args.result_id, &args.decisions, &args.notes)
+                .map(|()| json!({"submitted": true}))
+                .map_err(|_| "Could not review previews. Check the pending result and provide a decision for each format")
         }),
         "review_supplemental_items" => parse(arguments).and_then(|args: SupplementalReviewInput| {
             store.review_supplemental_items(args.workspace_id, args.run_id, args.result_id, &args.review, &args.notes)

@@ -96,7 +96,7 @@ pub use plugin_schema::{
 };
 pub use plugin_settings::ResolvedPluginSetting;
 pub use plugin_surfaces::InstalledPluginSurface;
-pub use preview_review::PreviewFormatDecision;
+pub use preview_review::{PreviewFormatDecision, PreviewReplacement, PreviewRevisionRequest};
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};

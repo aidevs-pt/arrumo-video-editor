@@ -20,6 +20,8 @@ pub struct GenerationClaim {
     pub current_step: Option<PlanStep>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub supplemental_revision: Option<SupplementalRevisionRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_revision: Option<crate::PreviewRevisionRequest>,
 }
 
 #[derive(Debug, Serialize)]
@@ -64,23 +66,30 @@ impl WorkspaceStore {
                         checkpoint: read_settings(row.get(7)?, 7)?,
                         current_step: plan.and_then(|plan| plan.steps.into_iter().nth(index as usize)),
                         supplemental_revision: None,
+                        preview_revision: None,
                     }, i64::from(index)))
                 },
             )
             .optional()?;
         let mut result = None;
         if let Some((mut claim, stage_index)) = claimed {
-            if claim
-                .current_step
-                .as_ref()
-                .is_some_and(|step| step.stage == ProductionStage::SupplementalOutputs)
-            {
-                claim.supplemental_revision =
-                    crate::supplemental_review::supplemental_revision_request(
+            match claim.current_step.as_ref().map(|step| step.stage) {
+                Some(ProductionStage::SupplementalOutputs) => {
+                    claim.supplemental_revision =
+                        crate::supplemental_review::supplemental_revision_request(
+                            &tx,
+                            claim.run.id,
+                            stage_index,
+                        )?;
+                }
+                Some(ProductionStage::Preview) => {
+                    claim.preview_revision = crate::preview_review::preview_revision_request(
                         &tx,
                         claim.run.id,
                         stage_index,
                     )?;
+                }
+                _ => {}
             }
             result = Some(claim);
         }

@@ -119,9 +119,11 @@ impl WorkspaceStore {
 }
 
 pub(crate) struct PreviewRevision {
-    pub previous: Value,
+    result_id: i64,
+    notes: Option<String>,
+    previous: Value,
     pub approved: BTreeMap<i64, String>,
-    pub unresolved: BTreeMap<i64, String>,
+    pub unresolved: BTreeMap<i64, PreviewReplacement>,
 }
 
 pub(crate) fn preview_revision(
@@ -129,26 +131,30 @@ pub(crate) fn preview_revision(
     run_id: i64,
     stage_index: i64,
 ) -> rusqlite::Result<Option<PreviewRevision>> {
-    let prior: Option<(Value, Vec<PreviewFormatDecision>)> = connection
+    let prior: Option<(i64, Value, Vec<PreviewFormatDecision>, Option<String>)> = connection
         .query_row(
-            "SELECT result_json, preview_review_json FROM (
-             SELECT result_json, preview_review_json, decision FROM production_results
+            "SELECT id, result_json, preview_review_json, review_notes FROM (
+             SELECT id, result_json, preview_review_json, review_notes, decision FROM production_results
              WHERE run_id = ?1 AND stage_index = ?2 ORDER BY id DESC LIMIT 1
          ) WHERE decision = 'revise' AND preview_review_json IS NOT NULL",
             params![run_id, stage_index],
             |row| {
                 Ok((
-                    read_settings(row.get(0)?, 0)?,
+                    row.get(0)?,
                     read_settings(row.get(1)?, 1)?,
+                    read_settings(row.get(2)?, 2)?,
+                    row.get(3)?,
                 ))
             },
         )
         .optional()?;
-    let Some((previous, decisions)) = prior else {
+    let Some((result_id, previous, decisions, notes)) = prior else {
         return Ok(None);
     };
     let mut files = preview_files(&previous)?;
     let mut revision = PreviewRevision {
+        result_id,
+        notes,
         previous,
         approved: BTreeMap::new(),
         unresolved: BTreeMap::new(),
@@ -160,13 +166,53 @@ pub(crate) fn preview_revision(
         if entry.decision == SupplementalDecision::Approved {
             revision.approved.insert(entry.format_id, filename);
         } else {
-            revision.unresolved.insert(entry.format_id, filename);
+            let previous_cuts = effective_cuts(&revision.previous, entry.format_id);
+            revision.unresolved.insert(
+                entry.format_id,
+                PreviewReplacement {
+                    format_id: entry.format_id,
+                    decision: entry.decision,
+                    note: entry.note,
+                    previous_file: filename,
+                    previous_cuts,
+                },
+            );
         }
     }
     if !files.is_empty() || revision.unresolved.is_empty() {
         return Err(rusqlite::Error::InvalidQuery);
     }
     Ok(Some(revision))
+}
+
+#[derive(Debug, Serialize)]
+pub struct PreviewReplacement {
+    pub format_id: i64,
+    pub decision: SupplementalDecision,
+    pub note: Option<String>,
+    pub previous_file: String,
+    pub previous_cuts: Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PreviewRevisionRequest {
+    pub result_id: i64,
+    pub notes: Option<String>,
+    pub formats: Vec<PreviewReplacement>,
+}
+
+pub(crate) fn preview_revision_request(
+    connection: &rusqlite::Connection,
+    run_id: i64,
+    stage_index: i64,
+) -> rusqlite::Result<Option<PreviewRevisionRequest>> {
+    Ok(
+        preview_revision(connection, run_id, stage_index)?.map(|revision| PreviewRevisionRequest {
+            result_id: revision.result_id,
+            notes: revision.notes,
+            formats: revision.unresolved.into_values().collect(),
+        }),
+    )
 }
 
 pub(crate) fn merge_preview_revision(
