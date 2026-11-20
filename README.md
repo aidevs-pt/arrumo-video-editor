@@ -157,7 +157,7 @@ Use `generate-delivery-subtitles <workspace-id> <run-id> <format-id>` to
 transcribe a rendered format while the run is at delivery verification. This
 command sends the format's extracted audio to a configured transcription
 provider from the run's captured order. It requires FFmpeg, ffprobe, and a
-provider that returns word timestamps. It validates the generated SRT before
+provider that returns timed words or segments. It validates the generated SRT before
 publishing it and preserves any existing subtitle file. MCP and A2A expose
 `generate_delivery_subtitles` with `workspaceId`, `runId`, and `formatId`.
 Only one subtitle generation request can run per output at a time. In the

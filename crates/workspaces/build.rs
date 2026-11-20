@@ -66,6 +66,7 @@ fn main() {
                 .expect("resolve default plugin manifest");
             println!("cargo:rerun-if-changed={}", directory.display());
             let transcription = optional_adapter(&directory, "transcription.json");
+            let transcription_timed = optional_adapter(&directory, "transcription-timed.json");
             let speech_synthesis = optional_adapter(&directory, "speech-synthesis.json");
             let (package, source) = default_package(
                 &output,
@@ -75,7 +76,7 @@ fn main() {
                 plugin,
                 &checkout,
             );
-            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, speech_synthesis: {speech_synthesis}, package: {package}, release: {source} }},\n"));
+            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, package: {package}, release: {source} }},\n"));
         }
     }
     index.push_str("];\n");

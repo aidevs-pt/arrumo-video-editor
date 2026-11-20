@@ -124,7 +124,7 @@ impl WorkspaceStore {
         let bytes = read_wav(audio, MAX_AUDIO_BYTES)?;
         let mut rejected = None;
         for provider in order {
-            let Some(adapter) = find_bundled_transcription_adapter(&provider)? else {
+            let Some(adapter) = find_bundled_transcription_adapter(&provider, timed)? else {
                 continue;
             };
             if bytes.len() as u64 > adapter.max_audio_bytes
@@ -226,7 +226,7 @@ fn execute_transcription(
 }
 
 fn bundled_transcription_adapter(plugin_id: &str) -> io::Result<TranscriptionAdapter> {
-    find_bundled_transcription_adapter(plugin_id)?.ok_or_else(|| {
+    find_bundled_transcription_adapter(plugin_id, false)?.ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
             "Plugin has no bundled transcription adapter",
@@ -234,21 +234,33 @@ fn bundled_transcription_adapter(plugin_id: &str) -> io::Result<TranscriptionAda
     })
 }
 
-fn find_bundled_transcription_adapter(plugin_id: &str) -> io::Result<Option<TranscriptionAdapter>> {
+fn find_bundled_transcription_adapter(
+    plugin_id: &str,
+    timed: bool,
+) -> io::Result<Option<TranscriptionAdapter>> {
     for (manifest, source) in crate::plugin_catalog::bundled_manifests()
         .iter()
         .zip(crate::plugin_catalog::BUNDLED)
     {
-        let Some(source) = source.transcription.filter(|_| manifest.id == plugin_id) else {
+        if manifest.id != plugin_id {
+            continue;
+        }
+        let descriptor = if timed {
+            source.transcription_timed.or(source.transcription)
+        } else {
+            source.transcription
+        };
+        let Some(descriptor) = descriptor else {
             continue;
         };
-        let adapter: TranscriptionAdapter = serde_json::from_slice(source)
+        let adapter: TranscriptionAdapter = serde_json::from_slice(descriptor)
             .map_err(|_| io::Error::other("Invalid bundled transcription adapter"))?;
         if adapter.plugin_id != manifest.id
             || adapter.schema_version != 2
             || !manifest.capabilities.contains_key("transcription")
             || !(1..=MAX_AUDIO_BYTES).contains(&adapter.max_audio_bytes)
             || adapter.form.contains_key(&adapter.file_field)
+            || (timed && source.transcription_timed.is_some() && adapter.response.words.is_none())
         {
             return Err(io::Error::other(
                 "Invalid transcription adapter declaration",
@@ -427,6 +439,23 @@ mod tests {
         let transcript = decode_transcript(br#"{"result":"Hello"}"#.as_slice(), &mapping).unwrap();
         assert_eq!(transcript.language_code, "und");
         assert!(transcript.words.is_empty());
+    }
+
+    #[test]
+    fn bundled_timed_descriptors_require_a_timing_mapping() {
+        // Core-only builds do not embed private sibling plugin checkouts.
+        for (manifest, source) in crate::plugin_catalog::bundled_manifests()
+            .iter()
+            .zip(crate::plugin_catalog::BUNDLED)
+        {
+            if source.transcription_timed.is_none() {
+                continue;
+            }
+            let adapter = find_bundled_transcription_adapter(&manifest.id, true)
+                .unwrap()
+                .unwrap();
+            assert!(adapter.response.words.is_some());
+        }
     }
 
     #[test]
