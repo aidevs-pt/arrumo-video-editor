@@ -27,6 +27,16 @@ struct ContextInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ResearchInput {
+    workspace_id: i64,
+    #[serde(default)]
+    sources: Vec<String>,
+    #[serde(default)]
+    notes: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CreateProfileInput {
     workspace_id: i64,
     name: String,
@@ -130,7 +140,7 @@ struct BrandColorsInput {
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 22] {
+pub(super) fn definitions() -> [Value; 23] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -173,6 +183,11 @@ pub(super) fn definitions() -> [Value; 22] {
         json!({"name": "set_workspace_context", "description": "Replace the workspace's saved Markdown context.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "markdown": {"type": "string"}},
                 "required": ["workspaceId", "markdown"], "additionalProperties": false}}),
+        json!({"name": "draft_workspace_context", "description": "Read up to eight public web pages, such as the creator's website or channel, and let the workspace's agent draft its context and suggest profiles. Returns the draft without saving it.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id,
+                "sources": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 2048}},
+                "notes": {"type": "string", "maxLength": 8000}},
+                "required": ["workspaceId"], "additionalProperties": false}}),
         json!({"name": "list_profiles", "description": "List the selected workspace's production profiles.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "create_profile", "description": "Create a production profile in the selected workspace.",
@@ -258,6 +273,12 @@ pub(super) fn call(
                 .set_workspace_context(args.workspace_id, &args.markdown)
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not save workspace context")
+        }),
+        "draft_workspace_context" => parse(arguments).and_then(|args: ResearchInput| {
+            store
+                .draft_workspace_context(args.workspace_id, &args.sources, &args.notes)
+                .map(|draft| json!(draft))
+                .map_err(|_| "Could not draft the workspace context. Check that the agent is installed and the links are public")
         }),
         "list_profiles" => parse(arguments).and_then(|args: WorkspaceInput| {
             store

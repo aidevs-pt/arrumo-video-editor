@@ -769,6 +769,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .workspace_context(utf8(workspace)?.parse()?)?;
             println!("{}", serde_json::to_string(&context)?);
         }
+        [database, command, workspace, sources, rest @ ..]
+            if command == "draft-context" && rest.len() <= 1 =>
+        {
+            let sources: Vec<String> = serde_json::from_str(utf8(sources)?)?;
+            let notes = rest
+                .first()
+                .map(|notes| utf8(notes))
+                .transpose()?
+                .unwrap_or("");
+            let draft = WorkspaceStore::open(Path::new(database))?.draft_workspace_context(
+                utf8(workspace)?.parse()?,
+                &sources,
+                notes,
+            )?;
+            println!("{}", serde_json::to_string(&draft)?);
+        }
         [database, command, workspace, markdown] if command == "set-context" => {
             WorkspaceStore::open(Path::new(database))?
                 .set_workspace_context(utf8(workspace)?.parse()?, utf8(markdown)?)?;
@@ -1476,7 +1492,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
                 "remove-asset <workspace-id> <asset-id> <confirmed-name> | asset-organization <workspace-id> <asset-id> | set-asset-organization <workspace-id> <asset-id> <settings-json> | ",
                 "set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown> | set-asset-notes <workspace-id> <asset-id> <notes> | ",
-                "context <workspace-id> | set-context <workspace-id> <markdown> | ",
+                "context <workspace-id> | set-context <workspace-id> <markdown> | draft-context <workspace-id> <sources-json> [notes] | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
                 "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",
                 "remove-feedback <workspace-id> <feedback-id> | ",

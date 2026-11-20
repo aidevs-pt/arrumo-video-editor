@@ -424,6 +424,36 @@ async fn get_workspace_context(
 }
 
 #[tauri::command]
+async fn draft_workspace_context(
+    workspace_id: i64,
+    sources: Vec<String>,
+    notes: String,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::ContextDraft, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .draft_workspace_context(workspace_id, &sources, &notes)
+            .map_err(|error| {
+                match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
+                    Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
+                    Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
+                    Some(_) => "agent_failed",
+                    None => "context_draft_failed",
+                }
+                .to_owned()
+            })
+    })
+    .await
+    .map_err(|_| "context_draft_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn set_workspace_context(
     workspace_id: i64,
     markdown: String,
@@ -897,6 +927,7 @@ fn main() {
             remove_asset,
             replace_asset,
             get_workspace_context,
+            draft_workspace_context,
             set_workspace_context,
             list_workspace_feedback,
             update_workspace_feedback,
