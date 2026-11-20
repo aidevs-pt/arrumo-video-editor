@@ -12,11 +12,8 @@ impl WorkspaceStore {
         asset_id: i64,
         confirmed_name: &str,
     ) -> Result<bool, Box<dyn Error>> {
-        let source = asset_path(
-            &asset_root(&database.canonicalize()?),
-            workspace_id,
-            asset_id,
-        );
+        let root = asset_root(&database.canonicalize()?);
+        let source = asset_path(&root, workspace_id, asset_id);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let pending: bool = tx.query_row(
             "SELECT EXISTS (SELECT 1 FROM pending_asset_cleanup
@@ -59,6 +56,44 @@ impl WorkspaceStore {
         }
         tx.commit()?;
 
+        self.finish_asset_cleanup(&root, workspace_id, asset_id)?;
+        Ok(true)
+    }
+
+    pub fn recover_asset_cleanup(&self, database: &Path) -> Result<usize, Box<dyn Error>> {
+        let root = asset_root(&database.canonicalize()?);
+        let pending: Vec<(i64, i64)> = self
+            .0
+            .prepare("SELECT workspace_id, asset_id FROM pending_asset_cleanup")?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut remaining = 0;
+        for (workspace_id, asset_id) in pending {
+            if self
+                .finish_asset_cleanup(&root, workspace_id, asset_id)
+                .is_err()
+            {
+                remaining += 1;
+            }
+        }
+        Ok(remaining)
+    }
+
+    fn finish_asset_cleanup(
+        &self,
+        root: &Path,
+        workspace_id: i64,
+        asset_id: i64,
+    ) -> Result<(), Box<dyn Error>> {
+        let live: bool = self.0.query_row(
+            "SELECT EXISTS (SELECT 1 FROM workspace_assets WHERE id = ?1)",
+            [asset_id],
+            |row| row.get(0),
+        )?;
+        if live {
+            return Err(io::Error::other("Cannot clean a live asset").into());
+        }
+        let source = asset_path(root, workspace_id, asset_id);
         if check_asset_file(&source)? {
             match fs::remove_file(source) {
                 Ok(()) => {}
@@ -70,7 +105,7 @@ impl WorkspaceStore {
             "DELETE FROM pending_asset_cleanup WHERE workspace_id = ?1 AND asset_id = ?2",
             params![workspace_id, asset_id],
         )?;
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -87,6 +122,45 @@ fn check_asset_file(source: &Path) -> io::Result<bool> {
 mod tests {
     use super::*;
     use crate::{DraftSettings, RunOptions, SupplementalOutputs};
+
+    #[test]
+    fn recovery_cleans_deleted_assets_and_preserves_live_assets() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspaces.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let original = temp.path().join("reference.png");
+        fs::write(&original, b"fixture").unwrap();
+        let root = asset_root(&database);
+        let deleted = store.import_asset(&root, workspace, &original).unwrap();
+        let live = store.import_asset(&root, workspace, &original).unwrap();
+
+        // Recreate the database state committed before filesystem cleanup.
+        store
+            .0
+            .execute("DELETE FROM workspace_assets WHERE id = ?1", [deleted.id])
+            .unwrap();
+        for asset in [&deleted, &live] {
+            store
+                .0
+                .execute(
+                    "INSERT INTO pending_asset_cleanup VALUES (?1, ?2, ?3)",
+                    params![workspace, asset.id, asset.name],
+                )
+                .unwrap();
+        }
+        drop(store);
+
+        let store = WorkspaceStore::open(&database).unwrap();
+        assert_eq!(store.recover_asset_cleanup(&database).unwrap(), 1);
+        assert!(!asset_path(&root, workspace, deleted.id).exists());
+        assert_eq!(
+            fs::read(asset_path(&root, workspace, live.id)).unwrap(),
+            b"fixture"
+        );
+        assert_eq!(fs::read(original).unwrap(), b"fixture");
+        assert_eq!(store.recover_asset_cleanup(&database).unwrap(), 1);
+    }
 
     #[test]
     fn captured_thumbnail_references_survive_live_settings_changes() {

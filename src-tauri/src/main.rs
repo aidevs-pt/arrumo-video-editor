@@ -708,20 +708,24 @@ fn main() {
             let database = data_dir.join("workspaces.sqlite");
             app.manage(Mutex::new(WorkspaceStore::open(&database)?));
             tauri::async_runtime::spawn_blocking(move || {
-                let result = WorkspaceStore::open(&database)
-                    .map_err(|_| ())
-                    .and_then(|store| {
-                        store
-                            .recover_all_delivery_cleanup(&database)
-                            .map_err(|_| ())
-                    });
-                match result {
+                let Ok(store) = WorkspaceStore::open(&database) else {
+                    eprintln!("Arrumo could not open the store to retry managed file cleanup.");
+                    return;
+                };
+                match store.recover_all_delivery_cleanup(&database) {
                     Ok(report) if report.pending_run_ids.is_empty() => {}
                     Ok(report) => eprintln!(
                         "Arrumo still has {} pending delivery cleanup entries.",
                         report.pending_run_ids.len()
                     ),
-                    Err(()) => eprintln!("Arrumo could not retry pending delivery cleanup."),
+                    Err(_) => eprintln!("Arrumo could not retry pending delivery cleanup."),
+                }
+                match store.recover_asset_cleanup(&database) {
+                    Ok(0) => {}
+                    Ok(remaining) => {
+                        eprintln!("Arrumo still has {remaining} pending asset cleanup entries.")
+                    }
+                    Err(_) => eprintln!("Arrumo could not retry pending asset cleanup."),
                 }
             });
             Ok(())
