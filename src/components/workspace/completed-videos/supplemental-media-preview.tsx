@@ -41,10 +41,10 @@ export function SupplementalMediaPreview({ workspaceId, runId, index, media }: {
   const unavailable = () => setFailed(true);
   if (media.kind === "image") return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt={media.name} className="max-h-[65dvh] max-w-full rounded-[4px] object-contain" onError={unavailable} />
+    <img src={url} alt={media.name} className="max-h-[65dvh] max-w-full rounded-thumb object-contain" onError={unavailable} />
   );
   if (media.kind === "audio") return <audio src={url} aria-label={media.name} controls preload="metadata"
     className="w-full max-w-xl" onError={unavailable} />;
   return <video src={url} aria-label={media.name} controls playsInline preload="metadata"
-    className="aspect-video max-h-[65dvh] w-full rounded-[4px] bg-ink object-contain" onError={unavailable} />;
+    className="aspect-video max-h-[65dvh] w-full rounded-thumb bg-ink object-contain" onError={unavailable} />;
 }

@@ -76,10 +76,10 @@ function ReviewMedia({ item }: { item: MediaItem }) {
   const unavailable = () => setFailed(true);
   if (item.kind === "image") return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={item.url} alt={item.name} loading="lazy" className="max-h-48 w-full rounded-[4px] object-contain" onError={unavailable} />
+    <img src={item.url} alt={item.name} loading="lazy" className="max-h-48 w-full rounded-thumb object-contain" onError={unavailable} />
   );
   if (item.kind === "audio") return <audio src={item.url} aria-label={item.name} controls preload="none"
     className="w-full" onError={unavailable} />;
   return <video src={item.url} aria-label={item.name} controls playsInline preload="none"
-    className="aspect-video w-full rounded-[4px] bg-ink object-contain" onError={unavailable} />;
+    className="aspect-video w-full rounded-thumb bg-ink object-contain" onError={unavailable} />;
 }

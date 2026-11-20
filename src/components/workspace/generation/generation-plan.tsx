@@ -177,7 +177,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
             {agent && <span>{agent}</span>}
             <span>{awaiting ? copy.awaitingReview : queue[runState]}</span>
           </p>
-          <p className="rounded-[4px] bg-[#0d1229d1] px-2.5 py-0.5 text-[23px] leading-[31px] font-bold wrap-anywhere">
+          <p className="rounded-thumb bg-caption px-2.5 py-0.5 text-[23px] leading-[31px] font-bold wrap-anywhere">
             {copy[currentStage]}
           </p>
         </div>

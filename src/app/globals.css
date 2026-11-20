@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./azulejo-tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -46,30 +47,20 @@
     --color-caption: var(--caption-bg);
     --color-approval: var(--approval);
     --color-workspace-panel: var(--workspace-panel);
-    --radius-sm: 5px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 14px;
+    --radius-thumb: var(--azulejo-radius-thumb);
+    --radius-sm: var(--azulejo-radius-sm);
+    --radius-md: var(--azulejo-radius-md);
+    --radius-lg: var(--azulejo-radius-lg);
+    --radius-xl: var(--azulejo-radius-xl);
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-    --ink: oklch(23% .05 268);
-    --attention: oklch(85.5% .16 86);
-    --cobalt-deep: oklch(33% .15 268);
-    --cobalt-tint: oklch(94% .03 266);
-    --on-cobalt: oklch(98.5% .008 265);
+    --attention: var(--yellow);
     --agent: var(--cobalt-deep);
-    --caption-bg: #0d1229d1;
-    --line-strong: oklch(82% .022 265);
-    --approval: oklch(50% .13 150);
-    --paper: oklch(97.6% .006 265);
-    --sheet: oklch(99.4% .003 265);
-    --sunk: oklch(94.6% .011 265);
-    --mist: oklch(89.5% .015 265);
-    --cobalt: #2337b4;
+    --approval: var(--ok);
     --selection: oklch(86% .065 269);
     --workspace-panel: var(--sheet);
     --background: var(--paper);
@@ -83,10 +74,10 @@
     --secondary: var(--sunk);
     --secondary-foreground: var(--ink);
     --muted: var(--sunk);
-    --muted-foreground: oklch(40% .04 268);
+    --muted-foreground: var(--ink-2);
     --accent: var(--cobalt-tint);
     --accent-foreground: var(--cobalt);
-    --destructive: oklch(52% .19 27);
+    --destructive: var(--bad);
     --border: var(--mist);
     --input: var(--line-strong);
     --ring: var(--attention);

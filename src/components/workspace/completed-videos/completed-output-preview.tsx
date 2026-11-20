@@ -127,13 +127,13 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
         </div>
       ) : (
         <div className="min-w-0">
-          <video ref={video} aria-label={label} className="aspect-video w-full rounded-[4px] bg-ink object-contain"
+          <video ref={video} aria-label={label} className="aspect-video w-full rounded-thumb bg-ink object-contain"
             controls playsInline preload="metadata" src={preview.video_url}
             onLoadedMetadata={() => { setSeekable(true); setTime(0); }}
             onTimeUpdate={showTranscript ? (event) => setTime(event.currentTarget.currentTime) : undefined}
             onError={() => { setSeekable(false); setTime(-1); setError("playbackError"); }} />
           {showTranscript && <div className="mt-2 min-h-8 text-center">
-            {caption && <span className="inline-block rounded-[4px] bg-ink px-2 py-1.5 text-sm font-bold whitespace-pre-wrap text-white">{caption.text}</span>}
+            {caption && <span className="inline-block rounded-thumb bg-ink px-2 py-1.5 text-sm font-bold whitespace-pre-wrap text-white">{caption.text}</span>}
           </div>}
         </div>
       )}

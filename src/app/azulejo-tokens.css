@@ -1,0 +1,25 @@
+/* Shared values from the Arrumo Azulejo design system, light theme. */
+:root {
+    --cobalt: #2337b4;
+    --cobalt-deep: oklch(33% 0.15 268);
+    --cobalt-tint: oklch(94% 0.03 266);
+    --yellow: oklch(85.5% 0.16 86);
+    --paper: oklch(97.6% 0.006 265);
+    --sheet: oklch(99.4% 0.003 265);
+    --sunk: oklch(94.6% 0.011 265);
+    --mist: oklch(89.5% 0.015 265);
+    --line-strong: oklch(82% 0.022 265);
+    --ink: oklch(23% 0.05 268);
+    --ink-2: oklch(40% 0.04 268);
+    --on-cobalt: oklch(98.5% 0.008 265);
+    --ok: oklch(50% 0.13 150);
+    --bad: oklch(52% 0.19 27);
+    --caption-bg: #0d1229d1;
+    --azulejo-radius-thumb: 4px;
+    --azulejo-radius-sm: 5px;
+    --azulejo-radius-md: 8px;
+    --azulejo-radius-lg: 12px;
+    --azulejo-radius-xl: 14px;
+    --duration-press: 120ms;
+    --duration-toggle: 140ms;
+}

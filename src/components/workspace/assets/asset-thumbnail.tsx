@@ -33,7 +33,7 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className }: {
   }, [assetId, kind, workspaceId]);
 
   return (
-    <div ref={element} aria-hidden="true" className={cn("grid aspect-video place-items-center overflow-hidden rounded-[4px] bg-muted", className)}>
+    <div ref={element} aria-hidden="true" className={cn("grid aspect-video place-items-center overflow-hidden rounded-thumb bg-muted", className)}>
       {url ? (
         // Managed local preview provided by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
