@@ -10,7 +10,7 @@ import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/co
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PluginCredentialField } from "@/components/workspace/settings/plugin-credential-field";
+import { OnboardingKeys } from "./onboarding-keys";
 import type { PluginSettingsManifest } from "@/components/workspace/settings/plugin-preferences";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
@@ -158,25 +158,8 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
           </footer>
         </>}
         {step === 1 && <>
-          <SetupHeading title={copy.servicesTitle.replace("{agent}", agent?.label ?? copy.agent)}>{copy.servicesIntro}</SetupHeading>
-          {services.length > 0 && <div className="divide-y border-y">
-            {services.map(({ manifest }) => (
-              <section key={manifest.id} aria-labelledby={`onboarding-service-${manifest.id}`} className="grid gap-3 py-4 md:grid-cols-2 md:gap-5">
-                <div>
-                  <h2 id={`onboarding-service-${manifest.id}`} className="font-heading text-xl font-bold [font-stretch:112%]">{manifest.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{manifest.description}</p>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {manifest.settings?.filter(({ kind }) => kind === "secret").map((field) =>
-                    <PluginCredentialField key={field.id} field={field} pluginId={manifest.id} workspaceId={null} />)}
-                </div>
-              </section>
-            ))}
-          </div>}
-          <footer className="mt-auto flex justify-between gap-4 pt-10">
-            <Back onClick={back}>{copy.back}</Back>
-            <Button onClick={() => setStep(2)}>{copy.next}</Button>
-          </footer>
+          <SetupHeading title={copy.servicesTitle.replace("{agent}", agent?.label ?? copy.agent)}>{copy.servicesIntro.replace("{agent}", agent?.label ?? copy.agent)}</SetupHeading>
+          <OnboardingKeys services={services.map(({ manifest }) => manifest)} onBack={back} onDone={() => setStep(2)} />
         </>}
         {step === 2 && <form className="flex flex-1 flex-col" onSubmit={finish}>
           <SetupHeading title={copy.workspaceTitle}>{copy.workspaceIntro}</SetupHeading>
