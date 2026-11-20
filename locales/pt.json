@@ -37,7 +37,12 @@
     "recentJobs": "Tarefas recentes",
     "jobsLoadError": "Não foi possível carregar as tarefas recentes dos plugins.",
     "resumeJob": "Processar tarefa",
-    "jobState": {"queued": "Em fila", "running": "Em execução", "completed": "Concluída", "failed": "Falhou"},
+    "jobState": {
+      "queued": "Em fila",
+      "running": "Em execução",
+      "completed": "Concluída",
+      "failed": "Falhou"
+    },
     "title": "Ações de plugins",
     "loadError": "Não foi possível carregar as ações dos plugins.",
     "input": "Entrada JSON",
@@ -196,7 +201,17 @@
     "publishing": "Publicações desta semana",
     "viewQueue": "Ver fila",
     "viewProfiles": "Ver perfis",
-    "noActiveRuns": "Não há vídeos em curso."
+    "noActiveRuns": "Não há vídeos em curso.",
+    "summaryReview": "A seguir: a sua revisão de {stage}.",
+    "summaryPaused": "Em pausa. Retome quando quiser.",
+    "summaryRunning": "A trabalhar em: {stage}.",
+    "summaryQueued": "À espera de que o agente comece.",
+    "onAutopilot": "Em piloto automático",
+    "allVideos": "Todos os vídeos",
+    "videoCount": "{count} vídeos",
+    "oneVideo": "1 vídeo",
+    "noVideos": "Ainda sem vídeos",
+    "progressLabel": "Progresso da produção"
   },
   "layers": {
     "app": "Aplicação",
@@ -236,7 +251,17 @@
     "searchCompleted": "Pesquisar vídeos concluídos",
     "noCompleted": "Ainda não há vídeos concluídos",
     "completedHint": "As entregas verificadas aparecem aqui.",
-    "noSearchMatches": "Nenhum título corresponde à pesquisa."
+    "noSearchMatches": "Nenhum título corresponde à pesquisa.",
+    "currentWorkspace": "Espaço de trabalho atual",
+    "newWorkspace": "Novo espaço de trabalho",
+    "agentWorking": "{agent} está a trabalhar",
+    "agentIdle": "{agent} está pronto",
+    "agentOneVideo": "em 1 vídeo",
+    "agentVideos": "em {count} vídeos",
+    "agentReady": "Nada a gerar",
+    "agentMissing": "Nenhum agente escolhido",
+    "agentChoose": "Escolha um nas Definições",
+    "workspaceSettingsHint": "Aplica-se a todos os perfis e vídeos de {workspace}, salvo se um perfil indicar o contrário."
   },
   "motionLibrary": {
     "renderer": "Renderizador instalado",
@@ -281,7 +306,7 @@
       "cancelDelete": "Cancelar",
       "deleting": "A eliminar…"
     },
-    "title": "Biblioteca de movimento",
+    "title": "Animações",
     "intro": "Organiza animações e transições reutilizáveis por espaço de trabalho ou perfil.",
     "scope": "Visibilidade",
     "workspaceScope": "Todo o espaço de trabalho",
@@ -495,7 +520,8 @@
     "save": "Guardar alterações",
     "cancel": "Cancelar",
     "updateError": "Não foi possível guardar as alterações. Tente novamente.",
-    "saving": "A criar…"
+    "saving": "A criar…",
+    "newProfile": "Novo perfil"
   },
   "profileFormats": {
     "missingProfile": "Este perfil não está disponível no espaço de trabalho selecionado.",

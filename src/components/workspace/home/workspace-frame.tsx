@@ -1,10 +1,11 @@
-import { CalendarDays, ChevronDown, Film, FolderOpen, House, Images, Layers, Package, Settings2, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { CalendarDays, Check, ChevronDown, Film, FolderCog, House, Images, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarFooter,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar,
@@ -12,6 +13,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLocale } from "@/lib/locale-provider";
 import { ReviewInbox, useGenerationInbox } from "./review-inbox";
+import { StudioTrailProvider, useStudioTrailItems } from "./studio-trail";
 import { WorkspaceSearch } from "./workspace-search";
 import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
@@ -27,8 +29,19 @@ export function WorkspaceFrame(props: {
 }) {
   return (
     <TooltipProvider delayDuration={250}>
-      <SidebarProvider style={{ "--sidebar-width": "15.5rem" } as CSSProperties}><StudioLayout {...props} /></SidebarProvider>
+      <SidebarProvider style={{ "--sidebar-width": "15.5rem" } as CSSProperties}>
+        <StudioTrailProvider><StudioLayout {...props} /></StudioTrailProvider>
+      </SidebarProvider>
     </TooltipProvider>
+  );
+}
+
+function FaceMark({ className = "size-8" }: { className?: string }) {
+  return (
+    <span aria-hidden="true" className={`grid shrink-0 place-items-center rounded-sm bg-attention ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="size-[56%]" src="/arrumo-face.svg" alt="" width={18} height={18} />
+    </span>
   );
 }
 
@@ -39,15 +52,14 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
   const query = useSearchParams();
   const copy = messages.studio;
   const inbox = useGenerationInbox(workspace?.id);
-  const hasPendingReviews = (inbox?.inbox?.reviews.length ?? 0) > 0;
+  const trail = useStudioTrailItems();
+  const reviewCount = inbox?.inbox?.reviews.length ?? 0;
   const videoSection = view === "drafts" || view === "generations" || view === "videos";
   const workspaceSection = view === "context" || view === "brand" || view === "outputs";
+  const onProfile = pathname === "/profile";
   const sectionLabel = pathname === "" ? copy.home
-    : pathname === "/settings" ? messages.agentSettings.title
-    : pathname === "/generation-run" ? messages.queue.runDetail
-    : pathname === "/completed-video" ? messages.completedVideo.details
-    : pathname === "/profile" ? messages.profileFormats.title
-    : videoSection ? copy.videos
+    : pathname === "/settings" ? (query.get("section") === "plugins" ? messages.pluginCatalog.title : messages.agentSettings.title)
+    : videoSection || pathname === "/generation-run" || pathname === "/completed-video" ? copy.videos
     : view === "calendar" ? messages.calendar.title
     : workspaceSection ? copy.workspaceSettings
     : view === "assets" ? messages.assets.title
@@ -70,26 +82,31 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton size="lg" tooltip={copy.workspace} className="h-12 px-1.5" aria-label={copy.workspace}>
-                    <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-sm bg-attention">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img className="size-[1.125rem]" src="/arrumo-face.svg" alt="" width={18} height={18} />
-                    </span>
+                    <FaceMark />
                     <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                      <span className="block truncate font-heading text-sm font-[850]">{workspace?.name ?? "Arrumo"}</span>
+                      <span className="block truncate font-heading text-[0.95rem] leading-tight font-[850] [font-variation-settings:'wdth'_120]">{workspace?.name ?? "Arrumo"}</span>
                       <span className="block truncate text-xs text-sidebar-foreground/80">{copy.workspace}</span>
                     </span>
                     <ChevronDown className="group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="bottom" align="start" className="w-56">
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>{messages.workspaces.list}</DropdownMenuLabel>
+                <DropdownMenuContent side="bottom" align="start" className="w-64">
+                  <DropdownMenuGroup aria-label={messages.workspaces.list}>
                     {workspaces.map((entry) => (
-                      <DropdownMenuItem key={entry.id} onSelect={() => choose(entry)}>{entry.name}</DropdownMenuItem>
+                      <DropdownMenuItem key={entry.id} onSelect={() => choose(entry)} className="gap-3 py-2">
+                        <FaceMark className="size-7" />
+                        <span className="min-w-0 flex-1 truncate font-semibold">{entry.name}</span>
+                        {entry.id === workspace?.id && <Check className="text-primary" aria-label={copy.currentWorkspace} />}
+                      </DropdownMenuItem>
                     ))}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => choose(null)}>{messages.workspaces.title}</DropdownMenuItem>
+                  {workspace && <DropdownMenuItem asChild>
+                    <Link href={workspaceHref("context", workspace.id)} onClick={() => setOpenMobile(false)}>
+                      <FolderCog />{copy.workspaceSettings}
+                    </Link>
+                  </DropdownMenuItem>}
+                  <DropdownMenuItem onSelect={() => choose(null)}><Plus />{copy.newWorkspace}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>
@@ -102,10 +119,15 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
                 <SidebarMenu>
                   <SidebarMenuItem><NavLink href={`/?workspace=${workspace.id}`} active={!pathname} label={copy.home} icon={House} /></SidebarMenuItem>
                   <SidebarMenuItem>
-                    <NavLink href={workspaceHref("drafts", workspace.id)} active={videoSection} label={copy.videos} icon={Film}
-                      attention={hasPendingReviews ? messages.productionPlan.reviewRequired : undefined} />
+                    <NavLink href={workspaceHref(reviewCount ? "generations" : "drafts", workspace.id)}
+                      active={videoSection || pathname === "/generation-run" || pathname === "/completed-video"}
+                      label={copy.videos} icon={Film} count={reviewCount}
+                      countLabel={messages.productionPlan.reviewRequired} />
                   </SidebarMenuItem>
-                  <SidebarMenuItem><NavLink href={workspaceHref("calendar", workspace.id)} active={view === "calendar"} label={messages.calendar.title} icon={CalendarDays} /></SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <NavLink href={workspaceHref("calendar", workspace.id)} active={view === "calendar" && !query.get("profile")}
+                      label={messages.calendar.title} icon={CalendarDays} />
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -113,38 +135,37 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
               <SidebarGroupLabel className="h-6 text-sidebar-foreground/75">{copy.library}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  <SidebarMenuItem><NavLink href={workspaceHref("assets", workspace.id)} active={view === "assets"} label={messages.assets.title} icon={Images} /></SidebarMenuItem>
-                  <SidebarMenuItem><NavLink href={workspaceHref("motion-library", workspace.id)} active={view === "motion-library"} label={messages.motionLibrary.title} icon={Layers} /></SidebarMenuItem>
+                  <SidebarMenuItem><NavLink href={workspaceHref("assets", workspace.id)} active={view === "assets" && !onProfile} label={messages.assets.title} icon={Images} /></SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <NavLink href={workspaceHref("motion-library", workspace.id)}
+                      active={view === "motion-library" && !onProfile && !query.get("profile")} label={messages.motionLibrary.title} icon={WandSparkles} />
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
             <SidebarGroup className="pe-0 pt-0">
+              <SidebarGroupLabel asChild className="h-6 text-sidebar-foreground/75 hover:text-sidebar-foreground">
+                <Link href={workspaceHref("profiles", workspace.id)}>{messages.profiles.title}</Link>
+              </SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <NavLink href={workspaceHref("profiles", workspace.id)} active={view === "profiles" && Boolean(pathname) && pathname !== "/profile"} label={messages.profiles.title} icon={Layers} />
-                    <WorkspaceProfileNavigation key={workspace.id} workspaceId={workspace.id}
-                      selected={pathname === "/profile" ? Number(query.get("profile")) : null} />
-                  </SidebarMenuItem>
-                </SidebarMenu>
+                <WorkspaceProfileNavigation key={workspace.id} workspaceId={workspace.id}
+                  selected={onProfile ? Number(query.get("profile")) : null} />
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
         )}
         <SidebarFooter className="mt-auto ps-2 pe-0 pb-3">
           <SidebarMenu>
-            {workspace && <SidebarMenuItem>
-              <NavLink href={workspaceHref("context", workspace.id)} active={workspaceSection} label={copy.workspaceSettings} icon={FolderOpen} />
-            </SidebarMenuItem>}
             <SidebarMenuItem>
               <NavLink href={workspace ? `/settings?workspace=${workspace.id}&scope=app&section=plugins` : "/settings?section=plugins"} active={pathname === "/settings" && query.get("section") === "plugins"}
-                label={messages.pluginCatalog.title} icon={Package} />
+                label={messages.pluginCatalog.title} icon={Puzzle} />
             </SidebarMenuItem>
             <SidebarMenuItem>
               <NavLink href={workspace ? `/settings?workspace=${workspace.id}` : "/settings"}
                 active={pathname === "/settings" && query.get("section") !== "plugins"} label={messages.agentSettings.title} icon={Settings2} />
             </SidebarMenuItem>
           </SidebarMenu>
+          {workspace && <AgentStatus workspaceId={workspace.id} working={inbox?.working ?? 0} />}
         </SidebarFooter>
       </Sidebar>
 
@@ -154,20 +175,26 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
           <Breadcrumb aria-label={copy.location} className="min-w-0 flex-1">
             <BreadcrumbList className="flex-nowrap">
               <BreadcrumbItem className="min-w-0">
-                {workspace ? <BreadcrumbLink asChild className="truncate font-medium">
+                {workspace ? <BreadcrumbLink asChild className="truncate">
                   <Link href={`/?workspace=${workspace.id}`}>{workspace.name}</Link>
                 </BreadcrumbLink> : <BreadcrumbPage>{pathname === "/settings" ? sectionLabel : messages.workspaces.title}</BreadcrumbPage>}
               </BreadcrumbItem>
-              {workspace && <>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem className="min-w-0"><BreadcrumbPage className="truncate">{sectionLabel}</BreadcrumbPage></BreadcrumbItem>
-              </>}
+              {workspace && (trail ?? [{ label: sectionLabel }]).map((item, index, items) => (
+                <Fragment key={`${index}-${item.label}`}>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem className="min-w-0">
+                    {item.href && index < items.length - 1
+                      ? <BreadcrumbLink asChild className="truncate"><Link href={item.href}>{item.label}</Link></BreadcrumbLink>
+                      : <BreadcrumbPage className="truncate font-semibold">{item.label}</BreadcrumbPage>}
+                  </BreadcrumbItem>
+                </Fragment>
+              ))}
             </BreadcrumbList>
           </Breadcrumb>
-          {workspace && <>
-            <WorkspaceSearch key={workspace.id} workspaceId={workspace.id} />
-            <ReviewInbox key={workspace.id} workspaceId={workspace.id} state={inbox} />
-          </>}
+          {workspace && <Fragment key={workspace.id}>
+            <WorkspaceSearch workspaceId={workspace.id} />
+            <ReviewInbox workspaceId={workspace.id} state={inbox} />
+          </Fragment>}
         </header>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
@@ -175,22 +202,61 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
   );
 }
 
-function NavLink({ href, label, active, icon: Icon, attention }: {
+type AgentSettings = { effective_provider: string | null };
+type AgentPlugin = { id: string; label: string };
+
+function AgentStatus({ workspaceId, working }: { workspaceId: number; working: number }) {
+  const { messages: { studio: copy } } = useLocale();
+  const { setOpenMobile } = useSidebar();
+  const [agent, setAgent] = useState<string | null>();
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      invoke<AgentSettings>("get_agent_settings", { workspaceId }),
+      invoke<AgentPlugin[]>("list_agent_plugins"),
+    ]).then(([settings, plugins]) => {
+      if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label ?? null);
+    }, () => { if (active) setAgent(null); });
+    return () => { active = false; };
+  }, [workspaceId]);
+
+  if (agent === undefined) return null;
+  const title = !agent ? copy.agentMissing
+    : working ? copy.agentWorking.replace("{agent}", agent) : copy.agentIdle.replace("{agent}", agent);
+  const detail = !agent ? copy.agentChoose
+    : working === 1 ? copy.agentOneVideo : working ? copy.agentVideos.replace("{count}", String(working)) : copy.agentReady;
+  const href = agent ? workspaceHref("generations", workspaceId) : `/settings?workspace=${workspaceId}`;
+
+  return (
+    <Link href={href} onClick={() => setOpenMobile(false)}
+      className="mt-2 flex items-center gap-3 rounded-lg bg-[color-mix(in_oklch,var(--sidebar)_55%,var(--ink))] p-2.5 text-sidebar-foreground outline-none hover:bg-[color-mix(in_oklch,var(--sidebar)_40%,var(--ink))] focus-visible:ring-2 focus-visible:ring-attention group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
+      <FaceMark className="size-9" />
+      <span className="min-w-0 group-data-[collapsible=icon]:hidden">
+        <span className="block truncate text-sm font-bold">{title}</span>
+        <span className="block truncate text-xs text-sidebar-foreground/80">{detail}</span>
+      </span>
+    </Link>
+  );
+}
+
+function NavLink({ href, label, active, icon: Icon, count = 0, countLabel }: {
   href: string;
   label: string;
   active: boolean;
-  icon: typeof Layers;
-  attention?: string;
+  icon: typeof Film;
+  count?: number;
+  countLabel?: string;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
     <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground">
       <Link href={href} aria-current={active ? "page" : undefined}
-        aria-label={attention ? `${label}, ${attention}` : label}
+        aria-label={count && countLabel ? `${label}, ${count} ${countLabel}` : label}
         onClick={() => setOpenMobile(false)}>
         <Icon /><span className="truncate">{label}</span>
-        {attention && <span aria-hidden="true"
-          className="pointer-events-none absolute end-2 size-1.5 rounded-[2px] bg-attention group-data-[collapsible=icon]:end-1 group-data-[collapsible=icon]:top-1" />}
+        {count > 0 && <span aria-hidden="true"
+          className="pointer-events-none ms-auto grid h-5 min-w-5 place-items-center rounded-[4px] bg-attention px-1 text-xs font-bold text-ink tabular-nums group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:end-0.5 group-data-[collapsible=icon]:top-0.5 group-data-[collapsible=icon]:h-2 group-data-[collapsible=icon]:min-w-2 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:text-[0]">{count}</span>}
       </Link>
     </SidebarMenuButton>
   );

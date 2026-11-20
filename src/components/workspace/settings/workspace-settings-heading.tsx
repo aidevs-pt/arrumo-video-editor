@@ -23,7 +23,7 @@ export function WorkspaceSettingsHeading({ workspace, current, headingRef }: {
   return <>
     <WorkspaceHeading className="mb-3">
       <h1 tabIndex={-1} ref={headingRef}>{messages.studio.workspaceSettings}</h1>
-      <p>{workspace.name}</p>
+      <p>{messages.studio.workspaceSettingsHint.replace("{workspace}", workspace.name)}</p>
     </WorkspaceHeading>
     <nav aria-label={messages.studio.workspaceSettings} className="mb-6 flex flex-wrap gap-x-5 gap-y-1 border-b">
       {tabs.map(([view, label]) => (

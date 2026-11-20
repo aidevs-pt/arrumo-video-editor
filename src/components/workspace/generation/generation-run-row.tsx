@@ -25,7 +25,8 @@ export type Run = {
   state: RunState;
   pending_review_id: number | null;
   display_title: string | null;
-  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean }; agent_settings?: { effective_provider?: string | null } };
+  progress?: { stage_index: number; stage_count: number; stage: string | null };
+  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; profile?: { id: number; name: string; color: string | null } | null; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean; autopilot?: boolean }; agent_settings?: { effective_provider?: string | null } };
 };
 
 export type RunAction = "pause" | "resume" | "retry" | "cancel";
@@ -37,6 +38,26 @@ export function runNeedsReview(run: Run) {
 
 export function runTitle(run: Run) {
   return run.display_title ?? run.snapshot.draft.title;
+}
+
+export function runHref(workspaceId: number, run: Run) {
+  return run.state === "completed" ? completedVideoHref(workspaceId, run.id)
+    : `/generation-run?workspace=${workspaceId}&run=${run.id}`;
+}
+
+type Messages = ReturnType<typeof useLocale>["messages"];
+const stageKeys = ["script", "assets", "preview", "supplemental_outputs", "final_render", "verify_delivery"] as const;
+
+/** One sentence that says where a run stands and whether it needs the user. */
+export function runSummary(run: Run, messages: Messages) {
+  const copy = messages.dashboard;
+  const key = stageKeys.find((stage) => stage === run.progress?.stage);
+  const stage = key ? messages.productionPlan[key].toLowerCase() : null;
+  if (runNeedsReview(run)) return stage ? copy.summaryReview.replace("{stage}", stage) : messages.productionPlan.awaitingReview;
+  if (run.state === "paused") return copy.summaryPaused;
+  if (run.state === "running" && stage) return copy.summaryRunning.replace("{stage}", stage);
+  if (run.state === "queued") return copy.summaryQueued;
+  return messages.queue[run.state];
 }
 
 export function RunStatus({ run }: { run: Run }) {

@@ -37,7 +37,12 @@
     "recentJobs": "Tareas recientes",
     "jobsLoadError": "No se pudieron cargar las tareas recientes de los complementos.",
     "resumeJob": "Procesar tarea",
-    "jobState": {"queued": "En cola", "running": "En curso", "completed": "Completada", "failed": "Fallida"},
+    "jobState": {
+      "queued": "En cola",
+      "running": "En curso",
+      "completed": "Completada",
+      "failed": "Fallida"
+    },
     "title": "Acciones de complementos",
     "loadError": "No se pudieron cargar las acciones de complementos.",
     "input": "Entrada JSON",
@@ -196,7 +201,17 @@
     "publishing": "Publicaciones de esta semana",
     "viewQueue": "Ver cola",
     "viewProfiles": "Ver perfiles",
-    "noActiveRuns": "No hay vídeos en curso."
+    "noActiveRuns": "No hay vídeos en curso.",
+    "summaryReview": "Lo siguiente es tu revisión de: {stage}.",
+    "summaryPaused": "En pausa. Reanuda cuando quieras.",
+    "summaryRunning": "Trabajando en: {stage}.",
+    "summaryQueued": "Esperando a que el agente empiece.",
+    "onAutopilot": "En piloto automático",
+    "allVideos": "Todos los vídeos",
+    "videoCount": "{count} vídeos",
+    "oneVideo": "1 vídeo",
+    "noVideos": "Aún no hay vídeos",
+    "progressLabel": "Progreso de la producción"
   },
   "layers": {
     "app": "Aplicación",
@@ -236,7 +251,17 @@
     "searchCompleted": "Buscar vídeos completados",
     "noCompleted": "No hay vídeos completados",
     "completedHint": "Las entregas verificadas aparecen aquí.",
-    "noSearchMatches": "Ningún título coincide con la búsqueda."
+    "noSearchMatches": "Ningún título coincide con la búsqueda.",
+    "currentWorkspace": "Espacio de trabajo actual",
+    "newWorkspace": "Nuevo espacio de trabajo",
+    "agentWorking": "{agent} está trabajando",
+    "agentIdle": "{agent} está listo",
+    "agentOneVideo": "en 1 vídeo",
+    "agentVideos": "en {count} vídeos",
+    "agentReady": "Nada en generación",
+    "agentMissing": "Ningún agente elegido",
+    "agentChoose": "Elige uno en Ajustes",
+    "workspaceSettingsHint": "Se aplica a todos los perfiles y vídeos de {workspace}, salvo que un perfil diga lo contrario."
   },
   "motionLibrary": {
     "renderer": "Renderizador instalado",
@@ -281,7 +306,7 @@
       "cancelDelete": "Cancelar",
       "deleting": "Eliminando…"
     },
-    "title": "Biblioteca de movimiento",
+    "title": "Animaciones",
     "intro": "Organiza animaciones y transiciones reutilizables por espacio de trabajo o perfil.",
     "scope": "Visibilidad",
     "workspaceScope": "Todo el espacio de trabajo",
@@ -495,7 +520,8 @@
     "save": "Guardar cambios",
     "cancel": "Cancelar",
     "updateError": "No se pudieron guardar los cambios. Inténtalo de nuevo.",
-    "saving": "Creando…"
+    "saving": "Creando…",
+    "newProfile": "Nuevo perfil"
   },
   "profileFormats": {
     "missingProfile": "Este perfil no está disponible en el espacio de trabajo seleccionado.",

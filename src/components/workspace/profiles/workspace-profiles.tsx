@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -37,7 +38,7 @@ export function WorkspaceProfiles({
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const nameInput = useRef<HTMLInputElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(useSearchParams().get("new") === "1");
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editing, setEditing] = useState<{ id: number; draft: Draft } | null>(null);
   const draft = editing?.draft ?? newDraft;

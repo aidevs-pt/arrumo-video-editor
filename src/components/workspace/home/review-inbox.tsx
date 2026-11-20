@@ -12,7 +12,10 @@ type RunNotice = { run_id: number; title: string };
 
 type Inbox = { reviews: RunNotice[]; completions: (RunNotice & { unread: boolean })[] };
 
-type InboxState = { workspaceId: number; inbox?: Inbox; failed: boolean };
+type InboxState = { workspaceId: number; inbox?: Inbox; working?: number; failed: boolean };
+type RunState = { state: string; pending_review_id: number | null };
+
+const workingStates = new Set(["queued", "running"]);
 
 export function useGenerationInbox(workspaceId: number | undefined) {
   const [state, setState] = useState<InboxState>();
@@ -24,12 +27,17 @@ export function useGenerationInbox(workspaceId: number | undefined) {
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const rows = await invoke<Inbox>("generation_inbox", { workspaceId: id });
-        if (active) setState({ workspaceId: id, inbox: rows, failed: false });
+        const [rows, runs] = await Promise.all([
+          invoke<Inbox>("generation_inbox", { workspaceId: id }),
+          invoke<RunState[]>("list_generation_runs", { workspaceId: id }),
+        ]);
+        const working = runs.filter((run) => workingStates.has(run.state) && run.pending_review_id === null).length;
+        if (active) setState({ workspaceId: id, inbox: rows, working, failed: false });
       } catch {
         if (active) setState((current) => ({
           workspaceId: id,
           inbox: current?.workspaceId === id ? current.inbox : undefined,
+          working: current?.workspaceId === id ? current.working : undefined,
           failed: true,
         }));
       }

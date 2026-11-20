@@ -8,7 +8,7 @@
     "title": "Videos",
     "drafts": "Drafts",
     "generating": "Generating",
-    "completed": "Completed",
+    "completed": "Finished",
     "generate": "Generate a video",
     "description": "Your drafts, active runs, and finished videos.",
     "continue": "Continue",
@@ -37,7 +37,12 @@
     "recentJobs": "Recent jobs",
     "jobsLoadError": "Could not load recent plugin jobs.",
     "resumeJob": "Process job",
-    "jobState": {"queued": "Queued", "running": "Running", "completed": "Completed", "failed": "Failed"},
+    "jobState": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
     "title": "Plugin actions",
     "loadError": "Could not load plugin actions.",
     "input": "JSON input",
@@ -196,7 +201,17 @@
     "publishing": "Publishing this week",
     "viewQueue": "View queue",
     "viewProfiles": "View profiles",
-    "noActiveRuns": "No videos in progress."
+    "noActiveRuns": "No videos in progress.",
+    "summaryReview": "Your review of the {stage} is next.",
+    "summaryPaused": "Paused. Resume when you're ready.",
+    "summaryRunning": "Working on {stage}.",
+    "summaryQueued": "Waiting for the agent to start.",
+    "onAutopilot": "On autopilot",
+    "allVideos": "All videos",
+    "videoCount": "{count} videos",
+    "oneVideo": "1 video",
+    "noVideos": "No videos yet",
+    "progressLabel": "Production progress"
   },
   "layers": {
     "app": "App",
@@ -236,7 +251,17 @@
     "searchCompleted": "Search completed videos",
     "noCompleted": "No completed videos",
     "completedHint": "Verified deliveries appear here.",
-    "noSearchMatches": "No titles match this search."
+    "noSearchMatches": "No titles match this search.",
+    "currentWorkspace": "Current workspace",
+    "newWorkspace": "New workspace",
+    "agentWorking": "{agent} is working",
+    "agentIdle": "{agent} is ready",
+    "agentOneVideo": "on 1 video",
+    "agentVideos": "on {count} videos",
+    "agentReady": "Nothing generating",
+    "agentMissing": "No agent chosen",
+    "agentChoose": "Choose one in Settings",
+    "workspaceSettingsHint": "Applies to every profile and video in {workspace} unless a profile says otherwise."
   },
   "motionLibrary": {
     "renderer": "Installed renderer",
@@ -281,7 +306,7 @@
       "cancelDelete": "Cancel",
       "deleting": "Deleting…"
     },
-    "title": "Motion library",
+    "title": "Animations",
     "intro": "Organize reusable animations and transitions by workspace or profile.",
     "scope": "Visibility",
     "workspaceScope": "Workspace-wide",
@@ -495,7 +520,8 @@
     "save": "Save changes",
     "cancel": "Cancel",
     "updateError": "Changes couldn’t be saved. Try again.",
-    "saving": "Creating…"
+    "saving": "Creating…",
+    "newProfile": "New profile"
   },
   "profileFormats": {
     "missingProfile": "This profile is unavailable in the selected workspace.",
