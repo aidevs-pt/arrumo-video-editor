@@ -21,7 +21,7 @@ In the Arrumo workspace layout, the build reads the sibling `plugin-registry/cat
 
 For local debug builds, place an SDK-built `plugin.zip` in a selected sibling plugin checkout. The host validates the ZIP and requires its manifest to match the checkout before exposing its actions or frontend surfaces. Workspace context still requires a grant for that package digest.
 
-For registry release builds, set `ARRUMO_PLUGIN_RELEASE_ROOT` to a directory containing the staged `<id>.zip` files. Each staged ZIP must match exactly one release SHA-256 in the selected registry and its manifest must match the corresponding checkout. The bundled catalog retains the release version, source repository and package URL. Release builds only embed executable ZIPs from this verified staging path.
+For registry release builds, set `ARRUMO_PLUGIN_RELEASE_ROOT` to a directory containing the staged `<id>.zip` files. Each staged ZIP must match exactly one release SHA-256 in the selected registry and its manifest must match the corresponding checkout. The bundled catalog retains the release version, source repository and package URL. Release builds only embed executable ZIPs and provider adapter descriptors from this verified staging path. Debug builds without release staging may use sibling checkout descriptors. A default without a staged ZIP has no bundled provider adapter in release builds.
 
 Use `export-plugin-package <plugin-id> <sha256> <new-zip>` to copy a bundled
 or installed package from the local catalog. The editor recomputes the digest

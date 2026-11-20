@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeSet,
     env, fs,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -16,6 +17,7 @@ fn main() {
     ] {
         println!("cargo:rerun-if-env-changed={name}");
     }
+    let debug = env::var("PROFILE").as_deref() == Ok("debug");
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut index = String::from("pub(crate) const BUNDLED: &[BundledSource] = &[\n");
     if env::var("ARRUMO_CORE_ONLY").as_deref() != Ok("1") {
@@ -65,10 +67,7 @@ fn main() {
                 .canonicalize()
                 .expect("resolve default plugin manifest");
             println!("cargo:rerun-if-changed={}", directory.display());
-            let transcription = optional_adapter(&directory, "transcription.json");
-            let transcription_timed = optional_adapter(&directory, "transcription-timed.json");
-            let speech_synthesis = optional_adapter(&directory, "speech-synthesis.json");
-            let (package, source) = default_package(
+            let (package, source, verified_zip) = default_package(
                 &output,
                 release_root.as_deref(),
                 &directory,
@@ -76,6 +75,36 @@ fn main() {
                 plugin,
                 &checkout,
             );
+            let mut verified_zip = verified_zip.map(|snapshot| {
+                let archive =
+                    fs::File::open(snapshot).expect("open verified default plugin snapshot");
+                let mut archive =
+                    zip::ZipArchive::new(archive).expect("read verified default plugin ZIP");
+                assert!(
+                    archive.len() <= 512,
+                    "Verified default plugin ZIP exceeds 512 entries"
+                );
+                archive
+                    .validate_header_consistency()
+                    .expect("verify default ZIP headers");
+                let bytes = read_release_entry(id, &mut archive, "manifest.json")
+                    .expect("verified default plugin ZIP must contain a root manifest");
+                let packaged: Value =
+                    serde_json::from_slice(&bytes).expect("parse verified manifest");
+                assert_eq!(
+                    packaged, checkout,
+                    "Verified {id} manifest differs from the checkout"
+                );
+                archive
+            });
+            let mut adapter = |name| match &mut verified_zip {
+                Some(archive) => release_adapter(&output, id, archive, name),
+                None if debug && release_root.is_none() => optional_adapter(&directory, name),
+                None => "None".into(),
+            };
+            let transcription = adapter("transcription.json");
+            let transcription_timed = adapter("transcription-timed.json");
+            let speech_synthesis = adapter("speech-synthesis.json");
             index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, package: {package}, release: {source} }},\n"));
         }
     }
@@ -93,6 +122,54 @@ fn optional_adapter(directory: &Path, name: &str) -> String {
     format!("Some(include_bytes!({path:?}))")
 }
 
+fn release_adapter(
+    output: &Path,
+    id: &str,
+    archive: &mut zip::ZipArchive<fs::File>,
+    name: &str,
+) -> String {
+    let Some(bytes) = read_release_entry(id, archive, name) else {
+        return "None".into();
+    };
+    let snapshot = output.join(format!("default-{id}-{name}"));
+    fs::write(&snapshot, bytes).expect("write verified adapter snapshot");
+    format!("Some(include_bytes!({snapshot:?}))")
+}
+fn read_release_entry(
+    id: &str,
+    archive: &mut zip::ZipArchive<fs::File>,
+    name: &str,
+) -> Option<Vec<u8>> {
+    const MAX_ENTRY_BYTES: u64 = 64 * 1024;
+    let matches = (0..archive.len())
+        .filter(|index| {
+            let entry = archive
+                .by_index_raw(*index)
+                .expect("read verified ZIP entry");
+            entry.name_raw() == name.as_bytes()
+        })
+        .count();
+    if matches == 0 {
+        return None;
+    }
+    assert_eq!(matches, 1, "Duplicate {id} entry {name}");
+    let entry = archive.by_name(name).expect("open verified ZIP entry");
+    assert!(
+        entry.is_file() && !entry.is_symlink() && entry.size() <= MAX_ENTRY_BYTES,
+        "Invalid {id} entry {name}"
+    );
+    let mut bytes = Vec::new();
+    entry
+        .take(MAX_ENTRY_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .expect("read verified ZIP entry");
+    assert!(
+        bytes.len() as u64 <= MAX_ENTRY_BYTES,
+        "Verified ZIP entry exceeds 64 KiB"
+    );
+    Some(bytes)
+}
+
 fn default_package(
     output: &Path,
     release_root: Option<&Path>,
@@ -100,11 +177,11 @@ fn default_package(
     id: &str,
     plugin: &Value,
     checkout: &Value,
-) -> (String, String) {
+) -> (String, String, Option<PathBuf>) {
     let release_path = release_root.map(|root| root.join(format!("{id}.zip")));
     let local_path = checkout_directory.join("plugin.zip");
     let debug = env::var("PROFILE").as_deref() == Ok("debug");
-    let (bytes, source) = if let Some(path) = release_path.filter(|path| path.is_file()) {
+    let (bytes, source, verified) = if let Some(path) = release_path.filter(|path| path.is_file()) {
         let bytes = read_package(&path);
         use std::fmt::Write;
         let mut digest = String::with_capacity(64);
@@ -138,15 +215,19 @@ fn default_package(
             "packageUrl": release["packageUrl"],
             "manifestSchemaVersion": release["manifestSchemaVersion"],
         });
-        (bytes, format!("Some({:?})", provenance.to_string()))
-    } else if debug && local_path.is_file() {
-        (read_package(&local_path), "None".into())
+        (bytes, format!("Some({:?})", provenance.to_string()), true)
+    } else if release_root.is_none() && debug && local_path.is_file() {
+        (read_package(&local_path), "None".into(), false)
     } else {
-        return ("None".into(), "None".into());
+        return ("None".into(), "None".into(), None);
     };
     let snapshot = output.join(format!("default-{id}.zip"));
     fs::write(&snapshot, bytes).expect("write default plugin ZIP snapshot");
-    (format!("Some(include_bytes!({snapshot:?}))"), source)
+    (
+        format!("Some(include_bytes!({snapshot:?}))"),
+        source,
+        verified.then_some(snapshot),
+    )
 }
 
 fn read_json(path: &std::path::Path) -> Value {
@@ -159,7 +240,6 @@ fn read_json(path: &std::path::Path) -> Value {
 }
 
 fn read_package(path: &Path) -> Vec<u8> {
-    use std::io::Read;
     const MAX_BYTES: u64 = 16 * 1024 * 1024;
     let path = path.canonicalize().expect("resolve default plugin ZIP");
     println!("cargo:rerun-if-changed={}", path.display());
