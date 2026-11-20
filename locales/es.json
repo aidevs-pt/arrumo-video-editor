@@ -1144,5 +1144,29 @@
     "needsContent": "Añade clips o describe el vídeo.",
     "backToFootage": "Volver al material",
     "backToBrief": "Volver al resumen"
+  },
+  "scriptReview": {
+    "selectAll": "Seleccionar todo",
+    "selected": "{count} seleccionadas",
+    "sharedComment": "Un comentario para todas (opcional)",
+    "selectSection": "Seleccionar {heading}",
+    "idea": "Idea de {agent}:",
+    "ideaFallback": "Idea:",
+    "noDecision": "Sin decisión",
+    "approved": "Aprobada",
+    "revise": "Cambios pedidos",
+    "rejected": "Rechazada",
+    "comment": "Comentar",
+    "commentFor": "Comentario sobre {heading}",
+    "notSent": "aún sin enviar",
+    "staged": "{count} decisiones preparadas.",
+    "stagedOne": "1 decisión preparada.",
+    "stagedHint": "Puedes cambiar de opinión. Nada llega a {agent} hasta que lo envíes.",
+    "nothingStaged": "Decide sobre las secciones que quieras cambiar. Las que dejes sin decidir se mantienen.",
+    "send": "Enviar {count} decisiones",
+    "sendOne": "Enviar 1 decisión",
+    "rejectAll": "Descartar este borrador y empezar de nuevo",
+    "overall": "Algo más sobre todo el guion (opcional)",
+    "notesHeading": "Decisiones por sección:"
   }
 }

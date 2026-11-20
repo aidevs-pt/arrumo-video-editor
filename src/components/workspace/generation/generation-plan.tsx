@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Check, ChevronDown, Clapperboard, PencilLine, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
+import { isScriptSections, ScriptSectionReview } from "./script-section-review";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -394,6 +395,25 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
       </div>;
   }
 
+  if (stage === "script" && isScriptSections(result.result.sections)) {
+    const sections = result.result.sections;
+    return (
+      <Card className="overflow-visible rounded-[14px]">
+        <CardHeader className="border-b">
+          <CardTitle className="font-heading text-[1.5rem] font-[850] [font-variation-settings:'wdth'_112]">
+            {copy.draftTitle.replace("{stage}", copy[stage]).replace("{version}", String(version))}
+          </CardTitle>
+          <CardDescription>{copy.reviewHint}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 pb-4">
+          <NoTranscriptNote workspaceId={workspaceId} clips={result.result.footage_without_transcript} />
+          <ScriptSectionReview storageKey={draftKey} sections={sections} agent={agent} reviewing={reviewing} reviewError={reviewError}
+            onSend={(decision, notes) => onReview(result.id, decision, notes)} />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="overflow-visible rounded-[14px]">
       <CardHeader className="border-b">
@@ -403,13 +423,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <CardDescription>{copy.reviewHint}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {Array.isArray(result.result.footage_without_transcript) && result.result.footage_without_transcript.length > 0 && (
-          <div role="note" className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg bg-attention/25 px-3 py-2.5 text-sm">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <p className="min-w-0 flex-1">{copy.noTranscript.replace("{clips}", result.result.footage_without_transcript.join(", "))}</p>
-            <Link href={`/settings?workspace=${workspaceId}&section=services`} className="font-semibold underline underline-offset-4">{copy.addKey}</Link>
-          </div>
-        )}
+        <NoTranscriptNote workspaceId={workspaceId} clips={result.result.footage_without_transcript} />
         {markdown && <ScriptReviewText markdown={markdown} />}
         {itemDraft && <>
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-secondary p-2" role="group" aria-label={selectedCount ? copy.selectedOutputCount.replace("{count}", String(selectedCount)) : copy.batchDecisions}>
@@ -516,5 +530,17 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         </Button>
       </div>
     </Card>
+  );
+}
+
+function NoTranscriptNote({ workspaceId, clips }: { workspaceId: number; clips: unknown }) {
+  const { messages: { productionPlan: copy } } = useLocale();
+  if (!Array.isArray(clips) || clips.length === 0) return null;
+  return (
+    <div role="note" className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg bg-attention/25 px-3 py-2.5 text-sm">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1">{copy.noTranscript.replace("{clips}", clips.join(", "))}</p>
+      <Link href={`/settings?workspace=${workspaceId}&section=services`} className="font-semibold underline underline-offset-4">{copy.addKey}</Link>
+    </div>
   );
 }

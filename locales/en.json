@@ -1144,5 +1144,29 @@
     "needsContent": "Add clips or describe the video.",
     "backToFootage": "Back to footage",
     "backToBrief": "Back to the brief"
+  },
+  "scriptReview": {
+    "selectAll": "Select all",
+    "selected": "{count} selected",
+    "sharedComment": "One comment for all of them (optional)",
+    "selectSection": "Select {heading}",
+    "idea": "{agent}'s idea:",
+    "ideaFallback": "Idea:",
+    "noDecision": "No decision",
+    "approved": "Approved",
+    "revise": "Changes asked",
+    "rejected": "Rejected",
+    "comment": "Comment",
+    "commentFor": "Comment on {heading}",
+    "notSent": "not sent yet",
+    "staged": "{count} decisions staged.",
+    "stagedOne": "1 decision staged.",
+    "stagedHint": "Change your mind freely. Nothing reaches {agent} until you send.",
+    "nothingStaged": "Decide on the sections you want changed. Sections you leave undecided are kept.",
+    "send": "Send {count} decisions",
+    "sendOne": "Send 1 decision",
+    "rejectAll": "Scrap this draft and start over",
+    "overall": "Anything else about the whole script (optional)",
+    "notesHeading": "Section decisions:"
   }
 }
