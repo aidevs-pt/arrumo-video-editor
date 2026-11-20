@@ -899,6 +899,7 @@ fn main() {
             media_worker::submit_desktop_motion_artifacts,
             media_worker::desktop_motion_renderer_available,
             media_worker::render_desktop_run_motion,
+            media_worker::generate_delivery_subtitles,
             media_worker::import_delivery_subtitles
         ])
         .build(tauri::generate_context!())

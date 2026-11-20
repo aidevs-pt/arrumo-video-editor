@@ -25,6 +25,28 @@ pub async fn process_desktop_media_stage(
 }
 
 #[tauri::command]
+pub async fn generate_delivery_subtitles(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    app: AppHandle,
+) -> Result<usize, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .generate_delivery_subtitles(&database, workspace_id, run_id, format_id)
+            .map_err(|_| "subtitle_generation_failed")
+    })
+    .await
+    .map_err(|_| "subtitle_generation_failed")?
+}
+
+#[tauri::command]
 pub async fn import_delivery_subtitles(
     workspace_id: i64,
     run_id: i64,
