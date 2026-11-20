@@ -944,7 +944,11 @@
     "addKey": "Add a key",
     "cutsTitle": "What {agent} kept",
     "cutsTitleFallback": "What the agent kept",
-    "cutsSummary": "{count} cuts, {duration} in total"
+    "cutsSummary": "{count} cuts, {duration} in total",
+    "assetPlanTitle": "What {agent} would add",
+    "assetPlanTitleFallback": "What the agent would add",
+    "assetPlanAnywhere": "Anywhere",
+    "assetPlanEmpty": "Nothing in your library fits this video, so it uses only your footage."
   },
   "markdownEditor": {
     "source": "Markdown source",

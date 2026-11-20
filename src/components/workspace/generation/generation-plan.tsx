@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Clapperboard, PencilLine, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { isScriptSections, ScriptSectionReview } from "./script-section-review";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
@@ -328,6 +328,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
     key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript"
+      && !(stage === "assets" && key === "asset_plan" && isAssetPlan(result.result.asset_plan))
       && !(previews.length > 0 && isCutList(result.result.cuts) && (key === "cuts" || key === "cut_notes")) && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
@@ -465,6 +466,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             {hasPreviewReview && reviewControls("media", index, formats.find((format) => format.id === formatId)?.name ?? filename)}
           </div>
         ))}</div>}
+        {stage === "assets" && <AssetPlan plan={result.result.asset_plan} agent={agent} />}
         {previews.length > 0 && <CutList cuts={result.result.cuts} notes={result.result.cut_notes} agent={agent} />}
         {Object.keys(source).length > 0 && (
           <Collapsible defaultOpen={!markdown && !hasSupplemental && previews.length === 0}>
@@ -533,6 +535,43 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         </Button>
       </div>
     </Card>
+  );
+}
+
+type Placement = { section: string; name: string; kind: string; use: string };
+
+function isAssetPlan(value: unknown): value is Placement[] {
+  return Array.isArray(value) && value.every((entry) => entry && typeof entry.name === "string" && typeof entry.kind === "string");
+}
+
+const placementIcons: Record<string, typeof Film> = { image: ImageIcon, video: Film, audio: Music };
+
+function AssetPlan({ plan, agent }: { plan: unknown; agent?: string }) {
+  const { messages: { productionPlan: copy } } = useLocale();
+  if (!isAssetPlan(plan)) return null;
+  if (plan.length === 0) return <p className="rounded-lg bg-secondary px-3 py-2.5 text-sm">{copy.assetPlanEmpty}</p>;
+  const sections = [...new Set(plan.map((entry) => entry.section || copy.assetPlanAnywhere))];
+  return (
+    <section aria-labelledby="asset-plan" className="flex flex-col gap-3">
+      <h3 id="asset-plan" className="font-bold">{agent ? copy.assetPlanTitle.replace("{agent}", agent) : copy.assetPlanTitleFallback}</h3>
+      {sections.map((section) => (
+        <div key={section} className="flex flex-col gap-1.5">
+          <p className="text-sm font-semibold text-muted-foreground">{section}</p>
+          <ul className="flex flex-col divide-y rounded-lg border">
+            {plan.filter((entry) => (entry.section || copy.assetPlanAnywhere) === section).map((entry, index) => {
+              const Icon = placementIcons[entry.kind] ?? Sparkles;
+              return (
+                <li key={index} className="flex items-start gap-3 px-3 py-2 text-sm">
+                  <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="min-w-0 flex-1"><span className="font-semibold wrap-anywhere">{entry.name}</span>
+                    {entry.use && <span className="block text-muted-foreground wrap-anywhere">{entry.use}</span>}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </section>
   );
 }
 

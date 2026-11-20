@@ -944,7 +944,11 @@
     "addKey": "Adicionar uma chave",
     "cutsTitle": "O que {agent} manteve",
     "cutsTitleFallback": "O que o agente manteve",
-    "cutsSummary": "{count} cortes, {duration} no total"
+    "cutsSummary": "{count} cortes, {duration} no total",
+    "assetPlanTitle": "O que {agent} acrescentaria",
+    "assetPlanTitleFallback": "O que o agente acrescentaria",
+    "assetPlanAnywhere": "Em qualquer parte",
+    "assetPlanEmpty": "Nada na sua biblioteca encaixa neste vídeo, por isso usa só as suas gravações."
   },
   "markdownEditor": {
     "source": "Código Markdown",
