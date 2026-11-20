@@ -250,7 +250,7 @@ function NavLink({ href, label, active, icon: Icon, count = 0, countLabel }: {
 }) {
   const { setOpenMobile } = useSidebar();
   return (
-    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground">
+    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground">
       <Link href={href} aria-current={active ? "page" : undefined}
         aria-label={count && countLabel ? `${label}, ${count} ${countLabel}` : label}
         onClick={() => setOpenMobile(false)}>

@@ -31,7 +31,7 @@ export function WorkspaceProfileNavigation({ workspaceId, selected }: { workspac
     };
   }, [pathname, workspaceId]);
 
-  const itemClass = "h-9 rounded-e-none pe-3 data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground";
+  const itemClass = "h-9 rounded-e-none pe-3 data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground";
   return (
     <SidebarMenu>
       {profiles.map((profile) => (
