@@ -116,7 +116,7 @@ pub(super) fn definitions() -> [Value; 15] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "formatId": id, "source": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "formatId", "source"], "additionalProperties": false},
-            "annotations": {"destructiveHint": false, "idempotentHint": false}}),
+            "annotations": {"destructiveHint": false, "idempotentHint": true}}),
         json!({"name": "attach_completed_media",
             "description": "Attach an existing managed asset to one verified output. Repeating a successful attachment returns added=false.",
             "inputSchema": {"type": "object", "properties": {

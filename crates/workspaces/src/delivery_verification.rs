@@ -1,12 +1,14 @@
 use std::{
     error::Error,
-    fs, io,
+    fs,
+    io::{self, Read},
     path::{Path, PathBuf},
     process::Command,
 };
 
-use rusqlite::{Transaction, TransactionBehavior, params};
+use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::format_deliveries::read_settings;
 use crate::generation_queue::read_run;
@@ -273,6 +275,7 @@ impl WorkspaceStore {
         {
             return Err(io::Error::other("Expected a regular MP4 variant file").into());
         }
+        let digest = variant_digest(source)?;
         let database = database.canonicalize()?;
         let media_root = crate::asset_root(&database);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
@@ -286,6 +289,23 @@ impl WorkspaceStore {
             return Err(io::Error::other("Unexpected filename in verified delivery").into());
         }
         let original = managed_delivery_file(&database, workspace_id, run_id, &expected.video)?;
+        let existing = tx.query_row(
+            "SELECT asset.id, asset.workspace_id, asset.name, asset.kind, asset.byte_size, asset.notes
+             FROM completed_media AS media JOIN workspace_assets AS asset ON asset.id = media.asset_id
+             WHERE media.run_id = ?1 AND media.format_id = ?2 AND media.variant_sha256 = ?3
+               AND asset.workspace_id = ?4",
+            params![run_id, format_id, digest.as_slice(), workspace_id],
+            crate::assets::read_asset,
+        ).optional()?;
+        if let Some(asset) = existing {
+            let managed = crate::asset_path(&media_root, workspace_id, asset.id);
+            if variant_digest(&managed)? != digest {
+                return Err(
+                    io::Error::other("Previously attached video variant has changed").into(),
+                );
+            }
+            return Ok(asset);
+        }
         let count: u32 = tx.query_row(
             "SELECT count(*) FROM completed_media WHERE run_id = ?1",
             [run_id],
@@ -298,6 +318,9 @@ impl WorkspaceStore {
             crate::assets::copy_asset_in(&tx, &media_root, workspace_id, source, false, None)?;
         let managed = crate::asset_path(&media_root, workspace_id, asset.id);
         let attached = (|| -> Result<(), Box<dyn Error + Send + Sync>> {
+            if variant_digest(&managed)? != digest {
+                return Err(io::Error::other("Video variant changed during import").into());
+            }
             let original = inspect_variant(&original)?;
             let variant = inspect_variant(&managed)?;
             let source_video = &original.streams[0];
@@ -321,8 +344,9 @@ impl WorkspaceStore {
             }
             crate::motion_artifacts::validate_motion_file(&managed, &asset.name, "audio")?;
             tx.execute(
-                "INSERT INTO completed_media (run_id, format_id, asset_id) VALUES (?1, ?2, ?3)",
-                params![run_id, format_id, asset.id],
+                "INSERT INTO completed_media (run_id, format_id, asset_id, variant_sha256)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![run_id, format_id, asset.id, digest.as_slice()],
             )?;
             Ok(())
         })();
@@ -369,6 +393,22 @@ pub(crate) fn managed_delivery_file(
         return Err(io::Error::other("Invalid managed delivery file"));
     }
     Ok(path)
+}
+
+fn variant_digest(path: &Path) -> io::Result<[u8; 32]> {
+    if !path.symlink_metadata()?.is_file() {
+        return Err(io::Error::other("Video variant must be a regular file"));
+    }
+    let mut file = fs::File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            return Ok(digest.finalize().into());
+        }
+        digest.update(&buffer[..count]);
+    }
 }
 
 fn positive_duration(value: &str) -> io::Result<f64> {

@@ -328,7 +328,7 @@ fn media_kind(path: &Path) -> io::Result<&'static str> {
     }
 }
 
-fn read_asset(row: &Row<'_>) -> rusqlite::Result<WorkspaceAsset> {
+pub(crate) fn read_asset(row: &Row<'_>) -> rusqlite::Result<WorkspaceAsset> {
     Ok(WorkspaceAsset {
         id: row.get(0)?,
         workspace_id: row.get(1)?,
