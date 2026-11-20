@@ -3,16 +3,13 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, ArrowRight, Clapperboard, FileText, Film } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { ArrowLeft, ArrowRight, Clapperboard } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { GenerationQueue } from "@/components/workspace/generation/generation-queue";
@@ -22,10 +19,12 @@ import { useWorkspaceCatalog } from "../home/workspace-router";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { DraftSourceClips } from "./draft-source-clips";
 import { RawFootageBatch } from "./raw-footage-batch";
+import { VideoDetails } from "./video-details";
+import { VideoThumbnail } from "../video-thumbnail";
 import { VideoCatalogHeader } from "../videos/video-catalog-header";
 import { cn } from "@/lib/utils";
 
-type CatalogEntry = { id: number; name: string };
+type CatalogEntry = { id: number; name: string; color?: string | null };
 type Asset = CatalogEntry & { kind: string };
 type Draft = { id: number; title: string; intent: string; profile_id: number | null; source_ids: number[] };
 
@@ -39,6 +38,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
 
   onBack: () => void;
 }) {
+  const router = useRouter();
   const [queueView, setQueueView] = useState<{ draftId: number | null } | null>(startInQueue ? { draftId: null } : null);
   const heading = useRef<HTMLHeadingElement>(null);
   const [tab, setTab] = useState<"compose" | "saved">(startComposing ? "compose" : "saved");
@@ -76,9 +76,11 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
       invoke<Draft[]>("list_video_drafts", { workspaceId }),
       invoke<Asset[]>("list_assets", { workspaceId }),
       invoke<CatalogEntry[]>("list_profiles", { workspaceId }),
-    ]).then(([items, media, entries]) => {
+      invoke<{ draft_id: number }[]>("list_generation_runs", { workspaceId }),
+    ]).then(([items, media, entries, runs]) => {
       if (!active) return;
-      setDrafts(items);
+      const submitted = new Set(runs.map((run) => run.draft_id));
+      setDrafts(items.filter((draft) => !submitted.has(draft.id) || draft.id === openDraft));
       setAssets(media.filter((asset) => asset.kind === "video"));
       setProfiles(entries);
       const requested = items.find((draft) => draft.id === openDraft);
@@ -208,21 +210,22 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
       {composing ? (
         <>
           <div className="mb-5">
-            <ol className="grid max-w-3xl grid-cols-2 gap-1.5 text-sm text-muted-foreground" aria-label={catalog.details}>
+            <ol className="grid max-w-4xl grid-cols-3 gap-1.5 text-sm text-muted-foreground" aria-label={messages.videoDetails.step2}>
               <li aria-current={sourceStep ? "step" : undefined}
-                className={cn("border-t-4 pt-1.5", sourceStep ? "border-primary font-semibold text-foreground" : "border-foreground")}>
-                {mode === "recordings" ? catalog.source : catalog.scratch}
+                className={cn("border-t-[6px] pt-1.5", sourceStep ? "border-primary font-semibold text-primary" : "border-foreground font-semibold text-foreground")}>
+                {mode === "recordings" ? messages.videoDetails.step1 : catalog.scratch}
               </li>
               <li aria-current={sourceStep ? undefined : "step"}
-                className={cn("border-t-4 pt-1.5", !sourceStep && "border-primary font-semibold text-foreground")}>{catalog.details}</li>
+                className={cn("border-t-[6px] pt-1.5", !sourceStep ? "border-primary font-semibold text-primary" : "border-border")}>{messages.videoDetails.step2}</li>
+              <li className="border-t-[6px] border-border pt-1.5">{messages.videoDetails.step3}</li>
             </ol>
           </div>
-          <WorkspaceHeading>
+          {sourceStep && <WorkspaceHeading>
             <h1 ref={heading} tabIndex={-1}>{sourceStep
               ? mode === "recordings" ? catalog.recordingsHeading : catalog.scratchHeading
               : editing === null ? catalog.details : copy.edit}</h1>
             {sourceStep && <p>{mode === "recordings" ? (editing === null ? messages.batch.intro : copy.sourcesHint) : copy.intentHint}</p>}
-          </WorkspaceHeading>
+          </WorkspaceHeading>}
         </>
       ) : <VideoCatalogHeader workspaceId={workspaceId} active={startInQueue ? "generations" : "drafts"} count={startInQueue ? undefined : drafts?.length} />}
       {loadError ? (
@@ -250,6 +253,24 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
               setSources([]);
               edit(created[0]);
             }} />
+        ) : composing && !sourceStep ? (
+          <VideoDetails workspace={workspace} draftId={editing} profiles={profiles}
+            draft={{ title, intent, profile_id: profile, source_ids: sources }}
+            onChange={(change) => {
+              if (change.title !== undefined) setTitle(change.title);
+              if (change.intent !== undefined) setIntent(change.intent);
+              if (change.profile_id !== undefined) setProfile(change.profile_id);
+            }}
+            onSaved={(saved) => {
+              setDrafts((current) => current?.some((row) => row.id === saved.id)
+                ? current.map((row) => row.id === saved.id ? saved : row) : [...(current ?? []), saved]);
+              setEditing(saved.id);
+            }}
+            onGenerated={(next, runId) => {
+              if (next) edit(next);
+              else router.push(`/generation-run?workspace=${workspaceId}&run=${runId}`);
+            }}
+            onBack={() => setStep("source")} />
         ) : composing ? (
           <form onSubmit={save} aria-busy={pending !== null} className="grid max-w-5xl gap-5">
             {sourceStep ? (
@@ -271,37 +292,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                     onClick={() => setMode("recordings")}>{catalog.source}</Button>
                 </Field>
               )
-            ) : (
-              <Card>
-                <CardHeader><CardTitle><h2>{copy.details}</h2></CardTitle></CardHeader>
-                <CardContent>
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel htmlFor="draft-title">{copy.name}</FieldLabel>
-                      <Input ref={titleInput} id="draft-title" name="title" required value={title}
-                        disabled={pending !== null} onChange={(event) => setTitle(event.target.value)} />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="draft-profile">{copy.profile}</FieldLabel>
-                      <Select value={profile === null ? "none" : String(profile)} disabled={pending !== null}
-                        onValueChange={(value) => setProfile(value === "none" ? null : Number(value))}>
-                        <SelectTrigger id="draft-profile" className="w-full"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">{copy.noProfile}</SelectItem>
-                          {profiles.map((entry) => <SelectItem key={entry.id} value={String(entry.id)}>{entry.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="draft-intent">{copy.intent}</FieldLabel>
-                      <MarkdownEditor id="draft-intent" label={copy.intent} value={intent}
-                        disabled={pending !== null} onChange={setIntent} />
-                      <FieldDescription>{copy.intentHint}</FieldDescription>
-                    </Field>
-                  </FieldGroup>
-                </CardContent>
-              </Card>
-            )}
+            ) : null}
             {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
               <Button type="button" variant="ghost" disabled={pending !== null} onClick={() => {
@@ -316,16 +307,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                   window.requestAnimationFrame(() => titleInput.current?.focus());
                 }}>
                 {catalog.detailsNext}<ArrowRight data-icon="inline-end" />
-              </Button> : (
-                <div className="flex flex-wrap gap-2">
-                  <Button type="submit" value="draft" variant="outline" disabled={pending !== null || !canSave}>
-                    {pending === "saving" ? copy.saving : copy.save}
-                  </Button>
-                  <Button type="submit" value="generate" disabled={pending !== null || !canSave}>
-                    {catalog.generationNext}<ArrowRight data-icon="inline-end" />
-                  </Button>
-                </div>
-              )}
+              </Button> : null}
             </div>
           </form>
         ) : (
@@ -344,16 +326,14 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
               <ul aria-label={copy.savedDrafts} className="divide-y border-y">
                 {drafts.map((draft) => {
                   const draftProfile = profiles.find((entry) => entry.id === draft.profile_id);
-                  const SourceIcon = draft.source_ids.length ? Film : FileText;
                   return (
                     <li key={draft.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-1 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
-                      <div aria-hidden="true" className="grid aspect-video w-18 place-items-center rounded-sm bg-muted text-muted-foreground sm:w-26">
-                        <SourceIcon className="size-4" />
-                      </div>
+                      <VideoThumbnail title={draft.title} color={draftProfile?.color} small className="w-24 opacity-70 sm:w-36" />
                       <div className="min-w-0">
-                        <h2 className="wrap-anywhere font-semibold">{draft.title}</h2>
+                        <h2 className="font-heading text-xl leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_112]">{draft.title}</h2>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-                          {draftProfile && <span>{draftProfile.name}</span>}
+                          {draftProfile && <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                            <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: draftProfile.color ?? "var(--border)" }} />{draftProfile.name}</span>}
                           <span>{draft.source_ids.length === 0 ? copy.intentOnly : draft.source_ids.length === 1
                             ? catalog.singleClip : catalog.clipCount.replace("{count}", draft.source_ids.length.toLocaleString(locale))}</span>
                         </div>
@@ -361,9 +341,6 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                       <div className="col-start-2 flex flex-wrap items-center gap-1.5 lg:col-start-3">
                         <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
                           aria-label={`${catalog.continue} ${draft.title}`} onClick={() => edit(draft)}>{catalog.continue}</Button>
-                        <Button type="button" size="sm" variant="ghost" disabled={pending !== null || editing !== null}
-                          aria-label={`${catalog.enqueue} ${draft.title}`}
-                          onClick={() => setQueueView({ draftId: draft.id })}>{catalog.enqueue}</Button>
                         <ConfirmTitleDelete title={draft.title} compact
                           copy={{ ...copy, deleteTitle: copy.deleteDraft, deleting: copy.deletingDraft }}
                           onConfirm={(confirmedTitle) => invoke<boolean>("delete_video_draft", {

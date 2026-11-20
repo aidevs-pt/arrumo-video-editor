@@ -91,7 +91,7 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
             </h1>
           </div>
           {run && (
-            <div className="flex flex-wrap items-center gap-2 self-end">
+            <div className="flex flex-wrap items-center gap-2 self-end [&_[data-slot=badge][data-variant=outline]]:border-white/50 [&_[data-slot=badge][data-variant=outline]]:text-white [&_[data-slot=badge][data-variant=secondary]]:bg-white/15 [&_[data-slot=badge][data-variant=secondary]]:text-white">
               <GenerationRunControls run={run} workspaceId={workspaceId} disabled={pending} onControl={control} />
               {run.state !== "completed" && <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy}
                 onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", {
