@@ -90,7 +90,16 @@ struct DetachCompletedMedia {
     attachment_id: i64,
 }
 
-pub(super) fn definitions() -> [Value; 14] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImportCompletedVideoVariant {
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    source: String,
+}
+
+pub(super) fn definitions() -> [Value; 15] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -102,6 +111,12 @@ pub(super) fn definitions() -> [Value; 14] {
                 "workspaceId": id, "runId": id, "attachmentId": id
             }, "required": ["workspaceId", "runId", "attachmentId"], "additionalProperties": false},
             "annotations": {"destructiveHint": false, "idempotentHint": true}}),
+        json!({"name": "import_completed_video_variant",
+            "description": "Import a local MP4 as an alternate video for a verified completed output. The host verifies video dimensions, duration and audio before committing the asset and attachment.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "formatId": id, "source": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "formatId", "source"], "additionalProperties": false},
+            "annotations": {"destructiveHint": false, "idempotentHint": false}}),
         json!({"name": "attach_completed_media",
             "description": "Attach an existing managed asset to one verified output. Repeating a successful attachment returns added=false.",
             "inputSchema": {"type": "object", "properties": {
@@ -176,6 +191,17 @@ pub(super) fn call(
                 store.detach_completed_media(args.workspace_id, args.run_id, args.attachment_id)
                     .map(|removed| json!({"removed": removed}))
                     .map_err(|_| "Could not detach completed media")
+            }),
+        "import_completed_video_variant" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid completed video variant arguments")
+            .and_then(|args: ImportCompletedVideoVariant| {
+                let source = Path::new(&args.source);
+                if !source.is_absolute() {
+                    return Err("Variant source must be an absolute local path");
+                }
+                store.import_completed_video_variant(database, args.workspace_id, args.run_id, args.format_id, source)
+                    .map(|asset| json!(asset))
+                    .map_err(|_| "Could not import the MP4 variant for the verified output")
             }),
         "attach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid completed media arguments")

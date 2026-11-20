@@ -487,3 +487,7 @@ Use `import-completed-video-variant <workspace-id> <run-id> <format-id> <source.
 to add a rendered alternate video. The editor verifies the managed copy's
 dimensions and duration against the selected completed output and requires an
 audio track before committing the asset and attachment together.
+
+MCP and A2A expose the same import as `import_completed_video_variant` with
+`workspaceId`, `runId`, `formatId`, and an absolute local `source` path.
+Each successful call creates a new asset and attachment.
