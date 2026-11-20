@@ -186,6 +186,8 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "dropFiles": "Suelta archivos multimedia en cualquier parte de esta vista.",
+    "recentImport": "Recién importado",
     "removal": {
       "deleteTitle": "Quitar recurso",
       "deleteDescription": "Se eliminará la copia gestionada del espacio de trabajo. El archivo original seguirá en su ubicación.",

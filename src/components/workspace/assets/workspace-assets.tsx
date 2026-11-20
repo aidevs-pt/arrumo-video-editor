@@ -2,10 +2,11 @@
 
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Upload, Images } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
@@ -34,6 +35,7 @@ export function WorkspaceAssets({ workspace }: {
   workspace: { id: number; name: string };
 
 }) {
+  const importing = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const [assets, setAssets] = useState<Asset[]>();
   const [organizations, setOrganizations] = useState<Record<number, AssetOrganization>>({});
@@ -44,6 +46,8 @@ export function WorkspaceAssets({ workspace }: {
   const [groupFilter, setGroupFilter] = useState("");
   const [labelFilter, setLabelFilter] = useState("");
   const [busy, setBusy] = useState<"import" | "save" | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [recent, setRecent] = useState<number[]>([]);
   const [progress, setProgress] = useState<{ completed: number; total: number }>();
   const [error, setError] = useState<"importError" | "notesError" | null>(null);
   const [editing, setEditing] = useState<Asset[] | null>(null);
@@ -73,6 +77,7 @@ export function WorkspaceAssets({ workspace }: {
   function onAssetRemoved(assetId: number) {
     setAssets((rows) => rows?.filter((asset) => asset.id !== assetId));
     setOrganizations(({ [assetId]: _removed, ...remaining }) => remaining);
+    setRecent((current) => current.filter((id) => id !== assetId));
     setSelected((current) => {
       const remaining = new Set(current);
       remaining.delete(assetId);
@@ -81,19 +86,25 @@ export function WorkspaceAssets({ workspace }: {
     heading.current?.focus();
   }
 
-  async function importFiles() {
-    if (busy) return;
+  async function importFiles(paths?: string[]) {
+    if (!assets || busy || editing || importing.current) return;
+    importing.current = true;
     setBusy("import");
     setError(null);
     try {
-      const files = await open({ multiple: true, title: copy.pickTitle });
-      if (!files) return;
+      const files = paths ?? await open({ multiple: true, title: copy.pickTitle });
+      if (!files?.length) return;
+      const imported: number[] = [];
       setProgress({ completed: 0, total: files.length });
       for (const [index, source] of files.entries()) {
         try {
           const asset = await invoke<Asset>("import_asset", { workspaceId: workspace.id, source });
           setAssets((rows) => [...(rows ?? []), asset]);
+          imported.push(asset.id);
+          setRecent([...imported]);
           setFilter("all");
+          setGroupFilter("");
+          setLabelFilter("");
         } catch {
           setError("importError");
         } finally {
@@ -105,8 +116,28 @@ export function WorkspaceAssets({ workspace }: {
     } finally {
       setProgress(undefined);
       setBusy(null);
+      importing.current = false;
     }
   }
+
+  const handleDragDrop = useEffectEvent((event: DragDropEvent) => {
+    const available = Boolean(assets) && !editing && !busy && !importing.current
+      && !document.querySelector('[role="dialog"], [role="alertdialog"]');
+    setDragging(available && (event.type === "enter" || event.type === "over"));
+    if (available && event.type === "drop") void importFiles(event.paths);
+  });
+
+  useEffect(() => {
+    let active = true;
+    if (!isTauri()) return;
+    const subscription = getCurrentWindow().onDragDropEvent(({ payload }) => {
+      if (active) handleDragDrop(payload);
+    });
+    return () => {
+      active = false;
+      void subscription.then((unlisten) => unlisten(), () => {});
+    };
+  }, []);
 
   async function saveNotes(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -173,7 +204,8 @@ export function WorkspaceAssets({ workspace }: {
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{copy.intro}</p>
       </WorkspaceHeading>
-      <section aria-labelledby="asset-list-title" className="flex flex-col gap-4">
+      <section aria-labelledby="asset-list-title" data-dragging={dragging && !busy}
+        className="flex flex-col gap-4 rounded-xl outline-offset-4 data-[dragging=true]:outline-2 data-[dragging=true]:outline-primary">
         <h2 id="asset-list-title" className="sr-only">{copy.list}</h2>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs value={filter} onValueChange={setFilter}>
@@ -186,6 +218,7 @@ export function WorkspaceAssets({ workspace }: {
             <Upload data-icon="inline-start" />{busy === "import" ? copy.picking : copy.pick}
           </Button>
         </div>
+        {assets && <p className="text-sm text-muted-foreground">{copy.dropFiles}</p>}
         {(groups.length > 0 || labels.length > 0) && <div className="flex flex-wrap gap-2">
           {groups.length > 0 && <AssetFilter label={copy.filterGroup} all={copy.allGroups}
             options={groups} value={activeGroup} onChange={setGroupFilter} />}
@@ -235,6 +268,7 @@ export function WorkspaceAssets({ workspace }: {
                           <h3 title={asset.name} className="truncate font-semibold">{asset.name}</h3>
                           <div className="flex flex-wrap gap-1">
                             <Badge variant="secondary">{copy[asset.kind]}</Badge>
+                            {recent.includes(asset.id) && <Badge>{copy.recentImport}</Badge>}
                             {organizations[asset.id]?.group && <Badge variant="secondary" className="max-w-full wrap-anywhere whitespace-normal">{organizations[asset.id].group}</Badge>}
                             {organizations[asset.id]?.labels.map((label) => <Badge key={label} variant="outline" className="max-w-full wrap-anywhere whitespace-normal">{label}</Badge>)}
                             {!asset.notes.trim() && <Badge variant="outline">{copy.noNotes}</Badge>}

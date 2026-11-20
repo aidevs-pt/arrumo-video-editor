@@ -186,6 +186,8 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "dropFiles": "Drop media files anywhere in this view.",
+    "recentImport": "Just imported",
     "removal": {
       "deleteTitle": "Remove asset",
       "deleteDescription": "This removes the managed copy from the workspace. The original file stays where you imported it from.",

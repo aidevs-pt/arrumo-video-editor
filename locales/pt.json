@@ -186,6 +186,8 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "assets": {
+    "dropFiles": "Larga ficheiros multimédia em qualquer ponto desta vista.",
+    "recentImport": "Importado agora",
     "removal": {
       "deleteTitle": "Remover recurso",
       "deleteDescription": "A cópia gerida será removida do espaço de trabalho. O ficheiro original mantém-se na sua localização.",
