@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { getLocaleCatalog } from "@/lib/locale-catalog";
+import { AppearanceProvider, appearanceScript } from "@/lib/appearance";
 import { LocaleProvider } from "@/lib/locale-provider";
 import { Anybody, Atkinson_Hyperlegible_Next } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -14,5 +15,10 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={cn("font-sans", anybody.variable, atkinson.variable)}><body><LocaleProvider catalog={getLocaleCatalog()}>{children}</LocaleProvider></body></html>;
+  return (
+    <html lang="en" className={cn("font-sans", anybody.variable, atkinson.variable)} suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: appearanceScript }} /></head>
+      <body><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}>{children}</LocaleProvider></AppearanceProvider></body>
+    </html>
+  );
 }

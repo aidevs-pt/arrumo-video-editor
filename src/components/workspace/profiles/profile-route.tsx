@@ -218,7 +218,7 @@ function ProfileColor({ workspaceId, profile, onUpdate }: {
             return <button key={swatch} type="button" role="radio" aria-checked={selected} aria-label={swatch}
               onClick={() => void choose(swatch)}
               className={cn("aspect-square rounded-[4px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-attention",
-                selected && "outline-2 outline-ink")} style={{ backgroundColor: swatch }} />;
+                selected && "outline-2 outline-foreground")} style={{ backgroundColor: swatch }} />;
           })}
         </div>
         <div className="mt-3 flex items-center gap-2">

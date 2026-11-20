@@ -1,22 +1,25 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, KeyRound, Package, Settings2 } from "lucide-react";
+import { ArrowUpRight, Bot, Gauge, KeyRound, Package, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
-import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceShell } from "@/components/workspace/layout";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
+import { useAppearance } from "@/lib/appearance";
 import { useLocale } from "@/lib/locale-provider";
+import { cn } from "@/lib/utils";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Switch } from "@/components/ui/switch";
 import { PluginCatalog } from "./plugin-catalog";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
@@ -33,19 +36,23 @@ const unset = "__inherit__";
 type LoginStatus = "confirmed" | "unconfirmed" | "unavailable" | "timed_out" | "failed";
 
 
+const sections = ["general", "agent", "services", "plugins", "quality"] as const;
+type Section = (typeof sections)[number];
+const sectionIcons = { general: Settings2, agent: Bot, services: KeyRound, plugins: Package, quality: Gauge };
+
 export function AgentSettingsPage() {
   const { status, workspaces, load } = useWorkspaceCatalog();
   const query = useSearchParams();
   const router = useRouter();
-  const { locale, setLocale, messages } = useLocale();
-  const { agentSettings: copy, workspaces: workspaceCopy } = messages;
+  const { messages } = useLocale();
+  const { agentSettings: copy, workspaces: workspaceCopy, settings: text } = messages;
   const studioWorkspace = query.get("workspace");
   const requested = query.get("scope") === "app" ? null : studioWorkspace;
   const setupWorkspace = workspaces.find(({ id }) => String(id) === query.get("setup"));
   const workspace = workspaces.find(({ id }) => String(id) === requested);
-  const section = query.get("section");
-  const tab = !setupWorkspace && (section === "plugins" || section === "services") ? section : "general";
-  const settingsHref = (target: string, scope = requested) => {
+  const tab: Section = setupWorkspace ? "agent" : sections.find((value) => value === query.get("section")) ?? "general";
+  const scoped = tab === "agent" || tab === "services" || tab === "plugins";
+  const settingsHref = (target: Section, scope = requested) => {
     const params = new URLSearchParams();
     if (scope) params.set("workspace", scope);
     else if (studioWorkspace) {
@@ -55,70 +62,168 @@ export function AgentSettingsPage() {
     if (target !== "general") params.set("section", target);
     return params.size ? `/settings?${params}` : "/settings";
   };
+  const titles: Record<Section, [string, string]> = {
+    general: [text.general, text.generalIntro],
+    agent: [text.agent, text.agentIntro],
+    services: [text.services, text.servicesIntro],
+    plugins: [text.plugins, text.pluginsIntro],
+    quality: [text.quality, text.qualityIntro],
+  };
+
   return (
-    <WorkspaceShell className="grid items-start gap-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
-      <nav className="flex flex-wrap gap-1 sm:flex-col" aria-label={copy.title}>
-        {([
-          ["general", messages.settings.general, Settings2],
-          ["services", messages.onboarding.services, KeyRound],
-          ["plugins", messages.pluginCatalog.title, Package],
-        ] as const).map(([key, label, Icon]) => (
-          <Button key={key} asChild size="sm" variant={key === tab ? "secondary" : "ghost"} className="justify-start">
-            <Link href={settingsHref(key)} aria-current={key === tab ? "page" : undefined}>
-              <Icon data-icon="inline-start" />{label}
+    <WorkspaceShell className="grid max-w-6xl items-start gap-8 md:grid-cols-[12rem_minmax(0,1fr)]">
+      <nav className="flex flex-wrap gap-1 md:sticky md:top-20 md:flex-col" aria-label={copy.title}>
+        {sections.map((key) => {
+          const Icon = sectionIcons[key];
+          const active = key === tab;
+          return (
+            <Link key={key} href={settingsHref(key)} aria-current={active ? "page" : undefined}
+              className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 font-semibold text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground",
+                active && "bg-foreground text-background hover:bg-foreground hover:text-background")}>
+              <Icon className={cn("size-4", active && "text-attention")} aria-hidden="true" />{titles[key][0]}
             </Link>
-          </Button>
-        ))}
+          );
+        })}
       </nav>
       <div className="min-w-0">
-      <WorkspaceHeading><h1>{tab === "general" ? messages.settings.general : tab === "services" ? messages.onboarding.services : messages.pluginCatalog.title}</h1>
-        {tab === "general" && <p>{copy.intro}</p>}</WorkspaceHeading>
-      {status === "browser" ? <Alert><AlertDescription>{workspaceCopy.desktop}</AlertDescription></Alert>
-        : status === "error" ? <Alert variant="destructive">
-          <AlertDescription>{workspaceCopy.loadError}</AlertDescription>
-          <Button variant="outline" onClick={load}>{workspaceCopy.retry}</Button>
-        </Alert>
-        : status === "loading" ? <Skeleton className="h-40 max-w-xl" role="status" aria-label={copy.loading} />
-        : (
-          <div className="flex max-w-3xl flex-col gap-5">
-            {tab === "general" && !setupWorkspace && <section className="border-y py-4">
-              <h2 className="mb-3 text-[1.3125rem]">{messages.settings.appearance}</h2>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span id="settings-language">{messages.settings.language}</span>
-                <ToggleGroup type="single" value={locale} onValueChange={(value) => value && setLocale(value)}
-                  variant="outline" spacing={0} aria-labelledby="settings-language">
-                  <ToggleGroupItem value="en">English</ToggleGroupItem>
-                  <ToggleGroupItem value="es">Español</ToggleGroupItem>
-                  <ToggleGroupItem value="pt">Português</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-            </section>}
-            {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
-            <Field>
-              <FieldLabel htmlFor="agent-settings-scope">{copy.scope}</FieldLabel>
-              <Select value={workspace ? String(workspace.id) : "app"}
-                onValueChange={(value) => router.push(settingsHref(tab, value === "app" ? null : value))}>
-                <SelectTrigger id="agent-settings-scope"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectGroup>
-                  <SelectItem value="app">{copy.app}</SelectItem>
-                  {workspaces.map((entry) => <SelectItem key={entry.id} value={String(entry.id)}>{entry.name}</SelectItem>)}
-                </SelectGroup></SelectContent>
-              </Select>
-            </Field>
-            {requested !== null && !workspace ? (
-              <Alert variant="destructive"><AlertDescription>{workspaceCopy.missing}</AlertDescription></Alert>
-            ) : tab === "general" && <ProviderForm key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
-            {setupWorkspace && <Button asChild variant="outline" className="self-start">
-              <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
-            </Button>}
-            {tab === "plugins" && !requested && <PluginCatalog />}
-            {tab === "services" && (requested === null || workspace) && <ScopedPluginPreferences key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
-            {workspace && tab === "plugins" && <PluginGrants key={workspace.id} workspace={workspace} />}
-            {workspace && tab === "plugins" && <PluginActions key={workspace.id} workspaceId={workspace.id} />}
-          </div>
-        )}
+        <header className="mb-6">
+          <h1 className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] [font-variation-settings:'wdth'_135]">{titles[tab][0]}</h1>
+          <p className="mt-2 text-lg text-muted-foreground">{titles[tab][1]}</p>
+        </header>
+        {status === "browser" ? <Alert><AlertDescription>{workspaceCopy.desktop}</AlertDescription></Alert>
+          : status === "error" ? <Alert variant="destructive">
+            <AlertDescription>{workspaceCopy.loadError}</AlertDescription>
+            <Button variant="outline" onClick={load}>{workspaceCopy.retry}</Button>
+          </Alert>
+          : status === "loading" ? <Skeleton className="h-40 max-w-xl" role="status" aria-label={copy.loading} />
+          : (
+            <div className="flex max-w-3xl flex-col gap-6">
+              {tab === "general" && <GeneralSettings />}
+              {tab === "quality" && <QualitySettings />}
+              {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
+              {scoped && <div className="flex flex-wrap items-center gap-3">
+                <span id="settings-scope" className="font-semibold">{text.appliesTo}</span>
+                <NativeSelect aria-labelledby="settings-scope" value={workspace ? String(workspace.id) : "app"}
+                  onChange={(event) => router.push(settingsHref(tab, event.target.value === "app" ? null : event.target.value))}>
+                  <NativeSelectOption value="app">{text.appScope}</NativeSelectOption>
+                  {workspaces.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{entry.name}</NativeSelectOption>)}
+                </NativeSelect>
+              </div>}
+              {scoped && requested !== null && !workspace ? (
+                <Alert variant="destructive"><AlertDescription>{workspaceCopy.missing}</AlertDescription></Alert>
+              ) : tab === "agent" && <ProviderForm key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
+              {setupWorkspace && <Button asChild variant="outline" className="self-start">
+                <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
+              </Button>}
+              {tab === "plugins" && !requested && <PluginCatalog />}
+              {tab === "services" && (requested === null || workspace) && <ScopedPluginPreferences key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
+              {workspace && tab === "plugins" && <PluginGrants key={workspace.id} workspace={workspace} />}
+              {workspace && tab === "plugins" && <PluginActions key={workspace.id} workspaceId={workspace.id} />}
+            </div>
+          )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function SettingRow({ label, hint, labelId, children }: { label: string; hint?: string; labelId: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+      <div className="min-w-0">
+        <p id={labelId} className="font-semibold">{label}</p>
+        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Segmented<T extends string>({ labelledBy, value, options, onChange }: {
+  labelledBy: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-labelledby={labelledBy} className="inline-flex flex-wrap rounded-lg bg-secondary p-1">
+      {options.map((option) => (
+        <button key={option.value} type="button" role="radio" aria-checked={value === option.value} onClick={() => onChange(option.value)}
+          className={cn("rounded-md px-3 py-1.5 font-semibold text-muted-foreground transition-colors duration-150 hover:text-foreground",
+            value === option.value && "bg-card text-foreground shadow-xs")}>{option.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function GeneralSettings() {
+  const { locale, setLocale, messages: { settings: text } } = useLocale();
+  const appearance = useAppearance();
+  return (
+    <section aria-labelledby="settings-appearance">
+      <h2 id="settings-appearance" className="mb-3 text-[1.5rem]">{text.appearance}</h2>
+      <div className="divide-y rounded-xl border bg-card">
+        <SettingRow label={text.language} hint={text.languageHint} labelId="settings-language">
+          <Segmented labelledBy="settings-language" value={locale} onChange={setLocale}
+            options={[{ value: "en", label: "English" }, { value: "es", label: "Español" }, { value: "pt", label: "Português" }]} />
+        </SettingRow>
+        <SettingRow label={text.theme} labelId="settings-theme">
+          <Segmented labelledBy="settings-theme" value={appearance.theme} onChange={appearance.setTheme} options={[
+            { value: "system", label: text.themeSystem }, { value: "light", label: text.themeLight }, { value: "dark", label: text.themeDark },
+          ]} />
+        </SettingRow>
+        <SettingRow label={text.motion} labelId="settings-motion"
+          hint={appearance.motion === "system" ? text.motionSystem.replace("{state}", appearance.systemReducesMotion ? text.motionOn : text.motionOff) : undefined}>
+          <div className="flex items-center gap-3">
+            {appearance.motion !== "system" && <Button variant="ghost" size="sm" onClick={() => appearance.setMotion("system")}>{text.motionFollow}</Button>}
+            <Switch aria-labelledby="settings-motion"
+              checked={appearance.motion === "reduce" || (appearance.motion === "system" && appearance.systemReducesMotion)}
+              onCheckedChange={(checked) => appearance.setMotion(checked ? "reduce" : "full")} />
+          </div>
+        </SettingRow>
+      </div>
+    </section>
+  );
+}
+
+type PreviewSettings = { override_max_edge: number | null; recommended_max_edge: number; effective_max_edge: number };
+const previewSizes = [360, 480, 540, 720, 1080];
+
+function QualitySettings() {
+  const { messages: { settings: text } } = useLocale();
+  const [settings, setSettings] = useState<PreviewSettings>();
+  const [state, setState] = useState<"idle" | "saved" | "error">("idle");
+
+  useEffect(() => {
+    let active = true;
+    invoke<PreviewSettings>("get_preview_settings").then((value) => { if (active) setSettings(value); }, () => { if (active) setState("error"); });
+    return () => { active = false; };
+  }, []);
+
+  async function choose(value: string) {
+    try {
+      setSettings(await invoke<PreviewSettings>("set_preview_max_edge", { maxEdge: value === "auto" ? null : Number(value) }));
+      setState("saved");
+    } catch {
+      setState("error");
+    }
+  }
+
+  if (!settings) return state === "error" ? <Alert variant="destructive"><AlertDescription>{text.previewError}</AlertDescription></Alert>
+    : <Skeleton className="h-24" />;
+  return (
+    <section className="divide-y rounded-xl border bg-card">
+      <SettingRow label={text.previewSize} labelId="settings-preview" hint={text.previewHint.replace("{recommended}", String(settings.recommended_max_edge))}>
+        <NativeSelect aria-labelledby="settings-preview" value={settings.override_max_edge === null ? "auto" : String(settings.override_max_edge)}
+          onChange={(event) => void choose(event.target.value)}>
+          <NativeSelectOption value="auto">{text.previewRecommended.replace("{size}", String(settings.recommended_max_edge))}</NativeSelectOption>
+          {[...new Set([...previewSizes, settings.override_max_edge ?? 360])].sort((a, b) => a - b).map((size) =>
+            <NativeSelectOption key={size} value={size}>{size} px</NativeSelectOption>)}
+        </NativeSelect>
+      </SettingRow>
+      {state !== "idle" && <p role="status" className={cn("px-5 py-3 text-sm", state === "error" ? "text-destructive" : "text-muted-foreground")}>
+        {state === "error" ? text.previewError : text.previewSaved.replace("{size}", String(settings.effective_max_edge))}
+      </p>}
+    </section>
   );
 }
 

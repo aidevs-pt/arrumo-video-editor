@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import NextImage from "next/image";
 import dynamic from "next/dynamic";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
@@ -61,7 +61,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
   agentId?: string | null;
 }) {
   const { messages: { productionPlan: copy, queue } } = useLocale();
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotionConfig();
   const timeline = useRef<HTMLElement>(null);
   const [agent, setAgent] = useState<string>();
   const [progress, setProgress] = useState<StageProgress>();

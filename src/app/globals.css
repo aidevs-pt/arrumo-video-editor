@@ -98,33 +98,34 @@
 }
 
 .dark {
+    /* Azulejo after dark: the same navy and cobalt family, lifted for contrast. --ink stays navy for text on yellow. */
+    --background: oklch(19% .035 268);
+    --foreground: oklch(96% .01 265);
+    --card: oklch(23% .04 268);
+    --card-foreground: var(--foreground);
+    --popover: oklch(24% .04 268);
+    --popover-foreground: var(--foreground);
     --workspace-panel: var(--card);
-    --selection: var(--accent);
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --primary: oklch(56% .17 268);
+    --primary-foreground: var(--on-cobalt);
+    --secondary: oklch(27% .045 268);
+    --secondary-foreground: var(--foreground);
+    --muted: oklch(27% .045 268);
+    --muted-foreground: oklch(80% .03 265);
+    --accent: oklch(33% .08 268);
+    --accent-foreground: oklch(90% .05 266);
+    --destructive: oklch(68% .17 27);
+    --approval: oklch(68% .14 150);
+    --border: oklch(33% .045 268);
+    --input: oklch(43% .05 268);
+    --line-strong: oklch(43% .05 268);
+    --selection: oklch(40% .1 268);
+    --agent: oklch(24% .1 268);
+    --sidebar: oklch(29% .12 268);
     --sidebar-primary: var(--background);
     --sidebar-primary-foreground: var(--foreground);
+    --sidebar-accent: oklch(34% .12 268);
+    --sidebar-border: oklch(38% .1 268);
     --ring: var(--attention);
 }
 
@@ -163,4 +164,12 @@
     background: var(--selection);
     color: var(--foreground);
   }
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+  scroll-behavior: auto !important;
 }

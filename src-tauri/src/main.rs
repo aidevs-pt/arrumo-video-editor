@@ -24,6 +24,29 @@ mod profiles;
 type Store = Mutex<WorkspaceStore>;
 
 #[tauri::command]
+fn get_preview_settings(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::PreviewSettings, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .preview_settings()
+        .map_err(|_| "preview_settings_failed")
+}
+
+#[tauri::command]
+fn set_preview_max_edge(
+    max_edge: Option<u32>,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::PreviewSettings, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    store
+        .set_preview_max_edge(max_edge)
+        .and_then(|()| store.preview_settings())
+        .map_err(|_| "preview_settings_failed")
+}
+
+#[tauri::command]
 fn list_workspaces(store: State<'_, Store>) -> Result<Vec<Workspace>, &'static str> {
     store
         .lock()
@@ -809,6 +832,8 @@ fn main() {
             motion_library::get_motion_library_shares,
             motion_library::set_motion_library_shares,
             list_workspaces,
+            get_preview_settings,
+            set_preview_max_edge,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,

@@ -12,7 +12,7 @@ export function StepTrack({ count, current, label, className }: {
       className={cn("flex gap-1", className)}>
       {Array.from({ length: count }, (_, index) => (
         <span key={index} className={cn("h-1.5 flex-1 rounded-[2px]",
-          index < current ? "bg-ink" : index === current ? "bg-primary" : "bg-border")} />
+          index < current ? "bg-foreground" : index === current ? "bg-primary" : "bg-border")} />
       ))}
     </div>
   );

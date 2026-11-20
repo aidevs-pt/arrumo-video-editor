@@ -176,7 +176,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                   <li key={kind}>
                     <button type="button" aria-pressed={active} onClick={() => { setFilter(kind); setGroupFilter(null); setLabelFilter(null); }}
                       className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start font-semibold hover:bg-secondary",
-                        active && "bg-ink text-white hover:bg-ink")}>
+                        active && "bg-foreground text-background hover:bg-foreground")}>
                       <Icon className={cn("size-4", active && "text-attention")} aria-hidden="true" />
                       <span className="flex-1">{copy[kind === "all" ? "all" : kind === "image" ? "images" : kind === "audio" ? "audio" : "videos"]}</span>
                       <span className={cn("rounded-[5px] px-1.5 text-sm tabular-nums", active ? "bg-white/15" : "bg-secondary")}>{kindCount(kind)}</span>
@@ -207,7 +207,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                   <li key={label}>
                     <button type="button" aria-pressed={labelFilter === label} onClick={() => setLabelFilter(labelFilter === label ? null : label)}
                       className={cn("flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 text-sm font-semibold hover:bg-accent",
-                        labelFilter === label && "bg-ink text-white hover:bg-ink")}>
+                        labelFilter === label && "bg-foreground text-background hover:bg-foreground")}>
                       <Tag className="size-3.5" aria-hidden="true" />{label}
                     </button>
                   </li>
