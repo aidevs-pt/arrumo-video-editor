@@ -262,6 +262,8 @@ fn replace_live_references(
     for statement in [
         "UPDATE video_draft_sources SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
         "UPDATE workspace_brand_assets SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
+        "UPDATE OR IGNORE asset_profile_shares SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
+        "DELETE FROM asset_profile_shares WHERE workspace_id = ?1 AND asset_id = ?2 AND ?3 IS NOT NULL",
         "UPDATE asset_organization SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
         "UPDATE motion_library SET preview_asset_id = ?3 WHERE workspace_id = ?1 AND preview_asset_id = ?2",
         "UPDATE motion_library SET thumbnail_asset_id = ?3 WHERE workspace_id = ?1 AND thumbnail_asset_id = ?2",
@@ -401,6 +403,13 @@ mod replacement_tests {
                 &RunOptions::default(),
             )
             .unwrap();
+        let profile = store
+            .create_profile(workspace, "Reviews", "", None)
+            .unwrap()
+            .id;
+        store
+            .share_asset_with_profile(workspace, old.id, profile, None)
+            .unwrap();
         assert!(store.replace_asset(&root, other, old.id, &edited).is_err());
         assert!(
             store
@@ -411,6 +420,9 @@ mod replacement_tests {
             .replace_asset(&root, workspace, old.id, &edited)
             .unwrap();
         assert_eq!(new.notes, "Brand reference");
+        let shared = store.list_profile_assets(workspace, profile).unwrap();
+        assert_eq!(shared.len(), 1);
+        assert_eq!(shared[0].asset.id, new.id);
         let ids: Vec<_> = store
             .list_assets(workspace)
             .unwrap()

@@ -50,6 +50,7 @@ mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
 mod profile_formats;
+mod profile_organization;
 mod provider_preferences;
 mod speech_synthesis;
 mod subtitle_revisions;
@@ -110,6 +111,7 @@ pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
+pub use profile_organization::{AssetProfileShare, MAX_PROFILE_DESCRIPTION, ProfileAsset};
 pub use provider_preferences::{CapabilityProvider, ProviderPreferences};
 pub use speech_synthesis::SpeechProviderStatus;
 pub use subtitle_revisions::{SubtitleRevision, read_subtitle_file};
@@ -135,6 +137,7 @@ pub struct Profile {
     pub name: String,
     pub guidance: String,
     pub color: Option<String>,
+    pub description: String,
 }
 
 pub struct WorkspaceStore(Connection);
@@ -197,6 +200,7 @@ impl WorkspaceStore {
             include_str!("../migrations/048-variant-content-identity.sql"),
             include_str!("../migrations/049-plugin-action-jobs.sql"),
             include_str!("../migrations/050-automatic-delivery-subtitles.sql"),
+            include_str!("../migrations/051-profile-organization.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -288,7 +292,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<Profile> {
         self.0.query_row(
             "INSERT INTO profiles (workspace_id, name, guidance, color)
-             VALUES (?1, ?2, ?3, ?4) RETURNING id, workspace_id, name, guidance, color",
+             VALUES (?1, ?2, ?3, ?4) RETURNING id, workspace_id, name, guidance, color, description",
             rusqlite::params![workspace_id, name.trim(), guidance, color],
             Self::read_profile,
         )
@@ -305,7 +309,7 @@ impl WorkspaceStore {
         self.0.query_row(
             "UPDATE profiles SET name = ?3, guidance = ?4, color = ?5
              WHERE workspace_id = ?1 AND id = ?2
-             RETURNING id, workspace_id, name, guidance, color",
+             RETURNING id, workspace_id, name, guidance, color, description",
             rusqlite::params![workspace_id, profile_id, name.trim(), guidance, color],
             Self::read_profile,
         )
@@ -314,7 +318,7 @@ impl WorkspaceStore {
     pub fn list_profiles(&self, workspace_id: i64) -> rusqlite::Result<Vec<Profile>> {
         self.0
             .prepare(
-                "SELECT id, workspace_id, name, guidance, color FROM profiles
+                "SELECT id, workspace_id, name, guidance, color, description FROM profiles
                  WHERE workspace_id = ?1 ORDER BY id",
             )?
             .query_map([workspace_id], Self::read_profile)?
@@ -328,6 +332,7 @@ impl WorkspaceStore {
             name: row.get(2)?,
             guidance: row.get(3)?,
             color: row.get(4)?,
+            description: row.get(5)?,
         })
     }
 

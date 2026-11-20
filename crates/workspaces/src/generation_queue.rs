@@ -262,6 +262,10 @@ impl WorkspaceStore {
             "brand_assets": self.list_brand_assets(workspace_id)?,
             "feedback": self.list_workspace_feedback(workspace_id)?,
             "delivery_feedback": self.draft_delivery_feedback(workspace_id, draft_id)?,
+            "profile_assets": match &profile {
+                Some(profile) => json!(self.list_profile_assets(workspace_id, profile.id)?),
+                None => json!([]),
+            },
             "profile": profile,
             "formats": formats,
         }))
@@ -444,7 +448,12 @@ mod tests {
                 .is_err()
         );
         let mut listed = store.list_generation_runs(studio).unwrap();
-        let steps = store.generation_plan(studio, run.id).unwrap().unwrap().steps.len() as i64;
+        let steps = store
+            .generation_plan(studio, run.id)
+            .unwrap()
+            .unwrap()
+            .steps
+            .len() as i64;
         assert_eq!(
             listed[0].progress.take(),
             Some(RunProgress {

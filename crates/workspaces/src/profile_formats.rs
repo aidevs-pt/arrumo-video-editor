@@ -19,6 +19,8 @@ pub struct ProfileFormat {
     pub overrides: DimensionOverrides,
     pub workspace_width: u32,
     pub workspace_height: u32,
+    /// Profile Markdown that applies only to this format.
+    pub context: String,
 }
 
 impl WorkspaceStore {
@@ -32,13 +34,18 @@ impl WorkspaceStore {
                 "SELECT format.id, format.name,
                         COALESCE(custom.width, format.width),
                         COALESCE(custom.height, format.height),
-                        custom.width, custom.height, format.width, format.height
+                        custom.width, custom.height, format.width, format.height,
+                        COALESCE(context.markdown, '')
                  FROM profiles AS profile
                  JOIN output_formats AS format ON format.workspace_id = profile.workspace_id
                  LEFT JOIN profile_format_overrides AS custom
                     ON custom.workspace_id = profile.workspace_id
                    AND custom.profile_id = profile.id
                    AND custom.format_id = format.id
+                 LEFT JOIN profile_format_context AS context
+                    ON context.workspace_id = profile.workspace_id
+                   AND context.profile_id = profile.id
+                   AND context.format_id = format.id
                  WHERE profile.workspace_id = ?1 AND profile.id = ?2 AND format.enabled = 1
                  ORDER BY format.id",
             )?
@@ -54,6 +61,7 @@ impl WorkspaceStore {
                     },
                     workspace_width: row.get(6)?,
                     workspace_height: row.get(7)?,
+                    context: row.get(8)?,
                 })
             })?
             .collect()

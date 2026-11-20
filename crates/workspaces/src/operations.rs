@@ -9,6 +9,7 @@ mod assets;
 mod generation;
 mod jobs;
 mod motion;
+mod profiles;
 mod providers;
 mod settings;
 mod setup;
@@ -61,6 +62,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     tools.extend(jobs::definitions());
     tools.extend(motion::definitions());
     tools.extend(setup::definitions());
+    tools.extend(profiles::definitions());
     tools.extend(providers::definitions());
     tools.extend(settings::definitions());
     tools.extend(subtitles::definitions());
@@ -102,6 +104,7 @@ pub(crate) fn invoke(
             .or_else(|| jobs::call(store, name, &arguments))
             .or_else(|| motion::call(store, database, name, &arguments))
             .or_else(|| setup::call(store, name, &arguments))
+            .or_else(|| profiles::call(store, name, &arguments))
             .or_else(|| providers::call(store, name, &arguments))
             .or_else(|| settings::call(store, name, &arguments))
             .or_else(|| subtitles::call(store, database, name, &arguments))

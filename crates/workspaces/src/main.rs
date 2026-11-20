@@ -495,6 +495,69 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&profile)?);
         }
+        [database, command, workspace_id, profile_id, description]
+            if command == "set-profile-description" =>
+        {
+            let profile = WorkspaceStore::open(Path::new(database))?.set_profile_description(
+                utf8(workspace_id)?.parse()?,
+                utf8(profile_id)?.parse()?,
+                utf8(description)?,
+            )?;
+            println!("{}", serde_json::to_string(&profile)?);
+        }
+        [
+            database,
+            command,
+            workspace_id,
+            profile_id,
+            format_id,
+            markdown,
+        ] if command == "set-profile-format-context" => {
+            WorkspaceStore::open(Path::new(database))?.set_profile_format_context(
+                utf8(workspace_id)?.parse()?,
+                utf8(profile_id)?.parse()?,
+                utf8(format_id)?.parse()?,
+                utf8(markdown)?,
+            )?;
+        }
+        [database, command, workspace_id, profile_id] if command == "profile-assets" => {
+            let assets = WorkspaceStore::open(Path::new(database))?
+                .list_profile_assets(utf8(workspace_id)?.parse()?, utf8(profile_id)?.parse()?)?;
+            println!("{}", serde_json::to_string(&assets)?);
+        }
+        [
+            database,
+            command,
+            workspace_id,
+            asset_id,
+            profile_id,
+            scope @ ..,
+        ] if (command == "share-asset" || command == "unshare-asset") && scope.len() <= 1 => {
+            let format_id: Option<i64> = match scope.first() {
+                Some(value) => Some(utf8(value)?.parse()?),
+                None => None,
+            };
+            let mut store = WorkspaceStore::open(Path::new(database))?;
+            let (workspace_id, asset_id, profile_id) = (
+                utf8(workspace_id)?.parse()?,
+                utf8(asset_id)?.parse()?,
+                utf8(profile_id)?.parse()?,
+            );
+            if command == "share-asset" {
+                store.share_asset_with_profile(workspace_id, asset_id, profile_id, format_id)?;
+            } else if !store.unshare_asset_from_profile(
+                workspace_id,
+                asset_id,
+                profile_id,
+                format_id,
+            )? {
+                return Err("No matching share".into());
+            }
+            println!(
+                "{}",
+                serde_json::to_string(&store.list_asset_profile_shares(workspace_id, asset_id)?)?
+            );
+        }
         [database, command, workspace] if command == "formats" => {
             let formats = WorkspaceStore::open(Path::new(database))?
                 .list_output_formats(utf8(workspace)?.parse()?)?;
@@ -1349,6 +1412,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "list | create <name> | profiles <workspace-id> | ",
                 "create-profile <workspace-id> <name> [guidance] [color] | ",
                 "update-profile <workspace-id> <profile-id> <name> <guidance> [color] | ",
+                "set-profile-description <workspace-id> <profile-id> <description> | ",
+                "set-profile-format-context <workspace-id> <profile-id> <format-id> <markdown> | ",
+                "profile-assets <workspace-id> <profile-id> | ",
+                "share-asset <workspace-id> <asset-id> <profile-id> [format-id] | ",
+                "unshare-asset <workspace-id> <asset-id> <profile-id> [format-id] | ",
                 "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
                 "update-format <workspace-id> <format-id> <settings-json> | ",
                 "remove-format <workspace-id> <format-id> | ",

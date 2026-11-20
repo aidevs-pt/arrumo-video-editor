@@ -72,6 +72,22 @@ cargo run --locked -- ./workspaces.sqlite update-profile 1 1 "Tutorials" "## Exp
 
 Pass an empty guidance string to clear it, or omit color on update to clear the color. On creation, guidance and color are optional. Colors use `#RRGGBB`. The commands print JSON. The database persists across runs. Run the backend tests with `cargo test --locked`.
 
+A profile also has a one-line description of up to 280 characters, shown in lists, and Markdown context for a single output format. Format context applies only to enabled formats, and saving empty text clears it. Both are captured in generation snapshots with the profile.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite set-profile-description 1 1 "Step-by-step tutorials"
+cargo run --locked -- ./workspaces.sqlite set-profile-format-context 1 1 2 "Keep each step under 20 seconds."
+```
+
+Workspace assets can be shared with a profile as a whole, or with one of its formats. Sharing does not copy the file. A profile-wide share replaces that profile's format shares for the asset, and replacing an asset's file keeps its shares. Runs for a profile capture the shared assets as `profile_assets`, each with its `format_id`, or null for every format.
+
+```sh
+cargo run --locked -- ./workspaces.sqlite share-asset 1 3 1        # every format of profile 1
+cargo run --locked -- ./workspaces.sqlite share-asset 1 4 1 2      # only format 2
+cargo run --locked -- ./workspaces.sqlite profile-assets 1 1
+cargo run --locked -- ./workspaces.sqlite unshare-asset 1 4 1 2
+```
+
 Copyright © 2026 DEVS AI Unipessoal LDA. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
 For custom AI solutions for your company, visit [DEVS AI](https://aidevs.pt).
@@ -332,7 +348,7 @@ Use `import_thumbnail_reference` to import a local image with thumbnail referenc
 
 Use `rename_completed_video` to change a completed run's display title. Use `add_completed_video_feedback` to save Markdown feedback about the full run or a specific production result. Pass the result ID from `get_completed_video` for stage feedback.
 
-Use `create_workspace` to initialize a workspace, then `get_workspace_context` and `set_workspace_context` to read or replace its Markdown context. Use `list_profiles`, `create_profile`, and `update_profile` to manage production profiles. Pass a profile's ID as `profile_id` in draft settings. The queue captures the saved context and profile when it creates the run.
+Use `create_workspace` to initialize a workspace, then `get_workspace_context` and `set_workspace_context` to read or replace its Markdown context. Use `list_profiles`, `create_profile`, and `update_profile` to manage production profiles, and `set_profile_description` and `set_profile_format_context` for their description and per-format context. Use `share_asset_with_profile`, `unshare_asset_from_profile`, `list_profile_assets`, and `list_asset_profile_shares` to scope workspace assets to profiles. Pass a profile's ID as `profile_id` in draft settings. The queue captures the saved context and profile when it creates the run.
 
 Use `list_output_formats`, `create_output_format`, and `update_output_format` to configure workspace output dimensions. Use `get_format_delivery` and `set_format_delivery` for supplemental deliverables. Sending a replacement resets omitted supplemental fields to their defaults. Final video and subtitles remain required.
 

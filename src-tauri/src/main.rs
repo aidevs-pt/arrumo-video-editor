@@ -19,6 +19,7 @@ mod guided_preview;
 mod media_worker;
 mod motion_library;
 mod plugin_settings;
+mod profiles;
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -792,6 +793,12 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            profiles::set_profile_description,
+            profiles::set_profile_format_context,
+            profiles::list_profile_assets,
+            profiles::list_asset_profile_shares,
+            profiles::share_asset_with_profile,
+            profiles::unshare_asset_from_profile,
             motion_library::list_motion_library,
             motion_library::preview_motion_library_item,
             motion_library::save_motion_result,
