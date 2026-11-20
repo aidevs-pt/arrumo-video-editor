@@ -1065,6 +1065,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )?;
             println!("{revision}");
         }
+        [database, command] if command == "watch-delivery-queue" => {
+            let database = Path::new(database);
+            let store = WorkspaceStore::open(database)?;
+            loop {
+                let verified = store.process_next_ready_delivery(database).unwrap_or_else(|_| {
+                    eprintln!("Arrumo could not verify a delivery. Check the run activity and output files.");
+                    false
+                });
+                let transcribed = store
+                    .process_next_automatic_subtitles(database)
+                    .unwrap_or_else(|_| {
+                        eprintln!("Arrumo could not process the automatic subtitle queue.");
+                        false
+                    });
+                if !verified && !transcribed {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                }
+            }
+        }
         [database, command] if command == "watch-motion-queue" => {
             let database = Path::new(database);
             let worker = arrumo_workspaces::configured_motion_worker(None).ok_or_else(|| {
@@ -1362,7 +1381,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
-                "process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
+                "watch-delivery-queue | process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
                 "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
