@@ -186,6 +186,12 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "renderer": "Installed renderer",
+    "selectRenderer": "Choose a renderer",
+    "rendererHint": "Runs the selected installed package in the local sandbox and submits its output to this stage.",
+    "renderMotion": "Render motion",
+    "renderingMotion": "Rendering…",
+    "rendererFailed": "Could not run the renderer or submit its files. Check the installed package and local worker.",
     "motionBatchItem": "Motion item {number}",
     "addBatchItem": "Add another item",
     "removeBatchItem": "Remove item",

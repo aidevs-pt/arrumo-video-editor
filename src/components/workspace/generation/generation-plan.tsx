@@ -20,6 +20,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
+import { MotionRendererAction } from "./motion-renderer-action";
 import { MotionArtifactAction } from "./motion-artifact-action";
 import { MediaStageAction } from "./media-stage-action";
 
@@ -144,7 +145,10 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
       {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
         <Card size="sm">
           <CardHeader><CardTitle>{copy.assets}</CardTitle></CardHeader>
-          <CardContent><MotionArtifactAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} /></CardContent>
+          <CardContent className="flex flex-col items-start gap-3">
+            <MotionArtifactAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
+            <MotionRendererAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} />
+          </CardContent>
         </Card>
       )}
       {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (

@@ -94,6 +94,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
+ "tempfile",
  "tiny_http",
  "uuid",
  "zeroize",

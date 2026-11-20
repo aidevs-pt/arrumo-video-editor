@@ -82,3 +82,53 @@ pub async fn submit_desktop_motion_artifacts(
     .await
     .map_err(|_| "motion_artifacts_failed")?
 }
+
+fn configured_motion_worker() -> Option<std::path::PathBuf> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let path = std::path::PathBuf::from(std::env::var_os("ARRUMO_MOTION_SDK_WORKER")?);
+    (path.is_absolute() && path.is_file()).then_some(path)
+}
+
+#[tauri::command]
+pub fn desktop_motion_renderer_available() -> bool {
+    configured_motion_worker().is_some()
+}
+
+#[tauri::command]
+pub async fn render_desktop_run_motion(
+    workspace_id: i64,
+    run_id: i64,
+    plugin_id: String,
+    digest: String,
+    app: AppHandle,
+) -> Result<i64, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let worker = configured_motion_worker().ok_or("motion_renderer_unavailable")?;
+        let toolchain = std::env::var_os("ARRUMO_MOTION_TOOLCHAIN").map(std::path::PathBuf::from);
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        let job = tempfile::tempdir().map_err(|_| "motion_renderer_failed")?;
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .render_run_motion(
+                &database,
+                workspace_id,
+                run_id,
+                &plugin_id,
+                &digest,
+                &arrumo_workspaces::MotionWorkerPaths {
+                    worker: &worker,
+                    output: &job.path().join("output"),
+                    toolchain: toolchain.as_deref(),
+                },
+            )
+            .map_err(|_| "motion_renderer_failed")
+    })
+    .await
+    .map_err(|_| "motion_renderer_failed")?
+}

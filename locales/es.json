@@ -186,6 +186,12 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "motionLibrary": {
+    "renderer": "Renderizador instalado",
+    "selectRenderer": "Elige un renderizador",
+    "rendererHint": "Ejecuta el paquete instalado en el entorno aislado local y envía el resultado a esta etapa.",
+    "renderMotion": "Renderizar movimiento",
+    "renderingMotion": "Renderizando…",
+    "rendererFailed": "No se pudo ejecutar el renderizador o enviar los archivos. Comprueba el paquete y el proceso local.",
     "motionBatchItem": "Elemento {number}",
     "addBatchItem": "Añadir otro elemento",
     "removeBatchItem": "Quitar elemento",

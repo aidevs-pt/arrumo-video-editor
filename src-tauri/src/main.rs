@@ -877,6 +877,8 @@ fn main() {
             guided_preview::open_guided_preview,
             media_worker::process_desktop_media_stage,
             media_worker::submit_desktop_motion_artifacts,
+            media_worker::desktop_motion_renderer_available,
+            media_worker::render_desktop_run_motion,
             media_worker::import_delivery_subtitles
         ])
         .run(tauri::generate_context!())
