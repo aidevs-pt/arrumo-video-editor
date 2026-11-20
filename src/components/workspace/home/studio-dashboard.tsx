@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, RectangleHorizontal, RectangleVertical, Upload } from "lucide-react";
+import { ArrowRight, Plus, RectangleHorizontal, RectangleVertical, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -94,6 +94,7 @@ export function StudioDashboard({ workspace }: { workspace: Workspace }) {
           </Button>
         </div>
       </header>
+      <ContextNudge workspaceId={workspaceId} />
       {failed && <Alert><AlertDescription>{messages.queue.loadError}</AlertDescription></Alert>}
       {!data && !failed && <Skeleton className="h-40 w-full" aria-label={messages.queue.loading} />}
       {data && <>
@@ -208,4 +209,37 @@ function SectionHeader({ id, title, href, label }: { id: string; title: string; 
     <h2 id={id} className="text-[1.75rem]">{title}</h2>
     <Link href={href} className="font-semibold text-primary underline underline-offset-4">{label}</Link>
   </div>;
+}
+
+/** Points a workspace with no context yet to the place where the agent can learn about the creator. */
+function ContextNudge({ workspaceId }: { workspaceId: number }) {
+  const { messages } = useLocale();
+  const [empty, setEmpty] = useState(false);
+  const [agent, setAgent] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      invoke<string | null>("get_workspace_context", { workspaceId }),
+      invoke<{ effective_provider: string | null }>("get_agent_settings", { workspaceId }),
+      invoke<{ id: string; label: string }[]>("list_agent_plugins"),
+    ]).then(([context, settings, plugins]) => {
+      if (!active) return;
+      setEmpty(!context?.trim() || context === messages.context.template);
+      setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label);
+    }, () => {});
+    return () => { active = false; };
+  }, [workspaceId, messages.context.template]);
+  if (!empty) return null;
+  const name = agent ?? messages.contextResearch.agentFallback;
+  return (
+    <Link href={workspaceHref("context", workspaceId)}
+      className="group -mt-4 flex items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-primary sm:p-5">
+      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-attention text-ink" aria-hidden="true"><Sparkles className="size-5" /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold group-hover:text-primary">{messages.dashboard.contextTitle.replace("{agent}", name)}</span>
+        <span className="block text-sm text-muted-foreground">{messages.dashboard.contextHint.replace("{agent}", name)}</span>
+      </span>
+      <ArrowRight aria-hidden="true" className="size-5 shrink-0 text-primary" />
+    </Link>
+  );
 }

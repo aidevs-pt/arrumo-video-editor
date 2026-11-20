@@ -221,7 +221,9 @@
     "videoCount": "{count} vídeos",
     "oneVideo": "1 vídeo",
     "noVideos": "Aún no hay vídeos",
-    "progressLabel": "Progreso de la producción"
+    "progressLabel": "Progreso de la producción",
+    "contextTitle": "Cuéntale a {agent} quién eres",
+    "contextHint": "Comparte tu web o canal para que cada guion, corte y título parta de quién eres."
   },
   "layers": {
     "app": "Aplicación",
