@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,11 +11,12 @@ type TextItem = { kind: "title" | "description" | "tags"; text: string; format_i
 type MediaItem = SupplementalMedia & { url: string | null };
 type Payload = { text: TextItem[]; media: MediaItem[] };
 
-export function SupplementalReview({ workspaceId, runId, resultId, formats }: {
+export function SupplementalReview({ workspaceId, runId, resultId, formats, controls }: {
   workspaceId: number;
   runId: number;
   resultId: number;
   formats: DeliveryFormat[];
+  controls: (kind: "text" | "media", index: number) => ReactNode;
 }) {
   const { messages } = useLocale();
   const [payload, setPayload] = useState<Payload>();
@@ -45,21 +46,22 @@ export function SupplementalReview({ workspaceId, runId, resultId, formats }: {
   ];
 
   return groups.map(({ id, name }) => {
-    const text = payload.text.filter((item) => item.format_id === id);
-    const media = payload.media.filter((item) => item.format_id === id);
+    const text = payload.text.map((item, index) => ({ item, index })).filter(({ item }) => item.format_id === id);
+    const media = payload.media.map((item, index) => ({ item, index })).filter(({ item }) => item.format_id === id);
     if (!text.length && !media.length) return null;
     return <section key={id ?? "shared"} className="min-w-0">
       <h3 className="border-b pb-2 text-base font-bold">{name}</h3>
       <dl className="divide-y">
-        {text.map((item, index) => <div key={index} className="grid gap-1 py-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+        {text.map(({ item, index }) => <div key={index} className="grid gap-1 py-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
           <dt className="text-sm font-semibold text-muted-foreground">{messages.completedVideo[`supplemental_${item.kind}`]}</dt>
-          <dd className="min-w-0 wrap-anywhere whitespace-pre-wrap text-sm">{item.text}</dd>
+          <dd className="grid min-w-0 gap-2 text-sm"><p className="wrap-anywhere whitespace-pre-wrap">{item.text}</p>{controls("text", index)}</dd>
         </div>)}
       </dl>
       {media.length > 0 && <ul className="grid gap-3 pt-3 sm:grid-cols-2">
-        {media.map((item, index) => <li key={index} className="min-w-0 rounded-lg border p-2.5">
+        {media.map(({ item, index }) => <li key={index} className="min-w-0 rounded-lg border p-2.5">
           <p className="mb-2 truncate text-sm font-semibold" title={item.name}>{item.name}</p>
           <ReviewMedia item={item} />
+          <div className="mt-2">{controls("media", index)}</div>
         </li>)}
       </ul>}
     </section>;

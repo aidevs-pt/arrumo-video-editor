@@ -729,6 +729,15 @@
     "replayMode": "Ajustes que se usarán"
   },
   "productionPlan": {
+    "batchDecisions": "Decidir sobre todas las salidas",
+    "batch_approved": "Aprobar todo",
+    "batch_revise": "Pedir cambios en todo",
+    "batch_rejected": "Rechazar todo",
+    "item_approved": "Aprobar",
+    "item_revise": "Pedir cambios",
+    "item_rejected": "Rechazar",
+    "selectEveryItem": "Elige una decisión para cada salida",
+    "submitDecisions": "Enviar {count} decisiones",
     "sharedSupplemental": "Compartido entre formatos",
     "keepMotionItems": "Guardar elementos en la biblioteca de movimiento",
     "resultDetails": "Datos del resultado",

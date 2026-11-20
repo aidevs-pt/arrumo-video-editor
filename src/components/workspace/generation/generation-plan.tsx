@@ -30,7 +30,8 @@ type Plan = { steps: { stage: Stage; review_required: boolean }[] };
 type StageResult = MotionStageResult;
 type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
 type Decision = "approved" | "revise" | "rejected";
-type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[] };
+type SupplementalChoices<T = Decision> = { text: T[]; media: T[] };
+type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[]; supplemental?: SupplementalChoices<Decision | ""> };
 
 const ScriptReviewText = dynamic(() => import("./script-review-text"), { ssr: false });
 
@@ -104,12 +105,16 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     || (hasSources && (currentStage === "preview" || currentStage === "final_render"))
     ? currentStage : undefined;
 
-  async function review(resultId: number, decision: Decision, notes: string, saveMotionIndexes?: number[]) {
+  async function review(resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalChoices) {
     if (reviewing) return false;
     setReviewing(true);
     setReviewError(false);
     try {
-      await invoke("review_production_result", { workspaceId, runId, resultId, decision, notes, saveMotionIndexes });
+      if (supplemental) {
+        await invoke("review_supplemental_items", { workspaceId, runId, resultId, review: supplemental, notes });
+      } else {
+        await invoke("review_production_result", { workspaceId, runId, resultId, decision, notes, saveMotionIndexes });
+      }
       setProgress((current) => current && { ...current, pending_review_id: null });
       timeline.current?.focus();
       return true;
@@ -214,7 +219,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   formats: DeliveryFormat[];
   reviewing: boolean;
   reviewError: boolean;
-  onReview: (resultId: number, decision: Decision, notes: string, saveMotionIndexes?: number[]) => Promise<boolean>;
+  onReview: (resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalChoices) => Promise<boolean>;
   saveMotionDefault: boolean;
 }) {
   const { messages: { productionPlan: copy, motionLibrary } } = useLocale();
@@ -228,6 +233,21 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
           kind: "kind" in item && item.kind === "transition" ? "transition" as const : "animation" as const,
         }] : []
     )) : [];
+  const textCount = stage === "supplemental_outputs" && Array.isArray(result.result.supplemental_text)
+    ? result.result.supplemental_text.length : 0;
+  const mediaCount = stage === "supplemental_outputs" && Array.isArray(result.result.supplemental_media)
+    ? result.result.supplemental_media.length : 0;
+  const hasSupplemental = textCount + mediaCount > 0;
+  const itemChoices = (saved?: SupplementalChoices<unknown>): SupplementalChoices<Decision | ""> => ({
+    text: Array.from({ length: textCount }, (_, index) => {
+      const value = saved?.text?.[index];
+      return isDecision(value) ? value : "";
+    }),
+    media: Array.from({ length: mediaCount }, (_, index) => {
+      const value = saved?.media?.[index];
+      return isDecision(value) ? value : "";
+    }),
+  });
   const reviewFormId = `stage-review-${runId}-${result.id}`;
   const draftKey = `arrumo:review:${workspaceId}:${runId}:${result.id}`;
   const [draft, setDraft] = useState<ReviewDraft>(() => {
@@ -236,6 +256,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
       if (saved && typeof saved.notes === "string") {
         return {
           notes: saved.notes,
+          supplemental: hasSupplemental ? itemChoices(saved.supplemental) : undefined,
           decision: isDecision(saved.decision) ? saved.decision : "",
           motionIndexes: Array.isArray(saved.motionIndexes)
             ? motionItems.map(({ index }) => index).filter((index) => saved.motionIndexes.includes(index))
@@ -243,13 +264,16 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         };
       }
     } catch {}
-    return emptyDraft;
+    return hasSupplemental ? { ...emptyDraft, supplemental: itemChoices() } : emptyDraft;
   });
   const selectedMotion = draft.motionIndexes ?? (saveMotionDefault ? motionItems.map(({ index }) => index) : []);
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
   const markdown = typeof result.result.markdown === "string" ? result.result.markdown : undefined;
-  const hasSupplemental = stage === "supplemental_outputs"
-    && (Array.isArray(result.result.supplemental_text) || Array.isArray(result.result.supplemental_media));
+  const itemDraft = draft.supplemental;
+  const textDecisions = itemDraft?.text.filter(isDecision) ?? [];
+  const mediaDecisions = itemDraft?.media.filter(isDecision) ?? [];
+  const staged = textDecisions.length + mediaDecisions.length;
+  const canSend = hasSupplemental ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
     key !== "markdown" && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
@@ -262,9 +286,10 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft.decision || reviewing) return;
+    if (!canSend || reviewing) return;
     if (await onReview(result.id, draft.decision, draft.notes,
-      draft.decision === "approved" && motionItems.length ? selectedMotion : undefined)) {
+      draft.decision === "approved" && motionItems.length ? selectedMotion : undefined,
+      hasSupplemental ? { text: textDecisions, media: mediaDecisions } : undefined)) {
       try { sessionStorage.removeItem(draftKey); } catch {}
     }
   }
@@ -277,7 +302,25 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {markdown && <ScriptReviewText markdown={markdown} />}
-        {hasSupplemental && <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats} />}
+        {itemDraft && <>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-secondary p-2" role="group" aria-label={copy.batchDecisions}>
+            {decisions.map(({ value, icon: Icon }) => <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
+              onClick={() => updateDraft({ ...draft, supplemental: {
+                text: itemDraft.text.map(() => value), media: itemDraft.media.map(() => value),
+              } })}><Icon data-icon="inline-start" />{copy[`batch_${value}`]}</Button>)}
+          </div>
+          <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats}
+            controls={(kind, index) => <div className="flex flex-wrap gap-2">
+              {decisions.map(({ value, icon: Icon, fill }) => {
+                const active = itemDraft[kind][index] === value;
+                return <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
+                  aria-pressed={active} className={cn(active && fill)} onClick={() => {
+                    const items = itemDraft[kind].map((decision, position) => position === index ? (active ? "" : value) : decision);
+                    updateDraft({ ...draft, supplemental: { ...itemDraft, [kind]: items } });
+                  }}><Icon data-icon="inline-start" />{copy[`item_${value}`]}</Button>;
+              })}
+            </div>} />
+        </>}
         {motionItems.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {motionItems.map(({ index, title, usage, kind }) => (
@@ -315,7 +358,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         <form id={reviewFormId} onSubmit={(event) => void submit(event)}>
           <fieldset disabled={reviewing}>
             <FieldGroup>
-              <Field>
+              {!hasSupplemental && <Field>
                 <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-2">
                   {decisions.map(({ value, label, icon: Icon, fill }) => {
                     const selected = draft.decision === value;
@@ -326,7 +369,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
                     </Button>;
                   })}
                 </div>
-              </Field>
+              </Field>}
               <Field>
                 <FieldLabel htmlFor={`review-notes-${runId}`}>{copy.reviewNotes}</FieldLabel>
                 <Textarea id={`review-notes-${runId}`} name="notes" value={draft.notes}
@@ -353,14 +396,14 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         </form>
       </CardContent>
       <div className="sticky bottom-4 z-[1] flex flex-wrap mx-4 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
-        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || draft.notes) && "font-bold text-attention")} role="status">
+        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || staged > 0 || draft.notes) && "font-bold text-attention")} role="status">
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
-          {draft.decision || draft.notes ? copy.unsentReview : copy.selectDecision}
+          {draft.decision || staged > 0 || draft.notes ? copy.unsentReview : hasSupplemental ? copy.selectEveryItem : copy.selectDecision}
         </p>
-        <Button type="submit" form={reviewFormId} disabled={!draft.decision || reviewing}
+        <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
           className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)]">
-          {copy.submitDecision}
+          {hasSupplemental && staged !== 1 ? copy.submitDecisions.replace("{count}", String(staged)) : copy.submitDecision}
         </Button>
       </div>
     </Card>

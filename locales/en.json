@@ -729,6 +729,15 @@
     "replayMode": "Settings to use"
   },
   "productionPlan": {
+    "batchDecisions": "Decide for all outputs",
+    "batch_approved": "Approve all",
+    "batch_revise": "Ask for changes to all",
+    "batch_rejected": "Reject all",
+    "item_approved": "Approve",
+    "item_revise": "Ask for changes",
+    "item_rejected": "Reject",
+    "selectEveryItem": "Choose a decision for every output",
+    "submitDecisions": "Send {count} decisions",
     "sharedSupplemental": "Shared across formats",
     "keepMotionItems": "Save selected items to the Motion library",
     "resultDetails": "Result data",
