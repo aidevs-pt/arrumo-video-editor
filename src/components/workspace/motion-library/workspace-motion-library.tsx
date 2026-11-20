@@ -162,6 +162,8 @@ function MotionLibraryScope({ workspace, scope }: { workspace: Workspace; scope:
                     <FieldLabel htmlFor={`motion-${kind}`}>{copy[kind]}</FieldLabel>
                     <NativeSelect id={`motion-${kind}`} name={kind} required={kind === "video"} defaultValue={assetId}>
                       <NativeSelectOption value="">{kind === "video" ? copy.chooseVideo : copy.none}</NativeSelectOption>
+                      {existing && assetId !== "" && !catalog?.assets.some((asset) => asset.id === assetId) &&
+                        <NativeSelectOption value={assetId}>{copy.preservedMedia}</NativeSelectOption>}
                       {catalog?.assets.filter((asset) => asset.kind === kind).map((asset) =>
                         <NativeSelectOption key={asset.id} value={asset.id}>{asset.name}</NativeSelectOption>
                       )}

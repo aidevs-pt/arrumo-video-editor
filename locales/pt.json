@@ -186,6 +186,7 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "motionLibrary": {
+    "preservedMedia": "Ficheiro preservado da geração",
     "runItems": "Animações e transições",
     "saveRunItem": "Guardar na biblioteca",
     "openSavedItem": "Abrir biblioteca de movimento",

@@ -129,14 +129,12 @@ pub async fn preview_motion_library_item(
         .into_iter()
         .find(|item| item.id == item_id)
         .ok_or(failed)?;
-    let assets = store.list_assets(workspace_id).map_err(|_| failed)?;
     let root = arrumo_workspaces::asset_root(&database);
     let media_url = |id, kind| {
-        let asset = assets
-            .iter()
-            .find(|asset| asset.id == id && asset.kind == kind)
-            .ok_or(failed)?;
-        let extension = std::path::Path::new(&asset.name)
+        let name = store
+            .managed_asset_name(workspace_id, id, kind)
+            .map_err(|_| failed)?;
+        let extension = std::path::Path::new(&name)
             .extension()
             .and_then(|value| value.to_str())
             .unwrap_or("")

@@ -39,11 +39,20 @@ pub struct MotionLibraryItem {
 }
 
 const VALID_MEDIA: &str = "EXISTS (SELECT 1 FROM workspace_assets
-                           WHERE workspace_id = ?1 AND id = ?6 AND kind = 'video' AND superseded = 0)
+                           WHERE workspace_id = ?1 AND id = ?6 AND kind = 'video'
+                             AND (superseded = 0 OR ?9 OR id = (
+                                 SELECT preview_asset_id FROM motion_library WHERE workspace_id = ?1 AND id = ?10
+                             )))
                AND (?7 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
-                           WHERE workspace_id = ?1 AND id = ?7 AND kind = 'image' AND superseded = 0))
+                           WHERE workspace_id = ?1 AND id = ?7 AND kind = 'image'
+                             AND (superseded = 0 OR ?9 OR id = (
+                                 SELECT thumbnail_asset_id FROM motion_library WHERE workspace_id = ?1 AND id = ?10
+                             ))))
                AND (?8 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
-                           WHERE workspace_id = ?1 AND id = ?8 AND kind = 'audio' AND superseded = 0))";
+                           WHERE workspace_id = ?1 AND id = ?8 AND kind = 'audio'
+                             AND (superseded = 0 OR ?9 OR id = (
+                                 SELECT sound_asset_id FROM motion_library WHERE workspace_id = ?1 AND id = ?10
+                             ))))";
 
 pub(crate) fn validate_motion_results(
     tx: &Transaction<'_>,
@@ -68,6 +77,8 @@ pub(crate) fn validate_motion_results(
                 settings.preview_asset_id,
                 settings.thumbnail_asset_id,
                 settings.sound_asset_id,
+                false,
+                None::<i64>,
             ],
             |row| row.get(0),
         )?;
@@ -83,6 +94,15 @@ impl WorkspaceStore {
         &self,
         workspace_id: i64,
         settings: &MotionLibrarySettings,
+    ) -> rusqlite::Result<MotionLibraryItem> {
+        self.insert_motion_library_item(workspace_id, settings, false)
+    }
+
+    fn insert_motion_library_item(
+        &self,
+        workspace_id: i64,
+        settings: &MotionLibrarySettings,
+        captured: bool,
     ) -> rusqlite::Result<MotionLibraryItem> {
         self.0.query_row(
             &format!(
@@ -103,6 +123,8 @@ impl WorkspaceStore {
                 settings.preview_asset_id,
                 settings.thumbnail_asset_id,
                 settings.sound_asset_id,
+                captured,
+                None::<i64>,
             ],
             read_item,
         )
@@ -154,13 +176,14 @@ impl WorkspaceStore {
         if let Some(item) = existing {
             return Ok(item);
         }
+        let position = usize::try_from(index).map_err(|_| rusqlite::Error::InvalidQuery)?;
         let settings = result
             .get("motion_items")
-            .and_then(|items| items.get(index as usize))
+            .and_then(|items| items.get(position))
             .ok_or(rusqlite::Error::InvalidQuery)?;
         let settings: MotionLibrarySettings = serde_json::from_value(settings.clone())
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
-        let item = self.create_motion_library_item(workspace_id, &settings)?;
+        let item = self.insert_motion_library_item(workspace_id, &settings, true)?;
         tx.execute(
             "UPDATE motion_library SET source_run_id = ?2, source_result_id = ?3, source_motion_index = ?4
              WHERE id = ?1",
@@ -182,7 +205,7 @@ impl WorkspaceStore {
                 "UPDATE motion_library
                  SET profile_id = ?2, kind = ?3, title = ?4, usage_markdown = ?5,
                      preview_asset_id = ?6, thumbnail_asset_id = ?7, sound_asset_id = ?8
-                 WHERE workspace_id = ?1 AND id = ?9 AND {VALID_MEDIA}
+                 WHERE workspace_id = ?1 AND id = ?10 AND {VALID_MEDIA}
                  RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
                            preview_asset_id, thumbnail_asset_id, sound_asset_id"
             ),
@@ -195,6 +218,7 @@ impl WorkspaceStore {
                 settings.preview_asset_id,
                 settings.thumbnail_asset_id,
                 settings.sound_asset_id,
+                false,
                 item_id,
             ],
             read_item,

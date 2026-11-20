@@ -186,6 +186,7 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "preservedMedia": "Preserved media from run",
     "runItems": "Animations and transitions",
     "saveRunItem": "Save to library",
     "openSavedItem": "Open motion library",

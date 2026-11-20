@@ -38,6 +38,19 @@ impl WorkspaceStore {
             .collect()
     }
 
+    pub fn managed_asset_name(
+        &self,
+        workspace_id: i64,
+        asset_id: i64,
+        kind: &str,
+    ) -> rusqlite::Result<String> {
+        self.0.query_row(
+            "SELECT name FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2 AND kind = ?3",
+            params![workspace_id, asset_id, kind],
+            |row| row.get(0),
+        )
+    }
+
     pub fn image_preview(
         &self,
         media_root: &Path,
