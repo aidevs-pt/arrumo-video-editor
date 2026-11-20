@@ -435,3 +435,5 @@ For selective approval, use `review-supplemental-items <workspace-id> <run-id> <
 In desktop guided Outputs review, choose a decision per item or use a batch button to set all items at once. You can override any item before sending. Arrumo stages your choices and shared notes locally until you select **Send**.
 
 MCP and A2A support `review_supplemental_items` with `workspaceId`, `runId`, `resultId`, `review` (the `text` and `media` decision arrays), and optional `notes`. In an A2A task message, the task ID supplies the workspace and run scope.
+
+Check individual outputs to apply a batch decision only to the selected rows. After a partial revision, prior approvals fill in automatically and the replacement items need a new decision. Review choices stay editable until Send.

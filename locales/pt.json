@@ -729,6 +729,12 @@
     "replayMode": "Definições a usar"
   },
   "productionPlan": {
+    "selectedOutputCount": "{count} selecionados",
+    "selected_approved": "Aprovar seleção",
+    "selected_revise": "Pedir alterações à seleção",
+    "selected_rejected": "Rejeitar seleção",
+    "clearOutputSelection": "Limpar seleção",
+    "selectOutput": "Selecionar {label}",
     "batchDecisions": "Decidir sobre todas as saídas",
     "batch_approved": "Aprovar tudo",
     "batch_revise": "Pedir alterações a tudo",

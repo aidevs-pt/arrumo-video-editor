@@ -27,7 +27,7 @@ import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
-type StageResult = MotionStageResult;
+type StageResult = MotionStageResult & { supplemental_review?: SupplementalChoices };
 type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
 type Decision = "approved" | "revise" | "rejected";
 type SupplementalChoices<T = Decision> = { text: T[]; media: T[] };
@@ -201,7 +201,9 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
               results={progress.results} steps={plan.steps} stageIndex={progress.stage_index} />}
             {awaiting && currentStage && (
               <StageReview key={awaiting.id} workspaceId={workspaceId} runId={runId} stage={currentStage} result={awaiting} formats={formats}
-                reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault} />
+                reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault}
+                previousSupplementalReview={progress?.results.findLast((entry) => entry.stage_index === awaiting.stage_index
+                  && entry.id < awaiting.id)?.supplemental_review} />
             )}
           </div>
           {activity}
@@ -211,7 +213,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
   );
 }
 
-function StageReview({ workspaceId, runId, stage, result, formats, reviewing, reviewError, onReview, saveMotionDefault }: {
+function StageReview({ workspaceId, runId, stage, result, formats, reviewing, reviewError, onReview, saveMotionDefault, previousSupplementalReview }: {
   workspaceId: number;
   runId: number;
   stage: Stage;
@@ -221,6 +223,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   reviewError: boolean;
   onReview: (resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalChoices) => Promise<boolean>;
   saveMotionDefault: boolean;
+  previousSupplementalReview?: SupplementalChoices;
 }) {
   const { messages: { productionPlan: copy, motionLibrary } } = useLocale();
   const motionItems = stage === "assets" && Array.isArray(result.result.motion_items)
@@ -241,11 +244,11 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   const itemChoices = (saved?: SupplementalChoices<unknown>): SupplementalChoices<Decision | ""> => ({
     text: Array.from({ length: textCount }, (_, index) => {
       const value = saved?.text?.[index];
-      return isDecision(value) ? value : "";
+      return value === "" || isDecision(value) ? value : previousSupplementalReview?.text[index] === "approved" ? "approved" : "";
     }),
     media: Array.from({ length: mediaCount }, (_, index) => {
       const value = saved?.media?.[index];
-      return isDecision(value) ? value : "";
+      return value === "" || isDecision(value) ? value : previousSupplementalReview?.media[index] === "approved" ? "approved" : "";
     }),
   });
   const reviewFormId = `stage-review-${runId}-${result.id}`;
@@ -270,6 +273,16 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
   const markdown = typeof result.result.markdown === "string" ? result.result.markdown : undefined;
   const itemDraft = draft.supplemental;
+  const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
+  const selectedCount = batchSelection.size;
+  function selectItem(key: string, selected: boolean) {
+    setBatchSelection((current) => {
+      const next = new Set(current);
+      if (selected) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
   const textDecisions = itemDraft?.text.filter(isDecision) ?? [];
   const mediaDecisions = itemDraft?.media.filter(isDecision) ?? [];
   const staged = textDecisions.length + mediaDecisions.length;
@@ -303,14 +316,21 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
       <CardContent className="flex flex-col gap-4">
         {markdown && <ScriptReviewText markdown={markdown} />}
         {itemDraft && <>
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-secondary p-2" role="group" aria-label={copy.batchDecisions}>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-secondary p-2" role="group" aria-label={selectedCount ? copy.selectedOutputCount.replace("{count}", String(selectedCount)) : copy.batchDecisions}>
+            {selectedCount > 0 && <span className="px-1 text-sm">{copy.selectedOutputCount.replace("{count}", String(selectedCount))}</span>}
             {decisions.map(({ value, icon: Icon }) => <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
               onClick={() => updateDraft({ ...draft, supplemental: {
-                text: itemDraft.text.map(() => value), media: itemDraft.media.map(() => value),
-              } })}><Icon data-icon="inline-start" />{copy[`batch_${value}`]}</Button>)}
+                text: itemDraft.text.map((current, index) => !selectedCount || batchSelection.has(`text-${index}`) ? value : current),
+                media: itemDraft.media.map((current, index) => !selectedCount || batchSelection.has(`media-${index}`) ? value : current),
+              } })}><Icon data-icon="inline-start" />{selectedCount ? copy[`selected_${value}`] : copy[`batch_${value}`]}</Button>)}
+            {selectedCount > 0 && <Button type="button" size="sm" variant="ghost" disabled={reviewing}
+              onClick={() => setBatchSelection(new Set())}>{copy.clearOutputSelection}</Button>}
           </div>
           <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats}
-            controls={(kind, index) => <div className="flex flex-wrap gap-2">
+            controls={(kind, index, label) => <div className="flex flex-wrap items-center gap-2">
+              <Checkbox disabled={reviewing} checked={batchSelection.has(`${kind}-${index}`)}
+                aria-label={copy.selectOutput.replace("{label}", label)}
+                onCheckedChange={(checked) => selectItem(`${kind}-${index}`, checked === true)} />
               {decisions.map(({ value, icon: Icon, fill }) => {
                 const active = itemDraft[kind][index] === value;
                 return <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}

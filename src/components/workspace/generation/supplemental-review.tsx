@@ -16,7 +16,7 @@ export function SupplementalReview({ workspaceId, runId, resultId, formats, cont
   runId: number;
   resultId: number;
   formats: DeliveryFormat[];
-  controls: (kind: "text" | "media", index: number) => ReactNode;
+  controls: (kind: "text" | "media", index: number, label: string) => ReactNode;
 }) {
   const { messages } = useLocale();
   const [payload, setPayload] = useState<Payload>();
@@ -54,14 +54,14 @@ export function SupplementalReview({ workspaceId, runId, resultId, formats, cont
       <dl className="divide-y">
         {text.map(({ item, index }) => <div key={index} className="grid gap-1 py-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
           <dt className="text-sm font-semibold text-muted-foreground">{messages.completedVideo[`supplemental_${item.kind}`]}</dt>
-          <dd className="grid min-w-0 gap-2 text-sm"><p className="wrap-anywhere whitespace-pre-wrap">{item.text}</p>{controls("text", index)}</dd>
+          <dd className="grid min-w-0 gap-2 text-sm"><p className="wrap-anywhere whitespace-pre-wrap">{item.text}</p>{controls("text", index, messages.completedVideo[`supplemental_${item.kind}`] + " " + (index + 1))}</dd>
         </div>)}
       </dl>
       {media.length > 0 && <ul className="grid gap-3 pt-3 sm:grid-cols-2">
         {media.map(({ item, index }) => <li key={index} className="min-w-0 rounded-lg border p-2.5">
           <p className="mb-2 truncate text-sm font-semibold" title={item.name}>{item.name}</p>
           <ReviewMedia item={item} />
-          <div className="mt-2">{controls("media", index)}</div>
+          <div className="mt-2">{controls("media", index, item.name)}</div>
         </li>)}
       </ul>}
     </section>;
