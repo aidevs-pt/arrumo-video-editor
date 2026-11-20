@@ -1188,5 +1188,44 @@
   },
   "media": {
     "linuxCodecs": "On Linux, video plays through GStreamer. Install its H.264 decoder (gstreamer1.0-libav on Debian and Ubuntu, gstreamer1-plugin-openh264 or gstreamer1-plugin-libav on Fedora), then restart Arrumo."
+  },
+  "contextResearch": {
+    "title": "Where can {agent} learn about you?",
+    "intro": "Share your website, channel or social profiles and {agent} drafts this page for you to edit. Or start from the template below.",
+    "links": "Links",
+    "linkLabel": "Link {number}",
+    "linkPlaceholder": "youtube.com/@yourchannel",
+    "addLink": "Add another link",
+    "removeLink": "Remove link",
+    "notes": "Anything else to know (optional)",
+    "notesPlaceholder": "What you make, who it is for, how you like to sound…",
+    "privacy": "Arrumo reads these public pages on this computer and gives their text to your agent. Nothing is saved until you press Save.",
+    "draft": "Draft my context",
+    "reading": "Reading…",
+    "readingHint": "Reading your links and drafting with {agent}. This can take a minute.",
+    "drafted": "The draft is ready.",
+    "reviewBelow": "Review it below, then save.",
+    "nothingRead": "None of the links could be read. Check them or add a few words about you.",
+    "profiles": "Suggested profiles",
+    "createProfile": "Create profile",
+    "profileCreated": "Created",
+    "agentFallback": "your agent",
+    "failures": {
+      "agent_unavailable": "{agent} is not installed or signed in on this computer. Check Settings, then try again.",
+      "agent_timed_out": "{agent} took too long. Try again with fewer links.",
+      "agent_failed": "{agent} could not write the draft. Try again.",
+      "context_draft_failed": "The draft could not be made. Check that an agent is selected in Settings."
+    },
+    "problems": {
+      "invalid_address": "not a web address",
+      "not_public": "only public addresses can be read",
+      "not_found": "the address could not be found",
+      "unreachable": "the page could not be reached",
+      "timed_out": "the page took too long to answer",
+      "http_error": "the page returned an error",
+      "not_a_page": "the address is not a web page",
+      "no_text": "the page has no readable text, it may need sign-in or JavaScript",
+      "too_many_redirects": "the page redirected too many times"
+    }
   }
 }

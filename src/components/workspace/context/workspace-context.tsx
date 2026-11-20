@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { WorkspaceFeedback } from "./workspace-feedback";
+import { ContextResearch } from "./context-research";
 
 export function WorkspaceContext({ workspace }: {
   workspace: { id: number; name: string };
@@ -24,6 +25,8 @@ export function WorkspaceContext({ workspace }: {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<"saved" | "saveError" | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [blank, setBlank] = useState<boolean>();
   const { messages } = useLocale();
   const copy = messages.context;
 
@@ -31,7 +34,11 @@ export function WorkspaceContext({ workspace }: {
   useEffect(() => {
     let active = true;
     invoke<string | null>("get_workspace_context", { workspaceId: workspace.id }).then(
-      (value) => { if (active) setMarkdown(value ?? copy.template); },
+      (value) => {
+        if (!active) return;
+        setMarkdown(value ?? copy.template);
+        setBlank(!value?.trim() || value === copy.template);
+      },
       () => { if (active) setLoadError(true); },
     );
     return () => { active = false; };
@@ -67,6 +74,13 @@ export function WorkspaceContext({ workspace }: {
               }}>{copy.retry}</Button>
             </Alert>
           ) : markdown === undefined ? <p role="status">{copy.loading}</p> : (
+            <div className="flex flex-col gap-5">
+            <ContextResearch workspaceId={workspace.id} startOpen={blank === true} onDraft={(draft) => {
+              setMarkdown(draft);
+              setDirty(true);
+              setResult(null);
+              setRevision((current) => current + 1);
+            }} />
             <form onSubmit={save} aria-busy={saving} aria-labelledby="context-about">
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 id="context-about" className="text-[1.75rem]">{copy.aboutYou}</h2>
@@ -74,13 +88,14 @@ export function WorkspaceContext({ workspace }: {
                   {result === "saveError" ? copy.saveError : dirty ? copy.unsaved : result === "saved" ? copy.saved : ""}
                 </span>
               </div>
-              <MarkdownEditor id="workspace-context" label={copy.label} value={markdown} disabled={saving} onChange={(value) => {
+              <MarkdownEditor key={revision} id="workspace-context" label={copy.label} value={markdown} disabled={saving} onChange={(value) => {
                 setMarkdown(value);
                 setDirty(true);
                 setResult(null);
               }} />
               <Button type="submit" className="mt-3" disabled={saving || !dirty}>{copy.save}</Button>
             </form>
+            </div>
           )}
           <WorkspaceFeedback workspaceId={workspace.id} />
           <PluginSurfaces placement="workspace" workspaceId={workspace.id} />

@@ -1188,5 +1188,44 @@
   },
   "media": {
     "linuxCodecs": "En Linux, el vídeo se reproduce con GStreamer. Instala su decodificador H.264 (gstreamer1.0-libav en Debian y Ubuntu, gstreamer1-plugin-openh264 o gstreamer1-plugin-libav en Fedora) y reinicia Arrumo."
+  },
+  "contextResearch": {
+    "title": "¿Dónde puede {agent} conocerte?",
+    "intro": "Comparte tu web, canal o perfiles sociales y {agent} redactará esta página para que la edites. O empieza con la plantilla de abajo.",
+    "links": "Enlaces",
+    "linkLabel": "Enlace {number}",
+    "linkPlaceholder": "youtube.com/@tucanal",
+    "addLink": "Añadir otro enlace",
+    "removeLink": "Quitar enlace",
+    "notes": "Algo más que deba saber (opcional)",
+    "notesPlaceholder": "Qué haces, para quién y cómo te gusta sonar…",
+    "privacy": "Arrumo lee estas páginas públicas en este ordenador y pasa su texto a tu agente. No se guarda nada hasta que pulses Guardar.",
+    "draft": "Redactar mi contexto",
+    "reading": "Leyendo…",
+    "readingHint": "Leyendo tus enlaces y redactando con {agent}. Puede tardar un minuto.",
+    "drafted": "El borrador está listo.",
+    "reviewBelow": "Revísalo abajo y guárdalo.",
+    "nothingRead": "No se pudo leer ningún enlace. Revísalos o añade unas palabras sobre ti.",
+    "profiles": "Perfiles sugeridos",
+    "createProfile": "Crear perfil",
+    "profileCreated": "Creado",
+    "agentFallback": "tu agente",
+    "failures": {
+      "agent_unavailable": "{agent} no está instalado o no ha iniciado sesión en este ordenador. Revisa Ajustes y vuelve a intentarlo.",
+      "agent_timed_out": "{agent} tardó demasiado. Inténtalo con menos enlaces.",
+      "agent_failed": "{agent} no pudo escribir el borrador. Vuelve a intentarlo.",
+      "context_draft_failed": "No se pudo hacer el borrador. Comprueba que hay un agente elegido en Ajustes."
+    },
+    "problems": {
+      "invalid_address": "no es una dirección web",
+      "not_public": "solo se pueden leer direcciones públicas",
+      "not_found": "no se encontró la dirección",
+      "unreachable": "no se pudo acceder a la página",
+      "timed_out": "la página tardó demasiado en responder",
+      "http_error": "la página devolvió un error",
+      "not_a_page": "la dirección no es una página web",
+      "no_text": "la página no tiene texto legible; puede requerir iniciar sesión o JavaScript",
+      "too_many_redirects": "la página redirigió demasiadas veces"
+    }
   }
 }

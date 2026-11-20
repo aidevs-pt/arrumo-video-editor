@@ -1188,5 +1188,44 @@
   },
   "media": {
     "linuxCodecs": "No Linux, o vídeo é reproduzido através do GStreamer. Instale o descodificador H.264 (gstreamer1.0-libav no Debian e Ubuntu, gstreamer1-plugin-openh264 ou gstreamer1-plugin-libav no Fedora) e reinicie o Arrumo."
+  },
+  "contextResearch": {
+    "title": "Onde pode {agent} conhecê-lo?",
+    "intro": "Partilhe o seu site, canal ou perfis sociais e {agent} redige esta página para a editar. Ou comece pelo modelo abaixo.",
+    "links": "Ligações",
+    "linkLabel": "Ligação {number}",
+    "linkPlaceholder": "youtube.com/@oseucanal",
+    "addLink": "Adicionar outra ligação",
+    "removeLink": "Remover ligação",
+    "notes": "Mais alguma coisa a saber (opcional)",
+    "notesPlaceholder": "O que faz, para quem e como gosta de soar…",
+    "privacy": "O Arrumo lê estas páginas públicas neste computador e entrega o texto ao seu agente. Nada é guardado até carregar em Guardar.",
+    "draft": "Redigir o meu contexto",
+    "reading": "A ler…",
+    "readingHint": "A ler as suas ligações e a redigir com {agent}. Pode demorar um minuto.",
+    "drafted": "O rascunho está pronto.",
+    "reviewBelow": "Reveja-o abaixo e guarde.",
+    "nothingRead": "Nenhuma ligação pôde ser lida. Verifique-as ou escreva algumas palavras sobre si.",
+    "profiles": "Perfis sugeridos",
+    "createProfile": "Criar perfil",
+    "profileCreated": "Criado",
+    "agentFallback": "o seu agente",
+    "failures": {
+      "agent_unavailable": "{agent} não está instalado ou sem sessão iniciada neste computador. Verifique as Definições e tente novamente.",
+      "agent_timed_out": "{agent} demorou demasiado. Tente com menos ligações.",
+      "agent_failed": "{agent} não conseguiu escrever o rascunho. Tente novamente.",
+      "context_draft_failed": "Não foi possível criar o rascunho. Verifique se há um agente escolhido nas Definições."
+    },
+    "problems": {
+      "invalid_address": "não é um endereço web",
+      "not_public": "só é possível ler endereços públicos",
+      "not_found": "o endereço não foi encontrado",
+      "unreachable": "não foi possível aceder à página",
+      "timed_out": "a página demorou demasiado a responder",
+      "http_error": "a página devolveu um erro",
+      "not_a_page": "o endereço não é uma página web",
+      "no_text": "a página não tem texto legível; pode exigir sessão iniciada ou JavaScript",
+      "too_many_redirects": "a página redirecionou demasiadas vezes"
+    }
   }
 }
