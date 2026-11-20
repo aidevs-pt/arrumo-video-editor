@@ -186,6 +186,9 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "assets": {
+    "replaceFile": "Substituir ficheiro",
+    "replacingAsset": "A substituir o ficheiro…",
+    "replacementError": "Não foi possível substituir o recurso. Escolhe um ficheiro do mesmo tipo ou reabre a biblioteca se o recurso tiver mudado.",
     "dropFiles": "Larga ficheiros multimédia em qualquer ponto desta vista.",
     "recentImport": "Importado agora",
     "removal": {

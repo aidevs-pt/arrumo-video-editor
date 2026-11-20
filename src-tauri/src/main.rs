@@ -314,6 +314,28 @@ async fn set_asset_organization(
 }
 
 #[tauri::command]
+async fn replace_asset(
+    app: AppHandle,
+    workspace_id: i64,
+    asset_id: i64,
+    source: PathBuf,
+) -> Result<WorkspaceAsset, &'static str> {
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "store_unavailable")?
+        .join("workspaces.sqlite");
+    tauri::async_runtime::spawn_blocking(move || {
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .replace_asset(&asset_root(&database), workspace_id, asset_id, &source)
+            .map_err(|_| "asset_replacement_failed")
+    })
+    .await
+    .map_err(|_| "asset_replacement_failed")?
+}
+
+#[tauri::command]
 async fn remove_asset(
     app: AppHandle,
     workspace_id: i64,
@@ -799,6 +821,7 @@ fn main() {
             list_asset_organization,
             set_asset_organization,
             remove_asset,
+            replace_asset,
             get_workspace_context,
             set_workspace_context,
             list_workspace_feedback,

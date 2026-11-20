@@ -45,11 +45,11 @@ export function WorkspaceAssets({ workspace }: {
   const [grouped, setGrouped] = useState(false);
   const [groupFilter, setGroupFilter] = useState("");
   const [labelFilter, setLabelFilter] = useState("");
-  const [busy, setBusy] = useState<"import" | "save" | null>(null);
+  const [busy, setBusy] = useState<"import" | "replace" | "save" | null>(null);
   const [dragging, setDragging] = useState(false);
   const [recent, setRecent] = useState<number[]>([]);
   const [progress, setProgress] = useState<{ completed: number; total: number }>();
-  const [error, setError] = useState<"importError" | "notesError" | null>(null);
+  const [error, setError] = useState<"importError" | "replacementError" | "notesError" | null>(null);
   const [editing, setEditing] = useState<Asset[] | null>(null);
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
@@ -115,6 +115,36 @@ export function WorkspaceAssets({ workspace }: {
       setError("importError");
     } finally {
       setProgress(undefined);
+      setBusy(null);
+      importing.current = false;
+    }
+  }
+
+  async function replaceAsset(asset: Asset) {
+    if (busy || importing.current) return;
+    importing.current = true;
+    setBusy("replace");
+    setError(null);
+    try {
+      const source = await open({ multiple: false, title: copy.replaceFile });
+      if (!source) return;
+      const replacement = await invoke<Asset>("replace_asset", {
+        workspaceId: workspace.id, assetId: asset.id, source,
+      });
+      setAssets((rows) => rows?.map((row) => row.id === asset.id ? replacement : row));
+      setOrganizations(({ [asset.id]: organization, ...remaining }) =>
+        organization ? { ...remaining, [replacement.id]: organization } : remaining,
+      );
+      setSelected((current) => {
+        const next = new Set(current);
+        if (next.delete(asset.id)) next.add(replacement.id);
+        return next;
+      });
+      setRecent([replacement.id]);
+      heading.current?.focus();
+    } catch {
+      setError("replacementError");
+    } finally {
       setBusy(null);
       importing.current = false;
     }
@@ -241,6 +271,8 @@ export function WorkspaceAssets({ workspace }: {
           <Progress aria-label={copy.picking} value={progress.completed / progress.total * 100} />
         </div>}
         {error === "importError" && <Alert variant="destructive"><AlertDescription>{copy.importError}</AlertDescription></Alert>}
+        {busy === "replace" && <p role="status" className="text-sm text-muted-foreground">{copy.replacingAsset}</p>}
+        {error === "replacementError" && <Alert variant="destructive"><AlertDescription>{copy.replacementError}</AlertDescription></Alert>}
         {loadError ? (
           <Alert variant="destructive">
             <AlertDescription>{copy.loadError}</AlertDescription>
@@ -290,6 +322,9 @@ export function WorkspaceAssets({ workspace }: {
                           <AssetOrganizationDialog workspaceId={workspace.id} assetId={asset.id} name={asset.name}
                             organization={organizations[asset.id]} disabled={busy !== null}
                             onSave={(organization) => setOrganizations((current) => ({ ...current, [asset.id]: organization }))} />
+                          <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
+                            aria-label={`${copy.replaceFile} · ${asset.name}`}
+                            onClick={() => void replaceAsset(asset)}>{copy.replaceFile}</Button>
                           <ConfirmTitleDelete title={asset.name} disabled={busy !== null} copy={copy.removal}
                             onConfirm={(confirmedName) => invoke<boolean>("remove_asset", {
                               workspaceId: workspace.id, assetId: asset.id, confirmedName,

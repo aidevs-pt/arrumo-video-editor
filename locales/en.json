@@ -186,6 +186,9 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "replaceFile": "Replace file",
+    "replacingAsset": "Replacing file…",
+    "replacementError": "Could not replace the asset. Choose a file of the same media type or reopen the library if the asset has changed.",
     "dropFiles": "Drop media files anywhere in this view.",
     "recentImport": "Just imported",
     "removal": {

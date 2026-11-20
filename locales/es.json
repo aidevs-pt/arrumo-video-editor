@@ -186,6 +186,9 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "replaceFile": "Reemplazar archivo",
+    "replacingAsset": "Reemplazando archivo…",
+    "replacementError": "No se pudo reemplazar el recurso. Elige un archivo del mismo tipo o vuelve a abrir la biblioteca si el recurso ha cambiado.",
     "dropFiles": "Suelta archivos multimedia en cualquier parte de esta vista.",
     "recentImport": "Recién importado",
     "removal": {
