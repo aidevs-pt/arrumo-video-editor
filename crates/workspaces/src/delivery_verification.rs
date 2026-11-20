@@ -489,6 +489,26 @@ impl WorkspaceStore {
         run_id: i64,
         format_id: i64,
     ) -> Result<usize, Box<dyn Error>> {
+        self.generate_delivery_subtitles_with(
+            database,
+            workspace_id,
+            run_id,
+            format_id,
+            |order, audio| {
+                self.transcribe_ordered_wav(workspace_id, order, audio, true)
+                    .map(|result| result.transcript)
+            },
+        )
+    }
+
+    fn generate_delivery_subtitles_with(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+        transcribe: impl FnOnce(Vec<String>, fs::File) -> io::Result<crate::transcription::Transcript>,
+    ) -> Result<usize, Box<dyn Error>> {
         let snapshot = self.subtitle_import_snapshot(workspace_id, run_id)?;
         let order: Vec<String> = serde_json::from_value(
             serde_json::from_str::<serde_json::Value>(&snapshot)?
@@ -567,10 +587,8 @@ impl WorkspaceStore {
         if !status.success() || wave.metadata()?.len() >= wave_limit {
             return Err(io::Error::other("Could not extract bounded delivery audio").into());
         }
-        let transcript =
-            self.transcribe_ordered_wav(workspace_id, order, fs::File::open(wave)?, true)?;
-        let subtitles =
-            crate::delivery_captions::render_srt(&transcript.transcript.words, duration)?;
+        let transcript = transcribe(order, fs::File::open(wave)?)?;
+        let subtitles = crate::delivery_captions::render_srt(&transcript.words, duration)?;
         self.publish_delivery_subtitles(
             [workspace_id, run_id, format_id],
             directory,
@@ -659,4 +677,132 @@ fn delivery_subtitle_format(snapshot: &str, format_id: i64) -> Result<Format, Bo
         .map(|entry| entry.format)
         .find(|format| format.id == format_id)
         .ok_or_else(|| io::Error::other("Format is not in the run snapshot").into())
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod transcription_tests {
+    use super::*;
+    use crate::{
+        DraftSettings, RunOptions,
+        transcription::{Transcript, TranscriptWord},
+    };
+    use serde_json::json;
+
+    #[test]
+    fn generated_subtitles_complete_a_delivery_and_preserve_existing_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspace.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Test delivery".into(),
+                    intent: "Test caption generation".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "caption-fixture",
+                &RunOptions::default(),
+            )
+            .unwrap();
+        let format_id = 5;
+        let snapshot = json!({
+            "formats": [{"format": {"id": format_id, "width": 160, "height": 90}}],
+            "provider_orders": {"transcription": {"effective": ["fixture-timed", "fixture-fallback"]}}
+        });
+        let plan = json!({"steps": [{"stage": "verify_delivery", "review_required": false}]});
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET snapshot_json = ?1, plan_json = ?2 WHERE id = ?3",
+                params![snapshot.to_string(), plan.to_string(), run.id],
+            )
+            .unwrap();
+
+        let directory = delivery_directory(&database, workspace, run.id);
+        fs::create_dir_all(&directory).unwrap();
+        let video = directory.join("5.mp4");
+        let status = Command::new("ffmpeg")
+            .args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=s=160x90:r=15",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:sample_rate=16000",
+                "-t",
+                "1",
+                "-c:v",
+                "mpeg4",
+                "-threads",
+                "1",
+                "-c:a",
+                "aac",
+            ])
+            .arg(video)
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let cues = store
+            .generate_delivery_subtitles_with(
+                &database,
+                workspace,
+                run.id,
+                format_id,
+                |order, mut audio| {
+                    assert_eq!(order, ["fixture-timed", "fixture-fallback"]);
+                    let mut header = [0; 12];
+                    audio.read_exact(&mut header)?;
+                    assert_eq!(&header[0..4], b"RIFF");
+                    assert_eq!(&header[8..12], b"WAVE");
+                    assert!(audio.metadata()?.len() > 30_000);
+                    Ok(Transcript {
+                        language_code: "en".into(),
+                        text: "Fixture audio".into(),
+                        words: vec![TranscriptWord {
+                            text: "Fixture audio".into(),
+                            start: 0.125,
+                            end: 0.75,
+                            speaker_id: None,
+                        }],
+                    })
+                },
+            )
+            .unwrap();
+        assert_eq!(cues, 1);
+
+        let srt = directory.join("5.srt");
+        let expected = "1\n00:00:00,125 --> 00:00:00,750\nFixture audio\n\n";
+        assert_eq!(fs::read_to_string(&srt).unwrap(), expected);
+        assert!(
+            store
+                .generate_delivery_subtitles_with(
+                    &database,
+                    workspace,
+                    run.id,
+                    format_id,
+                    |_, _| panic!("Existing subtitles must prevent provider dispatch"),
+                )
+                .is_err()
+        );
+        assert_eq!(fs::read_to_string(&srt).unwrap(), expected);
+        assert!(store.process_next_ready_delivery(&database).unwrap());
+        let verified = store.verified_delivery(workspace, run.id).unwrap();
+        assert_eq!(verified.verified_outputs[0].subtitle_cues, 1);
+        assert_eq!(verified.verified_outputs[0].subtitles, "5.srt");
+    }
 }
