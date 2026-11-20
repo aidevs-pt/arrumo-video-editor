@@ -1,7 +1,9 @@
+use std::path::Path;
+
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::{MotionLibrarySettings, WorkspaceStore};
+use crate::{MotionArtifact, MotionLibrarySettings, WorkspaceStore};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -65,7 +67,16 @@ struct SaveResult {
     index: i64,
 }
 
-pub(super) fn definitions() -> [Value; 8] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SubmitArtifacts {
+    workspace_id: i64,
+    run_id: i64,
+    attempt: i64,
+    artifacts: Vec<MotionArtifact>,
+}
+
+pub(super) fn definitions() -> [Value; 9] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -112,11 +123,25 @@ pub(super) fn definitions() -> [Value; 8] {
                 "workspaceId": id, "runId": id, "resultId": id, "index": {"type": "integer", "minimum": 0}
             }, "required": ["workspaceId", "runId", "resultId", "index"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "submit_motion_artifacts", "description": "Import finished local renderer files and submit an Assets result under the current run lease.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "attempt": id,
+                "artifacts": {"type": "array", "minItems": 1, "items": {
+                    "type": "object", "properties": {
+                        "kind": {"enum": ["animation", "transition"]}, "title": title,
+                        "usage_markdown": {"type": "string"}, "profile_id": optional_id,
+                        "preview": {"type": "string", "minLength": 1, "description": "Absolute local video path"},
+                        "thumbnail": {"type": ["string", "null"], "minLength": 1, "description": "Absolute local image path"},
+                        "sound": {"type": ["string", "null"], "minLength": 1, "description": "Absolute local audio path"}
+                    }, "required": ["kind", "title", "usage_markdown", "preview"], "additionalProperties": false
+                }}
+            }, "required": ["workspaceId", "runId", "attempt", "artifacts"], "additionalProperties": false}}),
     ]
 }
 
 pub(super) fn call(
     store: &WorkspaceStore,
+    database: &Path,
     name: &str,
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
@@ -167,6 +192,11 @@ pub(super) fn call(
             store.save_motion_result(args.workspace_id, args.run_id, args.result_id, args.index)
                 .map(|item| json!({"item": item}))
                 .map_err(|_| "Could not save motion result. Check the run, accepted result, item index, and media references")
+        }),
+        "submit_motion_artifacts" => parse(arguments).and_then(|args: SubmitArtifacts| {
+            store.submit_motion_artifacts(database, args.workspace_id, args.run_id, args.attempt, &args.artifacts)
+                .map(|id| json!({"resultId": id}))
+                .map_err(|_| "Could not submit motion artifacts. Check the Assets-stage lease and local media files")
         }),
         _ => return None,
     })
