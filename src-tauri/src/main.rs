@@ -17,6 +17,7 @@ mod delivery_stream;
 mod guided_preview;
 mod media_worker;
 mod motion_library;
+mod plugin_job_worker;
 mod plugin_settings;
 
 type Store = Mutex<WorkspaceStore>;
@@ -760,6 +761,10 @@ fn main() {
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("workspaces.sqlite");
             app.manage(Mutex::new(WorkspaceStore::open(&database)?));
+            app.manage(plugin_job_worker::PluginJobWorker::start(
+                app.handle().clone(),
+                database.clone(),
+            )?);
             tauri::async_runtime::spawn_blocking(move || {
                 let Ok(store) = WorkspaceStore::open(&database) else {
                     eprintln!("Arrumo could not open the store to retry managed file cleanup.");
@@ -893,6 +898,11 @@ fn main() {
             media_worker::render_desktop_run_motion,
             media_worker::import_delivery_subtitles
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to start Arrumo");
+        .build(tauri::generate_context!())
+        .expect("failed to start Arrumo")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                app.state::<plugin_job_worker::PluginJobWorker>().stop();
+            }
+        });
 }

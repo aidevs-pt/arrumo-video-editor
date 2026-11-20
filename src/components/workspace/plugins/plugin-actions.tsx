@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -38,6 +39,20 @@ export function PluginActions({ workspaceId, revision = "" }: {
   const [historyFailed, setHistoryFailed] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const refreshHistory = () => setRefresh((value) => value + 1);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void listen("arrumo-plugin-jobs-changed", () => {
+      if (active) setRefresh((value) => value + 1);
+    }).then((unlisten) => {
+      if (active) unsubscribe = unlisten;
+      else unlisten();
+    }).catch(() => {
+      // The panel still refreshes after actions it starts.
+    });
+    return () => { active = false; unsubscribe?.(); };
+  }, []);
 
   useEffect(() => {
     let active = true;

@@ -512,7 +512,9 @@ existing sandbox. Job requests persist their input, so include only the data
 the action needs.
 
 The desktop **Plugin actions** panel records each run as a job and includes
-recent jobs in the selected scope. Open a queued or interrupted job and
-choose **Process job** to claim it when available. The CLI equivalent is
-`list-plugin-action-jobs <app|workspace-id>`; MCP and A2A expose
+recent jobs in the selected scope. While the desktop app is open, it processes
+queued jobs and recovers interrupted jobs after their leases expire. The panel
+refreshes when a job finishes. Use **Process job** to claim a specific job when
+it is available. To list jobs from the CLI, use
+`list-plugin-action-jobs <app|workspace-id>`. MCP and A2A expose
 `list_plugin_action_jobs`.

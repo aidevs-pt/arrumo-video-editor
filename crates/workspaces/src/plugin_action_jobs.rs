@@ -125,6 +125,25 @@ impl WorkspaceStore {
             .map_err(|_| job_error())
     }
 
+    pub fn process_next_plugin_action_job(&self) -> io::Result<Option<PluginActionJob>> {
+        let next: Option<(String, Option<i64>)> = self
+            .0
+            .query_row(
+                "SELECT id, workspace_id FROM plugin_action_jobs
+             WHERE state = 'queued' OR (state = 'running' AND lease_until <= unixepoch())
+             ORDER BY created_at, rowid LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|_| job_error())?;
+        next.map(|(id, workspace)| {
+            let id = id.parse().map_err(|_| job_error())?;
+            self.process_plugin_action_job(workspace, id)
+        })
+        .transpose()
+    }
+
     pub fn process_plugin_action_job(
         &self,
         workspace_id: Option<i64>,
