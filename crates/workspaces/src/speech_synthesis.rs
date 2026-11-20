@@ -10,7 +10,7 @@ use reqwest::{
     blocking::{Client, Request},
     header::{HeaderName, HeaderValue},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use crate::{
@@ -61,7 +61,34 @@ impl AudioFormat {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeechProviderStatus {
+    response_format: &'static str,
+    max_text_characters: usize,
+    credential_source: Option<PluginSettingScope>,
+}
+
 impl WorkspaceStore {
+    pub fn speech_provider_status(
+        &self,
+        workspace_id: i64,
+        plugin_id: &str,
+    ) -> io::Result<SpeechProviderStatus> {
+        let adapter = speech_adapter(plugin_id)?;
+        speech_endpoint(&adapter, "voice", "a")?;
+        let status = self.plugin_credential_status(
+            plugin_id,
+            &adapter.credential_setting,
+            Some(workspace_id),
+        )?;
+        Ok(SpeechProviderStatus {
+            response_format: adapter.response_format.extension(),
+            max_text_characters: adapter.max_text_characters,
+            credential_source: status.source,
+        })
+    }
+
     pub fn synthesize_speech_to_file(
         &self,
         workspace_id: i64,

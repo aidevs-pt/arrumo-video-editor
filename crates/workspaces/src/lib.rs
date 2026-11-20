@@ -103,6 +103,7 @@ pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecisi
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
 pub use provider_preferences::{CapabilityProvider, ProviderPreferences};
+pub use speech_synthesis::SpeechProviderStatus;
 pub use subtitle_revisions::{SubtitleRevision, read_subtitle_file};
 pub use supplemental_delivery::{SupplementalMedia, SupplementalText};
 pub use supplemental_review::{

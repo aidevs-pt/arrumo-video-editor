@@ -77,6 +77,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let plugins = WorkspaceStore::open(Path::new(database))?.plugin_catalog()?;
             println!("{}", serde_json::to_string(&plugins)?);
         }
+        [database, command, workspace, provider] if command == "speech-provider-status" => {
+            let status = WorkspaceStore::open(Path::new(database))?
+                .speech_provider_status(utf8(workspace)?.parse()?, utf8(provider)?)?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
         [database, command, workspace, provider, voice, output]
             if command == "synthesize-speech" =>
         {
@@ -1292,7 +1297,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-settings <plugin-id> <app|workspace-id> | set-plugin-setting <plugin-id> <app|workspace-id> <setting-id> <value-json> | clear-plugin-setting <plugin-id> <app|workspace-id> <setting-id> | ",
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
-                "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file> (text on stdin) | ",
+                "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | speech-provider-status <workspace-id> <plugin-id> | synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file> (text on stdin) | ",
                 "a2a <port> (bearer token on stdin) | mcp | plugin-actions | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
