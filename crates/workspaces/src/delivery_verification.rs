@@ -67,7 +67,7 @@ pub struct VerifiedOutput {
     pub format_id: i64,
     pub video: String,
     pub subtitles: String,
-    duration_seconds: f64,
+    pub(crate) duration_seconds: f64,
     subtitle_cues: usize,
 }
 
@@ -228,7 +228,7 @@ fn verified_video_duration(
     Ok(duration)
 }
 
-fn verify_subtitle_cues(
+pub(crate) fn verify_subtitle_cues(
     directory: &Path,
     subtitles: &str,
     duration: f64,
@@ -305,12 +305,7 @@ impl WorkspaceStore {
         format_id: i64,
         source: &Path,
     ) -> Result<usize, Box<dyn Error>> {
-        use std::{
-            fs::File,
-            io::{Read, Write},
-        };
-
-        const MAX_SUBTITLE_BYTES: u64 = 2 * 1024 * 1024;
+        use std::io::Write;
         let snapshot = self.subtitle_import_snapshot(workspace_id, run_id)?;
         let format = serde_json::from_str::<Snapshot>(&snapshot)?
             .formats
@@ -328,13 +323,7 @@ impl WorkspaceStore {
         if !source.metadata()?.is_file() {
             return Err(io::Error::other("Choose an SRT file").into());
         }
-        let mut subtitles = String::new();
-        File::open(source)?
-            .take(MAX_SUBTITLE_BYTES + 1)
-            .read_to_string(&mut subtitles)?;
-        if subtitles.is_empty() || subtitles.len() as u64 > MAX_SUBTITLE_BYTES {
-            return Err(io::Error::other("Invalid subtitle file size").into());
-        }
+        let subtitles = crate::read_subtitle_file(source)?;
 
         let mut incoming = tempfile::NamedTempFile::new_in(directory)?;
         incoming.write_all(subtitles.as_bytes())?;

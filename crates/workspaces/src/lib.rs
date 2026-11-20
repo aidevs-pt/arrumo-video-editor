@@ -45,6 +45,7 @@ mod production_progress;
 mod profile_deliveries;
 mod profile_formats;
 mod provider_preferences;
+mod subtitle_revisions;
 mod transcription;
 mod video_drafts;
 mod workspace_feedback;
@@ -97,6 +98,7 @@ pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecisi
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
 pub use provider_preferences::{CapabilityProvider, ProviderPreferences};
+pub use subtitle_revisions::{SubtitleRevision, read_subtitle_file};
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
@@ -166,6 +168,7 @@ impl WorkspaceStore {
             include_str!("../migrations/038-motion-library.sql"),
             include_str!("../migrations/039-motion-profile-sharing.sql"),
             include_str!("../migrations/040-motion-result-origin.sql"),
+            include_str!("../migrations/041-subtitle-revisions.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

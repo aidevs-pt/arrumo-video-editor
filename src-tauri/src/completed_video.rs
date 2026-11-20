@@ -161,27 +161,19 @@ pub async fn preview_completed_output(
     app: AppHandle,
     stream: State<'_, crate::delivery_stream::DeliveryStream>,
 ) -> Result<DeliveryPreview, &'static str> {
-    use std::{fs::File, io::Read};
-
-    const MAX_SUBTITLE_BYTES: u64 = 2 * 1024 * 1024;
     let database = app
         .path()
         .app_local_data_dir()
         .map_err(|_| "store_unavailable")?
         .join("workspaces.sqlite");
     let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
-    let (video_path, subtitle_path) = store
+    let (video_path, _) = store
         .verified_delivery_files(&database, workspace_id, run_id, format_id)
         .map_err(|_| "delivery_preview_failed")?;
-    let mut subtitles = String::new();
-    File::open(subtitle_path)
+    let subtitles = store
+        .completed_subtitles(&database, workspace_id, run_id, format_id, None)
         .map_err(|_| "delivery_preview_failed")?
-        .take(MAX_SUBTITLE_BYTES + 1)
-        .read_to_string(&mut subtitles)
-        .map_err(|_| "delivery_preview_failed")?;
-    if subtitles.len() as u64 > MAX_SUBTITLE_BYTES {
-        return Err("delivery_preview_failed");
-    }
+        .subtitles;
     let video_url = stream
         .open(video_path)
         .map_err(|_| "delivery_preview_failed")?;
