@@ -66,13 +66,14 @@ impl DesktopJobWorkers {
                     .map_err(|_| ())
             },
         )?;
+        let publishing_database = database.clone();
         workers.spawn(
             "arrumo-publishing-text",
             database.clone(),
             Duration::from_secs(2),
-            |store| {
+            move |store| {
                 store
-                    .process_next_supplemental_writing()
+                    .process_next_supplemental_writing(&publishing_database)
                     .map(|result| result.is_some())
                     .map_err(|_| ())
             },

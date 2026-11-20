@@ -11,6 +11,18 @@ use crate::{
     generation_worker::LEASE_SECONDS,
 };
 
+/// A stage failure whose message is safe and useful to show in the run's activity.
+#[derive(Debug)]
+pub(crate) struct StageFailure(pub String);
+
+impl std::fmt::Display for StageFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl Error for StageFailure {}
+
 /// Whether the agent can run unattended on this computer.
 pub(crate) fn agent_ready(plugin: &AgentPlugin) -> bool {
     plugin.cli.structured_run.is_some() && crate::agent_cli::agent_cli_detected(&plugin.id)
@@ -66,9 +78,12 @@ impl WorkspaceStore {
         match work(&run, provider, attempt) {
             Ok(id) => Ok(Some(id)),
             Err(error) => {
-                let reason = match error.downcast_ref::<AgentRunError>() {
-                    Some(agent) => agent.to_string(),
-                    None => fallback.to_owned(),
+                let reason = if let Some(agent) = error.downcast_ref::<AgentRunError>() {
+                    agent.to_string()
+                } else if let Some(failure) = error.downcast_ref::<StageFailure>() {
+                    failure.to_string()
+                } else {
+                    fallback.to_owned()
                 };
                 match self.fail_generation(workspace_id, run_id, attempt, &reason) {
                     Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}

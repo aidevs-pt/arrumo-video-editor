@@ -277,7 +277,7 @@ pub(super) fn definitions() -> [Value; 38] {
         json!({"name": "process_script_stage", "description": "Run the run's agent on its queued Script stage and submit the draft for review. Earlier drafts' review notes are included. The run fails with a reason if the agent cannot finish.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
                 "required": ["workspaceId", "runId"], "additionalProperties": false}}),
-        json!({"name": "process_supplemental_writing", "description": "Let the run's agent write the titles, descriptions and tags each format asks for, from the approved script. Applies when the Supplemental outputs stage needs only text.",
+        json!({"name": "process_supplemental_writing", "description": "Let the run's agent write the titles, descriptions and tags each format asks for, from the approved script, and generate its thumbnails through the run's image providers. Stages that also need portrait cuts are left to renderers.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
                 "required": ["workspaceId", "runId"], "additionalProperties": false}}),
         json!({"name": "process_preview_edit", "description": "Let the run's agent choose the cuts from the recorded footage, following the approved script and transcripts, and render the preview for review.",
@@ -481,7 +481,7 @@ pub(super) fn call(
         }),
         "process_supplemental_writing" => parse(arguments).and_then(|args: RunInput| {
             store
-                .process_supplemental_writing(args.workspace_id, args.run_id)
+                .process_supplemental_writing(database, args.workspace_id, args.run_id)
                 .map(|result_id| json!({"resultId": result_id}))
                 .map_err(|_| "The titles and descriptions could not be written. Check the run activity for the reason")
         }),

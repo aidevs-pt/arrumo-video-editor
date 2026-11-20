@@ -161,6 +161,9 @@ pub struct SupplementalRevisionRequest {
     pub notes: Option<String>,
     pub text: Vec<RequestedReplacement>,
     pub media: Vec<RequestedReplacement>,
+    /// Image prompts the reviewed draft recorded for its thumbnails, by asset.
+    #[serde(skip)]
+    pub(crate) previous_prompts: Vec<Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -204,6 +207,10 @@ pub(crate) fn supplemental_revision_request(
     };
     let notes = previous.review.item_notes.as_ref();
     Ok(Some(SupplementalRevisionRequest {
+        previous_prompts: previous.result["thumbnail_prompts"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default(),
         result_id: previous.result_id,
         notes: previous.notes,
         text: replacements(

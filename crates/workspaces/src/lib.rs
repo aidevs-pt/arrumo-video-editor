@@ -29,6 +29,7 @@ mod generation_notifications;
 mod generation_plan;
 mod generation_queue;
 mod generation_worker;
+mod image_generation;
 mod mcp;
 mod media_worker;
 mod motion_artifacts;

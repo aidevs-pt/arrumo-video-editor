@@ -105,7 +105,8 @@ fn main() {
             let transcription = adapter("transcription.json");
             let transcription_timed = adapter("transcription-timed.json");
             let speech_synthesis = adapter("speech-synthesis.json");
-            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, package: {package}, release: {source} }},\n"));
+            let image_generation = adapter("image-generation.json");
+            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, image_generation: {image_generation}, package: {package}, release: {source} }},\n"));
         }
     }
     index.push_str("];\n");
