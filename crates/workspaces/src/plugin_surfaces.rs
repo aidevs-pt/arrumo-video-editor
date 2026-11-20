@@ -149,13 +149,15 @@ mod tests {
             store
                 .plugin_surfaces(PluginSurfacePlacement::Workspace)
                 .unwrap()
-                .is_empty()
+                .iter()
+                .all(|panel| panel.plugin_id != "fixture-panel")
         );
-        let panels = store
+        let panel = store
             .plugin_surfaces(PluginSurfacePlacement::Settings)
+            .unwrap()
+            .into_iter()
+            .find(|panel| panel.plugin_id == "fixture-panel")
             .unwrap();
-        assert_eq!(panels.len(), 1);
-        let panel = &panels[0];
         assert_eq!(
             store
                 .plugin_surface_document(&panel.plugin_id, &panel.id, &panel.package_sha256)

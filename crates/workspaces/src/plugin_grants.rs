@@ -122,3 +122,63 @@ impl WorkspaceStore {
 fn grant_error() -> io::Error {
     io::Error::other("Could not access plugin grants")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migration_preserves_existing_grants_and_removal_still_revokes_them() {
+        let connection = rusqlite::Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                "PRAGMA foreign_keys = ON;
+                 CREATE TABLE workspaces (id INTEGER PRIMARY KEY);
+                 CREATE TABLE installed_plugin_manifests (
+                     plugin_id TEXT PRIMARY KEY, package_sha256 TEXT, release_source TEXT
+                 );
+                 INSERT INTO workspaces VALUES (1);
+                 INSERT INTO installed_plugin_manifests VALUES ('installed-fixture', 'known-digest', NULL);",
+            )
+            .unwrap();
+        connection
+            .execute_batch(include_str!("../migrations/030-plugin-grants.sql"))
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO plugin_grants VALUES ('installed-fixture', 'known-digest', 1, ?1)",
+                [CONTEXT_PERMISSION],
+            )
+            .unwrap();
+        connection
+            .execute_batch(include_str!("../migrations/045-bundled-plugin-grants.sql"))
+            .unwrap();
+        let count = |id: &str| {
+            connection
+                .query_row(
+                    "SELECT count(*) FROM plugin_grants WHERE plugin_id = ?1",
+                    [id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap()
+        };
+        assert_eq!(count("installed-fixture"), 1);
+        connection
+            .execute(
+                "INSERT INTO plugin_grants VALUES ('bundled-fixture', 'bundled-digest', 1, ?1)",
+                [CONTEXT_PERMISSION],
+            )
+            .unwrap();
+        assert_eq!(count("bundled-fixture"), 1);
+        connection
+            .execute(
+                "DELETE FROM installed_plugin_manifests WHERE plugin_id = 'installed-fixture'",
+                [],
+            )
+            .unwrap();
+        assert_eq!(count("installed-fixture"), 0);
+        assert_eq!(count("bundled-fixture"), 1);
+        connection.execute("DELETE FROM workspaces", []).unwrap();
+        assert_eq!(count("bundled-fixture"), 0);
+    }
+}

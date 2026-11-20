@@ -256,7 +256,8 @@ mod tests {
         let reviewed = store
             .plugin_context_requests(allowed)
             .unwrap()
-            .pop()
+            .into_iter()
+            .find(|request| request.plugin_id == "fixture-reader")
             .unwrap();
         assert!(!reviewed.granted);
         assert!(
