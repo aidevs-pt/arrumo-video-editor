@@ -186,8 +186,11 @@
     "noSearchMatches": "No titles match this search."
   },
   "motionLibrary": {
+    "motionBatchItem": "Motion item {number}",
+    "addBatchItem": "Add another item",
+    "removeBatchItem": "Remove item",
     "submitArtifacts": "Submit motion files",
-    "submitArtifactsDescription": "Choose a finished animation or transition preview and any supporting files. Submitting finishes the Assets stage.",
+    "submitArtifactsDescription": "Choose one or more finished previews and their supporting files. Submitting finishes the Assets stage.",
     "submitArtifactsError": "Could not submit the files. Check the media types and the run’s current stage.",
     "clearArtifact": "Clear",
     "preservedMedia": "Preserved media from run",

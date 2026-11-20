@@ -186,8 +186,11 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "motionLibrary": {
+    "motionBatchItem": "Elemento {number}",
+    "addBatchItem": "Adicionar outro elemento",
+    "removeBatchItem": "Remover elemento",
     "submitArtifacts": "Enviar ficheiros de movimento",
-    "submitArtifactsDescription": "Escolhe uma pré-visualização finalizada e os recursos opcionais. O envio termina a etapa de recursos.",
+    "submitArtifactsDescription": "Escolhe uma ou mais pré-visualizações finalizadas e os ficheiros opcionais. O envio termina a etapa de recursos.",
     "submitArtifactsError": "Não foi possível enviar os ficheiros. Verifica os tipos e a etapa atual.",
     "clearArtifact": "Limpar",
     "preservedMedia": "Ficheiro preservado da geração",

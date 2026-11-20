@@ -186,8 +186,11 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "motionLibrary": {
+    "motionBatchItem": "Elemento {number}",
+    "addBatchItem": "Añadir otro elemento",
+    "removeBatchItem": "Quitar elemento",
     "submitArtifacts": "Enviar archivos de movimiento",
-    "submitArtifactsDescription": "Elige una vista previa terminada y los recursos opcionales. El envío completa la etapa de recursos.",
+    "submitArtifactsDescription": "Elige una o más vistas previas terminadas y sus archivos opcionales. El envío completa la etapa de recursos.",
     "submitArtifactsError": "No se pudieron enviar los archivos. Comprueba su tipo y la etapa actual.",
     "clearArtifact": "Quitar",
     "preservedMedia": "Archivo conservado de la generación",
