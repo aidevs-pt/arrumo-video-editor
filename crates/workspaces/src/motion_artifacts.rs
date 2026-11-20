@@ -2,7 +2,9 @@ use std::{
     error::Error,
     fs, io,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
@@ -191,7 +193,8 @@ fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::Result<()> {
         }
     };
     let selector = if kind == "audio" { "a:0" } else { "V:0" };
-    let output = Command::new("ffprobe")
+    let mut probe = Command::new("ffprobe");
+    probe
         .args([
             "-v",
             "error",
@@ -207,8 +210,8 @@ fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::Result<()> {
             "default=noprint_wrappers=1:nokey=1",
             "-i",
         ])
-        .arg(path)
-        .output()?;
+        .arg(path);
+    let output = run_probe(&mut probe, Duration::from_secs(10))?;
     let expected = if kind == "audio" {
         b"audio".as_slice()
     } else {
@@ -224,4 +227,38 @@ fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::Result<()> {
         ));
     }
     Ok(())
+}
+
+fn run_probe(command: &mut Command, timeout: Duration) -> io::Result<Output> {
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let start = Instant::now();
+    let failure = loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output(),
+            Ok(None) if start.elapsed() < timeout => thread::sleep(Duration::from_millis(10)),
+            Ok(None) => {
+                break io::Error::new(io::ErrorKind::TimedOut, "Motion media probe timed out");
+            }
+            Err(error) => break error,
+        }
+    };
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(failure)
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stops_an_unresponsive_motion_probe() {
+        let error =
+            run_probe(Command::new("sleep").arg("10"), Duration::from_millis(20)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    }
 }
