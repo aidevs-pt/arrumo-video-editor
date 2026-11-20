@@ -956,7 +956,8 @@
     "captionSubtitling": "A escrever as legendas; depois verifico cada ficheiro antes da entrega.",
     "finishedTitle": "O seu vídeo está pronto",
     "finishedDescription": "Veja-o, descarregue os ficheiros de cada formato, agende-o e diga ao agente o que manter da próxima vez.",
-    "openFinished": "Abrir o vídeo terminado"
+    "openFinished": "Abrir o vídeo terminado",
+    "thumbnailPrompt": "Instrução:"
   },
   "markdownEditor": {
     "source": "Código Markdown",

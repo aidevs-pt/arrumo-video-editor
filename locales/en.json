@@ -956,7 +956,8 @@
     "captionSubtitling": "Writing the subtitles, then I'll check each file before delivery.",
     "finishedTitle": "Your video is ready",
     "finishedDescription": "Watch it, download the files for each format, schedule it and tell the agent what to keep doing next time.",
-    "openFinished": "Open the finished video"
+    "openFinished": "Open the finished video",
+    "thumbnailPrompt": "Prompt:"
   },
   "markdownEditor": {
     "source": "Markdown source",

@@ -11,11 +11,12 @@ type TextItem = { kind: "title" | "description" | "tags"; text: string; format_i
 type MediaItem = SupplementalMedia & { url: string | null };
 type Payload = { text: TextItem[]; media: MediaItem[] };
 
-export function SupplementalReview({ workspaceId, runId, resultId, formats, controls }: {
+export function SupplementalReview({ workspaceId, runId, resultId, formats, prompts, controls }: {
   workspaceId: number;
   runId: number;
   resultId: number;
   formats: DeliveryFormat[];
+  prompts?: unknown;
   controls: (kind: "text" | "media", index: number, label: string) => ReactNode;
 }) {
   const { messages } = useLocale();
@@ -40,6 +41,8 @@ export function SupplementalReview({ workspaceId, runId, resultId, formats, cont
   </Alert>;
   if (!payload) return <Skeleton className="h-24" role="status" aria-label={messages.completedVideo.loadingPreview} />;
 
+  const promptFor = new Map(Array.isArray(prompts) ? prompts.flatMap((entry) =>
+    entry && typeof entry.asset_id === "number" && typeof entry.prompt === "string" ? [[entry.asset_id, entry.prompt] as const] : []) : []);
   const groups = [
     ...formats.map(({ id, name }) => ({ id, name })),
     { id: null, name: messages.productionPlan.sharedSupplemental },
@@ -61,6 +64,8 @@ export function SupplementalReview({ workspaceId, runId, resultId, formats, cont
         {media.map(({ item, index }) => <li key={index} className="min-w-0 rounded-lg border p-2.5">
           <p className="mb-2 truncate text-sm font-semibold" title={item.name}>{item.name}</p>
           <ReviewMedia item={item} />
+          {promptFor.has(item.asset_id) && <p className="mt-2 line-clamp-3 text-sm text-muted-foreground" title={promptFor.get(item.asset_id)}>
+            <span className="font-semibold text-foreground">{messages.productionPlan.thumbnailPrompt}</span> {promptFor.get(item.asset_id)}</p>}
           <div className="mt-2">{controls("media", index, item.name)}</div>
         </li>)}
       </ul>}

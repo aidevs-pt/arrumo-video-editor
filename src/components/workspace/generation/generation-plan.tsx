@@ -343,7 +343,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const staged = textDecisions.length + mediaDecisions.length;
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
-    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript"
+    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && key !== "thumbnail_prompts"
       && !(stage === "assets" && key === "asset_plan" && isAssetPlan(result.result.asset_plan))
       && !(previews.length > 0 && isCutList(result.result.cuts) && (key === "cuts" || key === "cut_notes")) && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
@@ -456,6 +456,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
               onClick={() => setBatchSelection(new Set())}>{copy.clearOutputSelection}</Button>}
           </div>
           {hasSupplemental && <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats}
+            prompts={result.result.thumbnail_prompts}
             controls={reviewControls} />}
         </>}
         {motionItems.length > 0 && (
