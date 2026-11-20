@@ -186,6 +186,8 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "groupView": "Agrupar recursos",
+    "ungrouped": "Sin grupo",
     "filterGroup": "Filtrar por grupo",
     "allGroups": "Todos los grupos",
     "filterLabel": "Filtrar por etiqueta",

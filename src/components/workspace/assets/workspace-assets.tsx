@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssetOrganizationDialog, type AssetOrganization } from "./asset-organization-dialog";
@@ -37,6 +39,7 @@ export function WorkspaceAssets({ workspace }: {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState("all");
+  const [grouped, setGrouped] = useState(false);
   const [groupFilter, setGroupFilter] = useState("");
   const [labelFilter, setLabelFilter] = useState("");
   const [busy, setBusy] = useState<"import" | "save" | null>(null);
@@ -140,6 +143,18 @@ export function WorkspaceAssets({ workspace }: {
       && (!activeGroup || organization?.group === activeGroup)
       && (!activeLabel || organization?.labels.some((label) => label.toLowerCase() === activeLabel.toLowerCase()));
   });
+  const sections = new Map<string | null, Asset[]>();
+  const showGroups = grouped && groups.length > 0;
+  for (const asset of visible ?? []) {
+    const key = showGroups ? organizations[asset.id]?.group ?? null : null;
+    const items = sections.get(key);
+    if (items) items.push(asset);
+    else sections.set(key, [asset]);
+  }
+  const sectionsInOrder = [...groups, null].flatMap((key) => {
+    const items = sections.get(key);
+    return items ? [{ key, items }] : [];
+  });
   return (
     <WorkspaceShell>
       <WorkspaceHeading icon={Images}>
@@ -164,6 +179,10 @@ export function WorkspaceAssets({ workspace }: {
             options={groups} value={activeGroup} onChange={setGroupFilter} />}
           {labels.length > 0 && <AssetFilter label={copy.filterLabel} all={copy.allLabels}
             options={labels} value={activeLabel} onChange={setLabelFilter} />}
+          {groups.length > 0 && <div className="flex items-center gap-2 px-1">
+            <Switch id="asset-group-view" checked={grouped} onCheckedChange={setGrouped} />
+            <Label htmlFor="asset-group-view">{copy.groupView}</Label>
+          </div>}
         </div>}
         {selectedAssets.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2">
           <p role="status" className="me-auto px-1 text-sm tabular-nums">{selectedLabel}</p>
@@ -190,41 +209,49 @@ export function WorkspaceAssets({ workspace }: {
             {[0, 1, 2].map((item) => <Skeleton key={item} className="aspect-video" />)}
           </div>
         ) : visible?.length ? (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-4">
-            {visible.map((asset) => (
-              <li key={asset.id} className="min-w-0">
-                <Card className="gap-3 pt-0">
-                  <AssetThumbnail workspaceId={workspace.id} assetId={asset.id} kind={asset.kind} />
-                  <CardContent className="flex min-w-0 flex-col gap-2">
-                    <h3 title={asset.name} className="truncate font-semibold">{asset.name}</h3>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="secondary">{copy[asset.kind]}</Badge>
-                      {organizations[asset.id]?.group && <Badge variant="secondary" className="max-w-full wrap-anywhere whitespace-normal">{organizations[asset.id].group}</Badge>}
-                      {organizations[asset.id]?.labels.map((label) => <Badge key={label} variant="outline" className="max-w-full wrap-anywhere whitespace-normal">{label}</Badge>)}
-                      {!asset.notes.trim() && <Badge variant="outline">{copy.noNotes}</Badge>}
-                    </div>
-                    {asset.notes.trim() && <p className="line-clamp-2 wrap-anywhere text-sm text-muted-foreground">{asset.notes}</p>}
-                  </CardContent>
-                  <CardFooter className="flex-wrap gap-2 py-2">
-                    <Checkbox aria-label={`${copy.selectAsset} · ${asset.name}`}
-                      checked={selected.has(asset.id)} disabled={busy !== null}
-                      onCheckedChange={(checked) => setSelected((current) => {
-                        const next = new Set(current);
-                        if (checked === true) next.add(asset.id);
-                        else next.delete(asset.id);
-                        return next;
-                      })} />
-                    <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
-                      aria-label={`${copy.edit} · ${asset.name}`}
-                      onClick={() => edit([asset])}>{copy.edit}</Button>
-                    <AssetOrganizationDialog workspaceId={workspace.id} assetId={asset.id} name={asset.name}
-                      organization={organizations[asset.id]} disabled={busy !== null}
-                      onSave={(organization) => setOrganizations((current) => ({ ...current, [asset.id]: organization }))} />
-                  </CardFooter>
-                </Card>
-              </li>
+          <div className="flex flex-col gap-5">
+            {sectionsInOrder.map(({ key, items }) => (
+              <section key={key === null ? "ungrouped" : `group:${key}`} className="flex flex-col gap-2"
+                aria-label={showGroups ? key ?? copy.ungrouped : undefined}>
+                {showGroups && <h3 className="wrap-anywhere text-sm font-semibold">{key ?? copy.ungrouped}</h3>}
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(12rem,100%),1fr))] gap-4">
+                  {items.map((asset) => (
+                    <li key={asset.id} className="min-w-0">
+                      <Card className="gap-3 pt-0">
+                        <AssetThumbnail workspaceId={workspace.id} assetId={asset.id} kind={asset.kind} />
+                        <CardContent className="flex min-w-0 flex-col gap-2">
+                          <h3 title={asset.name} className="truncate font-semibold">{asset.name}</h3>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary">{copy[asset.kind]}</Badge>
+                            {organizations[asset.id]?.group && <Badge variant="secondary" className="max-w-full wrap-anywhere whitespace-normal">{organizations[asset.id].group}</Badge>}
+                            {organizations[asset.id]?.labels.map((label) => <Badge key={label} variant="outline" className="max-w-full wrap-anywhere whitespace-normal">{label}</Badge>)}
+                            {!asset.notes.trim() && <Badge variant="outline">{copy.noNotes}</Badge>}
+                          </div>
+                          {asset.notes.trim() && <p className="line-clamp-2 wrap-anywhere text-sm text-muted-foreground">{asset.notes}</p>}
+                        </CardContent>
+                        <CardFooter className="flex-wrap gap-2 py-2">
+                          <Checkbox aria-label={`${copy.selectAsset} · ${asset.name}`}
+                            checked={selected.has(asset.id)} disabled={busy !== null}
+                            onCheckedChange={(checked) => setSelected((current) => {
+                              const next = new Set(current);
+                              if (checked === true) next.add(asset.id);
+                              else next.delete(asset.id);
+                              return next;
+                            })} />
+                          <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
+                            aria-label={`${copy.edit} · ${asset.name}`}
+                            onClick={() => edit([asset])}>{copy.edit}</Button>
+                          <AssetOrganizationDialog workspaceId={workspace.id} assetId={asset.id} name={asset.name}
+                            organization={organizations[asset.id]} disabled={busy !== null}
+                            onSave={(organization) => setOrganizations((current) => ({ ...current, [asset.id]: organization }))} />
+                        </CardFooter>
+                      </Card>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         ) : (
           <Empty className="min-h-56 rounded-xl border">
             <EmptyHeader><EmptyMedia variant="icon"><Images /></EmptyMedia><EmptyTitle>{copy.empty}</EmptyTitle></EmptyHeader>

@@ -186,6 +186,8 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "groupView": "Group assets",
+    "ungrouped": "Ungrouped",
     "filterGroup": "Filter by group",
     "allGroups": "All groups",
     "filterLabel": "Filter by label",
