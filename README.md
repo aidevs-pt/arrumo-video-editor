@@ -560,6 +560,12 @@ after its two-minute lease expires. MCP and A2A expose these as
 existing sandbox. Job requests persist their input, so include only the data
 the action needs.
 
+Run `arrumo-workspaces <database-path> watch-plugin-action-queue` as a
+foreground worker for queued Wasm actions when the desktop is closed. It
+claims queued jobs and recovers expired leases. Read each outcome through
+the same job status commands. The worker writes no job input or result to
+its console. Stop it with Ctrl+C.
+
 The desktop **Plugin actions** panel records each run as a job and includes
 recent jobs in the selected scope. While the desktop app is open, it processes
 queued jobs and recovers interrupted jobs after their leases expire. The panel

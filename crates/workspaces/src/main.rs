@@ -1065,6 +1065,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )?;
             println!("{revision}");
         }
+        [database, command] if command == "watch-plugin-action-queue" => {
+            let store = WorkspaceStore::open(Path::new(database))?;
+            loop {
+                match store.process_next_plugin_action_job() {
+                    Ok(Some(_)) => {}
+                    Ok(None) => std::thread::sleep(std::time::Duration::from_millis(500)),
+                    Err(_) => {
+                        eprintln!("Arrumo could not process the plugin action queue.");
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                    }
+                }
+            }
+        }
         [database, command] if command == "watch-delivery-queue" => {
             let database = Path::new(database);
             let store = WorkspaceStore::open(database)?;
@@ -1376,7 +1389,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "plugin-credential-status | set-plugin-credential | clear-plugin-credential <plugin-id> <app|workspace-id> <setting-id> | ",
                 "provider-preferences <capability> <app|workspace-id> | set-provider-preferences <capability> <app|workspace-id> <order-json> | clear-provider-preferences <capability> <app|workspace-id> | ",
                 "transcribe-wav <workspace-id> [plugin-id] <audio.wav> | speech-provider-status <workspace-id> <plugin-id> | synthesize-speech <workspace-id> <plugin-id> <voice-id> <new-audio-file> (text on stdin) | ",
-                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | queue-plugin-action-job (JSON on stdin) | list-plugin-action-jobs <app|workspace-id> | plugin-action-job <app|workspace-id> <job-id> | process-plugin-action-job <app|workspace-id> <job-id> | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
+                "a2a <port> (bearer token on stdin) | mcp | plugin-actions | watch-plugin-action-queue | queue-plugin-action-job (JSON on stdin) | list-plugin-action-jobs <app|workspace-id> | plugin-action-job <app|workspace-id> <job-id> | process-plugin-action-job <app|workspace-id> <job-id> | invoke-plugin-action <plugin-id> <action-id> <app|workspace-id> (JSON on stdin) | ",
                 "invoke-plugin <plugin-id> [workspace-id] (JSON on stdin) | plugin-context-grant <plugin-id> <workspace-id> | grant-plugin-context <plugin-id> <workspace-id> | revoke-plugin-context <plugin-id> <workspace-id> | ",
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
