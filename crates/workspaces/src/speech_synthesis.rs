@@ -87,13 +87,8 @@ impl WorkspaceStore {
             .parent()
             .filter(|path| !path.as_os_str().is_empty())
             .unwrap_or(Path::new("."));
-        let mut pending = NamedTempFile::new_in(directory)?;
-        let client = Client::builder()
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .retry(reqwest::retry::never())
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(120))
+        let pending = NamedTempFile::new_in(directory)?;
+        let client = speech_client_builder()
             .build()
             .map_err(|_| io::Error::other("Could not initialize speech transport"))?;
         let endpoint = speech_endpoint(&adapter, voice, text)?;
@@ -101,47 +96,66 @@ impl WorkspaceStore {
             .provider_secret(plugin_id, &adapter.credential_setting, workspace_id)?
             .ok_or_else(|| io::Error::other("Speech credential is not configured"))?;
         let request = speech_request(&client, &adapter, endpoint, text, &secret)?;
-        let response = client
-            .execute(request)
-            .map_err(|_| io::Error::other("Speech request failed"))?;
-        if !response.status().is_success() {
-            return Err(io::Error::other(format!(
-                "Speech provider returned HTTP {}",
-                response.status().as_u16()
-            )));
-        }
-        let media_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|header| header.to_str().ok())
-            .and_then(|header| header.split(';').next())
-            .unwrap_or_default();
-        if !adapter.response_format.accepts(media_type.trim()) {
-            return Err(io::Error::other(
-                "Speech response has an unexpected media type",
-            ));
-        }
-        let length = io::copy(
-            &mut response.take(MAX_AUDIO_BYTES + 1),
-            pending.as_file_mut(),
-        )
-        .map_err(|_| io::Error::other("Could not read or save speech response"))?;
-        if length == 0 || length > MAX_AUDIO_BYTES {
-            return Err(io::Error::other("Speech response size is invalid"));
-        }
-        pending.as_file_mut().flush()?;
-        crate::motion_artifacts::validate_motion_file(
-            pending.path(),
-            &format!("speech.{extension}"),
-            "audio",
-        )
-        .map_err(|_| io::Error::other("Speech response could not be verified as audio"))?;
-        pending.as_file().sync_all()?;
-        pending
-            .persist_noclobber(output)
-            .map_err(|error| error.error)?;
-        Ok(())
+        execute_speech(&client, request, &adapter.response_format, pending, output)
     }
+}
+
+fn speech_client_builder() -> reqwest::blocking::ClientBuilder {
+    Client::builder()
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .retry(reqwest::retry::never())
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(120))
+}
+
+fn execute_speech(
+    client: &Client,
+    request: Request,
+    format: &AudioFormat,
+    mut pending: NamedTempFile,
+    output: &Path,
+) -> io::Result<()> {
+    let response = client
+        .execute(request)
+        .map_err(|_| io::Error::other("Speech request failed"))?;
+    if !response.status().is_success() {
+        return Err(io::Error::other(format!(
+            "Speech provider returned HTTP {}",
+            response.status().as_u16()
+        )));
+    }
+    let media_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|header| header.to_str().ok())
+        .and_then(|header| header.split(';').next())
+        .unwrap_or_default();
+    if !format.accepts(media_type.trim()) {
+        return Err(io::Error::other(
+            "Speech response has an unexpected media type",
+        ));
+    }
+    let length = io::copy(
+        &mut response.take(MAX_AUDIO_BYTES + 1),
+        pending.as_file_mut(),
+    )
+    .map_err(|_| io::Error::other("Could not read or save speech response"))?;
+    if length == 0 || length > MAX_AUDIO_BYTES {
+        return Err(io::Error::other("Speech response size is invalid"));
+    }
+    pending.as_file_mut().flush()?;
+    crate::motion_artifacts::validate_motion_file(
+        pending.path(),
+        &format!("speech.{}", format.extension()),
+        "audio",
+    )
+    .map_err(|_| io::Error::other("Speech response could not be verified as audio"))?;
+    pending.as_file().sync_all()?;
+    pending
+        .persist_noclobber(output)
+        .map_err(|error| error.error)?;
+    Ok(())
 }
 
 fn speech_adapter(plugin_id: &str) -> io::Result<SpeechAdapter> {
@@ -322,5 +336,127 @@ mod tests {
         assert!(speech_endpoint(&fixture(), "..", "hello").is_err());
         assert!(speech_endpoint(&fixture(), "voice", "ééééé").is_ok());
         assert!(speech_endpoint(&fixture(), "voice", "éééééé").is_err());
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn https_transport_saves_verified_audio_and_discards_error_responses() {
+        use rustls::{ServerConfig, ServerConnection, StreamOwned, pki_types::PrivatePkcs8KeyDer};
+        use std::{
+            io::{BufRead, BufReader},
+            net::TcpListener,
+            sync::Arc,
+            thread,
+            time::Instant,
+        };
+
+        let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let der = certificate.cert.der();
+        let config = Arc::new(
+            ServerConfig::builder_with_provider(rustls::crypto::ring::default_provider().into())
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_no_client_auth()
+                .with_single_cert(
+                    vec![der.clone()],
+                    PrivatePkcs8KeyDer::from(certificate.signing_key.serialize_der()).into(),
+                )
+                .unwrap(),
+        );
+        let client = speech_client_builder()
+            .no_proxy()
+            .tls_certs_merge([reqwest::Certificate::from_der(der).unwrap()])
+            .timeout(Duration::from_secs(5))
+            .build()
+            .unwrap();
+
+        // 80 samples of silent 8 kHz mono PCM.
+        let mut wav = b"RIFF\xc4\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x40\x1f\0\0\x80\x3e\0\0\x02\0\x10\0data\xa0\0\0\0".to_vec();
+        wav.extend([0; 160]);
+        let directory = tempfile::tempdir().unwrap();
+        for (index, (status, extra, body, expected_error)) in [
+            ("200 OK", "Content-Type: audio/wav", wav.as_slice(), None),
+            (
+                "200 OK",
+                "Content-Type: application/json",
+                b"{}".as_slice(),
+                Some("unexpected media type"),
+            ),
+            (
+                "200 OK",
+                "Content-Type: audio/wav",
+                b"not audio".as_slice(),
+                Some("could not be verified"),
+            ),
+            (
+                "302 Found",
+                "Location: https://localhost:1/redirect-target",
+                b"".as_slice(),
+                Some("HTTP 302"),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let endpoint = Url::parse(&format!(
+                "https://localhost:{}/v1/speech/voice",
+                listener.local_addr().unwrap().port()
+            ))
+            .unwrap();
+            let request =
+                speech_request(&client, &fixture(), endpoint, "olá", b"fixture-secret").unwrap();
+            let output = directory.path().join(format!("{index}.wav"));
+            thread::scope(|scope| {
+                let config = Arc::clone(&config);
+                let server = scope.spawn(move || {
+                    let expires = Instant::now() + Duration::from_secs(5);
+                    let socket = loop {
+                        match listener.accept() {
+                            Ok((socket, _)) => break socket,
+                            Err(error) if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < expires =>
+                                thread::sleep(Duration::from_millis(10)),
+                            Err(error) => panic!("No HTTPS request arrived: {error}"),
+                        }
+                    };
+                    socket.set_nonblocking(false).unwrap();
+                    socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                    let stream = StreamOwned::new(ServerConnection::new(config).unwrap(), socket);
+                    let mut reader = BufReader::new(stream);
+                    let mut headers = String::new();
+                    loop {
+                        let length = headers.len();
+                        assert!(reader.read_line(&mut headers).unwrap() > 0);
+                        if &headers[length..] == "\r\n" { break; }
+                    }
+                    assert!(headers.starts_with("POST /v1/speech/voice?"));
+                    assert!(headers.contains("x-fixture-key: fixture-secret\r\n"));
+                    let length = headers.lines().find_map(|line| line.strip_prefix("content-length: "))
+                        .unwrap().parse::<usize>().unwrap();
+                    let mut json = vec![0; length];
+                    reader.read_exact(&mut json).unwrap();
+                    assert_eq!(serde_json::from_slice::<serde_json::Value>(&json).unwrap()["text"], "olá");
+                    let socket = reader.get_mut();
+                    write!(socket, "HTTP/1.1 {status}\r\n{extra}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).unwrap();
+                    socket.write_all(body).unwrap();
+                    socket.flush().unwrap();
+                });
+                let result = execute_speech(
+                    &client,
+                    request,
+                    &AudioFormat::Wav,
+                    NamedTempFile::new_in(directory.path()).unwrap(),
+                    &output,
+                );
+                server.join().unwrap();
+                if let Some(expected) = expected_error {
+                    assert!(result.unwrap_err().to_string().contains(expected));
+                    assert!(!output.exists());
+                } else {
+                    result.unwrap();
+                    assert_eq!(std::fs::read(&output).unwrap(), wav);
+                }
+            });
+        }
     }
 }
