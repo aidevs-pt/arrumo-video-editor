@@ -373,3 +373,5 @@ Use `create-motion-item <workspace-id> <settings-json>` to register existing man
 Use `motion-library <workspace-id> workspace` for workspace-wide items, or pass a profile ID to include items scoped to that profile. Several entries can refer to the same media without copying it.
 
 Use `update-motion-item <workspace-id> <item-id> <settings-json>` to replace its settings with the same fields as creation. Use `duplicate-motion-item <workspace-id> <item-id> <title>` to create a new entry with the source scope, usage notes, and media. Use `delete-motion-item <workspace-id> <item-id> <confirmed-title>` with the exact saved title. Deletion removes the library entry and keeps its assets in the workspace.
+
+MCP and A2A expose the same library through `list_motion_library`, `create_motion_library_item`, `update_motion_library_item`, `duplicate_motion_library_item`, and `delete_motion_library_item`. Use `workspaceId` and, where applicable, `profileId`, `itemId`, or `confirmedTitle` as top-level arguments. The nested `settings` uses the same field names as the CLI.
