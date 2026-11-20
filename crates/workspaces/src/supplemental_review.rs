@@ -11,6 +11,28 @@ const SECTIONS: [&str; 2] = ["supplemental_text", "supplemental_media"];
 pub struct SupplementalReview {
     pub text: Vec<SupplementalDecision>,
     pub media: Vec<SupplementalDecision>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_notes: Option<SupplementalItemNotes>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SupplementalItemNotes {
+    pub text: Vec<Option<String>>,
+    pub media: Vec<Option<String>>,
+}
+
+impl SupplementalItemNotes {
+    fn valid_for(&self, review: &SupplementalReview) -> bool {
+        self.text.len() == review.text.len()
+            && self.media.len() == review.media.len()
+            && self
+                .text
+                .iter()
+                .chain(&self.media)
+                .flatten()
+                .all(|note| note.len() <= 4096 && !note.contains('\0'))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -58,7 +80,12 @@ impl WorkspaceStore {
             params![workspace_id, run_id, result_id],
             |row| read_settings(row.get(0)?, 0),
         )?;
-        if review.text.is_empty() && review.media.is_empty() {
+        if (review.text.is_empty() && review.media.is_empty())
+            || review
+                .item_notes
+                .as_ref()
+                .is_some_and(|notes| !notes.valid_for(review))
+        {
             return Err(rusqlite::Error::InvalidQuery);
         }
         for (key, decisions) in review.sections() {

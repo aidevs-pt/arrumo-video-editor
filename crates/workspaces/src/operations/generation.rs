@@ -341,7 +341,11 @@ pub(super) fn definitions() -> [Value; 32] {
                 "workspaceId": id, "runId": id, "resultId": id, "notes": {"type": "string"},
                 "review": {"type": "object", "properties": {
                     "text": {"type": "array", "maxItems": 100, "items": {"enum": ["approved", "revise", "rejected"]}},
-                    "media": {"type": "array", "maxItems": 100, "items": {"enum": ["approved", "revise", "rejected"]}}
+                    "media": {"type": "array", "maxItems": 100, "items": {"enum": ["approved", "revise", "rejected"]}},
+                    "item_notes": {"type": "object", "properties": {
+                        "text": {"type": "array", "maxItems": 100, "items": {"type": ["string", "null"], "maxLength": 4096}},
+                        "media": {"type": "array", "maxItems": 100, "items": {"type": ["string", "null"], "maxLength": 4096}}
+                    }, "required": ["text", "media"], "additionalProperties": false}
                 }, "required": ["text", "media"], "additionalProperties": false}
             }, "required": ["workspaceId", "runId", "resultId", "review"], "additionalProperties": false}}),
         json!({"name": "review_production_result", "description": "Submit an explicit approval, rejection, or revision request for a pending result.",

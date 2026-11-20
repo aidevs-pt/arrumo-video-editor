@@ -27,11 +27,12 @@ import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
 type Plan = { steps: { stage: Stage; review_required: boolean }[] };
-type StageResult = MotionStageResult & { supplemental_review?: SupplementalChoices };
+type StageResult = MotionStageResult & { supplemental_review?: SupplementalReview };
 type StageProgress = { stage_index: number; pending_review_id: number | null; results: StageResult[] };
 type Decision = "approved" | "revise" | "rejected";
 type SupplementalChoices<T = Decision> = { text: T[]; media: T[] };
-type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[]; supplemental?: SupplementalChoices<Decision | ""> };
+type SupplementalReview = SupplementalChoices & { item_notes?: SupplementalChoices<string | null> };
+type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[]; supplemental?: SupplementalChoices<Decision | "">; itemNotes?: SupplementalChoices<string> };
 
 const ScriptReviewText = dynamic(() => import("./script-review-text"), { ssr: false });
 
@@ -105,7 +106,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     || (hasSources && (currentStage === "preview" || currentStage === "final_render"))
     ? currentStage : undefined;
 
-  async function review(resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalChoices) {
+  async function review(resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalReview) {
     if (reviewing) return false;
     setReviewing(true);
     setReviewError(false);
@@ -221,7 +222,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
   formats: DeliveryFormat[];
   reviewing: boolean;
   reviewError: boolean;
-  onReview: (resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalChoices) => Promise<boolean>;
+  onReview: (resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalReview) => Promise<boolean>;
   saveMotionDefault: boolean;
   previousSupplementalReview?: SupplementalChoices;
 }) {
@@ -251,6 +252,16 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
       return value === "" || isDecision(value) ? value : previousSupplementalReview?.media[index] === "approved" ? "approved" : "";
     }),
   });
+  const itemNotes = (saved?: SupplementalChoices<unknown>): SupplementalChoices<string> => ({
+    text: Array.from({ length: textCount }, (_, index) => {
+      const note = saved?.text?.[index];
+      return typeof note === "string" ? note : "";
+    }),
+    media: Array.from({ length: mediaCount }, (_, index) => {
+      const note = saved?.media?.[index];
+      return typeof note === "string" ? note : "";
+    }),
+  });
   const reviewFormId = `stage-review-${runId}-${result.id}`;
   const draftKey = `arrumo:review:${workspaceId}:${runId}:${result.id}`;
   const [draft, setDraft] = useState<ReviewDraft>(() => {
@@ -260,6 +271,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         return {
           notes: saved.notes,
           supplemental: hasSupplemental ? itemChoices(saved.supplemental) : undefined,
+          itemNotes: hasSupplemental ? itemNotes(saved.itemNotes) : undefined,
           decision: isDecision(saved.decision) ? saved.decision : "",
           motionIndexes: Array.isArray(saved.motionIndexes)
             ? motionItems.map(({ index }) => index).filter((index) => saved.motionIndexes.includes(index))
@@ -267,13 +279,15 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         };
       }
     } catch {}
-    return hasSupplemental ? { ...emptyDraft, supplemental: itemChoices() } : emptyDraft;
+    return hasSupplemental ? { ...emptyDraft, supplemental: itemChoices(), itemNotes: itemNotes() } : emptyDraft;
   });
   const selectedMotion = draft.motionIndexes ?? (saveMotionDefault ? motionItems.map(({ index }) => index) : []);
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
   const markdown = typeof result.result.markdown === "string" ? result.result.markdown : undefined;
   const itemDraft = draft.supplemental;
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
+  const [openNotes, setOpenNotes] = useState<Set<string>>(() => new Set());
+  const hasItemNotes = Boolean(draft.itemNotes && [...draft.itemNotes.text, ...draft.itemNotes.media].some((note) => note.trim()));
   const selectedCount = batchSelection.size;
   function selectItem(key: string, selected: boolean) {
     setBatchSelection((current) => {
@@ -302,7 +316,13 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
     if (!canSend || reviewing) return;
     if (await onReview(result.id, draft.decision, draft.notes,
       draft.decision === "approved" && motionItems.length ? selectedMotion : undefined,
-      hasSupplemental ? { text: textDecisions, media: mediaDecisions } : undefined)) {
+      hasSupplemental ? {
+        text: textDecisions, media: mediaDecisions,
+        item_notes: hasItemNotes && draft.itemNotes ? {
+          text: draft.itemNotes.text.map((note) => note.trim() ? note : null),
+          media: draft.itemNotes.media.map((note) => note.trim() ? note : null),
+        } : undefined,
+      } : undefined)) {
       try { sessionStorage.removeItem(draftKey); } catch {}
     }
   }
@@ -327,19 +347,44 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
               onClick={() => setBatchSelection(new Set())}>{copy.clearOutputSelection}</Button>}
           </div>
           <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats}
-            controls={(kind, index, label) => <div className="flex flex-wrap items-center gap-2">
-              <Checkbox disabled={reviewing} checked={batchSelection.has(`${kind}-${index}`)}
-                aria-label={copy.selectOutput.replace("{label}", label)}
-                onCheckedChange={(checked) => selectItem(`${kind}-${index}`, checked === true)} />
-              {decisions.map(({ value, icon: Icon, fill }) => {
-                const active = itemDraft[kind][index] === value;
-                return <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
-                  aria-pressed={active} className={cn(active && fill)} onClick={() => {
-                    const items = itemDraft[kind].map((decision, position) => position === index ? (active ? "" : value) : decision);
-                    updateDraft({ ...draft, supplemental: { ...itemDraft, [kind]: items } });
-                  }}><Icon data-icon="inline-start" />{copy[`item_${value}`]}</Button>;
-              })}
-            </div>} />
+            controls={(kind, index, label) => {
+              const key = `${kind}-${index}`;
+              const note = draft.itemNotes?.[kind][index] ?? "";
+              return <div className="grid gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Checkbox disabled={reviewing} checked={batchSelection.has(`${kind}-${index}`)}
+                    aria-label={copy.selectOutput.replace("{label}", label)}
+                    onCheckedChange={(checked) => selectItem(`${kind}-${index}`, checked === true)} />
+                  {decisions.map(({ value, icon: Icon, fill }) => {
+                    const active = itemDraft[kind][index] === value;
+                    return <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
+                      aria-pressed={active} className={cn(active && fill)} onClick={() => {
+                        const items = itemDraft[kind].map((decision, position) => position === index ? (active ? "" : value) : decision);
+                        updateDraft({ ...draft, supplemental: { ...itemDraft, [kind]: items } });
+                      }}><Icon data-icon="inline-start" />{copy[`item_${value}`]}</Button>;
+                  })}
+                  <Button type="button" size="sm" variant="ghost" disabled={reviewing} aria-expanded={openNotes.has(key)}
+                    aria-controls={`${reviewFormId}-${key}`} onClick={() => {
+                      setOpenNotes((current) => {
+                        const next = new Set(current);
+                        if (next.has(key)) next.delete(key);
+                        else next.add(key);
+                        return next;
+                      });
+                    }}>{note ? copy.editItemNote : copy.addItemNote}</Button>
+                </div>
+                {openNotes.has(key) && <Field>
+                  <FieldLabel htmlFor={`${reviewFormId}-${key}`}>{copy.itemNoteFor.replace("{label}", label)}</FieldLabel>
+                  <Textarea id={`${reviewFormId}-${key}`} disabled={reviewing} value={note} maxLength={4096}
+                    onChange={(event) => {
+                      const notes = draft.itemNotes ?? itemNotes();
+                      updateDraft({ ...draft, itemNotes: {
+                        ...notes, [kind]: notes[kind].map((value, position) => position === index ? event.target.value : value),
+                      } });
+                    }} />
+              </Field>}
+            </div>;
+            }} />
         </>}
         {motionItems.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -416,10 +461,10 @@ function StageReview({ workspaceId, runId, stage, result, formats, reviewing, re
         </form>
       </CardContent>
       <div className="sticky bottom-4 z-[1] flex flex-wrap mx-4 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
-        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || staged > 0 || draft.notes) && "font-bold text-attention")} role="status">
+        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || staged > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
-          {draft.decision || staged > 0 || draft.notes ? copy.unsentReview : hasSupplemental ? copy.selectEveryItem : copy.selectDecision}
+          {draft.decision || staged > 0 || draft.notes || hasItemNotes ? copy.unsentReview : hasSupplemental ? copy.selectEveryItem : copy.selectDecision}
         </p>
         <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
           className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)]">

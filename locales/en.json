@@ -729,6 +729,9 @@
     "replayMode": "Settings to use"
   },
   "productionPlan": {
+    "addItemNote": "Add note",
+    "editItemNote": "Edit note",
+    "itemNoteFor": "Note for {label}",
     "selectedOutputCount": "{count} selected",
     "selected_approved": "Approve selected",
     "selected_revise": "Ask for changes to selected",

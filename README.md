@@ -437,3 +437,5 @@ In desktop guided Outputs review, choose a decision per item or use a batch butt
 MCP and A2A support `review_supplemental_items` with `workspaceId`, `runId`, `resultId`, `review` (the `text` and `media` decision arrays), and optional `notes`. In an A2A task message, the task ID supplies the workspace and run scope.
 
 Check individual outputs to apply a batch decision only to the selected rows. After a partial revision, prior approvals fill in automatically and the replacement items need a new decision. Review choices stay editable until Send.
+
+A supplemental review may include `review.item_notes` with `text` and `media` arrays aligned with the decision arrays. Use `null` for an item without a note. Each note has a 4 KiB UTF-8 limit. The desktop note buttons stage feedback on the corresponding row until Send. Workers receive the notes with the saved review in production progress.
