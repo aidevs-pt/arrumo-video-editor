@@ -2,7 +2,7 @@
 
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
-import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, MessageSquare } from "lucide-react";
+import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, Image, MessageSquare, Music } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -20,10 +20,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
-import { completedVideoHref, workspaceHref } from "../home/workspace-links";
+import { completedVideoHref, workspaceHref, type CompletedFile } from "../home/workspace-links";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
 import { OutputDateField } from "./output-date-field";
+import { SupplementalMediaPreview, type SupplementalMedia } from "./supplemental-media-preview";
 import { CompletedOutputPreview } from "./completed-output-preview";
 import { CompletedVideoFeedback, type FeedbackResult, type VideoFeedback } from "./completed-video-feedback";
 import { CompletedVideoReplay } from "./completed-video-replay";
@@ -44,7 +45,6 @@ type Activity = {
   detail: string | null;
 };
 type TextOutput = { kind: "title" | "description" | "tags"; format_id: number | null; text: string };
-type CompletedFile = "subtitles" | `text-${number}`;
 
 type CompletedVideo = {
   run: {
@@ -62,6 +62,7 @@ type CompletedVideo = {
   title: string;
   delivery: { verified_outputs: Output[] };
   supplemental_text: TextOutput[];
+  supplemental_media: SupplementalMedia[];
   output_dates: Record<number, string>;
 };
 
@@ -162,6 +163,17 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
   }
 
   const textOutputs = video.supplemental_text;
+  const mediaOutputs = video.supplemental_media;
+  const mediaIndex = file?.startsWith("media-") ? Number(file.slice(6)) - 1 : undefined;
+  const mediaOutput = mediaIndex === undefined ? undefined : mediaOutputs[mediaIndex];
+  const mediaLinks = mediaOutputs.map((item, index) => {
+    const Icon = item.kind === "image" ? Image : item.kind === "audio" ? Music : Film;
+    return <Button key={`media-${index}`} asChild size="sm" variant="outline" className="max-w-full">
+      <Link href={completedVideoHref(workspaceId, runId, selected?.format_id, `media-${index + 1}`)}>
+        <Icon data-icon="inline-start" /><span className="truncate" title={item.name}>{item.name}</span>
+      </Link>
+    </Button>;
+  });
   const textIndex = file?.startsWith("text-") ? Number(file.slice(5)) - 1 : undefined;
   const textOutput = textIndex === undefined ? undefined : textOutputs[textIndex];
   const textFilename = (item: TextOutput, index: number) => `supplemental-${item.kind}-${index + 1}.txt`;
@@ -172,22 +184,25 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
       </Link>
     </Button>
   ));
-  if (textIndex !== undefined) {
-    const textFormat = formats.find(({ format }) => format.id === textOutput?.format_id)?.format;
+  if (textIndex !== undefined || mediaIndex !== undefined) {
+    const outputFormat = formats.find(({ format }) => format.id === (mediaOutput?.format_id ?? textOutput?.format_id))?.format;
+    const filename = mediaOutput?.name ?? (textOutput && textIndex !== undefined ? textFilename(textOutput, textIndex) : copy.otherFiles);
     return <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <WorkspaceHeading className="mb-0">
-          <h1>{textOutput ? textFilename(textOutput, textIndex) : copy.otherFiles}</h1>
-          <p>{savedTitle}{textFormat && ` / ${textFormat.name}`}</p>
+          <h1>{filename}</h1>
+          <p>{savedTitle}{outputFormat && ` / ${outputFormat.name}`}</p>
         </WorkspaceHeading>
         <Button asChild size="sm" variant="outline">
           <Link href={completedVideoHref(workspaceId, runId, selected?.format_id)}>{copy.videoTab}</Link>
         </Button>
       </div>
-      {textOutput ? <article className="max-w-3xl whitespace-pre-wrap wrap-anywhere rounded-lg border bg-card p-5">
+      {mediaOutput && mediaIndex !== undefined ? <SupplementalMediaPreview key={mediaIndex}
+        workspaceId={workspaceId} runId={runId} index={mediaIndex} media={mediaOutput} />
+        : textOutput ? <article className="max-w-3xl whitespace-pre-wrap wrap-anywhere rounded-lg border bg-card p-5">
         {textOutput.text}
       </article> : <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription></Alert>}
-      <div className="mt-6 flex flex-wrap gap-2">{textLinks}</div>
+      <div className="mt-6 flex flex-wrap gap-2">{textLinks}{mediaLinks}</div>
     </>;
   }
 
@@ -221,7 +236,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
               </Link>
             </Button>
           ))}
-          {textLinks}
+          {textLinks}{mediaLinks}
           <Button variant="outline" size="sm" disabled={Boolean(action)} onClick={() => void exportZip()}>
             <Archive data-icon="inline-start" />{action === "export" ? copy.exporting : copy.exportZip}
           </Button>
@@ -303,9 +318,9 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file }: { 
           ) : (
             <Empty><EmptyHeader><EmptyTitle>{copy.noOutputs}</EmptyTitle><EmptyDescription>{copy.previewError}</EmptyDescription></EmptyHeader></Empty>
           )}
-          {textLinks.length > 0 && <section className="mt-6 border-t pt-4">
+          {(textLinks.length > 0 || mediaLinks.length > 0) && <section className="mt-6 border-t pt-4">
             <h2 className="mb-3 text-[1.3125rem]">{copy.otherFiles}</h2>
-            <div className="flex flex-wrap gap-2">{textLinks}</div>
+            <div className="flex flex-wrap gap-2">{textLinks}{mediaLinks}</div>
           </section>}
         </TabsContent>
         <TabsContent value="details" forceMount className="flex flex-col gap-5 data-[state=inactive]:hidden">

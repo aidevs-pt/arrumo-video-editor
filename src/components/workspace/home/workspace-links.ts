@@ -12,7 +12,9 @@ export function profileHref(workspaceId: number, profileId: number) {
   return `/profile?workspace=${workspaceId}&profile=${profileId}`;
 }
 
-export function completedVideoHref(workspaceId: number, runId: number, formatId?: number, file?: "subtitles" | `text-${number}`) {
+export type CompletedFile = "subtitles" | `text-${number}` | `media-${number}`;
+
+export function completedVideoHref(workspaceId: number, runId: number, formatId?: number, file?: CompletedFile) {
   const query = new URLSearchParams({ workspace: String(workspaceId), run: String(runId) });
   if (formatId !== undefined) query.set("format", String(formatId));
   if (file) query.set("file", file);
@@ -28,10 +30,11 @@ export function calendarHref(workspaceId: number, profileId?: number, month?: st
   return isCalendarMonth(month) ? `${href}&month=${month}` : href;
 }
 
-export function completedFile(value: string | null): "subtitles" | `text-${number}` | undefined {
+export function completedFile(value: string | null): CompletedFile | undefined {
   if (value === "subtitles") return value;
-  if (value?.startsWith("text-") && /^[1-9]\d*$/.test(value.slice(5))) {
-    const index = Number(value.slice(5));
-    if (Number.isSafeInteger(index)) return `text-${index}`;
-  }
+  const match = value?.match(/^(text|media)-([1-9]\d*)$/);
+  if (!match) return;
+  const index = Number(match[2]);
+  if (!Number.isSafeInteger(index)) return;
+  return match[1] === "text" ? `text-${index}` : `media-${index}`;
 }

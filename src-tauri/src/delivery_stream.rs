@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{self, Read, Seek, SeekFrom},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
 };
@@ -23,6 +23,29 @@ struct StreamServer {
 struct StreamFile {
     path: PathBuf,
     content_type: &'static str,
+}
+
+pub(crate) fn managed_media_type(name: &str) -> Option<&'static str> {
+    let extension = Path::new(name).extension()?.to_str()?.to_ascii_lowercase();
+    Some(match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "avif" => "image/avif",
+        "mp4" => "video/mp4",
+        "mov" => "video/quicktime",
+        "webm" => "video/webm",
+        "mkv" => "video/x-matroska",
+        "avi" => "video/x-msvideo",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "flac" => "audio/flac",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "ogg" => "audio/ogg",
+        _ => return None,
+    })
 }
 
 impl DeliveryStream {
@@ -126,6 +149,7 @@ fn respond(request: Request, StreamFile { path, content_type }: StreamFile) {
         StatusCode(status),
         vec![
             header_value("Content-Type", content_type),
+            header_value("X-Content-Type-Options", "nosniff"),
             header_value("Accept-Ranges", "bytes"),
             header_value("Cache-Control", "no-store"),
         ],

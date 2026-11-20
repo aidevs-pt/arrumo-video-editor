@@ -164,6 +164,33 @@ impl WorkspaceStore {
             .collect()
     }
 
+    pub fn completed_supplemental_media_file(
+        &self,
+        database: &std::path::Path,
+        workspace_id: i64,
+        run_id: i64,
+        index: usize,
+    ) -> Result<(SupplementalMedia, std::path::PathBuf), Box<dyn std::error::Error>> {
+        let entry = self
+            .completed_supplemental_media(workspace_id, run_id)?
+            .into_iter()
+            .nth(index)
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+        let file = crate::asset_path(
+            &crate::asset_root(&database.canonicalize()?),
+            workspace_id,
+            entry.asset_id,
+        );
+        let metadata = file.symlink_metadata()?;
+        if !metadata.is_file()
+            || file.canonicalize()? != file
+            || metadata.len() != u64::try_from(entry.byte_size)?
+        {
+            return Err(std::io::Error::other("Supplemental media is unavailable").into());
+        }
+        Ok((entry, file))
+    }
+
     fn completed_supplemental_field<T: serde::de::DeserializeOwned>(
         &self,
         workspace_id: i64,

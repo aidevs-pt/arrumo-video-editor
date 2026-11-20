@@ -134,25 +134,7 @@ pub async fn preview_motion_library_item(
         let name = store
             .managed_asset_name(workspace_id, id, kind)
             .map_err(|_| failed)?;
-        let extension = std::path::Path::new(&name)
-            .extension()
-            .and_then(|value| value.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        let mime = match extension.as_str() {
-            "mp4" => "video/mp4",
-            "mov" => "video/quicktime",
-            "webm" => "video/webm",
-            "mkv" => "video/x-matroska",
-            "avi" => "video/x-msvideo",
-            "mp3" => "audio/mpeg",
-            "wav" => "audio/wav",
-            "flac" => "audio/flac",
-            "m4a" => "audio/mp4",
-            "aac" => "audio/aac",
-            "ogg" => "audio/ogg",
-            _ => return Err(failed),
-        };
+        let mime = crate::delivery_stream::managed_media_type(&name).ok_or(failed)?;
         stream
             .open_media(arrumo_workspaces::asset_path(&root, workspace_id, id), mime)
             .map_err(|_| failed)

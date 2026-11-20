@@ -236,3 +236,25 @@ pub async fn save_completed_subtitle_revision(
     .await
     .map_err(|_| "subtitle_revision_save_failed")?
 }
+
+#[tauri::command]
+pub async fn preview_completed_supplemental_media(
+    workspace_id: i64,
+    run_id: i64,
+    index: usize,
+    app: AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<String, &'static str> {
+    let failed = "supplemental_media_preview_failed";
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite");
+    let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
+    let (entry, file) = store
+        .completed_supplemental_media_file(&database, workspace_id, run_id, index)
+        .map_err(|_| failed)?;
+    let mime = crate::delivery_stream::managed_media_type(&entry.name).ok_or(failed)?;
+    stream.open_media(file, mime).map_err(|_| failed)
+}
