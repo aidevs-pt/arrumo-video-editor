@@ -19,6 +19,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empt
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AssetOrganizationDialog, type AssetOrganization } from "./asset-organization-dialog";
 import { AssetThumbnail } from "./asset-thumbnail";
 
 const kinds = ["image", "audio", "video"] as const;
@@ -31,6 +32,7 @@ export function WorkspaceAssets({ workspace }: {
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [assets, setAssets] = useState<Asset[]>();
+  const [organizations, setOrganizations] = useState<Record<number, AssetOrganization>>({});
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState("all");
@@ -46,8 +48,16 @@ export function WorkspaceAssets({ workspace }: {
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
     let active = true;
-    invoke<Asset[]>("list_assets", { workspaceId: workspace.id }).then(
-      (rows) => { if (active) setAssets(rows); },
+    Promise.all([
+      invoke<Asset[]>("list_assets", { workspaceId: workspace.id }),
+      invoke<Record<number, AssetOrganization>>("list_asset_organization", { workspaceId: workspace.id }),
+    ]).then(
+      ([rows, metadata]) => {
+        if (active) {
+          setAssets(rows);
+          setOrganizations(metadata);
+        }
+      },
       () => { if (active) setLoadError(true); },
     );
     return () => { active = false; };
@@ -162,11 +172,13 @@ export function WorkspaceAssets({ workspace }: {
                     <h3 title={asset.name} className="truncate font-semibold">{asset.name}</h3>
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="secondary">{copy[asset.kind]}</Badge>
+                      {organizations[asset.id]?.group && <Badge variant="secondary" className="max-w-full wrap-anywhere whitespace-normal">{organizations[asset.id].group}</Badge>}
+                      {organizations[asset.id]?.labels.map((label) => <Badge key={label} variant="outline" className="max-w-full wrap-anywhere whitespace-normal">{label}</Badge>)}
                       {!asset.notes.trim() && <Badge variant="outline">{copy.noNotes}</Badge>}
                     </div>
                     {asset.notes.trim() && <p className="line-clamp-2 wrap-anywhere text-sm text-muted-foreground">{asset.notes}</p>}
                   </CardContent>
-                  <CardFooter className="justify-between gap-3 py-2">
+                  <CardFooter className="flex-wrap gap-2 py-2">
                     <Checkbox aria-label={`${copy.selectAsset} · ${asset.name}`}
                       checked={selected.has(asset.id)} disabled={busy !== null}
                       onCheckedChange={(checked) => setSelected((current) => {
@@ -178,6 +190,9 @@ export function WorkspaceAssets({ workspace }: {
                     <Button type="button" size="sm" variant="ghost" disabled={busy !== null}
                       aria-label={`${copy.edit} · ${asset.name}`}
                       onClick={() => edit([asset])}>{copy.edit}</Button>
+                    <AssetOrganizationDialog workspaceId={workspace.id} assetId={asset.id} name={asset.name}
+                      organization={organizations[asset.id]} disabled={busy !== null}
+                      onSave={(organization) => setOrganizations((current) => ({ ...current, [asset.id]: organization }))} />
                   </CardFooter>
                 </Card>
               </li>

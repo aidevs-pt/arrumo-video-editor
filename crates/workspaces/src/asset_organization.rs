@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use rusqlite::{params, types::Type};
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,22 @@ impl WorkspaceStore {
                 })
             },
         )
+    }
+
+    pub fn list_asset_organization(
+        &self,
+        workspace_id: i64,
+    ) -> rusqlite::Result<BTreeMap<i64, AssetOrganization>> {
+        self.0.prepare(
+            "SELECT asset_id, group_name, labels_json FROM asset_organization WHERE workspace_id = ?1"
+        )?.query_map([workspace_id], |row| {
+            let labels: String = row.get(2)?;
+            Ok((row.get(0)?, AssetOrganization {
+                group: row.get(1)?,
+                labels: serde_json::from_str(&labels).map_err(|error|
+                    rusqlite::Error::FromSqlConversionFailure(2, Type::Text, Box::new(error)))?,
+            }))
+        })?.collect()
     }
 
     pub fn set_asset_organization(

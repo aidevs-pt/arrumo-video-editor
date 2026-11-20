@@ -186,6 +186,11 @@
     "noSearchMatches": "No titles match this search."
   },
   "assets": {
+    "organize": "Organize",
+    "group": "Group",
+    "labels": "Labels, one per line",
+    "saveOrganization": "Save organization",
+    "organizationError": "Could not save the group and labels.",
     "selectAsset": "Select asset",
     "selectionCount": "{count} selected",
     "editSelected": "Edit selected notes",

@@ -288,6 +288,32 @@ async fn preview_workspace_image(
 }
 
 #[tauri::command]
+async fn list_asset_organization(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<std::collections::BTreeMap<i64, arrumo_workspaces::AssetOrganization>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_asset_organization(workspace_id)
+        .map_err(|_| "asset_organization_failed")
+}
+
+#[tauri::command]
+async fn set_asset_organization(
+    workspace_id: i64,
+    asset_id: i64,
+    settings: arrumo_workspaces::AssetOrganization,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::AssetOrganization, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_asset_organization(workspace_id, asset_id, settings)
+        .map_err(|_| "asset_organization_failed")
+}
+
+#[tauri::command]
 async fn set_batch_asset_notes(
     workspace_id: i64,
     asset_ids: Vec<i64>,
@@ -744,6 +770,8 @@ fn main() {
             preview_workspace_image,
             set_asset_notes,
             set_batch_asset_notes,
+            list_asset_organization,
+            set_asset_organization,
             get_workspace_context,
             set_workspace_context,
             list_workspace_feedback,

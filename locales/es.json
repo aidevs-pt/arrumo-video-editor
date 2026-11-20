@@ -186,6 +186,11 @@
     "noSearchMatches": "Ningún título coincide con la búsqueda."
   },
   "assets": {
+    "organize": "Organizar",
+    "group": "Grupo",
+    "labels": "Etiquetas, una por línea",
+    "saveOrganization": "Guardar organización",
+    "organizationError": "No se pudieron guardar el grupo y las etiquetas.",
     "selectAsset": "Seleccionar recurso",
     "selectionCount": "{count} seleccionados",
     "editSelected": "Editar notas seleccionadas",
