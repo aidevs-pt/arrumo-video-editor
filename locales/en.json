@@ -297,7 +297,9 @@
     "agentReady": "Nothing generating",
     "agentMissing": "No agent chosen",
     "agentChoose": "Choose one in Settings",
-    "workspaceSettingsHint": "Applies to every profile and video in {workspace} unless a profile says otherwise."
+    "workspaceSettingsHint": "Applies to every profile and video in {workspace} unless a profile says otherwise.",
+    "workspaceCounts": "{profiles} profiles, {videos} videos",
+    "workspaceCountsOne": "1 profile, {videos} videos"
   },
   "motionLibrary": {
     "renderer": "Installed renderer",
@@ -706,27 +708,39 @@
   "context": {
     "title": "Context",
     "back": "Back to profiles",
-    "label": "Production context (Markdown)",
+    "label": "About you",
     "template": "## Company or channel\n\n## Author\n\n## Audience\n\n## Editorial guidance\n",
     "loading": "Loading context…",
     "loadError": "Context couldn’t be loaded.",
     "retry": "Retry",
-    "save": "Save context",
-    "saved": "Context saved.",
-    "saveError": "Context couldn’t be saved. Try again."
+    "save": "Save",
+    "saved": "Saved",
+    "saveError": "Context couldn’t be saved. Try again.",
+    "aboutYou": "About you",
+    "unsaved": "Unsaved changes",
+    "cascadeTitle": "Where a video's settings come from",
+    "cascadeApp": "Defaults: quality, language, plugins",
+    "cascadeWorkspace": "{workspace}, you are here",
+    "cascadeProfile": "Profiles add their own",
+    "cascadeVideo": "Set when you generate",
+    "cascadeHint": "The more specific layer wins for settings. Context and comments add up instead: a video reads all four layers, top to bottom."
   },
   "feedback": {
-    "title": "Agent feedback",
-    "empty": "No feedback has been recorded.",
+    "title": "What {agent} has learned",
+    "empty": "Nothing yet. When the agent learns something about your preferences, it shows up here.",
     "loading": "Loading feedback…",
     "loadError": "Feedback couldn’t be loaded.",
     "retry": "Retry",
-    "edit": "Edit feedback",
+    "edit": "Edit",
     "cardTitle": "Title",
     "markdown": "Feedback (Markdown)",
-    "save": "Save feedback",
+    "save": "Save",
     "cancel": "Cancel",
-    "saveError": "Feedback couldn’t be saved."
+    "saveError": "Feedback couldn’t be saved.",
+    "titleFallback": "What the agent has learned",
+    "hint": "{agent} adds these while it works. Edit or remove anything that's wrong; it reads them before every video.",
+    "remove": "Remove",
+    "removeError": "That card couldn't be removed."
   },
   "subtitleRevisions": {
     "language": "Subtitle language",

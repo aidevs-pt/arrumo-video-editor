@@ -66,6 +66,18 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
     : view === "motion-library" ? messages.profileHub.animations
     : messages.profiles.title;
 
+  const [counts, setCounts] = useState<Record<number, { profiles: number; videos: number }>>({});
+
+  function loadCounts(open: boolean) {
+    if (!open) return;
+    for (const entry of workspaces) {
+      Promise.all([
+        invoke<unknown[]>("list_profiles", { workspaceId: entry.id }),
+        invoke<unknown[]>("list_generation_runs", { workspaceId: entry.id }),
+      ]).then(([profiles, runs]) => setCounts((current) => ({ ...current, [entry.id]: { profiles: profiles.length, videos: runs.length } })), () => {});
+    }
+  }
+
   function choose(entry: Workspace | null) {
     setOpenMobile(false);
     onSelect(entry);
@@ -79,7 +91,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
             onClick={() => setOpenMobile(false)} aria-label={copy.closeNavigation}><X /></Button>
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={loadCounts}>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton size="lg" tooltip={copy.workspace} className="h-12 px-1.5" aria-label={copy.workspace}>
                     <FaceMark />
@@ -95,7 +107,13 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
                     {workspaces.map((entry) => (
                       <DropdownMenuItem key={entry.id} onSelect={() => choose(entry)} className="gap-3 py-2">
                         <FaceMark className="size-7" />
-                        <span className="min-w-0 flex-1 truncate font-semibold">{entry.name}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{entry.name}</span>
+                          {counts[entry.id] && <span className="block truncate text-xs text-muted-foreground">
+                            {(counts[entry.id].profiles === 1 ? copy.workspaceCountsOne : copy.workspaceCounts)
+                              .replace("{profiles}", String(counts[entry.id].profiles)).replace("{videos}", String(counts[entry.id].videos))}
+                          </span>}
+                        </span>
                         {entry.id === workspace?.id && <Check className="text-primary" aria-label={copy.currentWorkspace} />}
                       </DropdownMenuItem>
                     ))}

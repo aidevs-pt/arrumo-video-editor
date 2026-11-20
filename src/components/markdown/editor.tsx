@@ -23,13 +23,14 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
   const { messages: { markdownEditor: copy } } = useLocale();
 
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <Button type="button" size="sm" variant="outline" className="self-start" aria-pressed={showSource}
+    <div className="relative min-w-0">
+      <Button type="button" size="xs" variant="ghost" aria-pressed={showSource}
+        className="absolute end-2 top-2 z-[1] text-muted-foreground aria-pressed:bg-secondary aria-pressed:text-foreground"
         disabled={props.disabled} onClick={() => setShowSource((current) => !current)}>
         {copy.source}
       </Button>
       {showSource ? (
-        <Textarea id={props.id} aria-label={props.label} className="min-h-56 font-mono" value={props.value}
+        <Textarea id={props.id} aria-label={props.label} className="min-h-56 pt-11" value={props.value}
           disabled={props.disabled} onChange={(event) => props.onChange(event.target.value)} />
       ) : <RichEditor {...props} />}
     </div>

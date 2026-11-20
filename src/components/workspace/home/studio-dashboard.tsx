@@ -192,7 +192,7 @@ function PublishingWeek({ workspaceId, schedule }: { workspaceId: number; schedu
                   className="flex min-w-0 flex-col gap-1 text-sm hover:text-primary">
                   <span aria-hidden="true" className="h-1 rounded-[2px]" style={{ backgroundColor: output.profile_color ?? "var(--border)" }} />
                   <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                  <span className="line-clamp-4 font-semibold wrap-anywhere">{output.title}</span>
+                  <span lang={locale} className="line-clamp-4 font-semibold [overflow-wrap:break-word] hyphens-auto">{output.title}</span>
                 </Link>
               );
             })}

@@ -297,7 +297,9 @@
     "agentReady": "Nada en generación",
     "agentMissing": "Ningún agente elegido",
     "agentChoose": "Elige uno en Ajustes",
-    "workspaceSettingsHint": "Se aplica a todos los perfiles y vídeos de {workspace}, salvo que un perfil diga lo contrario."
+    "workspaceSettingsHint": "Se aplica a todos los perfiles y vídeos de {workspace}, salvo que un perfil diga lo contrario.",
+    "workspaceCounts": "{profiles} perfiles, {videos} vídeos",
+    "workspaceCountsOne": "1 perfil, {videos} vídeos"
   },
   "motionLibrary": {
     "renderer": "Renderizador instalado",
@@ -706,27 +708,39 @@
   "context": {
     "title": "Contexto",
     "back": "Volver a los perfiles",
-    "label": "Contexto de producción (Markdown)",
+    "label": "Sobre ti",
     "template": "## Empresa o canal\n\n## Autoría\n\n## Audiencia\n\n## Pautas editoriales\n",
     "loading": "Cargando contexto…",
     "loadError": "No se pudo cargar el contexto.",
     "retry": "Reintentar",
-    "save": "Guardar contexto",
-    "saved": "Contexto guardado.",
-    "saveError": "No se pudo guardar el contexto. Inténtalo de nuevo."
+    "save": "Guardar",
+    "saved": "Guardado",
+    "saveError": "No se pudo guardar el contexto. Inténtalo de nuevo.",
+    "aboutYou": "Sobre ti",
+    "unsaved": "Cambios sin guardar",
+    "cascadeTitle": "De dónde salen los ajustes de un vídeo",
+    "cascadeApp": "Predeterminados: calidad, idioma, plugins",
+    "cascadeWorkspace": "{workspace}, estás aquí",
+    "cascadeProfile": "Los perfiles añaden lo suyo",
+    "cascadeVideo": "Se define al generar",
+    "cascadeHint": "Para los ajustes gana la capa más específica. El contexto y los comentarios se suman: un vídeo lee las cuatro capas, de arriba abajo."
   },
   "feedback": {
-    "title": "Observaciones del agente",
-    "empty": "Aún no hay observaciones.",
+    "title": "Lo que {agent} ha aprendido",
+    "empty": "Nada todavía. Cuando el agente aprenda algo sobre tus preferencias, aparecerá aquí.",
     "loading": "Cargando observaciones…",
     "loadError": "No se pudieron cargar las observaciones.",
     "retry": "Reintentar",
-    "edit": "Editar observación",
+    "edit": "Editar",
     "cardTitle": "Título",
     "markdown": "Observación (Markdown)",
-    "save": "Guardar observación",
+    "save": "Guardar",
     "cancel": "Cancelar",
-    "saveError": "No se pudo guardar la observación."
+    "saveError": "No se pudo guardar la observación.",
+    "titleFallback": "Lo que ha aprendido el agente",
+    "hint": "{agent} los añade mientras trabaja. Edita o quita lo que esté mal; los lee antes de cada vídeo.",
+    "remove": "Quitar",
+    "removeError": "No se pudo quitar esa tarjeta."
   },
   "subtitleRevisions": {
     "language": "Idioma de subtítulos",

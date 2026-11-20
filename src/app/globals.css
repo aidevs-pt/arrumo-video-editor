@@ -173,3 +173,9 @@ html[data-reduce-motion] *::after {
   transition-duration: 0s !important;
   scroll-behavior: auto !important;
 }
+
+/* Toolbars read left to right like the reference; the end leaves room for the Markdown source toggle. */
+div.rte-toolbar {
+  justify-content: flex-start;
+  padding-inline-end: 8rem;
+}
