@@ -59,3 +59,26 @@ pub async fn import_delivery_subtitles(
     .await
     .map_err(|_| "subtitle_import_failed")?
 }
+
+#[tauri::command]
+pub async fn submit_desktop_motion_artifacts(
+    workspace_id: i64,
+    run_id: i64,
+    artifacts: Vec<arrumo_workspaces::MotionArtifact>,
+    app: AppHandle,
+) -> Result<bool, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .publish_queued_motion_artifacts(&database, workspace_id, run_id, &artifacts)
+            .map(|result| result.is_some())
+            .map_err(|_| "motion_artifacts_failed")
+    })
+    .await
+    .map_err(|_| "motion_artifacts_failed")?
+}

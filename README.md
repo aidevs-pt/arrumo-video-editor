@@ -397,3 +397,5 @@ During guided Assets review, select which animations and transitions to keep bef
 A local renderer worker can submit finished files with `submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json>` while it holds the Assets-stage lease. Pass an array of objects with `kind`, `title`, `usage_markdown`, and an absolute local `preview` video path. Optional fields are `profile_id`, `thumbnail` (image path), and `sound` (audio path). The host imports the files and submits their managed IDs together. A rejected batch leaves the run at its current stage and does not publish catalog entries. The input files remain with the worker.
 
 MCP and A2A expose `submit_motion_artifacts` with `workspaceId`, `runId`, `attempt`, and `artifacts`. Each artifact uses the CLI's field names and absolute paths on the machine running Arrumo. The response includes `resultId`.
+
+On a queued desktop run at the Assets stage, use **Submit motion files** to add one finished animation or transition with its video preview and optional thumbnail and sound. Submitting completes the stage or sends it to guided review, according to the run options.

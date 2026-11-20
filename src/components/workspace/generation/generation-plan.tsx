@@ -20,6 +20,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
+import { MotionArtifactAction } from "./motion-artifact-action";
 import { MediaStageAction } from "./media-stage-action";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
@@ -140,6 +141,12 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
           )}
         </CardContent>
       </Card>
+      {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
+        <Card size="sm">
+          <CardHeader><CardTitle>{copy.assets}</CardTitle></CardHeader>
+          <CardContent><MotionArtifactAction workspaceId={workspaceId} runId={runId} available={runState === "queued"} /></CardContent>
+        </Card>
+      )}
       {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
         <Card size="sm">
           <CardHeader><CardTitle>{copy[mediaStage]}</CardTitle></CardHeader>

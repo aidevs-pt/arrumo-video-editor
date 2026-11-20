@@ -186,6 +186,10 @@
     "noSearchMatches": "Nenhum título corresponde à pesquisa."
   },
   "motionLibrary": {
+    "submitArtifacts": "Enviar ficheiros de movimento",
+    "submitArtifactsDescription": "Escolhe uma pré-visualização finalizada e os recursos opcionais. O envio termina a etapa de recursos.",
+    "submitArtifactsError": "Não foi possível enviar os ficheiros. Verifica os tipos e a etapa atual.",
+    "clearArtifact": "Limpar",
     "preservedMedia": "Ficheiro preservado da geração",
     "runItems": "Animações e transições",
     "saveRunItem": "Guardar na biblioteca",

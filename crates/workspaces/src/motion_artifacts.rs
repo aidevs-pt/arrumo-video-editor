@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rusqlite::{Transaction, TransactionBehavior, params};
+use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -26,6 +26,49 @@ pub struct MotionArtifact {
 }
 
 impl WorkspaceStore {
+    pub fn publish_queued_motion_artifacts(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        artifacts: &[MotionArtifact],
+    ) -> Result<Option<i64>, Box<dyn Error + Send + Sync>> {
+        let attempt: Option<i64> = self
+            .0
+            .query_row(
+                "UPDATE generation_runs SET state = 'running', attempt = attempt + 1,
+                 lease_until = unixepoch() + ?3
+             WHERE workspace_id = ?1 AND id = ?2 AND state = 'queued'
+               AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'assets'
+             RETURNING attempt",
+                params![
+                    workspace_id,
+                    run_id,
+                    crate::generation_worker::LEASE_SECONDS
+                ],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(attempt) = attempt else {
+            return Ok(None);
+        };
+        match self.submit_motion_artifacts(database, workspace_id, run_id, attempt, artifacts) {
+            Ok(id) => Ok(Some(id)),
+            Err(error) => {
+                match self.fail_generation(
+                    workspace_id,
+                    run_id,
+                    attempt,
+                    "Motion artifact import failed. Check the files and retry.",
+                ) {
+                    Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
+                    Err(failure) => return Err(failure.into()),
+                }
+                Err(error)
+            }
+        }
+    }
+
     pub fn submit_motion_artifacts(
         &self,
         database: &Path,
