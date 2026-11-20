@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Settings2 } from "lucide-react";
+import { ArrowUpRight, KeyRound, Package, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -11,14 +11,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/workspace-router";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginCatalog } from "./plugin-catalog";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
-import { WorkspacePluginPreferences } from "./plugin-preferences";
+import { ScopedPluginPreferences } from "./plugin-preferences";
 
 type AgentPlugin = { id: string; label: string };
 type Settings = {
@@ -35,13 +37,42 @@ export function AgentSettingsPage() {
   const { status, workspaces, load } = useWorkspaceCatalog();
   const query = useSearchParams();
   const router = useRouter();
-  const { messages: { agentSettings: copy, workspaces: workspaceCopy } } = useLocale();
-  const requested = query.get("workspace");
+  const { locale, setLocale, messages } = useLocale();
+  const { agentSettings: copy, workspaces: workspaceCopy } = messages;
+  const studioWorkspace = query.get("workspace");
+  const requested = query.get("scope") === "app" ? null : studioWorkspace;
   const setupWorkspace = workspaces.find(({ id }) => String(id) === query.get("setup"));
   const workspace = workspaces.find(({ id }) => String(id) === requested);
+  const section = query.get("section");
+  const tab = !setupWorkspace && (section === "plugins" || section === "services") ? section : "general";
+  const settingsHref = (target: string, scope = requested) => {
+    const params = new URLSearchParams();
+    if (scope) params.set("workspace", scope);
+    else if (studioWorkspace) {
+      params.set("workspace", studioWorkspace);
+      params.set("scope", "app");
+    }
+    if (target !== "general") params.set("section", target);
+    return params.size ? `/settings?${params}` : "/settings";
+  };
   return (
-    <WorkspaceShell>
-      <WorkspaceHeading icon={Settings2}><h1>{copy.title}</h1><p>{copy.intro}</p></WorkspaceHeading>
+    <WorkspaceShell className="grid items-start gap-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
+      <nav className="flex flex-wrap gap-1 sm:flex-col" aria-label={copy.title}>
+        {([
+          ["general", messages.settings.general, Settings2],
+          ["services", messages.onboarding.services, KeyRound],
+          ["plugins", messages.pluginCatalog.title, Package],
+        ] as const).map(([key, label, Icon]) => (
+          <Button key={key} asChild size="sm" variant={key === tab ? "secondary" : "ghost"} className="justify-start">
+            <Link href={settingsHref(key)} aria-current={key === tab ? "page" : undefined}>
+              <Icon data-icon="inline-start" />{label}
+            </Link>
+          </Button>
+        ))}
+      </nav>
+      <div className="min-w-0">
+      <WorkspaceHeading><h1>{tab === "general" ? messages.settings.general : tab === "services" ? messages.onboarding.services : messages.pluginCatalog.title}</h1>
+        {tab === "general" && <p>{copy.intro}</p>}</WorkspaceHeading>
       {status === "browser" ? <Alert><AlertDescription>{workspaceCopy.desktop}</AlertDescription></Alert>
         : status === "error" ? <Alert variant="destructive">
           <AlertDescription>{workspaceCopy.loadError}</AlertDescription>
@@ -49,12 +80,24 @@ export function AgentSettingsPage() {
         </Alert>
         : status === "loading" ? <Skeleton className="h-40 max-w-xl" role="status" aria-label={copy.loading} />
         : (
-          <div className="flex max-w-xl flex-col gap-4">
+          <div className="flex max-w-3xl flex-col gap-5">
+            {tab === "general" && !setupWorkspace && <section className="border-y py-4">
+              <h2 className="mb-3 text-[1.3125rem]">{messages.settings.appearance}</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span id="settings-language">{messages.settings.language}</span>
+                <ToggleGroup type="single" value={locale} onValueChange={(value) => value && setLocale(value)}
+                  variant="outline" spacing={0} aria-labelledby="settings-language">
+                  <ToggleGroupItem value="en">English</ToggleGroupItem>
+                  <ToggleGroupItem value="es">Español</ToggleGroupItem>
+                  <ToggleGroupItem value="pt">Português</ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            </section>}
             {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
             <Field>
               <FieldLabel htmlFor="agent-settings-scope">{copy.scope}</FieldLabel>
               <Select value={workspace ? String(workspace.id) : "app"}
-                onValueChange={(value) => router.push(value === "app" ? "/settings" : `/settings?workspace=${value}`)}>
+                onValueChange={(value) => router.push(settingsHref(tab, value === "app" ? null : value))}>
                 <SelectTrigger id="agent-settings-scope"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>
                   <SelectItem value="app">{copy.app}</SelectItem>
@@ -64,16 +107,17 @@ export function AgentSettingsPage() {
             </Field>
             {requested !== null && !workspace ? (
               <Alert variant="destructive"><AlertDescription>{workspaceCopy.missing}</AlertDescription></Alert>
-            ) : <ProviderForm key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
+            ) : tab === "general" && <ProviderForm key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
             {setupWorkspace && <Button asChild variant="outline" className="self-start">
               <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
             </Button>}
-            {!requested && !setupWorkspace && <PluginCatalog />}
-            {workspace && !setupWorkspace && <WorkspacePluginPreferences key={workspace.id} workspaceId={workspace.id} />}
-            {workspace && !setupWorkspace && <PluginGrants key={workspace.id} workspace={workspace} />}
-            {workspace && !setupWorkspace && <PluginActions key={workspace.id} workspaceId={workspace.id} />}
+            {tab === "plugins" && !requested && <PluginCatalog />}
+            {tab === "services" && (requested === null || workspace) && <ScopedPluginPreferences key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
+            {workspace && tab === "plugins" && <PluginGrants key={workspace.id} workspace={workspace} />}
+            {workspace && tab === "plugins" && <PluginActions key={workspace.id} workspaceId={workspace.id} />}
           </div>
         )}
+      </div>
     </WorkspaceShell>
   );
 }
@@ -158,7 +202,7 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span>{copy.effective}</span>
                 <Badge variant="secondary">{settings.effective_provider ? plugins.find(({ id }) => id === settings.effective_provider)?.label ?? settings.effective_provider : copy.unset}</Badge>
-                {settings.source && <span className="text-muted-foreground">{settings.source === "app" ? copy.fromApp : copy.fromWorkspace}</span>}
+                {settings.source && <LayerGauge layer={settings.source} />}
               </div>
               {choice !== unset && <AgentSetupHelp key={choice} provider={choice} />}
               {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}

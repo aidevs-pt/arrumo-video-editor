@@ -1,13 +1,12 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { CalendarDays, ChevronLeft, ChevronRight, RectangleHorizontal, RectangleVertical, Square } from "lucide-react";
+import { ChevronLeft, ChevronRight, RectangleHorizontal, RectangleVertical, Square } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,6 +71,8 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
   const rows = results?.key === key ? results.rows : undefined;
   const failed = results?.key === key && !results.rows;
   const firstColumn = (month.getUTCDay() + 6) % 7;
+  const now = new Date();
+  const today = asDate(utcDate(now.getFullYear(), now.getMonth(), now.getDate()));
   const monthLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(month);
 
   function showMonth(offset: number) {
@@ -110,11 +111,10 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
 
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={CalendarDays}><h1>{copy.title}</h1></WorkspaceHeading>
-      <Card>
-        <CardHeader className="gap-3">
+      <section aria-label={copy.title}>
+        <div className="mb-4 flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="capitalize">{monthLabel}</CardTitle>
+            <WorkspaceHeading className="mb-0"><h1 className="capitalize">{monthLabel}</h1></WorkspaceHeading>
             <div className="flex gap-1">
               <Button variant="outline" size="icon-sm" aria-label={copy.previousMonth}
                 disabled={year === 1 && monthIndex === 0}
@@ -122,6 +122,9 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
               <Button variant="outline" size="icon-sm" aria-label={copy.nextMonth}
                 disabled={year >= 9999 && monthIndex === 11}
                 onClick={() => showMonth(1)}><ChevronRight /></Button>
+              <Button size="sm" variant="outline" onClick={() => router.push(
+                calendarHref(workspaceId, profileId ?? undefined, today.slice(0, 7)), { scroll: false },
+              )}>{copy.today}</Button>
             </div>
           </div>
           <Select value={profileId === null ? "all" : String(profileId)}
@@ -132,14 +135,14 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
               {profiles.map((profile) => <SelectItem key={profile.id} value={String(profile.id)}>{profile.name}</SelectItem>)}
             </SelectGroup></SelectContent>
           </Select>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {failed ? <Alert variant="destructive">
             <AlertDescription>{copy.loadError}</AlertDescription>
             <Button size="sm" variant="outline" onClick={() => setRetry((current) => current + 1)}>{messages.queue.retry}</Button>
           </Alert> : !rows ? <Skeleton className="min-h-48" aria-label={copy.loading} /> : (
             <>
-              <div className="hidden overflow-hidden rounded-md border lg:grid lg:grid-cols-7">
+              <div className="hidden overflow-hidden rounded-md border bg-card lg:grid lg:grid-cols-7">
                 {Array.from({ length: 7 }, (_, index) => (
                   <div key={index} className="border-b bg-muted px-2 py-1.5 text-sm font-medium">
                     {weekday.format(new Date(Date.UTC(2024, 0, index + 1)))}
@@ -149,7 +152,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
                   <div key={`blank-${index}`} aria-hidden="true" className="border-e border-b bg-muted/30" />)}
                 {days.map((date) => <section key={date} aria-label={dayLabel.format(new Date(date))}
                   className="min-h-20 min-w-0 border-e border-b p-2">
-                  <time dateTime={date} className="text-xs tabular-nums text-muted-foreground">{Number(date.slice(-2))}</time>
+                  <time dateTime={date} aria-current={date === today ? "date" : undefined} className="inline-grid min-h-5 min-w-5 place-items-center rounded-[2px] text-xs text-muted-foreground aria-[current=date]:bg-primary aria-[current=date]:text-primary-foreground">{Number(date.slice(-2))}</time>
                   <OutputList rows={byDate.get(date) ?? []} workspaceId={workspaceId} />
                 </section>)}
               </div>
@@ -164,8 +167,8 @@ function CalendarContent({ workspaceId, profileId, monthQuery }: {
               </EmptyHeader></Empty>}
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </WorkspaceShell>
   );
 }

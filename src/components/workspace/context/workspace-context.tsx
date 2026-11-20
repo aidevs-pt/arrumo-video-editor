@@ -1,9 +1,9 @@
 "use client";
 
-import { FileText } from "lucide-react";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
+import { WorkspaceSettingsHeading } from "@/components/workspace/settings/workspace-settings-heading";
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceForm, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -52,10 +52,7 @@ export function WorkspaceContext({ workspace }: {
 
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={FileText}>
-        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
-        <p>{workspace.name}</p>
-      </WorkspaceHeading>
+      <WorkspaceSettingsHeading workspace={workspace} current="context" headingRef={heading} />
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>

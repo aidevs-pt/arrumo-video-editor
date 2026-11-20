@@ -18,7 +18,7 @@ import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginRegistryBrowser } from "./plugin-registry-browser";
-import { PluginPreferences, type PluginSettingsManifest } from "./plugin-preferences";
+import type { PluginSettingsManifest } from "./plugin-preferences";
 
 type Plugin = {
   bundled: boolean;
@@ -78,7 +78,6 @@ export function PluginCatalog() {
 
   return (
     <>
-      {plugins && <PluginPreferences plugins={plugins} workspaceId={null} />}
       <Card>
         <CardHeader>
           <CardTitle>{copy.title}</CardTitle>

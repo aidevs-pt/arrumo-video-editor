@@ -1,8 +1,9 @@
 "use client";
 
-import { Monitor, SlidersHorizontal } from "lucide-react";
+import { Monitor } from "lucide-react";
+import { WorkspaceSettingsHeading } from "@/components/workspace/settings/workspace-settings-heading";
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceColumns, WorkspaceForm, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -111,10 +112,7 @@ export function WorkspaceOutputs({
 
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={SlidersHorizontal}>
-        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
-        <p>{workspace.name}</p>
-      </WorkspaceHeading>
+      <WorkspaceSettingsHeading workspace={workspace} current="outputs" headingRef={heading} />
       <WorkspaceColumns>
         <section className="min-w-0 [&>p]:mt-3 [&>p]:max-w-[60ch] [&>p]:text-muted-foreground" aria-labelledby="format-list-title">
           <h2 id="format-list-title">{copy.list}</h2>

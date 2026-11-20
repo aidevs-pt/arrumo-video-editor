@@ -76,7 +76,7 @@ export function PluginPreferences({
   );
 }
 
-export function WorkspacePluginPreferences({ workspaceId }: { workspaceId: number }) {
+export function ScopedPluginPreferences({ workspaceId }: { workspaceId: number | null }) {
   const { messages: { pluginPreferences: copy, workspaces } } = useLocale();
   const [manifests, setManifests] = useState<CatalogEntry[]>();
   const [error, setError] = useState(false);

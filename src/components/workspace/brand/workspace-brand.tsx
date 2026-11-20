@@ -1,8 +1,8 @@
 "use client";
 
-import { Palette } from "lucide-react";
+import { WorkspaceSettingsHeading } from "@/components/workspace/settings/workspace-settings-heading";
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -60,10 +60,7 @@ export function WorkspaceBrand({ workspace }: {
 
   return (
     <WorkspaceShell>
-      <WorkspaceHeading icon={Palette}>
-        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
-        <p>{workspace.name}</p>
-      </WorkspaceHeading>
+      <WorkspaceSettingsHeading workspace={workspace} current="brand" headingRef={heading} />
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -73,13 +70,13 @@ export function WorkspaceBrand({ workspace }: {
           }}>{copy.retry}</Button>
         </Alert>
       ) : !colors ? <p role="status">{copy.loading}</p> : (
-        <section className="rounded-xl border bg-card p-4 sm:p-5" aria-labelledby="brand-colors">
-          <h2 id="brand-colors" className="flex min-w-0 items-baseline gap-2.5 font-[680]">{copy.colors}</h2>
+        <section className="border-b pb-5" aria-labelledby="brand-colors">
+          <h2 id="brand-colors" className="text-[1.3125rem]">{copy.colors}</h2>
           {colors.length ? (
             <ul className="my-4 flex flex-wrap items-start gap-3">
               {colors.map((color) => (
                 <li key={color} className="flex min-w-20 flex-col items-center gap-1">
-                  <span className="size-14 rounded-lg border" style={{ backgroundColor: color }} aria-hidden="true" />
+                  <span className="h-11 w-22 rounded-sm border" style={{ backgroundColor: color }} aria-hidden="true" />
                   <span className="text-xs font-medium tabular-nums">{color}</span>
                   <Button type="button" variant="ghost" size="sm" disabled={saving}
                     aria-label={`${copy.remove} ${color}`} onClick={() => update(colors.filter((item) => item !== color))}>{copy.remove}</Button>
