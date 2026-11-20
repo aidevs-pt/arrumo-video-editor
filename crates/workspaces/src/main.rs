@@ -73,6 +73,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             let workspaces = WorkspaceStore::open(Path::new(database))?.list()?;
             println!("{}", serde_json::to_string(&workspaces)?);
         }
+        [database, command, plugin, digest, output] if command == "export-plugin-package" => {
+            WorkspaceStore::open(Path::new(database))?.export_reviewed_plugin_package(
+                utf8(plugin)?,
+                utf8(digest)?,
+                Path::new(output),
+            )?;
+        }
         [database, command] if command == "plugin-catalog" => {
             let plugins = WorkspaceStore::open(Path::new(database))?.plugin_catalog()?;
             println!("{}", serde_json::to_string(&plugins)?);
@@ -1289,7 +1296,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "review-preview-formats <workspace-id> <run-id> <result-id> <decisions-json> <notes> | ",
                 "review-supplemental-items <workspace-id> <run-id> <result-id> <decisions-json> <notes> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | completed-subtitles <workspace-id> <run-id> <format-id> [revision] | revise-completed-subtitles <workspace-id> <run-id> <format-id> <expected-revision> <srt-file> | completed-subtitle-languages <workspace-id> <run-id> <format-id> | completed-subtitle-track <workspace-id> <run-id> <format-id> <language> [revision] | revise-completed-subtitle-track <workspace-id> <run-id> <format-id> <language> <expected-revision> <srt-file> | watch-motion-queue | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | export-plugin-package <plugin-id> <sha256> <new-zip> | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | completed-subtitles <workspace-id> <run-id> <format-id> [revision] | revise-completed-subtitles <workspace-id> <run-id> <format-id> <expected-revision> <srt-file> | completed-subtitle-languages <workspace-id> <run-id> <format-id> | completed-subtitle-track <workspace-id> <run-id> <format-id> <language> [revision] | revise-completed-subtitle-track <workspace-id> <run-id> <format-id> <language> <expected-revision> <srt-file> | watch-motion-queue | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",

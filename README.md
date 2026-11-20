@@ -23,6 +23,11 @@ For local debug builds, place an SDK-built `plugin.zip` in a selected sibling pl
 
 For registry release builds, set `ARRUMO_PLUGIN_RELEASE_ROOT` to a directory containing the staged `<id>.zip` files. Each staged ZIP must match exactly one release SHA-256 in the selected registry and its manifest must match the corresponding checkout. The bundled catalog retains the release version, source repository and package URL. Release builds only embed executable ZIPs from this verified staging path.
 
+Use `export-plugin-package <plugin-id> <sha256> <new-zip>` to copy a bundled
+or installed package from the local catalog. The editor recomputes the digest
+and refuses to overwrite an existing file. Obtain the expected digest from
+the package entry you reviewed in `plugin-catalog`.
+
 Use `ARRUMO_CORE_ONLY=1` for isolated host verification without private checkout access. That build starts with an empty default catalog.
 
 ## Workspace CLI

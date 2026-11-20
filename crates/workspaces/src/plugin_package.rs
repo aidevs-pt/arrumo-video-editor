@@ -80,11 +80,11 @@ impl WorkspaceStore {
         Ok(package)
     }
 
-    pub fn reviewed_motion_renderer_package(
+    fn reviewed_plugin_package(
         &self,
         plugin_id: &str,
         expected_sha256: &str,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<ResolvedPluginPackage, Box<dyn Error>> {
         if !valid_sha256(expected_sha256) {
             return Err(
                 invalid_package("Expected SHA-256 must contain 64 hexadecimal digits").into(),
@@ -92,18 +92,46 @@ impl WorkspaceStore {
         }
         let package =
             self.resolve_plugin_package(plugin_id, Some(&expected_sha256.to_ascii_lowercase()))?;
-        let manifest = package.manifest;
-        let bytes = package.bytes;
-        if manifest.id != plugin_id || !manifest.capabilities.contains_key("motion-render") {
+        if !package_sha256(&package.bytes)?.eq_ignore_ascii_case(expected_sha256) {
+            return Err(invalid_package("Plugin package digest mismatch").into());
+        }
+        Ok(package)
+    }
+
+    pub fn export_reviewed_plugin_package(
+        &self,
+        plugin_id: &str,
+        expected_sha256: &str,
+        output: &std::path::Path,
+    ) -> Result<(), Box<dyn Error>> {
+        use std::io::Write;
+
+        let package = self.reviewed_plugin_package(plugin_id, expected_sha256)?;
+        let directory = output
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or(std::path::Path::new("."));
+        let mut pending = tempfile::NamedTempFile::new_in(directory)?;
+        pending.write_all(&package.bytes)?;
+        pending.as_file().sync_all()?;
+        pending
+            .persist_noclobber(output)
+            .map_err(|error| error.error)?;
+        Ok(())
+    }
+
+    pub fn reviewed_motion_renderer_package(
+        &self,
+        plugin_id: &str,
+        expected_sha256: &str,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        let package = self.reviewed_plugin_package(plugin_id, expected_sha256)?;
+        if !package.manifest.capabilities.contains_key("motion-render") {
             return Err(
                 invalid_package("Installed package does not declare motion rendering").into(),
             );
         }
-        let actual = package_sha256(&bytes)?;
-        if !actual.eq_ignore_ascii_case(expected_sha256) {
-            return Err(invalid_package("Installed renderer package digest mismatch").into());
-        }
-        Ok(bytes.into_owned())
+        Ok(package.bytes.into_owned())
     }
 
     pub fn install_plugin_zip(&self, archive: impl Read) -> Result<CatalogPlugin, Box<dyn Error>> {
@@ -272,6 +300,36 @@ mod tests {
             plugin.package.unwrap().sha256,
             checksum.to_ascii_lowercase()
         );
+
+        let directory = tempfile::tempdir().unwrap();
+        let output = directory.path().join("plugin.zip");
+        assert!(
+            store
+                .export_reviewed_plugin_package("local-plugin", &"0".repeat(64), &output)
+                .is_err()
+        );
+        assert!(!output.exists());
+        store
+            .export_reviewed_plugin_package("local-plugin", &checksum, &output)
+            .unwrap();
+        assert_eq!(std::fs::read(&output).unwrap(), bytes);
+        assert!(
+            store
+                .export_reviewed_plugin_package("local-plugin", &checksum, &output)
+                .is_err()
+        );
+        assert_eq!(std::fs::read(&output).unwrap(), bytes);
+        store.0.execute(
+            "UPDATE installed_plugin_manifests SET package_bytes = ?1 WHERE plugin_id = 'local-plugin'",
+            [b"changed bytes".as_slice()],
+        ).unwrap();
+        let other = directory.path().join("changed.zip");
+        assert!(
+            store
+                .export_reviewed_plugin_package("local-plugin", &checksum, &other)
+                .is_err()
+        );
+        assert!(!other.exists());
     }
 
     #[test]
