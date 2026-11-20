@@ -27,7 +27,7 @@ export function CompletedVideoRoute() {
         </Link>
       </Button>
       {/^[1-9]\d*$/.test(rawRun) && Number.isSafeInteger(runId) ? (
-        <CompletedVideoDetail key={`${workspace.id}-${runId}-${formatId}`} workspaceId={workspace.id} runId={runId} initialFormatId={formatId} />
+        <CompletedVideoDetail key={`${workspace.id}-${runId}-${formatId}`} workspaceId={workspace.id} runId={runId} initialFormatId={formatId} showSubtitles={query.get("file") === "subtitles"} />
       ) : (
         <>
           <WorkspaceHeading><h1>{messages.completedVideo.details}</h1></WorkspaceHeading>

@@ -2,7 +2,8 @@
 
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
-import { Archive, CheckCircle2, ClipboardList, Film, FileText, MessageSquare } from "lucide-react";
+import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
@@ -19,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
-import { workspaceHref } from "../home/workspace-links";
+import { completedVideoHref, workspaceHref } from "../home/workspace-links";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
 import type { Stage } from "../generation/generation-plan";
 import { OutputDateField } from "./output-date-field";
@@ -60,7 +61,7 @@ type CompletedVideo = {
   output_dates: Record<number, string>;
 };
 
-export function CompletedVideoDetail({ workspaceId, runId, initialFormatId }: { workspaceId: number; runId: number; initialFormatId: number }) {
+export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, showSubtitles }: { workspaceId: number; runId: number; initialFormatId: number; showSubtitles: boolean }) {
   const { messages: { completedVideo: copy, queue } } = useLocale();
   const [video, setVideo] = useState<CompletedVideo>();
   const [loadError, setLoadError] = useState(false);
@@ -104,10 +105,10 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId }: { 
       </>
     );
   }
-  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} />;
+  return <CompletedVideoContent workspaceId={workspaceId} video={video} initialFormatId={initialFormatId} showSubtitles={showSubtitles} />;
 }
 
-function CompletedVideoContent({ workspaceId, video, initialFormatId }: { workspaceId: number; video: CompletedVideo; initialFormatId: number }) {
+function CompletedVideoContent({ workspaceId, video, initialFormatId, showSubtitles }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; showSubtitles: boolean }) {
   const { locale, messages: { completedVideo: copy, queue } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
@@ -154,6 +155,46 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId }: { worksp
     } finally {
       setAction(undefined);
     }
+  }
+
+  if (showSubtitles && selected) {
+    return <>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <WorkspaceHeading className="mb-0">
+          <h1>{selected.subtitles}</h1>
+          <p>{savedTitle} / {outputName(selected)}</p>
+        </WorkspaceHeading>
+        <Button asChild variant="outline" size="sm">
+          <Link href={completedVideoHref(workspaceId, runId, selected.format_id)}>{copy.videoTab}</Link>
+        </Button>
+      </div>
+      <CompletedOutputPreview key={selected.format_id} workspaceId={workspaceId} runId={runId}
+        formatId={selected.format_id} label={outputName(selected)} showTranscript />
+      <section className="mt-6 border-t pt-4">
+        <h2 className="mb-2 text-[1.3125rem]">{copy.otherFiles}</h2>
+        <div className="flex flex-wrap gap-2">
+          {video.delivery.verified_outputs.map((output) => (
+            <Button key={output.format_id} asChild variant="outline" size="sm">
+              <Link href={completedVideoHref(workspaceId, runId, output.format_id)}>
+                <Film data-icon="inline-start" />{output.video}
+              </Link>
+            </Button>
+          ))}
+          {video.delivery.verified_outputs.filter((output) => output.format_id !== selected.format_id).map((output) => (
+            <Button key={output.format_id} asChild variant="outline" size="sm">
+              <Link href={completedVideoHref(workspaceId, runId, output.format_id, "subtitles")}>
+                <Captions data-icon="inline-start" />{output.subtitles}
+              </Link>
+            </Button>
+          ))}
+          <Button variant="outline" size="sm" disabled={Boolean(action)} onClick={() => void exportZip()}>
+            <Archive data-icon="inline-start" />{action === "export" ? copy.exporting : copy.exportZip}
+          </Button>
+        </div>
+        {error === "exportError" && <Alert className="mt-3" variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
+        {notice === "exported" && <p className="mt-3 text-sm text-muted-foreground" role="status">{copy[notice]}</p>}
+      </section>
+    </>;
   }
 
   return (
@@ -212,6 +253,11 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId }: { worksp
                     <Metadata name={copy.videoFile} value={selected.video} />
                     <Metadata name={copy.subtitleFile} value={selected.subtitles} />
                   </dl>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={completedVideoHref(workspaceId, runId, selected.format_id, "subtitles")}>
+                      <Captions data-icon="inline-start" />{copy.subtitleText}
+                    </Link>
+                  </Button>
                   <Separator />
                   <OutputDateField key={selected.format_id} workspaceId={workspaceId} runId={runId}
                     formatId={selected.format_id} savedDate={outputDates[selected.format_id] ?? ""}

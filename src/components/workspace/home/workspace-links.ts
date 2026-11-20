@@ -12,9 +12,10 @@ export function profileHref(workspaceId: number, profileId: number) {
   return `/profile?workspace=${workspaceId}&profile=${profileId}`;
 }
 
-export function completedVideoHref(workspaceId: number, runId: number, formatId?: number) {
+export function completedVideoHref(workspaceId: number, runId: number, formatId?: number, file?: "subtitles") {
   const query = new URLSearchParams({ workspace: String(workspaceId), run: String(runId) });
   if (formatId !== undefined) query.set("format", String(formatId));
+  if (file) query.set("file", file);
   return `/completed-video?${query}`;
 }
 

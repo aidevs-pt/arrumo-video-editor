@@ -25,7 +25,7 @@ function internalRoute(value: string) {
   } else if (url.pathname === "/generation-run" || url.pathname === "/completed-video") {
     const run = numericId(query, "run");
     if (run) return url.pathname === "/completed-video"
-      ? completedVideoHref(workspace, run, numericId(query, "format"))
+      ? completedVideoHref(workspace, run, numericId(query, "format"), query.get("file") === "subtitles" ? "subtitles" : undefined)
       : `/generation-run?workspace=${workspace}&run=${run}`;
   } else if (url.pathname === "/calendar") {
     return calendarHref(workspace, numericId(query, "profile"), query.get("month"));

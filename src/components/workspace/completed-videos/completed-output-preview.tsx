@@ -1,24 +1,52 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Captions } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/locale-provider";
 
 type DeliveryPreview = { video_url: string; subtitles: string };
+type Cue = { timestamp: string; finish: string; start: number; end: number; text: string };
 
-export function CompletedOutputPreview({ workspaceId, runId, formatId, label }: {
+function seconds(timestamp: string) {
+  const [hours, minutes, seconds, milliseconds] = timestamp.split(/[:,.]/).map(Number);
+  return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+}
+
+function readCues(subtitles: string): Cue[] {
+  return subtitles.replace(/\r\n?/g, "\n").trim().split(/\n[^\S\n]*\n/).flatMap((block) => {
+    const lines = block.split("\n");
+    const index = lines.findIndex((line) => /^\s*\d+:\d{2}:\d{2}[,.]\d{3}\s+-->/.test(line));
+    if (index < 0) return [];
+    const timing = lines[index].match(/^\s*(\d+:\d{2}:\d{2}[,.]\d{3})\s+-->\s+(\d+:\d{2}:\d{2}[,.]\d{3})/);
+    if (!timing) return [];
+    const [, timestamp, finish] = timing;
+    return [{ timestamp, finish, start: seconds(timestamp), end: seconds(finish), text: lines.slice(index + 1).join("\n") }];
+  });
+}
+
+export function CompletedOutputPreview({ workspaceId, runId, formatId, label, showTranscript = false }: {
   workspaceId: number;
   runId: number;
   formatId: number;
   label: string;
+  showTranscript?: boolean;
 }) {
   const { messages: { completedVideo: copy, queue } } = useLocale();
   const [preview, setPreview] = useState<DeliveryPreview>();
   const [error, setError] = useState<"previewError" | "playbackError">();
   const [attempt, setAttempt] = useState(0);
+  const video = useRef<HTMLVideoElement>(null);
+  const [time, setTime] = useState(-1);
+  const [seekable, setSeekable] = useState(false);
+  const [query, setQuery] = useState("");
+  const cues = useMemo(() => showTranscript && preview ? readCues(preview.subtitles) : [], [preview, showTranscript]);
+
+  const filter = query.trim().toLocaleLowerCase();
+  const caption = cues.find((cue) => time >= cue.start && time < cue.end);
+  const visibleCues = useMemo(() => cues.filter((cue) => !filter || cue.text.toLocaleLowerCase().includes(filter)), [cues, filter]);
 
   useEffect(() => {
     let active = true;
@@ -30,13 +58,15 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label }: 
   }, [attempt, formatId, runId, workspaceId]);
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className={cn("grid min-w-0 items-start gap-5", showTranscript && "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]")}>
       {error ? (
         <Alert variant="destructive">
           <AlertDescription>{copy[error]}</AlertDescription>
           <AlertAction>
             <Button variant="outline" size="sm" onClick={() => {
               setPreview(undefined);
+              setSeekable(false);
+              setTime(-1);
               setError(undefined);
               setAttempt((current) => current + 1);
             }}>{queue.retry}</Button>
@@ -47,21 +77,42 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label }: 
           <Skeleton className="aspect-video w-full rounded-xl" />
         </div>
       ) : (
-        <video aria-label={label} className="aspect-video w-full rounded-xl bg-black object-contain"
-          controls playsInline preload="metadata" src={preview.video_url} onError={() => setError("playbackError")} />
+        <div className="min-w-0">
+          <video ref={video} aria-label={label} className="aspect-video w-full rounded-[4px] bg-ink object-contain"
+            controls playsInline preload="metadata" src={preview.video_url}
+            onLoadedMetadata={() => { setSeekable(true); setTime(0); }}
+            onTimeUpdate={showTranscript ? (event) => setTime(event.currentTarget.currentTime) : undefined}
+            onError={() => { setSeekable(false); setTime(-1); setError("playbackError"); }} />
+          {showTranscript && <div className="mt-2 min-h-8 text-center">
+            {caption && <span className="inline-block rounded-[4px] bg-ink px-2 py-1.5 text-sm font-bold whitespace-pre-wrap text-white">{caption.text}</span>}
+          </div>}
+        </div>
       )}
-      {preview?.subtitles && (
-        <Accordion type="single" collapsible>
-          <AccordionItem value="subtitles">
-            <AccordionTrigger>
-              <span className="flex items-center gap-2"><Captions className="size-4" aria-hidden="true" />{copy.subtitleText}</span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs leading-relaxed wrap-anywhere whitespace-pre-wrap">{preview.subtitles}</pre>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
+      {showTranscript && preview && <section className="min-w-0" aria-labelledby="delivery-transcript">
+        <h2 id="delivery-transcript" className="mb-3 text-[1.3125rem]">{copy.subtitleText}</h2>
+        {cues.length > 0 && <Input type="search" className="mb-3" aria-label={copy.findSubtitles}
+          placeholder={copy.findSubtitles} value={query} onChange={(event) => setQuery(event.target.value)} />}
+        {cues.length ? <ol className="max-h-[60vh] divide-y overflow-auto border-y">
+          {visibleCues.length === 0 &&
+            <li className="p-3 text-sm text-muted-foreground">{copy.noMatchingSubtitles}</li>}
+          {visibleCues.map((cue, index) => {
+            const active = time >= cue.start && time < cue.end;
+            const content = <>
+              <span className="grid shrink-0 content-start text-xs text-muted-foreground">
+                <span>{cue.timestamp}</span><span>{cue.finish}</span>
+              </span>
+              <span className="min-w-0 wrap-anywhere whitespace-pre-wrap">{cue.text}</span>
+            </>;
+            return <li key={`${cue.timestamp}-${index}`} className={cn(active && "bg-accent text-accent-foreground")}>
+              {seekable ? <button type="button" className="flex w-full gap-3 p-3 text-start text-sm hover:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                aria-current={active ? "true" : undefined}
+                onClick={() => { if (video.current) video.current.currentTime = cue.start; }}>
+                {content}
+              </button> : <div className="flex gap-3 p-3 text-sm">{content}</div>}
+            </li>;
+          })}
+        </ol> : <p className="max-h-[60vh] overflow-auto whitespace-pre-wrap text-sm">{preview.subtitles}</p>}
+      </section>}
     </div>
   );
 }
