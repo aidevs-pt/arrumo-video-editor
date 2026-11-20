@@ -420,6 +420,10 @@ From a completed video's output, select **Subtitle text** to open the SRT file a
 
 The CLI command `completed-subtitles <workspace-id> <run-id> <format-id> [revision]` returns the subtitle text and revision number as JSON. Omit the revision for the latest version or pass `0` for the verified original. Use `revise-completed-subtitles <workspace-id> <run-id> <format-id> <expected-revision> <srt-file>` to append a version. The command validates cue timing against the verified video and rejects a stale expected revision. The completed-video viewer and ZIP export read the latest revision.
 
+Additional language tracks are scoped to one verified output format and have independent revision histories. Use `completed-subtitle-languages <workspace-id> <run-id> <format-id>` to list them and `completed-subtitle-track <workspace-id> <run-id> <format-id> <language> [revision]` to read one. Use `revise-completed-subtitle-track <workspace-id> <run-id> <format-id> <language> <expected-revision> <srt-file>` with expected revision zero to add a track. Language tags such as `pt-PT` are stored in lowercase. The delivery ZIP includes the latest revision of each language as `<format-id>.<language>.srt` alongside the primary subtitle.
+
+MCP and A2A provide `list_completed_subtitle_languages` and accept an optional `language` on `get_completed_subtitles` and `revise_completed_subtitles`.
+
 In the desktop subtitle viewer, **Edit subtitles** opens the latest SRT for editing. **Save version** adds a validated revision, and the history arrows move between saved versions and the verified original.
 
 MCP and A2A expose `get_completed_subtitles` with `workspaceId`, `runId`, `formatId`, and optional `revision`. Submit `revise_completed_subtitles` with those three IDs, `expectedRevision` from the latest read, and `subtitles` containing the complete SRT text. Both transports have a 128 KiB request envelope. Use the desktop or CLI to save larger SRT files within the 2 MiB subtitle limit.

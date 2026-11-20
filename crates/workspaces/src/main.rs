@@ -956,6 +956,63 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{revision}");
         }
+        [database, command, workspace, run, format]
+            if command == "completed-subtitle-languages" =>
+        {
+            let languages = WorkspaceStore::open(Path::new(database))?
+                .completed_subtitle_languages(
+                    utf8(workspace)?.parse()?,
+                    utf8(run)?.parse()?,
+                    utf8(format)?.parse()?,
+                )?;
+            println!("{}", serde_json::to_string(&languages)?);
+        }
+        [
+            database,
+            command,
+            workspace,
+            run,
+            format,
+            language,
+            revision @ ..,
+        ] if command == "completed-subtitle-track" && revision.len() <= 1 => {
+            let database = Path::new(database);
+            let revision = revision
+                .first()
+                .map(|value| -> Result<i64, Box<dyn Error>> { Ok(utf8(value)?.parse()?) })
+                .transpose()?;
+            let result = WorkspaceStore::open(database)?.completed_subtitle_track(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(format)?.parse()?,
+                Some(utf8(language)?),
+                revision,
+            )?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
+        [
+            database,
+            command,
+            workspace,
+            run,
+            format,
+            language,
+            revision,
+            source,
+        ] if command == "revise-completed-subtitle-track" => {
+            let content = arrumo_workspaces::read_subtitle_file(Path::new(source))?;
+            let revision = WorkspaceStore::open(Path::new(database))?
+                .revise_completed_subtitle_track(
+                    utf8(workspace)?.parse()?,
+                    utf8(run)?.parse()?,
+                    utf8(format)?.parse()?,
+                    Some(utf8(language)?),
+                    utf8(revision)?.parse()?,
+                    &content,
+                )?;
+            println!("{revision}");
+        }
         [database, command] if command == "watch-motion-queue" => {
             let database = Path::new(database);
             let worker = arrumo_workspaces::configured_motion_worker(None).ok_or_else(|| {
@@ -1180,7 +1237,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "review-preview-formats <workspace-id> <run-id> <result-id> <decisions-json> <notes> | ",
                 "review-supplemental-items <workspace-id> <run-id> <result-id> <decisions-json> <notes> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
-                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | completed-subtitles <workspace-id> <run-id> <format-id> [revision] | revise-completed-subtitles <workspace-id> <run-id> <format-id> <expected-revision> <srt-file> | watch-motion-queue | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
+                "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | completed-subtitles <workspace-id> <run-id> <format-id> [revision] | revise-completed-subtitles <workspace-id> <run-id> <format-id> <expected-revision> <srt-file> | completed-subtitle-languages <workspace-id> <run-id> <format-id> | completed-subtitle-track <workspace-id> <run-id> <format-id> <language> [revision] | revise-completed-subtitle-track <workspace-id> <run-id> <format-id> <language> <expected-revision> <srt-file> | watch-motion-queue | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",
                 "install-plugin-release <catalog.json> <plugin-id> <version> <package.zip> | ",
                 "read-plugin-registry <catalog.json> | fetch-plugin-registry <catalog-url> | ",
                 "download-plugin-release <catalog-url> <plugin-id> <version> | update-plugin-release <plugin-id> <version> | ",

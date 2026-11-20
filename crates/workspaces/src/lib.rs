@@ -180,6 +180,7 @@ impl WorkspaceStore {
             include_str!("../migrations/041-subtitle-revisions.sql"),
             include_str!("../migrations/042-supplemental-review.sql"),
             include_str!("../migrations/043-preview-review.sql"),
+            include_str!("../migrations/044-subtitle-languages.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

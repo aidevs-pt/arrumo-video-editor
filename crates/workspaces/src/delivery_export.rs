@@ -35,8 +35,18 @@ impl WorkspaceStore {
             .verified_outputs
             .into_iter()
             .map(|output| {
-                let edited = self.read_edited_subtitles(run_id, output.format_id, None)?;
-                Ok((output, edited))
+                let edited = self.read_edited_subtitles(run_id, output.format_id, "", None)?;
+                let translations = self
+                    .subtitle_languages(run_id, output.format_id)?
+                    .into_iter()
+                    .map(|language| {
+                        let revision = self
+                            .read_edited_subtitles(run_id, output.format_id, &language, None)?
+                            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+                        Ok((language, revision))
+                    })
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                Ok((output, edited, translations))
             })
             .collect::<rusqlite::Result<Vec<_>>>()?;
         let supplemental = self.completed_supplemental_text(workspace_id, run_id)?;
@@ -50,7 +60,7 @@ impl WorkspaceStore {
             .unwrap_or_else(|| Path::new("."));
         let mut pending = NamedTempFile::new_in(parent)?;
         let mut archive = ZipWriter::new(pending.as_file_mut());
-        for (output, edited) in outputs {
+        for (output, edited, translations) in outputs {
             for (recorded, extension) in [(output.video, "mp4"), (output.subtitles, "srt")] {
                 let filename = format!("{}.{extension}", output.format_id);
                 if recorded != filename {
@@ -78,6 +88,13 @@ impl WorkspaceStore {
                 if copied != metadata.len() {
                     return Err(io::Error::other("A delivery file changed during export").into());
                 }
+            }
+            for (language, revision) in translations {
+                archive.start_file(
+                    format!("{}.{language}.srt", output.format_id),
+                    SimpleFileOptions::default(),
+                )?;
+                archive.write_all(revision.subtitles.as_bytes())?;
             }
         }
         for (index, entry) in supplemental.iter().enumerate() {
