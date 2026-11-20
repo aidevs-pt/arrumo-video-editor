@@ -156,6 +156,7 @@ impl WorkspaceStore {
             include_str!("../migrations/034-output-schedules.sql"),
             include_str!("../migrations/035-asset-organization.sql"),
             include_str!("../migrations/036-asset-cleanup.sql"),
+            include_str!("../migrations/037-asset-replacements.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

@@ -70,7 +70,7 @@ impl WorkspaceStore {
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         self.0.query_row(
             "INSERT INTO asset_organization (workspace_id, asset_id, group_name, labels_json)
-             SELECT workspace_id, id, ?3, ?4 FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2
+             SELECT workspace_id, id, ?3, ?4 FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2 AND superseded = 0
              ON CONFLICT(workspace_id, asset_id) DO UPDATE
              SET group_name = excluded.group_name, labels_json = excluded.labels_json
              RETURNING asset_id",

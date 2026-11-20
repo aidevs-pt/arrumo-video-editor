@@ -91,7 +91,7 @@ impl WorkspaceStore {
             tx.query_row(
                 "INSERT INTO video_draft_sources (workspace_id, draft_id, asset_id, position)
                  SELECT workspace_id, ?2, id, ?4 FROM workspace_assets
-                 WHERE workspace_id = ?1 AND id = ?3 AND kind = 'video'
+                 WHERE workspace_id = ?1 AND id = ?3 AND kind = 'video' AND superseded = 0
                  RETURNING asset_id",
                 params![workspace_id, id, asset_id, position as i64],
                 |_| Ok(()),

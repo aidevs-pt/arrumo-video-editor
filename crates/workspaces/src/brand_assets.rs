@@ -56,7 +56,7 @@ impl WorkspaceStore {
         self.0.query_row(
             "INSERT INTO workspace_brand_assets (workspace_id, asset_id, role)
              SELECT workspace_id, id, ?3 FROM workspace_assets
-             WHERE workspace_id = ?1 AND id = ?2 AND kind = 'image'
+             WHERE workspace_id = ?1 AND id = ?2 AND kind = 'image' AND superseded = 0
              ON CONFLICT (workspace_id, role, asset_id) DO UPDATE SET role = excluded.role
              RETURNING asset_id",
             params![workspace_id, asset_id, role.as_str()],

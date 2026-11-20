@@ -483,6 +483,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(io::Error::other)?;
             println!("{}", serde_json::to_string(&asset)?);
         }
+        [database, command, workspace, asset, source] if command == "replace-asset" => {
+            let database = Path::new(database);
+            let replacement = WorkspaceStore::open(database)?
+                .replace_asset(
+                    &asset_root(database),
+                    utf8(workspace)?.parse()?,
+                    utf8(asset)?.parse()?,
+                    Path::new(source),
+                )
+                .map_err(io::Error::other)?;
+            println!("{}", serde_json::to_string(&replacement)?);
+        }
         [database, command, workspace, asset, name] if command == "remove-asset" => {
             let database = Path::new(database);
             let removed = WorkspaceStore::open(database)?.remove_workspace_asset(

@@ -32,7 +32,7 @@ impl WorkspaceStore {
         self.0
             .prepare(
                 "SELECT id, workspace_id, name, kind, byte_size, notes FROM workspace_assets
-                 WHERE workspace_id = ?1 ORDER BY id",
+                 WHERE workspace_id = ?1 AND superseded = 0 ORDER BY id",
             )?
             .query_map([workspace_id], read_asset)?
             .collect()
@@ -83,7 +83,7 @@ impl WorkspaceStore {
         notes: &str,
     ) -> rusqlite::Result<WorkspaceAsset> {
         self.0.query_row(
-            "UPDATE workspace_assets SET notes = ?3 WHERE workspace_id = ?1 AND id = ?2
+            "UPDATE workspace_assets SET notes = ?3 WHERE workspace_id = ?1 AND id = ?2 AND superseded = 0
              RETURNING id, workspace_id, name, kind, byte_size, notes",
             params![workspace_id, asset_id, notes],
             read_asset,
@@ -115,7 +115,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         source: &Path,
     ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
-        self.copy_asset(media_root, workspace_id, source, false)
+        self.copy_asset(media_root, workspace_id, source, false, None)
     }
 
     pub fn import_thumbnail_reference(
@@ -124,7 +124,17 @@ impl WorkspaceStore {
         workspace_id: i64,
         source: &Path,
     ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
-        self.copy_asset(media_root, workspace_id, source, true)
+        self.copy_asset(media_root, workspace_id, source, true, None)
+    }
+
+    pub fn replace_asset(
+        &mut self,
+        media_root: &Path,
+        workspace_id: i64,
+        asset_id: i64,
+        source: &Path,
+    ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
+        self.copy_asset(media_root, workspace_id, source, false, Some(asset_id))
     }
 
     fn copy_asset(
@@ -133,6 +143,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         source: &Path,
         thumbnail_reference: bool,
+        replacing: Option<i64>,
     ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
         let name = source
             .file_name()
@@ -159,12 +170,27 @@ impl WorkspaceStore {
         let transaction = self
             .0
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let previous_notes: String;
+        let notes = if let Some(asset_id) = replacing {
+            previous_notes = transaction.query_row(
+                "SELECT notes FROM workspace_assets
+                 WHERE workspace_id = ?1 AND id = ?2 AND kind = ?3 AND superseded = 0",
+                params![workspace_id, asset_id, kind],
+                |row| row.get(0),
+            )?;
+            &previous_notes
+        } else {
+            notes
+        };
         let asset = transaction.query_row(
             "INSERT INTO workspace_assets (workspace_id, name, kind, byte_size, notes)
              VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id, workspace_id, name, kind, byte_size, notes",
             params![workspace_id, name, kind, length, notes],
             read_asset,
         )?;
+        if let Some(previous) = replacing {
+            replace_live_references(&transaction, workspace_id, previous, asset.id)?;
+        }
         let directory = media_root.join(workspace_id.to_string());
         fs::create_dir_all(&directory)?;
         let target = asset_path(media_root, workspace_id, asset.id);
@@ -194,6 +220,50 @@ impl WorkspaceStore {
         transaction.commit()?;
         Ok(asset)
     }
+}
+
+fn replace_live_references(
+    tx: &Transaction<'_>,
+    workspace_id: i64,
+    previous: i64,
+    replacement: i64,
+) -> rusqlite::Result<()> {
+    let ids = params![workspace_id, previous, replacement];
+    for statement in [
+        "UPDATE video_draft_sources SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
+        "UPDATE workspace_brand_assets SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
+        "UPDATE asset_organization SET asset_id = ?3 WHERE workspace_id = ?1 AND asset_id = ?2",
+    ] {
+        tx.execute(statement, ids)?;
+    }
+    for (table, scope) in [
+        (
+            "format_deliveries",
+            "format_id IN (SELECT id FROM output_formats WHERE workspace_id = ?1)",
+        ),
+        ("profile_deliveries", "workspace_id = ?1"),
+    ] {
+        for path in [
+            "$.thumbnail_reference_ids",
+            "$.portrait_derivatives.source.thumbnail_reference_ids",
+        ] {
+            tx.execute(
+                &format!(
+                    "UPDATE {table} SET settings_json = json_set(settings_json, ?4, (
+                       SELECT json_group_array(CASE WHEN value = ?2 THEN ?3 ELSE value END ORDER BY key)
+                       FROM json_each(settings_json, ?4)
+                     ))
+                     WHERE {scope} AND EXISTS (SELECT 1 FROM json_each(settings_json, ?4) WHERE value = ?2)"
+                ),
+                params![workspace_id, previous, replacement, path],
+            )?;
+        }
+    }
+    tx.execute(
+        "UPDATE workspace_assets SET superseded = 1 WHERE workspace_id = ?1 AND id = ?2",
+        params![workspace_id, previous],
+    )?;
+    Ok(())
 }
 
 pub fn asset_root(database: &Path) -> PathBuf {
@@ -234,4 +304,111 @@ fn read_asset(row: &Row<'_>) -> rusqlite::Result<WorkspaceAsset> {
         byte_size: row.get(4)?,
         notes: row.get(5)?,
     })
+}
+
+#[cfg(test)]
+mod replacement_tests {
+    use super::*;
+    use crate::{BrandAssetRole, DraftSettings, RunOptions, SupplementalOutputs};
+
+    #[test]
+    fn replacement_retargets_live_references_and_retains_captured_media() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("studio.sqlite");
+        let root = asset_root(&database);
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        let original = temp.path().join("original.png");
+        let edited = temp.path().join("edited.png");
+        let video = temp.path().join("wrong.mp4");
+        for (path, bytes) in [
+            (&original, "original"),
+            (&edited, "edited"),
+            (&video, "video"),
+        ] {
+            fs::write(path, bytes).unwrap();
+        }
+        let old = store.import_asset(&root, workspace, &original).unwrap();
+        let unchanged = store.import_asset(&root, workspace, &original).unwrap();
+        store
+            .set_asset_notes(workspace, old.id, "Brand reference")
+            .unwrap();
+        store
+            .attach_brand_asset(workspace, old.id, BrandAssetRole::Identity)
+            .unwrap();
+        let format = store.list_output_formats(workspace).unwrap()[0].id;
+        store
+            .set_format_delivery(
+                workspace,
+                format,
+                &SupplementalOutputs {
+                    thumbnail_reference_ids: vec![unchanged.id, old.id],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Fixture".into(),
+                    intent: "Test references".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "before-replacement",
+                &RunOptions::default(),
+            )
+            .unwrap();
+        assert!(store.replace_asset(&root, other, old.id, &edited).is_err());
+        assert!(
+            store
+                .replace_asset(&root, workspace, old.id, &video)
+                .is_err()
+        );
+        let new = store
+            .replace_asset(&root, workspace, old.id, &edited)
+            .unwrap();
+        assert_eq!(new.notes, "Brand reference");
+        let ids: Vec<_> = store
+            .list_assets(workspace)
+            .unwrap()
+            .iter()
+            .map(|asset| asset.id)
+            .collect();
+        assert_eq!(ids, vec![unchanged.id, new.id]);
+        assert_eq!(
+            store.list_brand_assets(workspace).unwrap()[0].asset_id,
+            new.id
+        );
+        assert_eq!(
+            store
+                .format_delivery(workspace, format)
+                .unwrap()
+                .supplemental
+                .thumbnail_reference_ids,
+            vec![unchanged.id, new.id]
+        );
+        assert_eq!(
+            fs::read(asset_path(&root, workspace, old.id)).unwrap(),
+            b"original"
+        );
+        assert_eq!(
+            fs::read(asset_path(&root, workspace, new.id)).unwrap(),
+            b"edited"
+        );
+        assert!(
+            store
+                .replace_asset(&root, workspace, old.id, &edited)
+                .is_err()
+        );
+    }
 }

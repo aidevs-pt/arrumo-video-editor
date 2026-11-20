@@ -113,7 +113,7 @@ impl WorkspaceStore {
                  ) AS ref
                  WHERE ref.value IS NOT NULL AND NOT EXISTS (
                      SELECT 1 FROM workspace_assets AS image
-                     WHERE image.id = ref.value AND image.workspace_id = ?1 AND image.kind = 'image'
+                     WHERE image.id = ref.value AND image.workspace_id = ?1 AND image.kind = 'image' AND image.superseded = 0
                    )
              )
              ON CONFLICT (workspace_id, profile_id, format_id)
