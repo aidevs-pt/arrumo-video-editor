@@ -383,3 +383,5 @@ In MCP and A2A, call `get_motion_library_shares` with `workspaceId` and `itemId`
 In the desktop Motion library, select a profile to see its entries alongside workspace-wide items. Use **Share with profiles** on a profile-scoped item to add or remove recipients. A link such as `arrumo://open/motion-library?workspace=1&profile=2` opens that profile's library view.
 
 Use **Play preview** to open a looping video preview and audition linked sound separately. Playback depends on the desktop webview supporting the media codec.
+
+An Assets stage result can include a `motion_items` array. Each entry uses the same settings fields as `create-motion-item` and refers to managed assets and, optionally, a profile in the run's workspace. The host rejects the entire submission if a reference is invalid. Saved results protect their referenced media from cleanup until the run is removed.

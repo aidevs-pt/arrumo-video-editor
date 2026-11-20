@@ -88,6 +88,12 @@ impl WorkspaceStore {
             crate::clip_render::preview_cuts(result, &source_ids)
                 .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         }
+        if let Some(items) = result.get("motion_items") {
+            if stage != ProductionStage::Assets {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            crate::motion_library::validate_motion_results(&tx, workspace_id, items)?;
+        }
         let id = tx.query_row(
             "INSERT INTO production_results (run_id, stage_index, attempt, result_json)
              VALUES (?1, ?2, ?3, ?4) RETURNING id",

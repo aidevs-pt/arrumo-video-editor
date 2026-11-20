@@ -45,6 +45,39 @@ const VALID_MEDIA: &str = "EXISTS (SELECT 1 FROM workspace_assets
                AND (?8 IS NULL OR EXISTS (SELECT 1 FROM workspace_assets
                            WHERE workspace_id = ?1 AND id = ?8 AND kind = 'audio' AND superseded = 0))";
 
+pub(crate) fn validate_motion_results(
+    tx: &Transaction<'_>,
+    workspace_id: i64,
+    value: &serde_json::Value,
+) -> rusqlite::Result<()> {
+    let entries: Vec<MotionLibrarySettings> = serde_json::from_value(value.clone())
+        .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+    let mut statement = tx.prepare(&format!(
+        "SELECT trim(?4) <> '' AND {VALID_MEDIA}
+         AND (?2 IS NULL OR EXISTS (SELECT 1 FROM profiles WHERE workspace_id = ?1 AND id = ?2))
+         AND ?3 IN ('animation', 'transition') AND ?5 IS NOT NULL"
+    ))?;
+    for settings in entries {
+        let valid: bool = statement.query_row(
+            params![
+                workspace_id,
+                settings.profile_id,
+                settings.kind.as_str(),
+                settings.title.trim(),
+                settings.usage_markdown,
+                settings.preview_asset_id,
+                settings.thumbnail_asset_id,
+                settings.sound_asset_id,
+            ],
+            |row| row.get(0),
+        )?;
+        if !valid {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+    }
+    Ok(())
+}
+
 impl WorkspaceStore {
     pub fn create_motion_library_item(
         &self,

@@ -36,6 +36,15 @@ impl WorkspaceStore {
                  WHERE workspace_id = ?1 AND id = ?2 AND name = ?3
                    AND NOT EXISTS (SELECT 1 FROM workspace_brand_assets WHERE workspace_id = ?1 AND asset_id = ?2)
                    AND NOT EXISTS (SELECT 1 FROM video_draft_sources WHERE workspace_id = ?1 AND asset_id = ?2)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM production_results AS result
+                       JOIN generation_runs AS run ON run.id = result.run_id
+                       JOIN json_each(result.result_json, '$.motion_items') AS item
+                       WHERE run.workspace_id = ?1 AND item.type = 'object'
+                         AND ?2 IN (json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.preview_asset_id'),
+                                    json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.thumbnail_asset_id'),
+                                    json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.sound_asset_id'))
+                   )
                    AND NOT EXISTS (SELECT 1 FROM motion_library WHERE workspace_id = ?1
                                    AND ?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id))
                    AND NOT EXISTS (
