@@ -57,7 +57,7 @@ impl Dimensions {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 pub(crate) struct PreviewCut {
     asset_id: i64,
     start_ms: u32,
@@ -83,6 +83,49 @@ pub(crate) fn preview_cuts(
         ));
     }
     Ok(Some(cuts))
+}
+
+pub(crate) fn validate_preview_edit(
+    result: &Value,
+    source_ids: &[i64],
+    format_ids: &[i64],
+) -> io::Result<()> {
+    preview_cuts(result, source_ids)?;
+    if let Some(overrides) = result.get("format_cuts") {
+        let overrides = overrides.as_object().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Format cuts must be an object keyed by frozen format ID",
+            )
+        })?;
+        for (key, value) in overrides {
+            if !format_ids.iter().any(|id| id.to_string() == *key) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Preview cut format is not in the frozen run",
+                ));
+            }
+            if !value.is_null() {
+                preview_cuts(&json!({ "cuts": value }), source_ids)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn cuts_for_format(
+    edit: &Value,
+    format_id: i64,
+    source_ids: &[i64],
+) -> io::Result<Option<Vec<PreviewCut>>> {
+    match edit
+        .get("format_cuts")
+        .and_then(|cuts| cuts.get(format_id.to_string()))
+    {
+        Some(Value::Null) => Ok(None),
+        Some(value) => preview_cuts(&json!({ "cuts": value }), source_ids),
+        None => preview_cuts(edit, source_ids),
+    }
 }
 
 struct RenderClip {
@@ -211,18 +254,12 @@ impl WorkspaceStore {
             Some(edit) => edit.clone(),
             None => self.accepted_preview(run_id, &plan)?,
         };
-        let sources = match preview_cuts(&edit, &inputs.draft.source_ids)? {
-            Some(cuts) => cuts
-                .into_iter()
-                .map(|cut| (cut.asset_id, Some(cut)))
-                .collect(),
-            None => inputs
-                .draft
-                .source_ids
-                .into_iter()
-                .map(|id| (id, None))
-                .collect::<Vec<_>>(),
-        };
+        let format_ids = inputs
+            .formats
+            .iter()
+            .map(|entry| entry.format.id)
+            .collect::<Vec<_>>();
+        validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
 
         let preview_max_edge = inputs.preview_settings.map_or(
             crate::preview_settings::LEGACY_PREVIEW_MAX_EDGE,
@@ -247,27 +284,25 @@ impl WorkspaceStore {
         };
         let rendered = (|| -> Result<i64, Box<dyn Error>> {
             let root = asset_root(database);
-            let mut clips = Vec::new();
-            for (id, cut) in sources {
-                let path = asset_path(&root, workspace_id, id);
-                if !path.symlink_metadata()?.is_file() {
-                    return Err(io::Error::other("A managed source video is missing").into());
-                }
-                let path = path.canonicalize()?;
-                let has_audio = renderer.inspect_source(&path, cut.as_ref())?;
-                clips.push(RenderClip {
-                    path,
-                    cut,
-                    has_audio,
-                });
-            }
+            let mut clip_sets = Vec::new();
             let mut filenames = Vec::new();
             for output in inputs.formats {
                 let mut format = output.format;
                 if stage == ProductionStage::Preview {
                     format.scale_preview(preview_max_edge);
                 }
-                renderer.render_format(&scratch, &clips, &format)?;
+                let cuts = cuts_for_format(&edit, format.id, &inputs.draft.source_ids)?;
+                let clips_index = if let Some(index) =
+                    clip_sets.iter().position(|(cached, _)| cached == &cuts)
+                {
+                    index
+                } else {
+                    let clips =
+                        renderer.inspect_clips(&root, &inputs.draft.source_ids, cuts.as_deref())?;
+                    clip_sets.push((cuts, clips));
+                    clip_sets.len() - 1
+                };
+                renderer.render_format(&scratch, &clip_sets[clips_index].1, &format)?;
                 let filename = if stage == ProductionStage::Preview {
                     format!("preview-{attempt}-{}.mp4", format.id)
                 } else {
@@ -332,6 +367,34 @@ impl WorkspaceStore {
 }
 
 impl ActiveRender<'_> {
+    fn inspect_clips(
+        &self,
+        root: &Path,
+        source_ids: &[i64],
+        cuts: Option<&[PreviewCut]>,
+    ) -> Result<Vec<RenderClip>, Box<dyn Error>> {
+        let sources: Vec<_> = match cuts {
+            Some(cuts) => cuts.iter().map(|cut| (cut.asset_id, Some(cut))).collect(),
+            None => source_ids.iter().map(|&id| (id, None)).collect(),
+        };
+        sources
+            .into_iter()
+            .map(|(id, cut)| {
+                let path = asset_path(root, self.workspace_id, id);
+                if !path.symlink_metadata()?.is_file() {
+                    return Err(io::Error::other("A managed source video is missing").into());
+                }
+                let path = path.canonicalize()?;
+                let has_audio = self.inspect_source(&path, cut)?;
+                Ok(RenderClip {
+                    path,
+                    cut: cut.copied(),
+                    has_audio,
+                })
+            })
+            .collect()
+    }
+
     fn confirm_lease(&self) -> rusqlite::Result<()> {
         self.store.0.query_row(
             "SELECT id FROM generation_runs WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3

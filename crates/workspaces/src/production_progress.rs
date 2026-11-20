@@ -95,15 +95,20 @@ impl WorkspaceStore {
             .get(index as usize)
             .filter(|step| step.stage == stage)
             .ok_or(rusqlite::Error::InvalidQuery)?;
-        if stage == ProductionStage::Preview && result.get("cuts").is_some() {
-            let source_ids: String = tx.query_row(
-                "SELECT json_extract(snapshot_json, '$.draft.source_ids')
+        if stage == ProductionStage::Preview
+            && (result.get("cuts").is_some() || result.get("format_cuts").is_some())
+        {
+            let (sources, formats): (String, String) = tx.query_row(
+                "SELECT json_extract(snapshot_json, '$.draft.source_ids'),
+                        (SELECT json_group_array(json_extract(value, '$.format.id'))
+                         FROM json_each(snapshot_json, '$.formats'))
                  FROM generation_runs WHERE id = ?1",
                 [run_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
-            let source_ids: Vec<i64> = read_settings(Some(source_ids), 0)?;
-            crate::clip_render::preview_cuts(result, &source_ids)
+            let source_ids: Vec<i64> = read_settings(Some(sources), 0)?;
+            let format_ids: Vec<i64> = read_settings(Some(formats), 1)?;
+            crate::clip_render::validate_preview_edit(result, &source_ids, &format_ids)
                 .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         }
         if let Some(items) = result.get("motion_items") {
