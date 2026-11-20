@@ -1,7 +1,8 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Clapperboard, PencilLine, X } from "lucide-react";
+import { Check, ChevronDown, Clapperboard, PencilLine, TriangleAlert, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -324,7 +325,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const staged = textDecisions.length + mediaDecisions.length;
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
-    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && (key !== "preview_videos" || previews.length === 0)
+    key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && (key !== "preview_videos" || previews.length === 0)
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
@@ -402,6 +403,13 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <CardDescription>{copy.reviewHint}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {Array.isArray(result.result.footage_without_transcript) && result.result.footage_without_transcript.length > 0 && (
+          <div role="note" className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg bg-attention/25 px-3 py-2.5 text-sm">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p className="min-w-0 flex-1">{copy.noTranscript.replace("{clips}", result.result.footage_without_transcript.join(", "))}</p>
+            <Link href={`/settings?workspace=${workspaceId}&section=services`} className="font-semibold underline underline-offset-4">{copy.addKey}</Link>
+          </div>
+        )}
         {markdown && <ScriptReviewText markdown={markdown} />}
         {itemDraft && <>
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-secondary p-2" role="group" aria-label={selectedCount ? copy.selectedOutputCount.replace("{count}", String(selectedCount)) : copy.batchDecisions}>

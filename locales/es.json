@@ -926,7 +926,9 @@
     "captionDone": "Todo está entregado.",
     "waitingFor": "{agent}, esperándote",
     "draftTitle": "{stage}, borrador v{version}",
-    "reviewHint": "Aprueba, pide cambios o rechaza. No se envía nada hasta que pulses Enviar."
+    "reviewHint": "Aprueba, pide cambios o rechaza. No se envía nada hasta que pulses Enviar.",
+    "noTranscript": "Escrito sin oír {clips}. Añade una clave de transcripción y pide cambios para redactarlo a partir de lo que dijiste.",
+    "addKey": "Añadir una clave"
   },
   "markdownEditor": {
     "source": "Código Markdown",

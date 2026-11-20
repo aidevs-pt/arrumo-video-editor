@@ -926,7 +926,9 @@
     "captionDone": "Everything is delivered.",
     "waitingFor": "{agent}, waiting for you",
     "draftTitle": "{stage} draft v{version}",
-    "reviewHint": "Approve, ask for changes or reject. Nothing is sent until you press Send."
+    "reviewHint": "Approve, ask for changes or reject. Nothing is sent until you press Send.",
+    "noTranscript": "Written without hearing {clips}. Add a transcription key, then ask for changes to redraft from what you said.",
+    "addKey": "Add a key"
   },
   "markdownEditor": {
     "source": "Markdown source",
