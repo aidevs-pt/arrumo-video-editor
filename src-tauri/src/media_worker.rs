@@ -83,7 +83,7 @@ pub async fn submit_desktop_motion_artifacts(
     .map_err(|_| "motion_artifacts_failed")?
 }
 
-fn desktop_motion_worker(app: &AppHandle) -> Option<std::path::PathBuf> {
+pub(crate) fn desktop_motion_worker(app: &AppHandle) -> Option<std::path::PathBuf> {
     let resource = app
         .path()
         .resolve(

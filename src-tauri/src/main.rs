@@ -14,10 +14,10 @@ use tauri::{AppHandle, Manager, State};
 mod agent_settings;
 mod completed_video;
 mod delivery_stream;
+mod desktop_job_workers;
 mod guided_preview;
 mod media_worker;
 mod motion_library;
-mod plugin_job_worker;
 mod plugin_settings;
 
 type Store = Mutex<WorkspaceStore>;
@@ -761,7 +761,7 @@ fn main() {
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("workspaces.sqlite");
             app.manage(Mutex::new(WorkspaceStore::open(&database)?));
-            app.manage(plugin_job_worker::PluginJobWorker::start(
+            app.manage(desktop_job_workers::DesktopJobWorkers::start(
                 app.handle().clone(),
                 database.clone(),
             )?);
@@ -902,7 +902,7 @@ fn main() {
         .expect("failed to start Arrumo")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
-                app.state::<plugin_job_worker::PluginJobWorker>().stop();
+                app.state::<desktop_job_workers::DesktopJobWorkers>().stop();
             }
         });
 }
