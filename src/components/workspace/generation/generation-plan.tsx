@@ -526,7 +526,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         </p>
         <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
           className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
-          {hasItemReview ? (staged === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(staged)))
+          {hasItemReview ? (staged === 0 ? copy.sendNothing : staged === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(staged)))
             : draft.decision ? copy.submitDecision : copy.sendNothing}
         </Button>
       </div>

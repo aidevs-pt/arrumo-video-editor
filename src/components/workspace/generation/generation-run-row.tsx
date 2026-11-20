@@ -244,12 +244,13 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
         {!activity && !historyError && <Skeleton className="h-14" aria-label={copy.loading} />}
         {activity?.length ? (
           <ol className="flex flex-col gap-0">
-            {[...activity].reverse().map((event, index) => {
+            {[...activity].reverse().map((event, index, newestFirst) => {
               const date = new Date(event.created_at * 1000);
               return (
                 <li className="relative ms-1 border-s pb-4 ps-4 last:border-transparent last:pb-0" key={index}>
                   <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-sm bg-white/60 ring-4 ring-agent rtl:translate-x-1/2" aria-hidden="true" />
-                  <p className="font-medium">{activityLabel(event, index === 0 && run.pending_review_id !== null)}</p>
+                  <p className="font-medium">{activityLabel(event,
+                    (index === 0 && run.pending_review_id !== null) || newestFirst[index + 1]?.kind === "claimed")}</p>
                   <p className="text-xs text-white/75"><time dateTime={date.toISOString()}>
                     {new Intl.DateTimeFormat(locale, sameDay(date) ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }).format(date)}
                   </time></p>

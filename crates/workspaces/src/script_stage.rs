@@ -6,12 +6,9 @@ use std::{error::Error, io, path::Path, time::Duration};
 use rusqlite::{OptionalExtension, params};
 use serde_json::{Value, json};
 
-use crate::{
-    AgentPlugin, AgentRunError, ProductionStage, WorkspaceStore, agent_plugin,
-    agent_run::run_structured, generation_worker::LEASE_SECONDS,
-};
+use crate::{AgentPlugin, ProductionStage, WorkspaceStore, agent_run::run_structured};
 
-const AGENT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+pub(crate) const AGENT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_SECTIONS: usize = 40;
 /// Keeps the whole prompt well inside what agents accept in one turn.
 const MAX_TRANSCRIPT_CHARS: usize = 120_000;
@@ -155,30 +152,12 @@ impl WorkspaceStore {
         &self,
         database: &Path,
     ) -> Result<Option<i64>, Box<dyn Error>> {
-        let candidates: Vec<(i64, i64, Option<String>)> = self
-            .0
-            .prepare(
-                "SELECT workspace_id, id, json_extract(snapshot_json, '$.agent_settings.effective_provider')
-                 FROM generation_runs
-                 WHERE (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
-                   AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'script'
-                 ORDER BY id",
-            )?
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
-            .collect::<rusqlite::Result<_>>()?;
-        for (workspace_id, run_id, provider) in candidates {
-            let ready = provider
-                .as_deref()
-                .and_then(agent_plugin)
-                .is_some_and(|plugin| {
-                    plugin.cli.structured_run.is_some()
-                        && crate::agent_cli::agent_cli_detected(&plugin.id)
-                });
-            if ready {
-                return self.process_script_stage(database, workspace_id, run_id);
+        match self.runs_ready_for_agent("script")?.first() {
+            Some(&(workspace_id, run_id)) => {
+                self.process_script_stage(database, workspace_id, run_id)
             }
+            None => Ok(None),
         }
-        Ok(None)
     }
 
     /// Runs the run's agent on its queued Script stage and submits the draft. Returns the result
@@ -189,37 +168,22 @@ impl WorkspaceStore {
         workspace_id: i64,
         run_id: i64,
     ) -> Result<Option<i64>, Box<dyn Error>> {
-        let Some(run) = self.generation_run(workspace_id, run_id)? else {
-            return Ok(None);
-        };
-        let provider = run.snapshot["agent_settings"]["effective_provider"]
-            .as_str()
-            .and_then(agent_plugin)
-            .ok_or_else(|| io::Error::other("The run has no agent selected"))?;
-        let Some(attempt) = self.claim_queued_script_stage(workspace_id, run_id)? else {
-            return Ok(None);
-        };
-        match self.write_script(
-            database,
+        self.run_agent_stage(
             workspace_id,
             run_id,
-            attempt,
-            &run.snapshot,
-            provider,
-        ) {
-            Ok(id) => Ok(Some(id)),
-            Err(error) => {
-                let reason = match error.downcast_ref::<AgentRunError>() {
-                    Some(agent) => agent.to_string(),
-                    None => "The script could not be written.".to_owned(),
-                };
-                match self.fail_generation(workspace_id, run_id, attempt, &reason) {
-                    Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                    Err(failure) => return Err(failure.into()),
-                }
-                Err(error)
-            }
-        }
+            "script",
+            "The script could not be written.",
+            |run, provider, attempt| {
+                self.write_script(
+                    database,
+                    workspace_id,
+                    run_id,
+                    attempt,
+                    &run.snapshot,
+                    provider,
+                )
+            },
+        )
     }
 
     fn write_script(
@@ -322,25 +286,6 @@ impl WorkspaceStore {
         }
         Ok((footage, untranscribed))
     }
-
-    fn claim_queued_script_stage(
-        &self,
-        workspace_id: i64,
-        run_id: i64,
-    ) -> rusqlite::Result<Option<i64>> {
-        self.0
-            .query_row(
-                "UPDATE generation_runs SET state = 'running', attempt = attempt + 1,
-                 lease_until = unixepoch() + ?3
-                 WHERE workspace_id = ?1 AND id = ?2
-                   AND (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
-                   AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'script'
-                 RETURNING attempt",
-                params![workspace_id, run_id, LEASE_SECONDS],
-                |row| row.get(0),
-            )
-            .optional()
-    }
 }
 
 #[cfg(test)]
@@ -435,15 +380,19 @@ mod tests {
         let run = store
             .enqueue_video_draft(workspace, draft.id, "key", &crate::RunOptions::default())
             .unwrap();
-        let first = store.claim_queued_script_stage(workspace, run.id).unwrap();
+        let first = store
+            .claim_queued_stage(workspace, run.id, "script")
+            .unwrap();
         assert_eq!(first, Some(1));
         assert_eq!(
-            store.claim_queued_script_stage(workspace, run.id).unwrap(),
+            store
+                .claim_queued_stage(workspace, run.id, "script")
+                .unwrap(),
             None
         );
         let other = store.create("Other").unwrap().id;
         assert_eq!(
-            store.claim_queued_script_stage(other, run.id).unwrap(),
+            store.claim_queued_stage(other, run.id, "script").unwrap(),
             None
         );
         let _ = &mut store;

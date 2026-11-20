@@ -43,6 +43,17 @@ impl DesktopJobWorkers {
                     .map_err(|_| ())
             },
         )?;
+        workers.spawn(
+            "arrumo-publishing-text",
+            database.clone(),
+            Duration::from_secs(2),
+            |store| {
+                store
+                    .process_next_supplemental_writing()
+                    .map(|result| result.is_some())
+                    .map_err(|_| ())
+            },
+        )?;
         let subtitles_database = database.clone();
         workers.spawn(
             "arrumo-delivery-subtitles",
