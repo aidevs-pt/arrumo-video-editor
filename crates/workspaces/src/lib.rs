@@ -40,6 +40,7 @@ mod plugin_runtime;
 mod plugin_schema;
 mod plugin_settings;
 mod plugin_surfaces;
+mod preview_review;
 mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
@@ -95,6 +96,7 @@ pub use plugin_schema::{
 };
 pub use plugin_settings::ResolvedPluginSetting;
 pub use plugin_surfaces::InstalledPluginSurface;
+pub use preview_review::PreviewFormatDecision;
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
@@ -177,6 +179,7 @@ impl WorkspaceStore {
             include_str!("../migrations/040-motion-result-origin.sql"),
             include_str!("../migrations/041-subtitle-revisions.sql"),
             include_str!("../migrations/042-supplemental-review.sql"),
+            include_str!("../migrations/043-preview-review.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

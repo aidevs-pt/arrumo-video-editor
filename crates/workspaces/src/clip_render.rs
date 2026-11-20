@@ -150,23 +150,20 @@ impl WorkspaceStore {
         result_id: i64,
         format_id: i64,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        let (attempt, result): (i64, String) = self.0.query_row(
-            "SELECT result.attempt, result.result_json FROM generation_runs AS run
+        let result: String = self.0.query_row(
+            "SELECT result.result_json FROM generation_runs AS run
              JOIN production_results AS result ON result.run_id = run.id AND result.id = run.pending_review_id
              WHERE run.workspace_id = ?1 AND run.id = ?2 AND result.id = ?3
                AND run.state = 'paused' AND result.decision IS NULL AND result.stage_index = run.stage_index
                AND json_extract(run.plan_json, '$.steps[' || run.stage_index || '].stage') = 'preview'",
             params![workspace_id, run_id, result_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| row.get(0),
         )?;
         let result: Value = serde_json::from_str(&result)?;
-        let filename = format!("preview-{attempt}-{format_id}.mp4");
-        if !result["preview_videos"]
-            .as_array()
-            .is_some_and(|files| files.iter().any(|file| file == &filename))
-        {
-            return Err(io::Error::other("Preview file is not in the pending review").into());
-        }
+        let mut files = crate::preview_review::preview_files(&result)?;
+        let filename = files
+            .remove(&format_id)
+            .ok_or_else(|| io::Error::other("Preview file is not in the pending review"))?;
         Ok(crate::delivery_verification::managed_delivery_file(
             database,
             workspace_id,
@@ -261,6 +258,23 @@ impl WorkspaceStore {
             .collect::<Vec<_>>();
         validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
 
+        let revision = if stage == ProductionStage::Preview {
+            crate::preview_review::preview_revision(&self.0, run_id, index)?
+        } else {
+            None
+        };
+
+        if let Some(revision) = &revision {
+            for filename in revision.approved.values() {
+                crate::delivery_verification::managed_delivery_file(
+                    database,
+                    workspace_id,
+                    run_id,
+                    filename,
+                )?;
+            }
+        }
+
         let preview_max_edge = inputs.preview_settings.map_or(
             crate::preview_settings::LEGACY_PREVIEW_MAX_EDGE,
             |settings| settings.effective_max_edge,
@@ -288,6 +302,12 @@ impl WorkspaceStore {
             let mut filenames = Vec::new();
             for output in inputs.formats {
                 let mut format = output.format;
+                if revision
+                    .as_ref()
+                    .is_some_and(|revision| !revision.unresolved.contains_key(&format.id))
+                {
+                    continue;
+                }
                 if stage == ProductionStage::Preview {
                     format.scale_preview(preview_max_edge);
                 }

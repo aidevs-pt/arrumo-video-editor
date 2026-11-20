@@ -901,6 +901,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("null");
         }
         [database, command, workspace, run, result, decisions, notes]
+            if command == "review-preview-formats" =>
+        {
+            WorkspaceStore::open(Path::new(database))?.review_preview_formats(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(result)?.parse()?,
+                &serde_json::from_str::<Vec<arrumo_workspaces::PreviewFormatDecision>>(utf8(
+                    decisions,
+                )?)?,
+                utf8(notes)?,
+            )?;
+            println!("null");
+        }
+        [database, command, workspace, run, result, decisions, notes]
             if command == "review-supplemental-items" =>
         {
             WorkspaceStore::open(Path::new(database))?.review_supplemental_items(
@@ -1163,6 +1177,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
                 "production-progress <workspace-id> <run-id> | ",
                 "submit-motion-artifacts <workspace-id> <run-id> <attempt> <artifacts-json> | submit-stage <workspace-id> <run-id> <attempt> <stage> <result-json> | ",
+                "review-preview-formats <workspace-id> <run-id> <result-id> <decisions-json> <notes> | ",
                 "review-supplemental-items <workspace-id> <run-id> <result-id> <decisions-json> <notes> | ",
                 "review-stage <workspace-id> <run-id> <result-id> <approved|rejected|revise> <notes> [motion-indexes-json] | ",
                 "plugin-catalog | install-plugin-manifest <manifest.json> | install-plugin-zip <package.zip> [--sha256 <digest>] | completed-subtitles <workspace-id> <run-id> <format-id> [revision] | revise-completed-subtitles <workspace-id> <run-id> <format-id> <expected-revision> <srt-file> | watch-motion-queue | process-motion-stage <workspace-id> <run-id> | render-run-motion <workspace-id> <run-id> <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | run-installed-motion-renderer <plugin-id> <digest> <sdk-worker> <output-directory> [toolchain] | remove-plugin-manifest <plugin-id> | ",

@@ -40,6 +40,8 @@ pub struct ProductionResult {
     pub review_notes: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub supplemental_review: Option<crate::SupplementalReview>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_review: Option<Vec<crate::PreviewFormatDecision>>,
 }
 
 impl WorkspaceStore {
@@ -51,7 +53,28 @@ impl WorkspaceStore {
         stage: ProductionStage,
         result: &Value,
     ) -> rusqlite::Result<i64> {
-        self.submit_production_result_with(workspace_id, run_id, attempt, stage, result, || Ok(()))
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        if stage == ProductionStage::Preview {
+            let index: i64 = tx.query_row(
+                "SELECT stage_index FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+                params![workspace_id, run_id],
+                |row| row.get(0),
+            )?;
+            if crate::preview_review::preview_revision(&tx, run_id, index)?.is_some() {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            if result.get("preview_videos").is_some()
+                && crate::preview_review::preview_files(result)?
+                    .iter()
+                    .any(|(format, name)| *name != format!("preview-{attempt}-{format}.mp4"))
+            {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+        }
+        let id =
+            self.record_production_result(&tx, workspace_id, run_id, attempt, stage, result)?;
+        tx.commit()?;
+        Ok(id)
     }
 
     pub(crate) fn submit_production_result_with(
@@ -136,6 +159,12 @@ impl WorkspaceStore {
         }
         let merged = if stage == ProductionStage::SupplementalOutputs {
             crate::supplemental_review::merge_supplemental_revisions(tx, run_id, index, result)?
+        } else if stage == ProductionStage::Preview {
+            crate::preview_review::preview_revision(tx, run_id, index)?
+                .map(|review| {
+                    crate::preview_review::merge_preview_revision(review, attempt, result)
+                })
+                .transpose()?
         } else {
             None
         };
@@ -321,7 +350,7 @@ impl WorkspaceStore {
         )?;
         let results = tx
             .prepare(
-                "SELECT id, stage_index, attempt, result_json, decision, review_notes, supplemental_review_json
+                "SELECT id, stage_index, attempt, result_json, decision, review_notes, supplemental_review_json, preview_review_json
              FROM production_results WHERE run_id = ?1 ORDER BY id",
             )?
             .query_map([run_id], |row| {
@@ -333,6 +362,7 @@ impl WorkspaceStore {
                     decision: row.get(4)?,
                     review_notes: row.get(5)?,
                     supplemental_review: read_settings(row.get(6)?, 6)?,
+                    preview_review: read_settings(row.get(7)?, 7)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
