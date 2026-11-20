@@ -56,7 +56,16 @@ struct SetShares {
     profile_ids: Vec<i64>,
 }
 
-pub(super) fn definitions() -> [Value; 7] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SaveResult {
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    index: i64,
+}
+
+pub(super) fn definitions() -> [Value; 8] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -98,6 +107,11 @@ pub(super) fn definitions() -> [Value; 7] {
                 "workspaceId": id, "itemId": id, "profileIds": {"type": "array", "items": id, "uniqueItems": true}
             }, "required": ["workspaceId", "itemId", "profileIds"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
+        json!({"name": "save_motion_result", "description": "Save a motion item from an accepted Assets stage result. Use the zero-based index in motion_items. Repeating the call returns the existing library entry.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "resultId": id, "index": {"type": "integer", "minimum": 0}
+            }, "required": ["workspaceId", "runId", "resultId", "index"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
     ]
 }
 
@@ -148,6 +162,11 @@ pub(super) fn call(
             store.set_motion_library_shares(args.workspace_id, args.item_id, &args.profile_ids)
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not save shares. Use distinct profiles in the workspace and omit the owning profile")
+        }),
+        "save_motion_result" => parse(arguments).and_then(|args: SaveResult| {
+            store.save_motion_result(args.workspace_id, args.run_id, args.result_id, args.index)
+                .map(|item| json!({"item": item}))
+                .map_err(|_| "Could not save motion result. Check the run, accepted result, item index, and media references")
         }),
         _ => return None,
     })
