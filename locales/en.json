@@ -651,6 +651,12 @@
     "saveError": "Feedback couldn’t be saved."
   },
   "subtitleRevisions": {
+    "language": "Subtitle language",
+    "primary": "Primary subtitles",
+    "addLanguage": "Add language",
+    "addDescription": "Enter a language tag and paste the translated SRT subtitles.",
+    "languageTag": "Language tag",
+    "duplicateLanguage": "This language already has a subtitle track.",
     "previous": "Previous subtitle version",
     "next": "Next subtitle version",
     "original": "Original",

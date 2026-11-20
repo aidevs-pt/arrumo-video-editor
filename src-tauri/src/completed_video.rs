@@ -150,6 +150,7 @@ pub async fn add_completed_video_feedback(
 #[derive(serde::Serialize)]
 pub struct DeliveryPreview {
     video_url: String,
+    languages: Vec<String>,
     subtitles: String,
     revision: i64,
 }
@@ -174,11 +175,15 @@ pub async fn preview_completed_output(
     let subtitles = store
         .completed_subtitles(&database, workspace_id, run_id, format_id, None)
         .map_err(|_| "delivery_preview_failed")?;
+    let languages = store
+        .completed_subtitle_languages(workspace_id, run_id, format_id)
+        .map_err(|_| "delivery_preview_failed")?;
     let video_url = stream
         .open(video_path)
         .map_err(|_| "delivery_preview_failed")?;
     Ok(DeliveryPreview {
         video_url,
+        languages,
         subtitles: subtitles.subtitles,
         revision: subtitles.revision,
     })
@@ -189,7 +194,8 @@ pub async fn read_completed_subtitle_revision(
     workspace_id: i64,
     run_id: i64,
     format_id: i64,
-    revision: i64,
+    revision: Option<i64>,
+    language: Option<String>,
     app: AppHandle,
 ) -> Result<arrumo_workspaces::SubtitleRevision, &'static str> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -200,7 +206,14 @@ pub async fn read_completed_subtitle_revision(
             .join("workspaces.sqlite");
         WorkspaceStore::open(&database)
             .map_err(|_| "store_unavailable")?
-            .completed_subtitles(&database, workspace_id, run_id, format_id, Some(revision))
+            .completed_subtitle_track(
+                &database,
+                workspace_id,
+                run_id,
+                format_id,
+                language.as_deref(),
+                revision,
+            )
             .map_err(|_| "subtitle_revision_read_failed")
     })
     .await
@@ -213,6 +226,7 @@ pub async fn save_completed_subtitle_revision(
     run_id: i64,
     format_id: i64,
     expected_revision: i64,
+    language: Option<String>,
     subtitles: String,
     app: AppHandle,
 ) -> Result<i64, &'static str> {
@@ -224,10 +238,11 @@ pub async fn save_completed_subtitle_revision(
             .join("workspaces.sqlite");
         WorkspaceStore::open(&database)
             .map_err(|_| "store_unavailable")?
-            .revise_completed_subtitles(
+            .revise_completed_subtitle_track(
                 workspace_id,
                 run_id,
                 format_id,
+                language.as_deref(),
                 expected_revision,
                 &subtitles,
             )

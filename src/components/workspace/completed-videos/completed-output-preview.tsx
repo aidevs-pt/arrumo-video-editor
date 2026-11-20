@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,7 @@ import { useLocale } from "@/lib/locale-provider";
 
 import { SubtitleRevisionControls, type SubtitleRevision } from "./subtitle-revision-controls";
 
-type DeliveryPreview = SubtitleRevision & { video_url: string };
+type DeliveryPreview = SubtitleRevision & { video_url: string; languages: string[] };
 type Cue = { timestamp: string; finish: string; start: number; end: number; text: string };
 
 function seconds(timestamp: string) {
@@ -36,15 +37,19 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
   label: string;
   showTranscript?: boolean;
 }) {
-  const { messages: { completedVideo: copy, queue } } = useLocale();
+  const { locale, messages: { completedVideo: copy, queue, subtitleRevisions: tracks } } = useLocale();
   const [preview, setPreview] = useState<DeliveryPreview>();
   const [error, setError] = useState<"previewError" | "playbackError">();
   const [attempt, setAttempt] = useState(0);
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(-1);
   const [seekable, setSeekable] = useState(false);
-  const [historical, setHistorical] = useState<SubtitleRevision>();
-  const displayed = historical ?? preview;
+  const [track, setTrack] = useState<{ language: string; latest: SubtitleRevision; historical?: SubtitleRevision }>();
+  const [loadingTrack, setLoadingTrack] = useState(false);
+  const [trackError, setTrackError] = useState(false);
+  const languageSelect = useRef<HTMLSelectElement>(null);
+  const languageNames = useMemo(() => new Intl.DisplayNames([locale], { type: "language" }), [locale]);
+  const displayed = track?.historical ?? track?.latest;
   const [query, setQuery] = useState("");
   const cues = useMemo(() => showTranscript && displayed ? readCues(displayed.subtitles) : [], [displayed, showTranscript]);
 
@@ -55,11 +60,50 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
   useEffect(() => {
     let active = true;
     invoke<DeliveryPreview>("preview_completed_output", { workspaceId, runId, formatId }).then(
-      (media) => { if (active) setPreview(media); },
+      (media) => {
+        if (!active) return;
+        setPreview(media);
+        setTrack({ language: "", latest: media });
+      },
       () => { if (active) setError("previewError"); },
     );
     return () => { active = false; };
   }, [attempt, formatId, runId, workspaceId]);
+
+  async function selectTrack(language: string) {
+    if (!track || track.language === language || loadingTrack) return;
+    setLoadingTrack(true);
+    setTrackError(false);
+    try {
+      const latest = await invoke<SubtitleRevision>("read_completed_subtitle_revision", {
+        workspaceId, runId, formatId, language: language || null,
+      });
+      setTrack({ language, latest });
+      setQuery("");
+    } catch {
+      setTrackError(true);
+    } finally {
+      setLoadingTrack(false);
+    }
+  }
+
+  function saveTrack(language: string, latest: SubtitleRevision) {
+    setTrack({ language, latest });
+    setTrackError(false);
+    if (language && !preview?.languages.includes(language)) {
+      setPreview((current) => current && { ...current, languages: [...current.languages, language].sort() });
+      setQuery("");
+      requestAnimationFrame(() => languageSelect.current?.focus());
+    }
+  }
+
+  function languageName(language: string) {
+    try {
+      return languageNames.of(language) ?? language;
+    } catch {
+      return language;
+    }
+  }
 
   return (
     <div className={cn("grid min-w-0 items-start gap-5", showTranscript && "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]")}>
@@ -69,7 +113,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
           <AlertAction>
             <Button variant="outline" size="sm" onClick={() => {
               setPreview(undefined);
-              setHistorical(undefined);
+              setTrack(undefined);
               setSeekable(false);
               setTime(-1);
               setError(undefined);
@@ -93,11 +137,21 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
           </div>}
         </div>
       )}
-      {showTranscript && preview && <section className="min-w-0" aria-labelledby="delivery-transcript">
+      {showTranscript && preview && track && <section className="min-w-0" aria-labelledby="delivery-transcript">
         <h2 id="delivery-transcript" className="mb-3 text-[1.3125rem]">{copy.subtitleText}</h2>
-        <SubtitleRevisionControls workspaceId={workspaceId} runId={runId} formatId={formatId}
-          latest={preview} current={displayed ?? preview} onRead={setHistorical}
-          onSave={(revision) => { setHistorical(undefined); setPreview({ ...preview, ...revision }); }} />
+        <NativeSelect ref={languageSelect} className="mb-3 w-full" aria-label={tracks.language}
+          value={track.language} disabled={loadingTrack} onChange={(event) => void selectTrack(event.target.value)}>
+          <NativeSelectOption value="">{tracks.primary}</NativeSelectOption>
+          {preview.languages.map((language) => <NativeSelectOption key={language} value={language}>
+            {languageName(language)}
+          </NativeSelectOption>)}
+        </NativeSelect>
+        {trackError && <Alert variant="destructive" className="mb-3"><AlertDescription>{tracks.readError}</AlertDescription></Alert>}
+        <SubtitleRevisionControls key={track.language} workspaceId={workspaceId} runId={runId} formatId={formatId}
+          language={track.language} languages={preview.languages} disabled={loadingTrack}
+          latest={track.latest} current={track.historical ?? track.latest}
+          onRead={(historical) => setTrack((current) => current?.language === track.language ? { ...current, historical } : current)}
+          onSave={saveTrack} />
         {cues.length > 0 && <Input type="search" className="mb-3" aria-label={copy.findSubtitles}
           placeholder={copy.findSubtitles} value={query} onChange={(event) => setQuery(event.target.value)} />}
         {cues.length ? <ol className="max-h-[60vh] divide-y overflow-auto border-y">

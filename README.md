@@ -424,7 +424,7 @@ Additional language tracks are scoped to one verified output format and have ind
 
 MCP and A2A provide `list_completed_subtitle_languages` and accept an optional `language` on `get_completed_subtitles` and `revise_completed_subtitles`.
 
-In the desktop subtitle viewer, **Edit subtitles** opens the latest SRT for editing. **Save version** adds a validated revision, and the history arrows move between saved versions and the verified original.
+In the desktop subtitle viewer, use **Subtitle language** to switch between the primary subtitles and additional tracks. **Add language** creates a track from a language tag and translated SRT. **Edit subtitles** opens the selected track for editing. **Save version** adds a validated revision, and the history arrows browse that track’s revisions.
 
 MCP and A2A expose `get_completed_subtitles` with `workspaceId`, `runId`, `formatId`, and optional `revision`. Submit `revise_completed_subtitles` with those three IDs, `expectedRevision` from the latest read, and `subtitles` containing the complete SRT text. Both transports have a 128 KiB request envelope. Use the desktop or CLI to save larger SRT files within the 2 MiB subtitle limit.
 

@@ -651,6 +651,12 @@
     "saveError": "Não foi possível guardar a observação."
   },
   "subtitleRevisions": {
+    "language": "Idioma das legendas",
+    "primary": "Legendas principais",
+    "addLanguage": "Adicionar idioma",
+    "addDescription": "Introduza uma etiqueta de idioma e cole as legendas traduzidas em formato SRT.",
+    "languageTag": "Etiqueta de idioma",
+    "duplicateLanguage": "Este idioma já tem uma faixa de legendas.",
     "previous": "Versão anterior das legendas",
     "next": "Próxima versão das legendas",
     "original": "Original",
