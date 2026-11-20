@@ -164,7 +164,9 @@ Only one subtitle generation request can run per output at a time. In the
 desktop delivery step, select **Generate subtitles** for the rendered format
 or **Import SRT** to supply your own subtitles.
 
-To opt in when submitting a run through the CLI, MCP, or A2A, set
+In the desktop queue form, turn on **Generate missing subtitles automatically**
+for the selected draft. To opt in when submitting a run through the CLI, MCP,
+or A2A, set
 `generate_delivery_subtitles: true` in its run options. While the desktop is
 open, it attempts transcription once per rendered format missing an SRT.
 An interrupted or failed automatic attempt requires an explicit retry via

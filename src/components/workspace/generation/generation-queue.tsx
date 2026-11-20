@@ -67,6 +67,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
     const fields = new FormData(event.currentTarget);
     const options = {
       autopilot: fields.has("autopilot"),
+      generate_delivery_subtitles: fields.has("generate-subtitles"),
       save_motion_to_library: fields.has("save-motion"),
       platform: String(fields.get("platform") ?? "").trim() || null,
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
@@ -138,6 +139,14 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
                       <div className="flex flex-col gap-1">
                         <FieldLabel htmlFor="run-autopilot">{copy.autopilot}</FieldLabel>
                         <FieldDescription id="run-autopilot-description">{copy.autopilotHint}</FieldDescription>
+                      </div>
+                    </Field>
+                    <Field orientation="horizontal">
+                      <Switch id="run-generate-subtitles" name="generate-subtitles" disabled={pending}
+                        aria-describedby="run-generate-subtitles-description" />
+                      <div className="flex flex-col gap-1">
+                        <FieldLabel htmlFor="run-generate-subtitles">{copy.automaticSubtitles}</FieldLabel>
+                        <FieldDescription id="run-generate-subtitles-description">{copy.automaticSubtitlesHint}</FieldDescription>
                       </div>
                     </Field>
                     <Field orientation="horizontal">

@@ -529,6 +529,8 @@
     "saveMotion": "Save motion to library",
     "saveMotionHint": "Save accepted animations and transitions for reuse. Turn this off for one-off media.",
     "autopilotHint": "Automatically proceed through review stages.",
+    "automaticSubtitles": "Generate missing subtitles automatically",
+    "automaticSubtitlesHint": "Sends audio from each rendered format missing an SRT to the transcription provider selected for this run.",
     "runDetail": "Generation run",
     "openRun": "Open run",
     "missingRun": "This run is unavailable in the selected workspace.",

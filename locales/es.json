@@ -529,6 +529,8 @@
     "saveMotion": "Guardar animaciones y transiciones",
     "saveMotionHint": "Guarda las animaciones y transiciones aceptadas para reutilizarlas. Desactívalo para usarlas solo en esta generación.",
     "autopilotHint": "Avanza automáticamente por las etapas de revisión.",
+    "automaticSubtitles": "Generar automáticamente los subtítulos que falten",
+    "automaticSubtitlesHint": "Envía el audio de cada formato renderizado sin SRT al proveedor de transcripción seleccionado para esta ejecución.",
     "runDetail": "Proceso de generación",
     "openRun": "Abrir proceso",
     "missingRun": "Este proceso no está disponible en el espacio de trabajo seleccionado.",
