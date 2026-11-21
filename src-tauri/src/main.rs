@@ -803,6 +803,13 @@ async fn review_production_result(
 }
 
 fn main() {
+    // WebKitGTK's DMA-BUF renderer stalls media pipelines before demuxing on many Linux systems,
+    // so videos never load and report no error. Users can still opt back in by setting the variable.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        // SAFETY: runs first in main, before any thread exists.
+        unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
