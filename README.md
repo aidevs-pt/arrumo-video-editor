@@ -177,7 +177,7 @@ A worker claims queued work with `claim-generation <workspace-id>`. The claim in
 
 Every agent run is logged with its prompt, command line, standard output, error output, answer and problem. Use `agent-logs <workspace-id> [run-id]` to list them, newest first, and `agent-log <workspace-id> <log-id>` to read one. A running entry is updated every two seconds, and an entry left running by a crash is marked interrupted when the stage is retried. In the desktop, open **Agent logs** next to a run's activity, or from the animation generator.
 
-A video started from scratch has no footage to cut. At **Video previews**, its agent storyboards the approved script as animated scenes, reusing approved animations where they fit, and Arrumo renders them for every format. The final render renders the same scenes at full size and writes each format's SRT from the scenes' on-screen text, unless an SRT already exists.
+A video started from scratch has no footage to cut. At **Video previews**, its agent storyboards the approved script as animated scenes, reusing approved animations where they fit, and Arrumo renders them for every format. The final render renders the same scenes at full size and writes each format's SRT from the scenes' on-screen text, unless an SRT already exists. The agent also writes each scene's narration. When the run's first text-to-speech provider has a credential, Arrumo voices it while making the preview, using the plugin's voice setting or its default voice, lengthens scenes that need more time, and stores the audio with the run so the final render reuses it; subtitles then follow the narration. If synthesis fails, the preview stays silent and its summary says why.
 
 ## Interface translations
 

@@ -20,7 +20,7 @@ Abre **Salidas** y comprueba qué formatos están activados. Para que la entrega
 
 En una ejecución guiada, abre **Revisar proceso** cuando haya una decisión pendiente. Comprueba el guion, los recursos o la vista previa disponibles. Prepara tus decisiones y envíalas cuando hayas terminado. Si necesitas una revisión, describe el cambio en las notas de la etapa antes de enviarla.
 
-En **Recursos y animaciones**, el agente también diseña animaciones para el vídeo, como un rótulo de título, rótulos inferiores o una tarjeta final, y Arrumo las renderiza para que las revises. Un vídeo empezado desde cero no tiene grabaciones, así que su vista previa es un guion gráfico de escenas animadas creado a partir del guion y las animaciones aprobadas. Sus subtítulos salen del texto en pantalla.
+En **Recursos y animaciones**, el agente también diseña animaciones para el vídeo, como un rótulo de título, rótulos inferiores o una tarjeta final, y Arrumo las renderiza para que las revises. Un vídeo empezado desde cero no tiene grabaciones, así que su vista previa es un guion gráfico de escenas animadas creado a partir del guion y las animaciones aprobadas. Sus subtítulos salen del texto en pantalla. Si hay un proveedor de texto a voz configurado, como ElevenLabs, el guion gráfico se narra y sus subtítulos siguen la narración.
 
 Para ver qué se pidió al agente y qué mostró, abre **Registros del agente** junto a la actividad del proceso. Si un paso falla, ahí verás su salida de error.
 

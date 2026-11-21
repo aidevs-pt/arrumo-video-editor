@@ -190,17 +190,40 @@ fn place_motion(edit: &mut Value, answer: &Value, animations: &[Value]) {
 }
 
 /// Turns the agent's storyboard into a preview edit of validated scenes.
+/// A storyboard scene is an animation with the narration read over it.
+fn with_narration(mut scene: Value) -> Value {
+    scene["properties"]["narration"] = json!({"type": "string", "maxLength": MAX_NARRATION});
+    if let Some(required) = scene["required"].as_array_mut() {
+        required.push(json!("narration"));
+    }
+    scene
+}
+
+const MAX_NARRATION: usize = 600;
+
 fn storyboard(answer: &Value, images: &[i64], agent: &str) -> Result<Value, &'static str> {
-    let scenes: Vec<crate::motion_spec::MotionSpec> = answer
+    let (scenes, narration): (Vec<crate::motion_spec::MotionSpec>, Vec<String>) = answer
         .get("scenes")
         .and_then(Value::as_array)
         .ok_or("The agent's storyboard did not follow the expected structure")?
         .iter()
         .take(MAX_SCENES)
         .filter_map(|scene| {
-            crate::motion_spec::MotionSpec::from_answer(scene, |id| images.contains(&id)).ok()
+            let spec =
+                crate::motion_spec::MotionSpec::from_answer(scene, |id| images.contains(&id))
+                    .ok()?;
+            let words: String = scene["narration"]
+                .as_str()
+                .unwrap_or("")
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(MAX_NARRATION)
+                .collect();
+            Some((spec, words))
         })
-        .collect();
+        .unzip();
     if scenes.is_empty() {
         return Err("The agent's storyboard has no scene that can be drawn");
     }
@@ -212,6 +235,7 @@ fn storyboard(answer: &Value, images: &[i64], agent: &str) -> Result<Value, &'st
     Ok(json!({
         "summary": if summary.is_empty() { "The storyboard is ready to watch." } else { summary },
         "scenes": scenes,
+        "narration": narration,
         "agent": agent,
     }))
 }
@@ -354,6 +378,8 @@ impl WorkspaceStore {
              Turn the approved script into scenes in viewing order, one per beat, so a viewer can follow the whole \
              message from the screen alone. Give each scene enough time to read its text comfortably. Where an approved \
              animation fits a beat, use it as that scene unchanged. Keep a consistent visual style across scenes.\n\
+             Give each scene the narration a voice reads over it: the script's spoken words for that beat, in the \
+             script's language, short enough to say within the scene. Leave it empty where nothing is said.\n\
              Each scene is an animation: {guide}\n\
              {revision}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
@@ -376,7 +402,7 @@ impl WorkspaceStore {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": MAX_SCENES,
-                    "items": crate::motion_spec::spec_schema(&image_ids)
+                    "items": with_narration(crate::motion_spec::spec_schema(&image_ids))
                 }
             }
         });
@@ -397,7 +423,8 @@ impl WorkspaceStore {
                     .map_err(Into::into)
             },
         )?;
-        let edit = storyboard(&answer, &image_ids, &provider.id).map_err(io::Error::other)?;
+        let mut edit = storyboard(&answer, &image_ids, &provider.id).map_err(io::Error::other)?;
+        self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)?;
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
         self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)
     }

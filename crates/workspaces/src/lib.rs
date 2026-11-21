@@ -39,6 +39,7 @@ mod motion_library;
 mod motion_renderer;
 mod motion_scratch;
 mod motion_spec;
+mod narration;
 mod operations;
 mod output_formats;
 mod output_schedule;

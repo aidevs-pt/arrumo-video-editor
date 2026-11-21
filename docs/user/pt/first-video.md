@@ -20,7 +20,7 @@ Abre **Saídas** e verifica os formatos ativos. Para a entrega ser verificada, c
 
 Numa execução guiada, abre **Rever execução** quando houver uma decisão pendente. Verifica o guião, os recursos ou a pré-visualização disponíveis. Prepara as tuas decisões e envia-as quando terminares. Se precisares de alterações, descreve-as nas notas da etapa antes de enviar a decisão.
 
-Em **Recursos e animações**, o agente também desenha animações para o vídeo, como um cartão de título, oráculos ou um cartão final, e o Arrumo renderiza-as para as reveres. Um vídeo começado do zero não tem gravações, por isso a pré-visualização é um storyboard de cenas animadas feito a partir do guião e das animações aprovadas. As legendas vêm do texto no ecrã.
+Em **Recursos e animações**, o agente também desenha animações para o vídeo, como um cartão de título, oráculos ou um cartão final, e o Arrumo renderiza-as para as reveres. Um vídeo começado do zero não tem gravações, por isso a pré-visualização é um storyboard de cenas animadas feito a partir do guião e das animações aprovadas. As legendas vêm do texto no ecrã. Se houver um fornecedor de texto para voz configurado, como o ElevenLabs, o storyboard é narrado e as legendas seguem a narração.
 
 Para veres o que foi pedido ao agente e o que ele mostrou, abre **Registos do agente** junto à atividade da execução. Se um passo falhar, vês aí a saída de erro.
 

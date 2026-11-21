@@ -34,6 +34,10 @@ struct SpeechAdapter {
     query: BTreeMap<String, String>,
     response_format: AudioFormat,
     max_text_characters: usize,
+    /// A non-secret string setting where creators choose a voice.
+    voice_setting: Option<String>,
+    /// The voice used when that setting is empty.
+    default_voice: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -70,7 +74,38 @@ pub struct SpeechProviderStatus {
     adapter_sha256: String,
 }
 
+/// The audio file extension a speech plugin produces.
+pub(crate) fn speech_extension(plugin_id: &str) -> io::Result<&'static str> {
+    Ok(speech_adapter(plugin_id)?.0.response_format.extension())
+}
+
+impl SpeechProviderStatus {
+    pub(crate) fn credential_configured(&self) -> bool {
+        self.credential_source.is_some()
+    }
+}
+
 impl WorkspaceStore {
+    /// The voice a plugin narrates with in a workspace: the creator's chosen voice, or the
+    /// plugin's default. `None` when the plugin names neither.
+    pub(crate) fn narration_voice(
+        &self,
+        workspace_id: i64,
+        plugin_id: &str,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        let (adapter, _) = speech_adapter(plugin_id)?;
+        let chosen = match &adapter.voice_setting {
+            Some(setting) => self
+                .plugin_settings(plugin_id, Some(workspace_id))?
+                .remove(setting)
+                .and_then(|value| value.effective)
+                .and_then(|value| value.as_str().map(|voice| voice.trim().to_owned()))
+                .filter(|voice| !voice.is_empty()),
+            None => None,
+        };
+        Ok(chosen.or(adapter.default_voice))
+    }
+
     pub fn speech_provider_status(
         &self,
         workspace_id: i64,
@@ -198,12 +233,20 @@ fn speech_adapter(plugin_id: &str) -> io::Result<(SpeechAdapter, &'static [u8])>
         .speech_synthesis
         .ok_or_else(|| io::Error::other("Plugin has no trusted speech adapter"))?;
     let adapter: SpeechAdapter = serde_json::from_slice(bytes).map_err(|_| invalid_adapter())?;
+    let voice_setting_declared = adapter.voice_setting.as_ref().is_none_or(|id| {
+        manifest
+            .settings
+            .iter()
+            .flatten()
+            .any(|setting| &setting.id == id && setting.kind == PluginSettingKind::String)
+    });
     let has_secret = manifest.settings.iter().flatten().any(|setting| {
         setting.id == adapter.credential_setting
             && setting.kind == PluginSettingKind::Secret
             && setting.scope == PluginSettingScope::Workspace
     });
     if adapter.schema_version != 1
+        || !voice_setting_declared
         || adapter.plugin_id != manifest.id
         || !manifest.capabilities.contains_key("text-to-speech")
         || !has_secret

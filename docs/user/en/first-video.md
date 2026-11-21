@@ -20,7 +20,7 @@ Open **Outputs** and check which formats are enabled. Each enabled format needs 
 
 For a guided run, open **Review run** when a stage needs a decision. Check the available script, media, or preview. Stage your decisions and send them when you are ready. If you want a revision, describe the change in the stage’s notes before sending.
 
-At **Assets and animations**, the agent also designs animations for the video, such as a title card, lower thirds or an end card, and Arrumo renders them for you to review. A video started from scratch has no footage, so its preview is a storyboard of animated scenes built from the approved script and animations. Its captions come from the text on screen.
+At **Assets and animations**, the agent also designs animations for the video, such as a title card, lower thirds or an end card, and Arrumo renders them for you to review. A video started from scratch has no footage, so its preview is a storyboard of animated scenes built from the approved script and animations. Its captions come from the text on screen. If a text-to-speech provider such as ElevenLabs is set up, the storyboard is narrated and its captions follow the narration.
 
 To see what the agent was asked and what it printed, open **Agent logs** next to the run's activity. A failed step shows its error output there.
 

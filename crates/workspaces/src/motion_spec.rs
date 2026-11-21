@@ -21,6 +21,7 @@ use crate::MotionKind;
 pub(crate) const MAX_LAYERS: usize = 12;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
 pub(crate) const MAX_SECONDS: f64 = 20.0;
+const MAX_STORED_SECONDS: f64 = 60.0;
 const MAX_TEXT: usize = 240;
 const FPS: u32 = 30;
 
@@ -144,6 +145,23 @@ fn hex_color(value: &str) -> Option<String> {
         .then(|| format!("0x{}", digits.to_ascii_uppercase()))
 }
 
+impl MotionSpec {
+    /// Lengthens the spec to at least `seconds`, keeping layers that lasted to the end on screen.
+    pub(crate) fn extend_to(&mut self, seconds: f64) {
+        let seconds = seconds.min(MAX_STORED_SECONDS);
+        if seconds <= self.duration_seconds {
+            return;
+        }
+        let previous = self.duration_seconds;
+        for layer in &mut self.layers {
+            if layer.end >= previous - 0.05 {
+                layer.end = seconds;
+            }
+        }
+        self.duration_seconds = seconds;
+    }
+}
+
 /// Pictographs, arrows and other symbols the text font cannot draw.
 fn undrawable(c: char) -> bool {
     matches!(u32::from(c), 0x2190..=0x21FF | 0x2300..=0x23FF | 0x2460..=0x27BF | 0x2900..=0x2BFF
@@ -182,7 +200,8 @@ impl MotionSpec {
         if !spec.duration_seconds.is_finite() {
             return Err(invalid);
         }
-        spec.duration_seconds = spec.duration_seconds.clamp(MIN_SECONDS, MAX_SECONDS);
+        // Agents design up to MAX_SECONDS; narration can lengthen a stored scene further.
+        spec.duration_seconds = spec.duration_seconds.clamp(MIN_SECONDS, MAX_STORED_SECONDS);
         hex_color(&spec.background).ok_or(invalid)?;
         let duration = spec.duration_seconds;
         spec.layers.truncate(MAX_LAYERS);
@@ -407,27 +426,41 @@ impl LayerTarget<'_> {
                 LayerType::Text => {
                     let font_px = (layer.size * frame_h).round().max(8.0);
                     let columns = (layer.width * frame_w / (font_px * 0.52)).floor() as usize;
-                    let file = format!("{prefix}text-{index}.txt");
-                    fs::write(
-                        directory.join(&file),
-                        wrap(layer.text.as_deref().unwrap_or_default(), columns),
-                    )?;
+                    let wrapped = wrap(layer.text.as_deref().unwrap_or_default(), columns);
                     let font = if layer.bold {
                         "font-bold"
                     } else {
                         "font-regular"
                     };
-                    write!(
-                        graph,
-                        "[{current}]drawtext=fontfile={font}:textfile={file}:expansion=none:\
-                     fontsize={font_px:.0}:fontcolor={color}:text_align=C:line_spacing={:.0}:\
-                     alpha='{alpha}':x='{:.2}-text_w/2+{dx}':y='{:.2}-text_h/2+{dy}':\
-                     enable='{enable}'[{label}];",
-                        font_px * 0.25,
-                        layer.x * frame_w,
-                        layer.y * frame_h,
-                    )
-                    .ok();
+                    // FFmpeg 8's drawtext draws a missing-glyph box at each line break, so
+                    // every line is its own centred drawtext.
+                    let lines: Vec<&str> = wrapped.lines().collect();
+                    let line_height = font_px * 1.25;
+                    let top = layer.y * frame_h - line_height * lines.len() as f64 / 2.0;
+                    let mut line_input = current.clone();
+                    for (number, line) in lines.iter().enumerate() {
+                        let file = format!("{prefix}text-{index}-{number}.txt");
+                        fs::write(directory.join(&file), line)?;
+                        let output = if number + 1 == lines.len() {
+                            label.clone()
+                        } else {
+                            format!("{label}l{number}")
+                        };
+                        write!(
+                            graph,
+                            "[{line_input}]drawtext=fontfile={font}:textfile={file}:expansion=none:\
+                         fontsize={font_px:.0}:fontcolor={color}:\
+                         alpha='{alpha}':x='{:.2}-text_w/2+{dx}':y='{:.2}+{dy}':\
+                         enable='{enable}'[{output}];",
+                            layer.x * frame_w,
+                            top + line_height * number as f64 + font_px * 0.1,
+                        )
+                        .ok();
+                        line_input = output;
+                    }
+                    if lines.is_empty() {
+                        write!(graph, "[{current}]null[{label}];").ok();
+                    }
                 }
                 LayerType::Box | LayerType::Image => {
                     let box_w = ((layer.width * frame_w).round() as u32).max(2);
@@ -531,6 +564,7 @@ fn render_arguments(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
+    audio: Option<&Path>,
 ) -> io::Result<Vec<String>> {
     let duration = spec.duration_seconds;
     let background = hex_color(&spec.background).ok_or_else(|| io::Error::other("Bad colour"))?;
@@ -549,7 +583,10 @@ fn render_arguments(
     args.push(format!(
         "color=c={background}:s={width}x{height}:r={FPS}:d={duration:.3}"
     ));
-    args.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"].map(String::from));
+    match audio {
+        Some(audio) => args.extend(["-i".to_owned(), audio.to_string_lossy().into_owned()]),
+        None => args.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"].map(String::from)),
+    }
     let mut graph = String::new();
     let layers = LayerTarget {
         width,
@@ -567,7 +604,7 @@ fn render_arguments(
     };
     write!(graph, "[{current}]format={pixel_format},setsar=1[out]").ok();
     args.extend(["-filter_complex".into(), graph]);
-    args.extend(["-map", "[out]", "-map", "1:a:0", "-t"].map(String::from));
+    args.extend(["-map", "[out]", "-map", "1:a:0", "-af", "apad", "-t"].map(String::from));
     args.push(format!("{duration:.3}"));
     args.extend(
         [
@@ -634,14 +671,27 @@ pub(crate) fn run_ffmpeg(
 /// Renders `spec` to `output` (inside `directory`) at the given size.
 pub(crate) fn render_spec(
     spec: &MotionSpec,
-    (width, height): (u32, u32),
+    size: (u32, u32),
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
+    render_spec_with_audio(spec, size, directory, output, images, None, check)
+}
+
+/// Renders `spec` with `audio` as its soundtrack, padded with silence to the spec's duration.
+pub(crate) fn render_spec_with_audio(
+    spec: &MotionSpec,
+    (width, height): (u32, u32),
+    directory: &Path,
+    output: &str,
+    images: &dyn Fn(i64) -> Option<PathBuf>,
+    audio: Option<&Path>,
+    check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
     ensure_fonts(directory)?;
-    let args = render_arguments(spec, width, height, directory, output, images)?;
+    let args = render_arguments(spec, width, height, directory, output, images, audio)?;
     run_ffmpeg(directory, &args, check)
 }
 
@@ -670,8 +720,9 @@ pub(crate) fn render_thumbnail(
     run_ffmpeg(directory, &args, &mut || Ok(()))
 }
 
-/// SubRip captions of each scene's text, timed to when the scene plays.
-pub(crate) fn storyboard_subtitles(scenes: &[MotionSpec]) -> String {
+/// SubRip captions timed to when each scene plays: its spoken words when it is narrated,
+/// otherwise its on-screen text.
+pub(crate) fn storyboard_subtitles(scenes: &[MotionSpec], spoken: &[Option<&str>]) -> String {
     let stamp = |seconds: f64| {
         let total = (seconds * 1000.0).round() as u64;
         format!(
@@ -685,9 +736,18 @@ pub(crate) fn storyboard_subtitles(scenes: &[MotionSpec]) -> String {
     let mut srt = String::new();
     let mut offset = 0.0;
     let mut cue = 1;
-    for scene in scenes {
+    for (index, scene) in scenes.iter().enumerate() {
         let mut lines: Vec<&str> = Vec::new();
-        for layer in &scene.layers {
+        if let Some(words) = spoken
+            .get(index)
+            .copied()
+            .flatten()
+            .filter(|words| !words.trim().is_empty())
+        {
+            lines.push(words);
+        }
+        let narrated = !lines.is_empty();
+        for layer in scene.layers.iter().filter(|_| !narrated) {
             if let Some(text) = layer.text.as_deref()
                 && !lines.contains(&text)
             {
@@ -741,7 +801,7 @@ mod tests {
         value["durationSeconds"] = json!(90);
         value["layers"][1]["x"] = json!(4);
         let spec = MotionSpec::from_answer(&value, |id| id == 1).unwrap();
-        assert_eq!(spec.duration_seconds, MAX_SECONDS);
+        assert_eq!(spec.duration_seconds, MAX_STORED_SECONDS);
         assert_eq!(spec.layers.len(), 2, "the unknown image is dropped");
         assert_eq!(spec.layers[1].x, 1.0);
         value["background"] = json!("red; drop");
@@ -751,11 +811,13 @@ mod tests {
     #[test]
     fn storyboards_caption_their_text_per_scene() {
         let spec = MotionSpec::from_answer(&answer(), |_| true).unwrap();
-        let srt = storyboard_subtitles(&[spec.clone(), spec]);
+        let srt = storyboard_subtitles(&[spec.clone(), spec.clone()], &[]);
         assert_eq!(
             srt,
             "1\n00:00:00,000 --> 00:00:02,950\nSubscribe for more\n\n2\n00:00:03,000 --> 00:00:05,950\nSubscribe for more\n\n"
         );
+        let spoken = storyboard_subtitles(&[spec.clone(), spec], &[None, Some("Hit subscribe.")]);
+        assert!(spoken.ends_with("2\n00:00:03,000 --> 00:00:05,950\nHit subscribe.\n\n"));
     }
 
     #[test]

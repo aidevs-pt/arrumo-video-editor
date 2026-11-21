@@ -12,7 +12,9 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::format_deliveries::read_settings;
-use crate::motion_spec::{MotionSpec, overlay_graph, render_spec, run_ffmpeg};
+use crate::motion_spec::{
+    MotionSpec, overlay_graph, render_spec, render_spec_with_audio, run_ffmpeg,
+};
 use crate::{
     GenerationPlan, ProductionStage, WorkspaceStore, asset_path, asset_root, delivery_directory,
 };
@@ -177,6 +179,41 @@ impl EditMotion {
     }
 }
 
+/// A scene's voiced narration: the managed audio file and the words it says.
+type NarrationTrack = (Option<PathBuf>, Option<String>);
+
+fn narration_tracks(
+    database: &Path,
+    workspace_id: i64,
+    run_id: i64,
+    edit: &Value,
+    scenes: usize,
+) -> Result<Vec<NarrationTrack>, Box<dyn Error>> {
+    let Some(files) = edit.get("narration_audio").and_then(Value::as_array) else {
+        return Ok(vec![(None, None); scenes]);
+    };
+    (0..scenes)
+        .map(|index| {
+            let Some(name) = files.get(index).and_then(Value::as_str) else {
+                return Ok((None, None));
+            };
+            if !crate::narration::narration_file_name(name) {
+                return Err(
+                    io::Error::other("A narration file name is not one Arrumo wrote").into(),
+                );
+            }
+            let path = crate::delivery_verification::managed_delivery_file(
+                database,
+                workspace_id,
+                run_id,
+                name,
+            )?;
+            let words = edit["narration"][index].as_str().map(str::to_owned);
+            Ok((Some(path), words))
+        })
+        .collect()
+}
+
 struct RenderClip {
     path: PathBuf,
     cut: Option<PreviewCut>,
@@ -294,6 +331,10 @@ impl WorkspaceStore {
             None => self.accepted_preview(run_id, &plan)?,
         };
         let scenes = self.storyboard_scenes(workspace_id, &edit)?;
+        let narration = match &scenes {
+            Some(scenes) => narration_tracks(database, workspace_id, run_id, &edit, scenes.len())?,
+            None => Vec::new(),
+        };
         if (inputs.draft.source_ids.is_empty() && scenes.is_none()) || inputs.formats.is_empty() {
             return Err(io::Error::other(
                 "Rendering requires managed source videos or a storyboard, and output formats",
@@ -364,12 +405,18 @@ impl WorkspaceStore {
                     format.scale_preview(preview_max_edge);
                 }
                 if let Some(scenes) = &scenes {
-                    renderer.render_scenes(&root, &scratch, scenes, &format)?;
+                    renderer.render_scenes(&root, &scratch, scenes, &narration, &format)?;
                     if stage == ProductionStage::FinalRender {
                         // Storyboards have no speech to transcribe; caption their on-screen text.
                         fs::write(
                             scratch.join(format!("{}.srt", format.id)),
-                            crate::motion_spec::storyboard_subtitles(scenes),
+                            crate::motion_spec::storyboard_subtitles(
+                                scenes,
+                                &narration
+                                    .iter()
+                                    .map(|(_, words)| words.as_deref())
+                                    .collect::<Vec<_>>(),
+                            ),
                         )?;
                     }
                     let filename = if stage == ProductionStage::Preview {
@@ -540,6 +587,7 @@ impl ActiveRender<'_> {
         root: &Path,
         scratch: &Path,
         scenes: &[MotionSpec],
+        narration: &[NarrationTrack],
         format: &Dimensions,
     ) -> Result<(), Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
@@ -559,12 +607,13 @@ impl ActiveRender<'_> {
         let mut manifest = String::new();
         for (index, scene) in scenes.iter().enumerate() {
             let name = format!("scene-{index}.mp4");
-            render_spec(
+            render_spec_with_audio(
                 scene,
                 (format.width, format.height),
                 &directory,
                 &name,
                 &images,
+                narration.get(index).and_then(|(audio, _)| audio.as_deref()),
                 &mut check,
             )?;
             manifest.push_str(&format!("file {name}\n"));

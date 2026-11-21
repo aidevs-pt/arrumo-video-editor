@@ -1266,7 +1266,7 @@
     "exitCode": "Exit code",
     "problem": "Problem",
     "output": "Output",
-    "errors": "Errors",
+    "errors": "Progress and errors",
     "prompt": "Prompt",
     "answer": "Answer",
     "command": "Command",

@@ -1266,7 +1266,7 @@
     "exitCode": "Código de salida",
     "problem": "Problema",
     "output": "Salida",
-    "errors": "Errores",
+    "errors": "Progreso y errores",
     "prompt": "Instrucciones",
     "answer": "Respuesta",
     "command": "Comando",
