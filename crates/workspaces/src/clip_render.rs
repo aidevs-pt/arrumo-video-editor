@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::format_deliveries::read_settings;
-use crate::motion_spec::{MotionSpec, render_spec, run_ffmpeg};
+use crate::motion_spec::{MotionSpec, overlay_graph, render_spec, run_ffmpeg};
 use crate::{
     GenerationPlan, ProductionStage, WorkspaceStore, asset_path, asset_root, delivery_directory,
 };
@@ -50,8 +50,10 @@ impl Dimensions {
     fn scale_preview(&mut self, max_edge: u32) {
         let longest = self.width.max(self.height);
         if longest > max_edge {
-            let scale =
-                |edge| (u64::from(edge) * u64::from(max_edge) / u64::from(longest)).max(1) as u32;
+            // Even sizes: FFmpeg rounds subsampled video to even rows and columns when scaling.
+            let scale = |edge| {
+                ((u64::from(edge) * u64::from(max_edge) / u64::from(longest)).max(2) & !1) as u32
+            };
             self.width = scale(self.width);
             self.height = scale(self.height);
         }
@@ -126,6 +128,52 @@ fn cuts_for_format(
         Some(Value::Null) => Ok(None),
         Some(value) => preview_cuts(&json!({ "cuts": value }), source_ids),
         None => preview_cuts(edit, source_ids),
+    }
+}
+
+/// A full-frame animation played before a cut; `before_cut` equal to the number of cuts plays
+/// it at the end.
+#[derive(Debug, Clone, Copy, Deserialize, serde::Serialize, PartialEq, Eq)]
+pub(crate) struct MotionInsert {
+    pub before_cut: usize,
+    pub animation: usize,
+}
+
+/// An animation drawn over a cut, starting `at_ms` into it.
+#[derive(Debug, Clone, Copy, Deserialize, serde::Serialize, PartialEq, Eq)]
+pub(crate) struct MotionOverlay {
+    pub cut: usize,
+    pub animation: usize,
+    pub at_ms: u32,
+}
+
+/// The approved animations an edit of recorded footage places, and where.
+#[derive(Default)]
+pub(crate) struct EditMotion {
+    animations: Vec<MotionSpec>,
+    inserts: Vec<MotionInsert>,
+    overlays: Vec<MotionOverlay>,
+}
+
+const MAX_PLACEMENTS: usize = 40;
+
+impl EditMotion {
+    fn inserts_before(&self, cut: usize) -> impl Iterator<Item = &MotionSpec> {
+        self.inserts
+            .iter()
+            .filter(move |insert| insert.before_cut == cut)
+            .filter_map(|insert| self.animations.get(insert.animation))
+    }
+
+    fn overlays_on(&self, cut: usize) -> impl Iterator<Item = (&MotionSpec, f64)> {
+        self.overlays
+            .iter()
+            .filter(move |overlay| overlay.cut == cut)
+            .filter_map(|overlay| {
+                self.animations
+                    .get(overlay.animation)
+                    .map(|spec| (spec, f64::from(overlay.at_ms) / 1000.0))
+            })
     }
 }
 
@@ -260,6 +308,7 @@ impl WorkspaceStore {
         if scenes.is_none() {
             validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
         }
+        let motion = self.edit_motion(workspace_id, &edit)?;
 
         let revision = if stage == ProductionStage::Preview {
             crate::preview_review::preview_revision(&self.0, run_id, index)?
@@ -342,7 +391,13 @@ impl WorkspaceStore {
                     clip_sets.push((cuts, clips));
                     clip_sets.len() - 1
                 };
-                renderer.render_format(&scratch, &clip_sets[clips_index].1, &format)?;
+                renderer.render_format(
+                    &root,
+                    &scratch,
+                    &clip_sets[clips_index].1,
+                    &format,
+                    &motion,
+                )?;
                 let filename = if stage == ProductionStage::Preview {
                     format!("preview-{attempt}-{}.mp4", format.id)
                 } else {
@@ -390,6 +445,43 @@ impl WorkspaceStore {
         }
         rendered
     }
+    /// The animations an edit of recorded footage places, validated against the workspace.
+    fn edit_motion(&self, workspace_id: i64, edit: &Value) -> Result<EditMotion, Box<dyn Error>> {
+        let Some(animations) = edit.get("animations").and_then(Value::as_array) else {
+            return Ok(EditMotion::default());
+        };
+        let images: Vec<i64> = self
+            .workspace_images(workspace_id)?
+            .into_iter()
+            .map(|image| image.id)
+            .collect();
+        let animations = animations
+            .iter()
+            .take(crate::motion_design::MAX_RUN_ANIMATIONS * 4)
+            .map(|spec| MotionSpec::from_answer(spec, |id| images.contains(&id)))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(io::Error::other)?;
+        let list = |key: &str| edit.get(key).cloned().unwrap_or(Value::Array(Vec::new()));
+        let inserts: Vec<MotionInsert> = serde_json::from_value(list("motion_inserts"))?;
+        let overlays: Vec<MotionOverlay> = serde_json::from_value(list("motion_overlays"))?;
+        if inserts.len() > MAX_PLACEMENTS
+            || overlays.len() > MAX_PLACEMENTS
+            || inserts
+                .iter()
+                .any(|insert| insert.animation >= animations.len())
+            || overlays
+                .iter()
+                .any(|overlay| overlay.animation >= animations.len())
+        {
+            return Err(io::Error::other("The edit places animations it does not include").into());
+        }
+        Ok(EditMotion {
+            animations,
+            inserts,
+            overlays,
+        })
+    }
+
     /// The validated scenes of a storyboard edit, or `None` for an edit of recorded footage.
     fn storyboard_scenes(
         &self,
@@ -546,15 +638,31 @@ impl ActiveRender<'_> {
         let mut process = command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()?;
+        // FFmpeg runs with `-v error`, so its error output stays small.
+        let errors = process.stderr.take().map(|mut stderr| {
+            thread::spawn(move || {
+                let mut text = String::new();
+                let _ = std::io::Read::read_to_string(&mut stderr, &mut text);
+                text
+            })
+        });
         let mut heartbeat = Instant::now();
         loop {
             if let Some(status) = process.try_wait()? {
+                let errors = errors
+                    .and_then(|reader| reader.join().ok())
+                    .unwrap_or_default();
                 return if status.success() {
                     Ok(())
                 } else {
-                    Err(io::Error::other(format!("FFmpeg failed while {operation}")).into())
+                    let tail: Vec<&str> = errors.lines().rev().take(4).collect();
+                    Err(io::Error::other(format!(
+                        "FFmpeg failed while {operation}: {}",
+                        tail.join(" | ")
+                    ))
+                    .into())
                 };
             }
             let lease = if heartbeat.elapsed() >= Duration::from_secs(10) {
@@ -628,9 +736,11 @@ impl ActiveRender<'_> {
 
     fn render_format(
         &self,
+        root: &Path,
         scratch: &Path,
         clips: &[RenderClip],
         format: &Dimensions,
+        motion: &EditMotion,
     ) -> Result<(), Box<dyn Error>> {
         let Dimensions { id, width, height } = format;
         let pixel_format = if width % 2 == 0 && height % 2 == 0 {
@@ -642,7 +752,22 @@ impl ActiveRender<'_> {
             "scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30"
         );
         let mut manifest = String::new();
+        let images = |asset: i64| {
+            asset_path(root, self.workspace_id, asset)
+                .canonicalize()
+                .ok()
+        };
+        let mut check = || -> Result<(), Box<dyn Error>> { Ok(self.confirm_lease()?) };
+        let mut insert = |cut: usize, manifest: &mut String| -> Result<(), Box<dyn Error>> {
+            for (number, spec) in motion.inserts_before(cut).enumerate() {
+                let name = format!("insert-{id}-{cut}-{number}.mp4");
+                render_spec(spec, (*width, *height), scratch, &name, &images, &mut check)?;
+                manifest.push_str(&format!("file {name}\n"));
+            }
+            Ok(())
+        };
         for (index, clip) in clips.iter().enumerate() {
+            insert(index, &mut manifest)?;
             let filename = format!("clip-{id}-{index}.mp4");
             let mut command = Command::new("ffmpeg");
             command.args([
@@ -664,17 +789,38 @@ impl ActiveRender<'_> {
                 command.args(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]);
                 "1:a:0"
             };
+            let mut graph = format!("[0:v]{filter}[base];");
+            let mut video = "base".to_owned();
+            let mut inputs = Vec::new();
+            for (number, (spec, at)) in motion.overlays_on(index).enumerate() {
+                let first_input = if clip.has_audio { 1 } else { 2 }
+                    + inputs.iter().filter(|arg| *arg == "-i").count();
+                video = overlay_graph(
+                    spec,
+                    (*width, *height),
+                    scratch,
+                    &format!("o{index}x{number}"),
+                    at,
+                    &video,
+                    first_input,
+                    &mut graph,
+                    &mut inputs,
+                    &images,
+                )?;
+            }
+            graph.push_str(&format!("[{video}]null[video]"));
+            command.args(&inputs).current_dir(scratch);
             if let Some(cut) = &clip.cut {
                 command.args(["-t", &format!("{}ms", cut.end_ms - cut.start_ms)]);
             }
             command
                 .args([
                     "-map",
-                    "0:v:0",
+                    "[video]",
                     "-map",
                     audio_source,
-                    "-vf",
-                    &filter,
+                    "-filter_complex",
+                    &graph,
                     "-af",
                     "apad",
                     "-shortest",
@@ -696,6 +842,7 @@ impl ActiveRender<'_> {
             self.run(&mut command, "normalizing a source clip")?;
             manifest.push_str(&format!("file {filename}\n"));
         }
+        insert(clips.len(), &mut manifest)?;
         let list = scratch.join(format!("{id}.ffconcat"));
         fs::write(&list, manifest)?;
         let mut command = Command::new("ffmpeg");

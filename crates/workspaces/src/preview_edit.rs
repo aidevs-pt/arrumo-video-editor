@@ -57,7 +57,8 @@ fn preview_edit(
         .ok_or(invalid)?;
     let mut kept = Vec::new();
     let mut notes = Vec::new();
-    for cut in cuts.iter().take(MAX_CUTS) {
+    let mut origins = Vec::new();
+    for (origin, cut) in cuts.iter().take(MAX_CUTS).enumerate() {
         let clip = cut.get("clipId").and_then(Value::as_i64).ok_or(invalid)?;
         let (_, duration, name) = clips.iter().find(|(id, _, _)| *id == clip).ok_or(invalid)?;
         let start = cut
@@ -78,6 +79,7 @@ fn preview_edit(
             continue;
         }
         kept.push(json!({"asset_id": clip, "start_ms": start_ms, "end_ms": end_ms}));
+        origins.push(origin);
         let purpose: String = cut
             .get("purpose")
             .and_then(Value::as_str)
@@ -100,8 +102,91 @@ fn preview_edit(
         "summary": if summary.is_empty() { "The first cut is ready to watch." } else { summary },
         "cuts": kept,
         "cut_notes": notes,
+        "cut_origins": origins,
         "agent": agent,
     }))
+}
+
+/// Lets the agent place the run's approved animations: full-frame inserts before a cut (or after
+/// the last one) and overlays drawn over a cut.
+fn with_motion_schema(mut schema: Value, animations: usize) -> Value {
+    if animations == 0 {
+        return schema;
+    }
+    let index = json!({"type": "integer", "minimum": 0, "maximum": animations - 1});
+    let place = |fields: Value, required: Value| {
+        json!({"type": "array", "maxItems": 20, "items": {
+            "type": "object", "additionalProperties": false,
+            "required": required, "properties": fields,
+        }})
+    };
+    schema["properties"]["inserts"] = place(
+        json!({"animation": index, "beforeCut": {"type": "integer", "minimum": 0}}),
+        json!(["animation", "beforeCut"]),
+    );
+    schema["properties"]["overlays"] = place(
+        json!({"animation": index, "cut": {"type": "integer", "minimum": 0},
+               "atSeconds": {"type": "number", "minimum": 0}}),
+        json!(["animation", "cut", "atSeconds"]),
+    );
+    if let Some(required) = schema["required"].as_array_mut() {
+        required.extend([json!("inserts"), json!("overlays")]);
+    }
+    schema
+}
+
+/// Adds the agent's animation placements to `edit`, renumbering cuts it dropped. Placements on
+/// dropped cuts or unknown animations are skipped.
+fn place_motion(edit: &mut Value, answer: &Value, animations: &[Value]) {
+    let origins: Vec<usize> = edit
+        .as_object_mut()
+        .and_then(|edit| edit.remove("cut_origins"))
+        .and_then(|origins| serde_json::from_value(origins).ok())
+        .unwrap_or_default();
+    if animations.is_empty() {
+        return;
+    }
+    let kept = |cut: usize| origins.iter().position(|&origin| origin == cut);
+    let valid = |entry: &Value| {
+        entry["animation"]
+            .as_u64()
+            .map(|index| index as usize)
+            .filter(|&index| index < animations.len())
+    };
+    let list = |key: &str| answer[key].as_array().cloned().unwrap_or_default();
+    let inserts: Vec<Value> = list("inserts")
+        .iter()
+        .take(20)
+        .filter_map(|entry| {
+            let animation = valid(entry)?;
+            let before = entry["beforeCut"].as_u64()? as usize;
+            // Inserts before a dropped cut move to the next kept one.
+            let before_cut = origins
+                .iter()
+                .position(|&origin| origin >= before)
+                .unwrap_or(origins.len());
+            Some(json!({"before_cut": before_cut, "animation": animation}))
+        })
+        .collect();
+    let overlays: Vec<Value> = list("overlays")
+        .iter()
+        .take(20)
+        .filter_map(|entry| {
+            let animation = valid(entry)?;
+            let cut = kept(entry["cut"].as_u64()? as usize)?;
+            let at = entry["atSeconds"]
+                .as_f64()
+                .filter(|at| at.is_finite())?
+                .clamp(0.0, 3600.0);
+            Some(json!({"cut": cut, "animation": animation, "at_ms": (at * 1000.0).round() as u32}))
+        })
+        .collect();
+    if inserts.is_empty() && overlays.is_empty() {
+        return;
+    }
+    edit["animations"] = json!(animations);
+    edit["motion_inserts"] = json!(inserts);
+    edit["motion_overlays"] = json!(overlays);
 }
 
 /// Turns the agent's storyboard into a preview edit of validated scenes.
@@ -410,6 +495,32 @@ impl WorkspaceStore {
                 })
             })
             .collect();
+        let animations: Vec<Value> = self
+            .approved_stage_result(run_id, "assets")?
+            .and_then(|result| result["motion_specs"].as_array().cloned())
+            .unwrap_or_default();
+        let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
+        if !animations.is_empty() {
+            let summaries: Vec<Value> = animations
+                .iter()
+                .enumerate()
+                .map(|(index, spec)| {
+                    json!({
+                        "animation": index, "title": spec["title"], "kind": spec["kind"],
+                        "usage": spec["usage"], "durationSeconds": spec["durationSeconds"],
+                    })
+                })
+                .collect();
+            prompt.push_str(&format!(
+                "\n\nThe creator approved these animations for this video. Place each where its usage says: \
+                 a title card, end card or transition plays full screen as an insert before a cut (beforeCut \
+                 counts your cuts from 0; use the number of cuts to play it at the end), and a lower third or \
+                 callout is drawn over a cut as an overlay starting atSeconds into that cut. Overlays draw their \
+                 background colour too, so prefer inserts for animations designed as full scenes. Return empty \
+                 lists when an animation does not fit.\nAPPROVED ANIMATIONS (JSON):\n{}",
+                serde_json::to_string_pretty(&summaries).unwrap_or_default()
+            ));
+        }
         let answer = self.run_logged_agent(
             crate::agent_logs::AgentLogScope {
                 workspace_id,
@@ -418,8 +529,8 @@ impl WorkspaceStore {
                 attempt: Some(attempt),
             },
             provider,
-            &preview_prompt(snapshot, script, &footage, &earlier),
-            &answer_schema(&sources),
+            &prompt,
+            &with_motion_schema(answer_schema(&sources), animations.len()),
             AGENT_TIMEOUT,
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
@@ -427,7 +538,8 @@ impl WorkspaceStore {
                     .map_err(Into::into)
             },
         )?;
-        let edit = preview_edit(&answer, &clips, &provider.id).map_err(io::Error::other)?;
+        let mut edit = preview_edit(&answer, &clips, &provider.id).map_err(io::Error::other)?;
+        place_motion(&mut edit, &answer, &animations);
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
         self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)
     }
@@ -486,5 +598,43 @@ mod tests {
             &[json!({"notes": "Tighter hook"})],
         );
         assert!(revised.contains("Tighter hook") && revised.contains("Address every note"));
+    }
+
+    #[test]
+    fn animation_placements_follow_the_cuts_that_were_kept() {
+        let clips = [(1, 10.0, "take1.mp4".to_owned())];
+        let answer = json!({"summary": "", "cuts": [
+            {"clipId": 1, "startSeconds": 0, "endSeconds": 2, "purpose": "a"},
+            {"clipId": 1, "startSeconds": 3, "endSeconds": 3.01, "purpose": "too short"},
+            {"clipId": 1, "startSeconds": 4, "endSeconds": 6, "purpose": "b"}
+        ],
+        "inserts": [{"animation": 0, "beforeCut": 0}, {"animation": 0, "beforeCut": 1}, {"animation": 5, "beforeCut": 0}],
+        "overlays": [{"animation": 1, "cut": 2, "atSeconds": 0.5}, {"animation": 1, "cut": 1, "atSeconds": 0}]});
+        let mut edit = preview_edit(&answer, &clips, "codex").unwrap();
+        place_motion(
+            &mut edit,
+            &answer,
+            &[json!({"title": "Title"}), json!({"title": "Lower third"})],
+        );
+        assert!(edit.get("cut_origins").is_none());
+        assert_eq!(
+            edit["motion_inserts"],
+            json!([
+                {"before_cut": 0, "animation": 0}, {"before_cut": 1, "animation": 0}
+            ])
+        );
+        assert_eq!(
+            edit["motion_overlays"],
+            json!([{"cut": 1, "animation": 1, "at_ms": 500}])
+        );
+        let schema = with_motion_schema(answer_schema(&[1]), 2);
+        assert_eq!(
+            schema["required"],
+            json!(["summary", "cuts", "inserts", "overlays"])
+        );
+        assert_eq!(
+            with_motion_schema(answer_schema(&[1]), 0),
+            answer_schema(&[1])
+        );
     }
 }

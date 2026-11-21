@@ -311,6 +311,13 @@ fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String
     )
 }
 
+pub(crate) fn ensure_fonts(directory: &Path) -> io::Result<()> {
+    if directory.join("font-bold").is_file() {
+        return Ok(());
+    }
+    install_fonts(directory)
+}
+
 /// Fonts drawtext uses, copied into the job directory so filter arguments need no path escaping.
 fn install_fonts(directory: &Path) -> io::Result<()> {
     for (name, weight) in [("font-regular", "regular"), ("font-bold", "bold")] {
@@ -353,6 +360,168 @@ fn system_font(weight: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
+/// Where layers are drawn: a frame size, the job directory for text files, a label prefix that
+/// keeps several animations in one graph apart, and when the animation starts on the base video.
+struct LayerTarget<'a> {
+    width: u32,
+    height: u32,
+    directory: &'a Path,
+    prefix: &'a str,
+    shift: f64,
+    /// How long image and box sources last, in seconds of the base video.
+    length: f64,
+}
+
+impl LayerTarget<'_> {
+    /// Appends the filters that draw `spec`'s layers over the `base` stream to `graph`, adding any
+    /// image inputs to `args` from input index `first_input`, and returns the final stream label.
+    fn draw(
+        &self,
+        spec: &MotionSpec,
+        base: &str,
+        first_input: usize,
+        graph: &mut String,
+        args: &mut Vec<String>,
+        images: &dyn Fn(i64) -> Option<PathBuf>,
+    ) -> io::Result<String> {
+        let (width, height, directory, prefix, duration) = (
+            self.width,
+            self.height,
+            self.directory,
+            self.prefix,
+            self.length,
+        );
+        let mut current = base.to_owned();
+        let mut next_input = first_input;
+        let (frame_w, frame_h) = (f64::from(width), f64::from(height));
+        for (index, layer) in spec.layers.iter().enumerate() {
+            let mut layer = layer.clone();
+            layer.start += self.shift;
+            layer.end += self.shift;
+            let layer = &layer;
+            let (alpha, dx, dy) = motion_expressions(layer, width, height);
+            let enable = format!("between(t,{:.3},{:.3})", layer.start, layer.end);
+            let color = hex_color(&layer.color).ok_or_else(|| io::Error::other("Bad colour"))?;
+            let label = format!("{prefix}v{index}");
+            match layer.kind {
+                LayerType::Text => {
+                    let font_px = (layer.size * frame_h).round().max(8.0);
+                    let columns = (layer.width * frame_w / (font_px * 0.52)).floor() as usize;
+                    let file = format!("{prefix}text-{index}.txt");
+                    fs::write(
+                        directory.join(&file),
+                        wrap(layer.text.as_deref().unwrap_or_default(), columns),
+                    )?;
+                    let font = if layer.bold {
+                        "font-bold"
+                    } else {
+                        "font-regular"
+                    };
+                    write!(
+                        graph,
+                        "[{current}]drawtext=fontfile={font}:textfile={file}:expansion=none:\
+                     fontsize={font_px:.0}:fontcolor={color}:text_align=C:line_spacing={:.0}:\
+                     alpha='{alpha}':x='{:.2}-text_w/2+{dx}':y='{:.2}-text_h/2+{dy}':\
+                     enable='{enable}'[{label}];",
+                        font_px * 0.25,
+                        layer.x * frame_w,
+                        layer.y * frame_h,
+                    )
+                    .ok();
+                }
+                LayerType::Box | LayerType::Image => {
+                    let box_w = ((layer.width * frame_w).round() as u32).max(2);
+                    let box_h = ((layer.height * frame_h).round() as u32).max(2);
+                    let source = format!("{prefix}s{index}");
+                    if layer.kind == LayerType::Box {
+                        write!(
+                        graph,
+                        "color=c={color}@{:.3}:s={box_w}x{box_h}:r={FPS}:d={duration:.3},format=rgba[{source}];",
+                        layer.opacity
+                    )
+                    .ok();
+                    } else {
+                        let path = layer
+                            .asset_id
+                            .and_then(images)
+                            .ok_or_else(|| io::Error::other("An animation image is missing"))?;
+                        args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
+                        args.push(format!("{duration:.3}"));
+                        args.push("-i".into());
+                        args.push(path.to_string_lossy().into_owned());
+                        write!(
+                        graph,
+                        "[{next_input}:v]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,\
+                         format=rgba,colorchannelmixer=aa={:.3}[{source}];",
+                        layer.opacity
+                    )
+                    .ok();
+                        next_input += 1;
+                    }
+                    // Overlay alpha cannot follow an expression, so fade the layer itself.
+                    let faded = format!("{prefix}f{index}");
+                    let span = (layer.end - layer.start).max(0.1);
+                    let ease = (span / 3.0).min(0.6);
+                    let mut fades = Vec::new();
+                    if layer.enter != Motion::None {
+                        fades.push(format!(
+                            "fade=t=in:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.start
+                        ));
+                    }
+                    if layer.exit != Motion::None {
+                        fades.push(format!(
+                            "fade=t=out:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.end - ease
+                        ));
+                    }
+                    if fades.is_empty() {
+                        fades.push("null".into());
+                    }
+                    write!(graph, "[{source}]{}[{faded}];", fades.join(",")).ok();
+                    write!(
+                    graph,
+                    "[{current}][{faded}]overlay=x='{:.2}-overlay_w/2+{dx}':y='{:.2}-overlay_h/2+{dy}':\
+                     enable='{enable}':eof_action=pass[{label}];",
+                    layer.x * frame_w,
+                    layer.y * frame_h,
+                )
+                .ok();
+                }
+            }
+            current = label;
+        }
+        Ok(current)
+    }
+}
+
+/// Draws `spec` over a video stream in a larger filter graph, starting `at` seconds into it.
+/// Returns the label of the drawn stream.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn overlay_graph(
+    spec: &MotionSpec,
+    (width, height): (u32, u32),
+    directory: &Path,
+    prefix: &str,
+    at: f64,
+    base: &str,
+    first_input: usize,
+    graph: &mut String,
+    args: &mut Vec<String>,
+    images: &dyn Fn(i64) -> Option<PathBuf>,
+) -> io::Result<String> {
+    ensure_fonts(directory)?;
+    LayerTarget {
+        width,
+        height,
+        directory,
+        prefix,
+        shift: at,
+        length: at + spec.duration_seconds,
+    }
+    .draw(spec, base, first_input, graph, args, images)
+}
+
 /// Builds the FFmpeg arguments that render `spec` at `width`×`height` into `output` (a name inside
 /// `directory`). Text files are written next to it. `images` resolves asset IDs to files.
 fn render_arguments(
@@ -382,102 +551,15 @@ fn render_arguments(
     ));
     args.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"].map(String::from));
     let mut graph = String::new();
-    let mut current = "0:v".to_owned();
-    let mut next_input = 2;
-    let (frame_w, frame_h) = (f64::from(width), f64::from(height));
-    for (index, layer) in spec.layers.iter().enumerate() {
-        let (alpha, dx, dy) = motion_expressions(layer, width, height);
-        let enable = format!("between(t,{:.3},{:.3})", layer.start, layer.end);
-        let color = hex_color(&layer.color).ok_or_else(|| io::Error::other("Bad colour"))?;
-        let label = format!("v{index}");
-        match layer.kind {
-            LayerType::Text => {
-                let font_px = (layer.size * frame_h).round().max(8.0);
-                let columns = (layer.width * frame_w / (font_px * 0.52)).floor() as usize;
-                let file = format!("text-{index}.txt");
-                fs::write(
-                    directory.join(&file),
-                    wrap(layer.text.as_deref().unwrap_or_default(), columns),
-                )?;
-                let font = if layer.bold {
-                    "font-bold"
-                } else {
-                    "font-regular"
-                };
-                write!(
-                    graph,
-                    "[{current}]drawtext=fontfile={font}:textfile={file}:expansion=none:\
-                     fontsize={font_px:.0}:fontcolor={color}:text_align=C:line_spacing={:.0}:\
-                     alpha='{alpha}':x='{:.2}-text_w/2+{dx}':y='{:.2}-text_h/2+{dy}':\
-                     enable='{enable}'[{label}];",
-                    font_px * 0.25,
-                    layer.x * frame_w,
-                    layer.y * frame_h,
-                )
-                .ok();
-            }
-            LayerType::Box | LayerType::Image => {
-                let box_w = ((layer.width * frame_w).round() as u32).max(2);
-                let box_h = ((layer.height * frame_h).round() as u32).max(2);
-                let source = format!("s{index}");
-                if layer.kind == LayerType::Box {
-                    write!(
-                        graph,
-                        "color=c={color}@{:.3}:s={box_w}x{box_h}:r={FPS}:d={duration:.3},format=rgba[{source}];",
-                        layer.opacity
-                    )
-                    .ok();
-                } else {
-                    let path = layer
-                        .asset_id
-                        .and_then(images)
-                        .ok_or_else(|| io::Error::other("An animation image is missing"))?;
-                    args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
-                    args.push(format!("{duration:.3}"));
-                    args.push("-i".into());
-                    args.push(path.to_string_lossy().into_owned());
-                    write!(
-                        graph,
-                        "[{next_input}:v]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,\
-                         format=rgba,colorchannelmixer=aa={:.3}[{source}];",
-                        layer.opacity
-                    )
-                    .ok();
-                    next_input += 1;
-                }
-                // Overlay alpha cannot follow an expression, so fade the layer itself.
-                let faded = format!("f{index}");
-                let span = (layer.end - layer.start).max(0.1);
-                let ease = (span / 3.0).min(0.6);
-                let mut fades = Vec::new();
-                if layer.enter != Motion::None {
-                    fades.push(format!(
-                        "fade=t=in:st={:.3}:d={ease:.3}:alpha=1",
-                        layer.start
-                    ));
-                }
-                if layer.exit != Motion::None {
-                    fades.push(format!(
-                        "fade=t=out:st={:.3}:d={ease:.3}:alpha=1",
-                        layer.end - ease
-                    ));
-                }
-                if fades.is_empty() {
-                    fades.push("null".into());
-                }
-                write!(graph, "[{source}]{}[{faded}];", fades.join(",")).ok();
-                write!(
-                    graph,
-                    "[{current}][{faded}]overlay=x='{:.2}-overlay_w/2+{dx}':y='{:.2}-overlay_h/2+{dy}':\
-                     enable='{enable}':eof_action=pass[{label}];",
-                    layer.x * frame_w,
-                    layer.y * frame_h,
-                )
-                .ok();
-            }
-        }
-        current = label;
-    }
+    let layers = LayerTarget {
+        width,
+        height,
+        directory,
+        prefix: "",
+        shift: 0.0,
+        length: duration,
+    };
+    let current = layers.draw(spec, "0:v", 2, &mut graph, &mut args, images)?;
     let pixel_format = if width.is_multiple_of(2) && height.is_multiple_of(2) {
         "yuv420p"
     } else {
@@ -493,8 +575,6 @@ fn render_arguments(
             "30",
             "-c:v",
             "libx264",
-            "-preset",
-            "veryfast",
             "-threads",
             "2",
             "-c:a",
@@ -560,9 +640,7 @@ pub(crate) fn render_spec(
     images: &dyn Fn(i64) -> Option<PathBuf>,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
-    if !directory.join("font-bold").is_file() {
-        install_fonts(directory)?;
-    }
+    ensure_fonts(directory)?;
     let args = render_arguments(spec, width, height, directory, output, images)?;
     run_ffmpeg(directory, &args, check)
 }
