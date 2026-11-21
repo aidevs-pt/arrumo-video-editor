@@ -40,19 +40,12 @@ impl OutputRequest {
     }
 }
 
-/// Requests per format, or `None` when the stage also needs portrait cuts, which need a renderer.
+/// Text and thumbnail requests per format, or `None` when no format asks for any.
 fn output_requests(snapshot: &Value) -> Option<BTreeMap<i64, OutputRequest>> {
     let mut requests = BTreeMap::new();
     for entry in snapshot["formats"].as_array()? {
         let id = entry["format"]["id"].as_i64()?;
         let supplemental = &entry["delivery"]["supplemental"];
-        if supplemental["portrait_derivatives"]["count"]
-            .as_u64()
-            .unwrap_or(0)
-            > 0
-        {
-            return None;
-        }
         let (width, height) = (
             entry["format"]["width"].as_u64().unwrap_or(0),
             entry["format"]["height"].as_u64().unwrap_or(0),
@@ -222,7 +215,8 @@ fn supplemental_prompt(
 struct Draft {
     summary: String,
     text: Vec<Value>,
-    thumbnails: Vec<(Option<i64>, String)>,
+    /// Format, prompt and the aspect ratio when it is not the format's own.
+    thumbnails: Vec<(Option<i64>, String, Option<String>)>,
 }
 
 /// One item the creator sent back, which the agent must replace.
@@ -234,6 +228,8 @@ struct Slot {
     previous: String,
     note: Option<String>,
     decision: &'static str,
+    /// For thumbnails drawn at another aspect ratio than their format's, such as portrait cuts'.
+    aspect_ratio: Option<String>,
 }
 
 fn revision_slots(revision: &SupplementalRevisionRequest) -> Vec<Slot> {
@@ -259,11 +255,13 @@ fn revision_slots(revision: &SupplementalRevisionRequest) -> Vec<Slot> {
                 .to_owned(),
             note: entry.note.clone(),
             decision: decision(entry.decision),
+            aspect_ratio: None,
         });
     let media = revision
         .media
         .iter()
         .enumerate()
+        .filter(|(_, entry)| !is_portrait_cut(revision, &entry.previous))
         .map(|(position, entry)| Slot {
             id: format!("thumbnail-{position}"),
             kind: "thumbnail".into(),
@@ -274,8 +272,47 @@ fn revision_slots(revision: &SupplementalRevisionRequest) -> Vec<Slot> {
                 .unwrap_or_default(),
             note: entry.note.clone(),
             decision: decision(entry.decision),
+            aspect_ratio: prompt_record(revision, &entry.previous)
+                .and_then(|record| record["aspect_ratio"].as_str())
+                .map(str::to_owned),
         });
     text.chain(media).collect()
+}
+
+/// The reviewed draft's record for a media entry: its thumbnail prompt or portrait cut plan.
+fn prompt_record<'a>(
+    revision: &'a SupplementalRevisionRequest,
+    media: &Value,
+) -> Option<&'a Value> {
+    let asset = media["asset_id"].as_i64()?;
+    revision
+        .previous_prompts
+        .iter()
+        .find(|record| record["asset_id"].as_i64() == Some(asset))
+}
+
+fn is_portrait_cut(revision: &SupplementalRevisionRequest, media: &Value) -> bool {
+    prompt_record(revision, media)
+        .is_some_and(|record| record["kind"] == crate::portrait_cuts::CUT_KIND)
+}
+
+/// Portrait cuts the creator sent back.
+fn cut_replacements(
+    revision: &SupplementalRevisionRequest,
+) -> Vec<crate::portrait_cuts::CutReplacement> {
+    revision
+        .media
+        .iter()
+        .filter_map(|entry| {
+            let record = prompt_record(revision, &entry.previous)
+                .filter(|record| record["kind"] == crate::portrait_cuts::CUT_KIND)?;
+            Some(crate::portrait_cuts::CutReplacement {
+                format_id: entry.previous["format_id"].as_i64()?,
+                previous: json!({"title": record["title"], "startSeconds": record["start_seconds"], "endSeconds": record["end_seconds"]}),
+                note: entry.note.clone(),
+            })
+        })
+        .collect()
 }
 
 /// Thumbnail prompts of the reviewed draft, by asset.
@@ -403,7 +440,9 @@ fn revised_draft(answer: &Value, slots: &[Slot]) -> Result<Draft, &'static str> 
             .remove(slot.id.as_str())
             .ok_or("The agent did not replace every item you sent back")?;
         if slot.kind == "thumbnail" {
-            draft.thumbnails.push((slot.format_id, text));
+            draft
+                .thumbnails
+                .push((slot.format_id, text, slot.aspect_ratio.clone()));
         } else {
             draft
                 .text
@@ -422,7 +461,10 @@ impl WorkspaceStore {
         for (workspace_id, run_id) in self.runs_ready_for_agent("supplemental_outputs")? {
             let supported = self
                 .generation_run(workspace_id, run_id)?
-                .is_some_and(|run| output_requests(&run.snapshot).is_some());
+                .is_some_and(|run| {
+                    output_requests(&run.snapshot).is_some()
+                        || !crate::portrait_cuts::cut_requests(&run.snapshot).is_empty()
+                });
             if supported {
                 return self.process_supplemental_writing(database, workspace_id, run_id);
             }
@@ -465,8 +507,7 @@ impl WorkspaceStore {
         provider: &AgentPlugin,
     ) -> Result<i64, Box<dyn Error>> {
         let snapshot = &run.snapshot;
-        let requests = output_requests(snapshot)
-            .ok_or_else(|| io::Error::other("This run also needs portrait cuts"))?;
+        let requests = output_requests(snapshot).unwrap_or_default();
         let script = self.approved_stage_result(run_id, "script")?;
         let script = script
             .as_ref()
@@ -484,6 +525,11 @@ impl WorkspaceStore {
             .ok_or_else(|| io::Error::other("The run has no production plan"))?;
         let revision = supplemental_revision_request(&self.0, run_id, stage_index)?;
         let draft = match &revision {
+            Some(revision) if revision_slots(revision).is_empty() => Draft {
+                summary: String::new(),
+                text: Vec::new(),
+                thumbnails: Vec::new(),
+            },
             Some(revision) => {
                 let slots = revision_slots(revision);
                 let answer = self.run_logged_agent(
@@ -501,6 +547,11 @@ impl WorkspaceStore {
                 )?;
                 revised_draft(&answer, &slots).map_err(|reason| StageFailure(reason.into()))?
             }
+            None if requests.is_empty() => Draft {
+                summary: String::new(),
+                text: Vec::new(),
+                thumbnails: Vec::new(),
+            },
             None => {
                 let formats: Vec<i64> = requests.keys().copied().collect();
                 let notes = self.latest_stage_notes(run_id, stage_index)?;
@@ -525,7 +576,7 @@ impl WorkspaceStore {
                     thumbnails: sorted
                         .thumbnails
                         .into_iter()
-                        .map(|(format, prompt)| (Some(format), prompt))
+                        .map(|(format, prompt)| (Some(format), prompt, None))
                         .collect(),
                 }
             }
@@ -541,11 +592,13 @@ impl WorkspaceStore {
             .unwrap_or_default();
         let mut media = Vec::new();
         let mut prompts = revision.as_ref().map(kept_prompts).unwrap_or_default();
-        for (index, (format, prompt)) in draft.thumbnails.iter().enumerate() {
+        for (index, (format, prompt, aspect)) in draft.thumbnails.iter().enumerate() {
             self.renew_generation_lease(workspace_id, run_id, attempt)?;
-            let aspect_ratio = format
-                .and_then(|id| requests.get(&id))
-                .map_or("16:9", |request| request.aspect_ratio);
+            let aspect_ratio = aspect.as_deref().unwrap_or_else(|| {
+                format
+                    .and_then(|id| requests.get(&id))
+                    .map_or("16:9", |request| request.aspect_ratio)
+            });
             let stem = format!("thumbnail-run{run_id}-{attempt}-{}", index + 1);
             let (asset_id, image_provider) = self
                 .generate_image_asset(database, workspace_id, &order, prompt, aspect_ratio, &stem)
@@ -553,12 +606,60 @@ impl WorkspaceStore {
                     StageFailure(format!("The thumbnails could not be generated: {error}"))
                 })?;
             media.push(json!({"asset_id": asset_id, "format_id": format}));
-            prompts.push(json!({"asset_id": asset_id, "format_id": format, "prompt": prompt, "provider": image_provider}));
+            let mut record = json!({"asset_id": asset_id, "format_id": format, "prompt": prompt, "provider": image_provider});
+            if let Some(aspect) = aspect {
+                record["aspect_ratio"] = json!(aspect);
+            }
+            prompts.push(record);
         }
-        let summary = if draft.summary.is_empty() {
-            "Titles, descriptions and thumbnails are ready for your review.".to_owned()
+        let replacements = revision.as_ref().map(cut_replacements);
+        let needs_cuts = match &replacements {
+            Some(replacements) => !replacements.is_empty(),
+            None => !crate::portrait_cuts::cut_requests(snapshot).is_empty(),
+        };
+        let mut summary = draft.summary;
+        if needs_cuts {
+            let (cut_summary, cut_media, cut_records) = self.make_portrait_cuts(
+                database,
+                workspace_id,
+                run_id,
+                attempt,
+                snapshot,
+                provider,
+                replacements.as_deref(),
+                &order,
+            )?;
+            media = match &revision {
+                // Replacements merge in the order the creator sent the items back.
+                Some(revision) => {
+                    let (mut cuts, mut thumbnails) = (cut_media.into_iter(), media.into_iter());
+                    revision
+                        .media
+                        .iter()
+                        .filter_map(|entry| {
+                            if is_portrait_cut(revision, &entry.previous) {
+                                cuts.next()
+                            } else {
+                                thumbnails.next()
+                            }
+                        })
+                        .collect()
+                }
+                None => media.into_iter().chain(cut_media).collect(),
+            };
+            prompts.extend(cut_records);
+            if !cut_summary.is_empty() {
+                summary = if summary.is_empty() {
+                    cut_summary
+                } else {
+                    format!("{summary} {cut_summary}")
+                };
+            }
+        }
+        let summary = if summary.is_empty() {
+            "Titles, descriptions, thumbnails and cuts are ready for your review.".to_owned()
         } else {
-            draft.summary
+            summary
         };
         let mut result =
             json!({"summary": summary, "supplemental_text": draft.text, "agent": provider.id});
@@ -614,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn requests_skip_empty_formats_and_leave_portrait_cuts_to_renderers() {
+    fn requests_skip_empty_formats_and_count_portrait_cuts_separately() {
         let requests = output_requests(&snapshot(2, 0)).unwrap();
         assert_eq!(requests.len(), 1);
         assert_eq!(
@@ -627,7 +728,11 @@ mod tests {
                 aspect_ratio: "16:9"
             }
         );
-        assert!(output_requests(&snapshot(0, 1)).is_none());
+        assert!(output_requests(&snapshot(0, 1)).is_some());
+        assert_eq!(
+            crate::portrait_cuts::cut_requests(&snapshot(0, 1))[&1].count,
+            1
+        );
     }
 
     #[test]
@@ -731,7 +836,7 @@ mod tests {
         );
         assert_eq!(
             draft.thumbnails,
-            vec![(Some(1), "Calm desk, two laptops".to_owned())]
+            vec![(Some(1), "Calm desk, two laptops".to_owned(), None)]
         );
         assert_eq!(
             kept_prompts(&revision),

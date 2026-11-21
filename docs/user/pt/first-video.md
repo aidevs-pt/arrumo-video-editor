@@ -22,6 +22,8 @@ Numa execução guiada, abre **Rever execução** quando houver uma decisão pen
 
 Em **Recursos e animações**, o agente também desenha animações para o vídeo, como um cartão de título, oráculos ou um cartão final, e o Arrumo renderiza-as para as reveres. Um vídeo começado do zero não tem gravações, por isso a pré-visualização é um storyboard de cenas animadas feito a partir do guião e das animações aprovadas. As legendas vêm do texto no ecrã. Se houver um fornecedor de texto para voz configurado, como o ElevenLabs, o storyboard é narrado e as legendas seguem a narração.
 
+Os formatos que pedem cortes verticais recebem vídeos verticais curtos tirados do vídeo aprovado, cada um com as suas miniaturas, prontos a rever com os títulos e as descrições.
+
 Para veres o que foi pedido ao agente e o que ele mostrou, abre **Registos do agente** junto à atividade da execução. Se um passo falhar, vês aí a saída de erro.
 
 Na etapa de renderização final, usa **Gerar vídeo final** quando estiver disponível. Em **Verificar a entrega**, usa **Gerar legendas** ou **Importar SRT** em cada formato que ainda não tenha legendas. O SRT importado tem de estar em UTF-8 e as marcas temporais devem ficar dentro da duração do vídeo desse formato.

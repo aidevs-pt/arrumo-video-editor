@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,31 +36,45 @@ export function RunMotionResults({ workspaceId, runId, results, steps, stageInde
     });
   });
 
-  if (items.length === 0) return null;
+  const [saved, setSaved] = useState<Map<string, number | null>>();
+  useEffect(() => {
+    let active = true;
+    invoke<{ result_id: number; index: number; profile_id: number | null }[]>("saved_run_motion", { workspaceId, runId })
+      .then((rows) => { if (active) setSaved(new Map(rows.map((row) => [`${row.result_id}:${row.index}`, row.profile_id]))); })
+      .catch(() => { if (active) setSaved(new Map()); });
+    return () => { active = false; };
+  }, [workspaceId, runId]);
+
+  if (items.length === 0 || !saved) return null;
 
   return (
     <Card size="sm">
       <CardHeader><CardTitle>{copy.runItems}</CardTitle></CardHeader>
       <CardContent>
         <ul className="divide-y">
-          {items.map((item) => <ResultRow key={`${item.resultId}:${item.index}`} workspaceId={workspaceId} runId={runId} {...item} />)}
+          {items.map((item) => {
+            const key = `${item.resultId}:${item.index}`;
+            return <ResultRow key={key} workspaceId={workspaceId} runId={runId} {...item}
+              savedProfile={saved.has(key) ? { profileId: saved.get(key) ?? null } : undefined} />;
+          })}
         </ul>
       </CardContent>
     </Card>
   );
 }
 
-function ResultRow({ workspaceId, runId, resultId, index, title, kind }: {
+function ResultRow({ workspaceId, runId, resultId, index, title, kind, savedProfile }: {
   workspaceId: number;
   runId: number;
   resultId: number;
   index: number;
   title: string;
   kind: "animation" | "transition";
+  savedProfile?: { profileId: number | null };
 }) {
   const { messages: { motionLibrary: copy } } = useLocale();
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<{ profileId: number | null }>();
+  const [saved, setSaved] = useState<{ profileId: number | null } | undefined>(savedProfile);
   const [error, setError] = useState(false);
 
   async function save() {

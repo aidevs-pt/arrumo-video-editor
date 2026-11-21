@@ -22,6 +22,8 @@ For a guided run, open **Review run** when a stage needs a decision. Check the a
 
 At **Assets and animations**, the agent also designs animations for the video, such as a title card, lower thirds or an end card, and Arrumo renders them for you to review. A video started from scratch has no footage, so its preview is a storyboard of animated scenes built from the approved script and animations. Its captions come from the text on screen. If a text-to-speech provider such as ElevenLabs is set up, the storyboard is narrated and its captions follow the narration.
 
+Formats that ask for portrait cuts get short vertical videos taken from the approved video, each with its own thumbnails, ready to review with the titles and descriptions.
+
 To see what the agent was asked and what it printed, open **Agent logs** next to the run's activity. A failed step shows its error output there.
 
 At the final render stage, use **Render final video** when the action is available. In **Verify delivery**, use **Generate subtitles** or **Import SRT** for any format still missing captions. An imported SRT must be UTF-8 and its cues must fit within that format’s video duration.

@@ -492,6 +492,51 @@ impl WorkspaceStore {
         }
         rendered
     }
+    /// Renders the run's accepted preview edit at any size into `<directory>/0.mp4`, for
+    /// derivatives such as portrait cuts. The caller holds the run's current lease.
+    pub(crate) fn render_accepted_edit(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        (width, height): (u32, u32),
+        directory: &Path,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        let (snapshot, plan): (String, GenerationPlan) = self.0.query_row(
+            "SELECT snapshot_json, plan_json FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
+             AND state = 'running' AND lease_until > unixepoch() AND plan_json IS NOT NULL",
+            params![workspace_id, run_id, attempt],
+            |row| Ok((row.get(0)?, read_settings(row.get(1)?, 1)?)),
+        )?;
+        let inputs: RenderInputs = serde_json::from_str(&snapshot)?;
+        let edit = self.accepted_preview(run_id, &plan)?;
+        let renderer = ActiveRender {
+            store: self,
+            workspace_id,
+            run_id,
+            attempt,
+        };
+        let root = asset_root(database);
+        let format = Dimensions {
+            id: 0,
+            width,
+            height,
+        };
+        if let Some(scenes) = self.storyboard_scenes(workspace_id, &edit)? {
+            let narration = narration_tracks(database, workspace_id, run_id, &edit, scenes.len())?;
+            renderer.render_scenes(&root, directory, &scenes, &narration, &format)?;
+        } else {
+            let source_ids = &inputs.draft.source_ids;
+            let cuts = preview_cuts(&edit, source_ids)?;
+            let clips = renderer.inspect_clips(&root, source_ids, cuts.as_deref())?;
+            let motion = self.edit_motion(workspace_id, &edit)?;
+            renderer.render_format(&root, directory, &clips, &format, &motion)?;
+        }
+        Ok(directory.join("0.mp4"))
+    }
+
     /// The animations an edit of recorded footage places, validated against the workspace.
     fn edit_motion(&self, workspace_id: i64, edit: &Value) -> Result<EditMotion, Box<dyn Error>> {
         let Some(animations) = edit.get("animations").and_then(Value::as_array) else {
@@ -557,7 +602,7 @@ impl WorkspaceStore {
             .map(Some)
     }
 
-    fn accepted_preview(
+    pub(crate) fn accepted_preview(
         &self,
         run_id: i64,
         plan: &GenerationPlan,

@@ -196,3 +196,30 @@ pub async fn save_motion_result(
         .save_motion_result(workspace_id, run_id, result_id, index)
         .map_err(|_| "motion_result_save_failed")
 }
+
+#[derive(serde::Serialize)]
+pub struct SavedRunMotion {
+    result_id: i64,
+    index: i64,
+    profile_id: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn saved_run_motion(
+    workspace_id: i64,
+    run_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<SavedRunMotion>, &'static str> {
+    Ok(store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .saved_run_motion(workspace_id, run_id)
+        .map_err(|_| "motion_library_load_failed")?
+        .into_iter()
+        .map(|(result_id, index, profile_id)| SavedRunMotion {
+            result_id,
+            index,
+            profile_id,
+        })
+        .collect())
+}

@@ -179,6 +179,24 @@ impl WorkspaceStore {
         Ok(item)
     }
 
+    /// Motion results of a run already in the library: (result ID, item index, profile ID).
+    pub fn saved_run_motion(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> rusqlite::Result<Vec<(i64, i64, Option<i64>)>> {
+        self.0
+            .prepare(
+                "SELECT source_result_id, source_motion_index, profile_id FROM motion_library
+                 WHERE workspace_id = ?1 AND source_run_id = ?2
+                   AND source_result_id IS NOT NULL AND source_motion_index IS NOT NULL",
+            )?
+            .query_map(params![workspace_id, run_id], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .collect()
+    }
+
     /// A motion item an Assets-stage result proposes, read for previewing during review.
     pub fn run_motion_item(
         &self,
