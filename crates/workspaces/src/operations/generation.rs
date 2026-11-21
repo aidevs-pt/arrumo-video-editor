@@ -33,6 +33,21 @@ struct RunInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AgentLogsInput {
+    workspace_id: i64,
+    run_id: Option<i64>,
+    limit: Option<u32>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AgentLogInput {
+    workspace_id: i64,
+    log_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ControlInput {
     workspace_id: i64,
     run_id: i64,
@@ -226,7 +241,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 38] {
+pub(super) fn definitions() -> [Value; 40] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -360,6 +375,15 @@ pub(super) fn definitions() -> [Value; 38] {
             }, "required": ["workspaceId", "runId", "attempt", "detail"], "additionalProperties": false}}),
         json!({"name": "get_generation_activity", "description": "Read the transition history of a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "list_agent_logs", "description": "List the workspace's agent runs, newest first, with their stage, status and problem. Pass runId to see only one generation run.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "limit": {"type": "integer", "minimum": 1, "maximum": 500}
+            }, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_agent_log", "description": "Read one agent run: its prompt, command, standard output, error output, answer and problem.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "logId": id},
+                "required": ["workspaceId", "logId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "claim_generation", "description": "Claim the next available run in a workspace and receive its attempt number, lease expiry, checkpoint, current step, and any pending Preview or Supplemental Outputs replacements.",
             "inputSchema": workspace}),
         json!({"name": "checkpoint_generation", "description": "Save progress and renew the lease for the current attempt.",
@@ -493,7 +517,7 @@ pub(super) fn call(
         }),
         "process_asset_plan" => parse(arguments).and_then(|args: RunInput| {
             store
-                .process_asset_plan(args.workspace_id, args.run_id)
+                .process_asset_plan(database, args.workspace_id, args.run_id)
                 .map(|result_id| json!({"resultId": result_id}))
                 .map_err(|_| "The asset plan could not be made. Check the run activity for the reason")
         }),
@@ -619,6 +643,19 @@ pub(super) fn call(
                 .generation_activity(args.workspace_id, args.run_id)
                 .map(|events| json!({"events": events}))
                 .map_err(|_| "Could not read generation activity")
+        }),
+        "list_agent_logs" => parse(arguments).and_then(|args: AgentLogsInput| {
+            store
+                .agent_logs(args.workspace_id, args.run_id, args.limit.unwrap_or(100))
+                .map(|logs| json!({"logs": logs}))
+                .map_err(|_| "Could not read agent logs")
+        }),
+        "get_agent_log" => parse(arguments).and_then(|args: AgentLogInput| {
+            match store.agent_log(args.workspace_id, args.log_id) {
+                Ok(Some(log)) => Ok(json!({"log": log})),
+                Ok(None) => Err("No such agent log in this workspace"),
+                Err(_) => Err("Could not read the agent log"),
+            }
         }),
         "claim_generation" => parse(arguments).and_then(|args: WorkspaceInput| {
             store

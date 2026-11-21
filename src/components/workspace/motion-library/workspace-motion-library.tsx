@@ -2,7 +2,6 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, Pencil, Plus, Volume2, X } from "lucide-react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,6 +18,7 @@ import { workspaceHref, type Workspace } from "@/components/workspace/home/works
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
+import { GenerateMotionDialog } from "./generate-motion-dialog";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
 
@@ -132,13 +132,16 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
             {catalog?.profiles.map((profile) => <NativeSelectOption key={profile.id} value={profile.id}>{profile.name}</NativeSelectOption>)}
           </NativeSelect>
         </Field>
+        <div className="flex flex-wrap gap-2">
+        <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
+          disabled={!items || open} onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
         <Dialog open={open} onOpenChange={(next) => {
           if (saving) return;
           setSaveError(false);
           setOpen(next);
         }}>
           <DialogTrigger asChild>
-            <Button disabled={!items || !videos.length} onClick={() => setOperation(undefined)}><Plus data-icon="inline-start" />{copy.add}</Button>
+            <Button variant="outline" disabled={!items || !videos.length} onClick={() => setOperation(undefined)}><Plus data-icon="inline-start" />{copy.add}</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85dvh] overflow-y-auto" onCloseAutoFocus={(event) => {
             if (!operation) return;
@@ -185,13 +188,13 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
       {loadError ? <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription>
         <Button variant="outline" onClick={() => { setLoadError(false); setAttempt((value) => value + 1); }}>{copy.retry}</Button>
       </Alert> : !items ? <p role="status" className="text-sm text-muted-foreground">{copy.loading}</p>
         : items.length === 0 ? <div className="rounded-xl border p-6">
-          <p className="text-sm text-muted-foreground">{videos.length ? copy.empty : copy.importFirst}</p>
-          {!videos.length && <Button asChild variant="outline" className="mt-3"><Link href={workspaceHref("assets", workspaceId)}>{messages.assets.title}</Link></Button>}
+          <p className="text-sm text-muted-foreground">{copy.emptyGenerate}</p>
         </div>
         : <div className={cn("grid items-start gap-6", chosen && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
@@ -239,6 +242,9 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
                     setOpen(true);
                   }}>{mode === "edit" ? <Pencil data-icon="inline-start" /> : <Copy data-icon="inline-start" />}{copy[mode]}</Button>
               ))}
+              <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={chosen.settings.profile_id}
+                basedOn={{ id: chosen.id, title: chosen.settings.title }} disabled={open}
+                onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
               {chosen.settings.profile_id !== null && catalog && <MotionShareDialog
                 workspaceId={workspaceId} itemId={chosen.id} title={chosen.settings.title}
                 ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}

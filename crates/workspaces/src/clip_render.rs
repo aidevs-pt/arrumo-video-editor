@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::format_deliveries::read_settings;
+use crate::motion_spec::{MotionSpec, render_spec, run_ffmpeg};
 use crate::{
     GenerationPlan, ProductionStage, WorkspaceStore, asset_path, asset_root, delivery_directory,
 };
@@ -240,23 +241,25 @@ impl WorkspaceStore {
             return Err(io::Error::other("The run is not at the requested render stage").into());
         }
         let inputs: RenderInputs = serde_json::from_str(&snapshot)?;
-        if inputs.draft.source_ids.is_empty() || inputs.formats.is_empty() {
-            return Err(io::Error::other(
-                "Clip assembly requires managed source videos and output formats",
-            )
-            .into());
-        }
-
         let edit = match edit {
             Some(edit) => edit.clone(),
             None => self.accepted_preview(run_id, &plan)?,
         };
+        let scenes = self.storyboard_scenes(workspace_id, &edit)?;
+        if (inputs.draft.source_ids.is_empty() && scenes.is_none()) || inputs.formats.is_empty() {
+            return Err(io::Error::other(
+                "Rendering requires managed source videos or a storyboard, and output formats",
+            )
+            .into());
+        }
         let format_ids = inputs
             .formats
             .iter()
             .map(|entry| entry.format.id)
             .collect::<Vec<_>>();
-        validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
+        if scenes.is_none() {
+            validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
+        }
 
         let revision = if stage == ProductionStage::Preview {
             crate::preview_review::preview_revision(&self.0, run_id, index)?
@@ -311,6 +314,23 @@ impl WorkspaceStore {
                 if stage == ProductionStage::Preview {
                     format.scale_preview(preview_max_edge);
                 }
+                if let Some(scenes) = &scenes {
+                    renderer.render_scenes(&root, &scratch, scenes, &format)?;
+                    if stage == ProductionStage::FinalRender {
+                        // Storyboards have no speech to transcribe; caption their on-screen text.
+                        fs::write(
+                            scratch.join(format!("{}.srt", format.id)),
+                            crate::motion_spec::storyboard_subtitles(scenes),
+                        )?;
+                    }
+                    let filename = if stage == ProductionStage::Preview {
+                        format!("preview-{attempt}-{}.mp4", format.id)
+                    } else {
+                        format!("{}.mp4", format.id)
+                    };
+                    filenames.push((format.id, filename));
+                    continue;
+                }
                 let cuts = cuts_for_format(&edit, format.id, &inputs.draft.source_ids)?;
                 let clips_index = if let Some(index) =
                     clip_sets.iter().position(|(cached, _)| cached == &cuts)
@@ -350,6 +370,13 @@ impl WorkspaceStore {
                             .map_err(|error| {
                                 rusqlite::Error::ToSqlConversionFailure(Box::new(error))
                             })?;
+                        let captions = scratch.join(format!("{id}.srt"));
+                        let destination = delivery.join(format!("{id}.srt"));
+                        if captions.is_file() && destination.symlink_metadata().is_err() {
+                            fs::rename(captions, destination).map_err(|error| {
+                                rusqlite::Error::ToSqlConversionFailure(Box::new(error))
+                            })?;
+                        }
                     }
                     Ok(())
                 },
@@ -363,6 +390,34 @@ impl WorkspaceStore {
         }
         rendered
     }
+    /// The validated scenes of a storyboard edit, or `None` for an edit of recorded footage.
+    fn storyboard_scenes(
+        &self,
+        workspace_id: i64,
+        edit: &Value,
+    ) -> Result<Option<Vec<MotionSpec>>, Box<dyn Error>> {
+        let Some(scenes) = edit.get("scenes") else {
+            return Ok(None);
+        };
+        let scenes = scenes
+            .as_array()
+            .filter(|scenes| !scenes.is_empty() && scenes.len() <= crate::preview_edit::MAX_SCENES)
+            .ok_or_else(|| io::Error::other("A storyboard needs between one and forty scenes"))?;
+        let images: Vec<i64> = self
+            .workspace_images(workspace_id)?
+            .into_iter()
+            .map(|image| image.id)
+            .collect();
+        scenes
+            .iter()
+            .map(|scene| {
+                MotionSpec::from_answer(scene, |id| images.contains(&id))
+                    .map_err(|reason| io::Error::other(reason).into())
+            })
+            .collect::<Result<Vec<_>, Box<dyn Error>>>()
+            .map(Some)
+    }
+
     fn accepted_preview(
         &self,
         run_id: i64,
@@ -387,6 +442,68 @@ impl WorkspaceStore {
 }
 
 impl ActiveRender<'_> {
+    /// Renders each scene at the format's size and joins them into `<format id>.mp4`.
+    fn render_scenes(
+        &self,
+        root: &Path,
+        scratch: &Path,
+        scenes: &[MotionSpec],
+        format: &Dimensions,
+    ) -> Result<(), Box<dyn Error>> {
+        let directory = scratch.join(format!("scenes-{}", format.id));
+        fs::create_dir(&directory)?;
+        let images = |id: i64| asset_path(root, self.workspace_id, id).canonicalize().ok();
+        let mut heartbeat = Instant::now();
+        let mut check = || -> Result<(), Box<dyn Error>> {
+            if heartbeat.elapsed() >= Duration::from_secs(10) {
+                heartbeat = Instant::now();
+                self.store
+                    .renew_generation_lease(self.workspace_id, self.run_id, self.attempt)?;
+            } else {
+                self.confirm_lease()?;
+            }
+            Ok(())
+        };
+        let mut manifest = String::new();
+        for (index, scene) in scenes.iter().enumerate() {
+            let name = format!("scene-{index}.mp4");
+            render_spec(
+                scene,
+                (format.width, format.height),
+                &directory,
+                &name,
+                &images,
+                &mut check,
+            )?;
+            manifest.push_str(&format!("file {name}\n"));
+        }
+        fs::write(directory.join("scenes.ffconcat"), manifest)?;
+        let output = scratch.join(format!("{}.mp4", format.id));
+        let args: Vec<String> = [
+            "-nostdin",
+            "-v",
+            "error",
+            "-protocol_whitelist",
+            "file",
+            "-f",
+            "concat",
+            "-safe",
+            "1",
+            "-i",
+            "scenes.ffconcat",
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            "-y",
+        ]
+        .map(String::from)
+        .into_iter()
+        .chain([output.to_string_lossy().into_owned()])
+        .collect();
+        run_ffmpeg(&directory, &args, &mut check)
+    }
+
     fn inspect_clips(
         &self,
         root: &Path,

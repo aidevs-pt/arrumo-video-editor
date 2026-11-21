@@ -347,7 +347,7 @@
       "deleting": "A eliminar…"
     },
     "title": "Animações e transições",
-    "intro": "Sobreposições e transições que o agente pode usar em qualquer vídeo. Por dentro são código; só vê o ciclo.",
+    "intro": "Sobreposições e transições que o agente pode usar em qualquer vídeo. Gere uma descrevendo-a e o Arrumo renderiza uma pré-visualização em ciclo.",
     "scope": "Visibilidade",
     "workspaceScope": "Espaço de trabalho",
     "add": "Adicionar elemento",
@@ -372,7 +372,27 @@
     "empty": "Ainda não há animações nem transições aqui.",
     "importFirst": "Importa um vídeo em Recursos para adicionar o primeiro elemento.",
     "close": "Fechar detalhes",
-    "sharedWith": "Partilhado com"
+    "sharedWith": "Partilhado com",
+    "generate": "Gerar com o agente",
+    "generateDescription": "Descreva a animação ou transição de que precisa. O agente do espaço desenha-a com a sua marca e o Arrumo renderiza uma pré-visualização em ciclo.",
+    "request": "O que deve mostrar?",
+    "requestPlaceholder": "Um oráculo com o nome e a função de quem fala a entrar pela esquerda",
+    "requestHint": "Indique textos, cores, ritmo e onde vai ser usada. Pode demorar alguns minutos.",
+    "generating": "O agente está a desenhar a animação. Abra os registos do agente para acompanhar.",
+    "generatingShort": "A gerar…",
+    "generateSubmit": "Gerar",
+    "changeWithAgent": "Alterar com o agente",
+    "changeDescription": "Descreva o que alterar em «{title}». O original fica na biblioteca e a versão alterada é adicionada ao lado.",
+    "changeRequest": "O que deve mudar?",
+    "changePlaceholder": "Torne-a mais rápida e use a cor de destaque na barra",
+    "changeSubmit": "Criar versão alterada",
+    "generateErrors": {
+      "agent_unavailable": "O agente do espaço não está disponível. Escolha um agente nas Definições e confirme que a ferramenta de linha de comandos está instalada.",
+      "agent_timed_out": "O agente não respondeu a tempo. Experimente um pedido mais simples.",
+      "agent_failed": "O agente não conseguiu desenhar a animação. Abra os registos do agente para ver porquê.",
+      "motion_generation_failed": "Não foi possível renderizar a animação. Abra os registos do agente e confirme que o FFmpeg está instalado."
+    },
+    "emptyGenerate": "Ainda não há animações. Use Gerar com o agente para descrever uma ou adicione um vídeo que já tenha."
   },
   "assets": {
     "replaceFile": "Substituir ficheiro",
@@ -1229,6 +1249,44 @@
       "not_a_page": "o endereço não é uma página web",
       "no_text": "a página não tem texto legível; pode exigir sessão iniciada ou JavaScript",
       "too_many_redirects": "a página redirecionou demasiadas vezes"
+    }
+  },
+  "agentLogs": {
+    "open": "Registos do agente",
+    "title": "Registos do agente",
+    "description": "O que foi pedido ao agente e o que ele mostrou em cada execução. Use-o para ver porque um passo falhou.",
+    "runs": "Execuções do agente",
+    "loading": "A carregar os registos do agente",
+    "error": "Não foi possível ler os registos do agente.",
+    "empty": "O agente ainda não foi executado.",
+    "attempt": "tentativa {attempt}",
+    "agent": "Agente",
+    "duration": "Duração",
+    "seconds": "{seconds} s",
+    "exitCode": "Código de saída",
+    "problem": "Problema",
+    "output": "Saída",
+    "errors": "Erros",
+    "prompt": "Instruções",
+    "answer": "Resposta",
+    "command": "Comando",
+    "nothing": "Nada registado.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "status": {
+      "running": "Em curso",
+      "succeeded": "Concluído",
+      "failed": "Falhou",
+      "timed_out": "Tempo esgotado",
+      "unavailable": "Indisponível"
+    },
+    "stages": {
+      "context": "Contexto do espaço",
+      "script": "Guião",
+      "assets": "Recursos e animações",
+      "preview": "Pré-visualizações",
+      "supplemental_outputs": "Extras de publicação",
+      "motion_library": "Biblioteca de animações"
     }
   }
 }

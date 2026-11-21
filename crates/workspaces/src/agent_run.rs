@@ -4,8 +4,9 @@
 use std::{
     error::Error,
     fmt, fs,
-    io::{Read, Write},
+    io::{self, Read, Write},
     process::{Command, Stdio},
+    sync::Mutex,
     thread,
     time::{Duration, Instant},
 };
@@ -19,6 +20,8 @@ use crate::{
 };
 
 const MAX_ANSWER_BYTES: u64 = 4 * 1024 * 1024;
+/// How much of each output stream a saved log keeps.
+pub(crate) const MAX_LOG_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AgentRunError {
@@ -44,13 +47,73 @@ impl fmt::Display for AgentRunError {
 
 impl Error for AgentRunError {}
 
-/// Runs the agent once. `tick` is called about every second while it works, so callers can renew
-/// leases or stop early by returning an error.
+/// What one agent run was asked and printed, readable while it is still running.
+#[derive(Default)]
+pub(crate) struct AgentTranscript {
+    pub command: Mutex<String>,
+    pub output: Mutex<Vec<u8>>,
+    pub errors: Mutex<Vec<u8>>,
+    pub exit_code: Mutex<Option<i32>>,
+}
+
+impl AgentTranscript {
+    pub(crate) fn output_text(&self) -> String {
+        tail_text(
+            &self
+                .output
+                .lock()
+                .map(|bytes| bytes.clone())
+                .unwrap_or_default(),
+        )
+    }
+
+    pub(crate) fn errors_text(&self) -> String {
+        tail_text(
+            &self
+                .errors
+                .lock()
+                .map(|bytes| bytes.clone())
+                .unwrap_or_default(),
+        )
+    }
+}
+
+/// Keeps the end of long output, where failures are reported.
+fn tail_text(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    if text.len() <= MAX_LOG_BYTES {
+        return text.into_owned();
+    }
+    let mut start = text.len() - MAX_LOG_BYTES;
+    while !text.is_char_boundary(start) {
+        start += 1;
+    }
+    format!("…\n{}", &text[start..])
+}
+
+fn capture(mut stream: impl Read, sink: &Mutex<Vec<u8>>, limit: u64) -> io::Result<()> {
+    let mut buffer = [0; 8192];
+    loop {
+        let read = stream.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(());
+        }
+        let mut sink = sink.lock().map_err(|_| io::Error::other("poisoned"))?;
+        if (sink.len() as u64) < limit {
+            sink.extend_from_slice(&buffer[..read]);
+        }
+    }
+}
+
+/// Runs the agent once, recording what it prints in `transcript`. `tick` is called about every
+/// second while it works, so callers can renew leases, save progress, or stop early by returning
+/// an error.
 pub(crate) fn run_structured(
     plugin: &AgentPlugin,
     prompt: &str,
     schema: &Value,
     timeout: Duration,
+    transcript: &AgentTranscript,
     mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<Value, AgentRunError> {
     let run = plugin
@@ -66,6 +129,9 @@ pub(crate) fn run_structured(
     let output_path = directory.path().join("answer.json");
     fs::write(&schema_path, &schema_text).map_err(|_| failed("Could not prepare the agent run"))?;
     let args = expand_args(run, &schema_text, &schema_path, &output_path);
+    if let Ok(mut command) = transcript.command.lock() {
+        *command = describe_command(&executable, &run.args);
+    }
 
     let mut command = Command::new(executable);
     command
@@ -73,7 +139,7 @@ pub(crate) fn run_structured(
         .current_dir(directory.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(Stdio::piped());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -86,58 +152,66 @@ pub(crate) fn run_structured(
         .stdin
         .take()
         .ok_or_else(|| failed("Could not start the agent"))?;
-    let prompt = prompt.to_owned();
-    let writer = thread::spawn(move || stdin.write_all(prompt.as_bytes()));
-    let mut stdout = process
+    let stdout = process
         .stdout
         .take()
         .ok_or_else(|| failed("Could not start the agent"))?;
-    let reader = thread::spawn(move || {
-        let mut buffer = Vec::new();
-        stdout
-            .by_ref()
-            .take(MAX_ANSWER_BYTES + 1)
-            .read_to_end(&mut buffer)
-            .map(|_| buffer)
-    });
+    let stderr = process
+        .stderr
+        .take()
+        .ok_or_else(|| failed("Could not start the agent"))?;
+    let prompt = prompt.to_owned();
 
-    let deadline = Instant::now() + timeout;
-    let mut last_tick = Instant::now();
-    let status = loop {
-        match process.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() >= deadline => {
-                let _ = process.kill();
-                let _ = process.wait();
-                return Err(AgentRunError::TimedOut);
-            }
-            Ok(None) => {
-                if last_tick.elapsed() >= Duration::from_secs(1) {
-                    last_tick = Instant::now();
-                    if tick().is_err() {
-                        let _ = process.kill();
-                        let _ = process.wait();
-                        return Err(failed("The run was stopped while the agent worked"));
-                    }
+    let status = thread::scope(|scope| {
+        scope.spawn(move || stdin.write_all(prompt.as_bytes()));
+        let reader = scope.spawn(|| capture(stdout, &transcript.output, MAX_ANSWER_BYTES + 1));
+        let errors = scope.spawn(|| capture(stderr, &transcript.errors, MAX_ANSWER_BYTES));
+        let deadline = Instant::now() + timeout;
+        let mut last_tick = Instant::now();
+        let status = loop {
+            match process.try_wait() {
+                Ok(Some(status)) => break Ok(status),
+                Ok(None) if Instant::now() >= deadline => {
+                    let _ = process.kill();
+                    let _ = process.wait();
+                    break Err(AgentRunError::TimedOut);
                 }
-                thread::sleep(Duration::from_millis(100));
+                Ok(None) => {
+                    if last_tick.elapsed() >= Duration::from_secs(1) {
+                        last_tick = Instant::now();
+                        if tick().is_err() {
+                            let _ = process.kill();
+                            let _ = process.wait();
+                            break Err(failed("The run was stopped while the agent worked"));
+                        }
+                    }
+                    thread::sleep(Duration::from_millis(100));
+                }
+                Err(_) => {
+                    let _ = process.kill();
+                    let _ = process.wait();
+                    break Err(failed("Lost track of the agent process"));
+                }
             }
-            Err(_) => {
-                let _ = process.kill();
-                return Err(failed("Lost track of the agent process"));
-            }
+        };
+        let _ = errors.join();
+        if reader.join().map_or(true, |read| read.is_err()) && status.is_ok() {
+            return Err(failed("Could not read the agent's answer"));
         }
-    };
-    let _ = writer.join();
-    let stdout = reader
-        .join()
-        .map_err(|_| failed("Could not read the agent's answer"))?
-        .map_err(|_| failed("Could not read the agent's answer"))?;
+        status
+    })?;
+    if let Ok(mut code) = transcript.exit_code.lock() {
+        *code = status.code();
+    }
     if !status.success() {
         return Err(failed("The agent exited with an error"));
     }
     let document = match run.result.source {
-        StructuredSource::Stdout => stdout,
+        StructuredSource::Stdout => transcript
+            .output
+            .lock()
+            .map(|bytes| bytes.clone())
+            .map_err(|_| failed("Could not read the agent's answer"))?,
         StructuredSource::OutputFile => {
             let file =
                 fs::File::open(&output_path).map_err(|_| failed("The agent wrote no answer"))?;
@@ -152,6 +226,25 @@ pub(crate) fn run_structured(
         return Err(failed("The agent's answer is too large"));
     }
     extract_answer(run, &document)
+}
+
+/// The command line as the plugin declares it, with the schema left as a placeholder.
+fn describe_command(executable: &std::path::Path, args: &[String]) -> String {
+    let name = executable
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    std::iter::once(name)
+        .chain(args.iter().map(|arg| {
+            if arg.is_empty() || arg.contains(|c: char| c.is_whitespace() || c == '"' || c == '\'')
+            {
+                format!("'{}'", arg.replace('\'', "'\\''"))
+            } else {
+                arg.clone()
+            }
+        }))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn expand_args(

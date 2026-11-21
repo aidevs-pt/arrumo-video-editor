@@ -20,6 +20,10 @@ Abre **Saídas** e verifica os formatos ativos. Para a entrega ser verificada, c
 
 Numa execução guiada, abre **Rever execução** quando houver uma decisão pendente. Verifica o guião, os recursos ou a pré-visualização disponíveis. Prepara as tuas decisões e envia-as quando terminares. Se precisares de alterações, descreve-as nas notas da etapa antes de enviar a decisão.
 
+Em **Recursos e animações**, o agente também desenha animações para o vídeo, como um cartão de título, oráculos ou um cartão final, e o Arrumo renderiza-as para as reveres. Um vídeo começado do zero não tem gravações, por isso a pré-visualização é um storyboard de cenas animadas feito a partir do guião e das animações aprovadas. As legendas vêm do texto no ecrã.
+
+Para veres o que foi pedido ao agente e o que ele mostrou, abre **Registos do agente** junto à atividade da execução. Se um passo falhar, vês aí a saída de erro.
+
 Na etapa de renderização final, usa **Gerar vídeo final** quando estiver disponível. Em **Verificar a entrega**, usa **Gerar legendas** ou **Importar SRT** em cada formato que ainda não tenha legendas. O SRT importado tem de estar em UTF-8 e as marcas temporais devem ficar dentro da duração do vídeo desse formato.
 
 Se a transcrição automática falhar ou for interrompida, podes tentar novamente com **Gerar legendas** ou importar um ficheiro. O Arrumo evita reenviar automaticamente um pedido interrompido porque o fornecedor pode já tê-lo processado. A geração preserva as legendas existentes.

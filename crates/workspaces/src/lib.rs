@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod a2a;
 mod agent_cli;
+mod agent_logs;
 mod agent_plugins;
 mod agent_run;
 mod agent_settings;
@@ -33,9 +34,11 @@ mod image_generation;
 mod mcp;
 mod media_worker;
 mod motion_artifacts;
+mod motion_design;
 mod motion_library;
 mod motion_renderer;
 mod motion_scratch;
+mod motion_spec;
 mod operations;
 mod output_formats;
 mod output_schedule;
@@ -72,6 +75,7 @@ mod workspace_feedback;
 
 pub use a2a::serve_a2a;
 pub use agent_cli::{AgentLoginStatus, agent_cli_detected, check_agent_login};
+pub use agent_logs::{AgentLog, AgentLogSummary};
 pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};
 pub use agent_run::AgentRunError;
 pub use agent_settings::{AgentProviderSource, AgentSettings};
@@ -215,6 +219,8 @@ impl WorkspaceStore {
             include_str!("../migrations/050-automatic-delivery-subtitles.sql"),
             include_str!("../migrations/051-profile-organization.sql"),
             include_str!("../migrations/052-source-transcripts.sql"),
+            include_str!("../migrations/053-agent-logs.sql"),
+            include_str!("../migrations/054-motion-specs.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

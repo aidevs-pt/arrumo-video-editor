@@ -88,6 +88,27 @@ impl WorkspaceStore {
         attempt: i64,
         artifacts: &[MotionArtifact],
     ) -> Result<i64, Box<dyn Error + Send + Sync>> {
+        self.submit_motion_artifacts_with(
+            database,
+            workspace_id,
+            run_id,
+            attempt,
+            artifacts,
+            &json!({}),
+        )
+    }
+
+    /// Like `submit_motion_artifacts`, keeping the other fields of `result` (such as the asset
+    /// plan and the animation specs) next to the imported motion items.
+    pub(crate) fn submit_motion_artifacts_with(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        artifacts: &[MotionArtifact],
+        result: &serde_json::Value,
+    ) -> Result<i64, Box<dyn Error + Send + Sync>> {
         if artifacts.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -149,13 +170,15 @@ impl WorkspaceStore {
                         .transpose()?,
                 });
             }
+            let mut result = result.clone();
+            result["motion_items"] = json!(items);
             Ok(self.record_production_result(
                 &tx,
                 workspace_id,
                 run_id,
                 attempt,
                 ProductionStage::Assets,
-                &json!({"motion_items": items}),
+                &result,
             )?)
         })();
         match result {
@@ -163,6 +186,62 @@ impl WorkspaceStore {
                 // A failed commit can have an uncertain outcome, so leave the files for recovery.
                 tx.commit()?;
                 Ok(id)
+            }
+            Err(error) => {
+                for file in copied {
+                    let _ = fs::remove_file(file);
+                }
+                Err(error)
+            }
+        }
+    }
+}
+
+impl WorkspaceStore {
+    /// Imports a rendered animation and saves it to the library with the spec it came from.
+    pub(crate) fn import_motion_library_item(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        artifact: &MotionArtifact,
+        spec: &crate::motion_spec::MotionSpec,
+    ) -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
+        let root = asset_root(&database.canonicalize()?);
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let mut copied = Vec::new();
+        let result = (|| -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
+            let mut import =
+                |source: &Path, kind: &str| -> Result<i64, Box<dyn Error + Send + Sync>> {
+                    let asset = copy_asset_in(&tx, &root, workspace_id, source, false, None)?;
+                    let path = asset_path(&root, workspace_id, asset.id);
+                    copied.push(path.clone());
+                    validate_motion_file(&path, &asset.name, kind)?;
+                    Ok(asset.id)
+                };
+            let settings = MotionLibrarySettings {
+                kind: artifact.kind,
+                title: artifact.title.clone(),
+                usage_markdown: artifact.usage_markdown.clone(),
+                profile_id: artifact.profile_id,
+                preview_asset_id: import(&artifact.preview, "video")?,
+                thumbnail_asset_id: artifact
+                    .thumbnail
+                    .as_deref()
+                    .map(|path| import(path, "image"))
+                    .transpose()?,
+                sound_asset_id: None,
+            };
+            let item = self.create_motion_library_item(workspace_id, &settings)?;
+            tx.execute(
+                "UPDATE motion_library SET spec_json = ?2 WHERE id = ?1",
+                params![item.id, serde_json::to_string(spec)?],
+            )?;
+            Ok(item)
+        })();
+        match result {
+            Ok(item) => {
+                tx.commit()?;
+                Ok(item)
             }
             Err(error) => {
                 for file in copied {

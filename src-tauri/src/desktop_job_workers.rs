@@ -43,13 +43,14 @@ impl DesktopJobWorkers {
                     .map_err(|_| ())
             },
         )?;
+        let assets_database = database.clone();
         workers.spawn(
             "arrumo-asset-planner",
             database.clone(),
             Duration::from_secs(2),
-            |store| {
+            move |store| {
                 store
-                    .process_next_asset_plan()
+                    .process_next_asset_plan(&assets_database)
                     .map(|result| result.is_some())
                     .map_err(|_| ())
             },

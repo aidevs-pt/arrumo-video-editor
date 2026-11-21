@@ -22,7 +22,6 @@ impl WorkspaceStore {
                 "SELECT workspace_id, id FROM generation_runs
                  WHERE (state = 'queued' OR (state = 'running' AND lease_until <= unixepoch()))
                    AND json_extract(plan_json, '$.steps[' || stage_index || '].stage') = 'final_render'
-                   AND json_array_length(snapshot_json, '$.draft.source_ids') > 0
                  ORDER BY id",
             )?
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -96,7 +95,7 @@ impl WorkspaceStore {
                    AND (?5 IS NULL OR json_extract(plan_json, '$.steps[' || stage_index || '].stage') = ?5)
                    AND CASE json_extract(plan_json, '$.steps[' || stage_index || '].stage')
                        WHEN 'preview' THEN ?4 AND json_array_length(snapshot_json, '$.draft.source_ids') > 0
-                       WHEN 'final_render' THEN NOT ?4 AND json_array_length(snapshot_json, '$.draft.source_ids') > 0
+                       WHEN 'final_render' THEN NOT ?4
                        WHEN 'verify_delivery' THEN NOT ?4
                        ELSE 0
                    END

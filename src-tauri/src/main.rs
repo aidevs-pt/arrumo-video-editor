@@ -454,6 +454,37 @@ async fn draft_workspace_context(
 }
 
 #[tauri::command]
+async fn generate_motion_library_item(
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    request: String,
+    based_on: Option<i64>,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::MotionLibraryItem, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .generate_motion_library_item(&database, workspace_id, profile_id, &request, based_on)
+            .map_err(|error| {
+                match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
+                    Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
+                    Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
+                    Some(_) => "agent_failed",
+                    None => "motion_generation_failed",
+                }
+                .to_owned()
+            })
+    })
+    .await
+    .map_err(|_| "motion_generation_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn set_workspace_context(
     workspace_id: i64,
     markdown: String,
@@ -753,6 +784,32 @@ async fn generation_activity(
 }
 
 #[tauri::command]
+async fn agent_logs(
+    workspace_id: i64,
+    run_id: Option<i64>,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::AgentLogSummary>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .agent_logs(workspace_id, run_id, 200)
+        .map_err(|_| "agent_logs_failed")
+}
+
+#[tauri::command]
+async fn agent_log(
+    workspace_id: i64,
+    log_id: i64,
+    store: State<'_, Store>,
+) -> Result<Option<arrumo_workspaces::AgentLog>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .agent_log(workspace_id, log_id)
+        .map_err(|_| "agent_logs_failed")
+}
+
+#[tauri::command]
 async fn generation_plan(
     workspace_id: i64,
     run_id: i64,
@@ -935,6 +992,7 @@ fn main() {
             replace_asset,
             get_workspace_context,
             draft_workspace_context,
+            generate_motion_library_item,
             set_workspace_context,
             list_workspace_feedback,
             update_workspace_feedback,
@@ -956,6 +1014,8 @@ fn main() {
             generation_inbox,
             control_generation,
             generation_activity,
+            agent_logs,
+            agent_log,
             delete_generation,
             generation_plan,
             production_progress,

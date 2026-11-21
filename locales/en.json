@@ -347,7 +347,7 @@
       "deleting": "Deleting…"
     },
     "title": "Animations and transitions",
-    "intro": "Overlays and transitions the agent can drop into any video. Each is code under the hood; you only see the loop.",
+    "intro": "Overlays and transitions the agent can drop into any video. Generate one by describing it, and Arrumo renders a looping preview.",
     "scope": "Visibility",
     "workspaceScope": "Workspace",
     "add": "Add item",
@@ -372,7 +372,27 @@
     "empty": "No animations or transitions here yet.",
     "importFirst": "Import a video in Assets to add your first motion item.",
     "close": "Close details",
-    "sharedWith": "Shared with"
+    "sharedWith": "Shared with",
+    "generate": "Generate with agent",
+    "generateDescription": "Describe the animation or transition you need. The workspace's agent designs it with your brand and Arrumo renders a looping preview.",
+    "request": "What should it show?",
+    "requestPlaceholder": "A lower third with the speaker's name and role that slides in from the left",
+    "requestHint": "Mention text, colours, timing and where it will be used. It can take a few minutes.",
+    "generating": "The agent is designing the animation. Open the agent logs to follow it.",
+    "generatingShort": "Generating…",
+    "generateSubmit": "Generate",
+    "changeWithAgent": "Change with agent",
+    "changeDescription": "Describe what to change in “{title}”. The original stays in the library and the changed version is added next to it.",
+    "changeRequest": "What should change?",
+    "changePlaceholder": "Make it faster and use the accent colour for the bar",
+    "changeSubmit": "Create changed version",
+    "generateErrors": {
+      "agent_unavailable": "The workspace's agent is not available. Choose an agent in Settings and check that its command line tool is installed.",
+      "agent_timed_out": "The agent did not answer in time. Try a simpler request.",
+      "agent_failed": "The agent could not design the animation. Open the agent logs to see why.",
+      "motion_generation_failed": "The animation could not be rendered. Open the agent logs and check that FFmpeg is installed."
+    },
+    "emptyGenerate": "No animations yet. Use Generate with agent to describe one, or add a video you already have."
   },
   "assets": {
     "replaceFile": "Replace file",
@@ -1229,6 +1249,44 @@
       "not_a_page": "the address is not a web page",
       "no_text": "the page has no readable text, it may need sign-in or JavaScript",
       "too_many_redirects": "the page redirected too many times"
+    }
+  },
+  "agentLogs": {
+    "open": "Agent logs",
+    "title": "Agent logs",
+    "description": "What the agent was asked and what it printed on each run. Use this to see why a step failed.",
+    "runs": "Agent runs",
+    "loading": "Loading agent logs",
+    "error": "Agent logs could not be read.",
+    "empty": "The agent has not run yet.",
+    "attempt": "attempt {attempt}",
+    "agent": "Agent",
+    "duration": "Duration",
+    "seconds": "{seconds} s",
+    "exitCode": "Exit code",
+    "problem": "Problem",
+    "output": "Output",
+    "errors": "Errors",
+    "prompt": "Prompt",
+    "answer": "Answer",
+    "command": "Command",
+    "nothing": "Nothing recorded.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "status": {
+      "running": "Running",
+      "succeeded": "Finished",
+      "failed": "Failed",
+      "timed_out": "Timed out",
+      "unavailable": "Unavailable"
+    },
+    "stages": {
+      "context": "Workspace context",
+      "script": "Script",
+      "assets": "Assets and animations",
+      "preview": "Video previews",
+      "supplemental_outputs": "Publishing extras",
+      "motion_library": "Animation library"
     }
   }
 }

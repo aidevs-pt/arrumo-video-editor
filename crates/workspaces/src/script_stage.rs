@@ -6,7 +6,7 @@ use std::{error::Error, io, path::Path, time::Duration};
 use rusqlite::{OptionalExtension, params};
 use serde_json::{Value, json};
 
-use crate::{AgentPlugin, ProductionStage, WorkspaceStore, agent_run::run_structured};
+use crate::{AgentPlugin, ProductionStage, WorkspaceStore};
 
 pub(crate) const AGENT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_SECTIONS: usize = 40;
@@ -212,10 +212,22 @@ impl WorkspaceStore {
             })
             .collect();
         let prompt = script_prompt(snapshot, &footage, &earlier);
-        let answer = run_structured(provider, &prompt, &answer_schema(), AGENT_TIMEOUT, || {
-            self.renew_generation_lease(workspace_id, run_id, attempt)?;
-            Ok(())
-        })?;
+        let answer = self.run_logged_agent(
+            crate::agent_logs::AgentLogScope {
+                workspace_id,
+                run_id: Some(run_id),
+                stage: "script",
+                attempt: Some(attempt),
+            },
+            provider,
+            &prompt,
+            &answer_schema(),
+            AGENT_TIMEOUT,
+            || {
+                self.renew_generation_lease(workspace_id, run_id, attempt)?;
+                Ok(())
+            },
+        )?;
         let mut result = script_result(&answer, &provider.id).map_err(io::Error::other)?;
         if !untranscribed.is_empty() {
             result["footage_without_transcript"] = json!(untranscribed);

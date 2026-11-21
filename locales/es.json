@@ -347,7 +347,7 @@
       "deleting": "Eliminando…"
     },
     "title": "Animaciones y transiciones",
-    "intro": "Superposiciones y transiciones que el agente puede usar en cualquier vídeo. Por dentro son código; tú solo ves el bucle.",
+    "intro": "Superposiciones y transiciones que el agente puede usar en cualquier vídeo. Genera una describiéndola y Arrumo renderiza una vista previa en bucle.",
     "scope": "Visibilidad",
     "workspaceScope": "Espacio de trabajo",
     "add": "Añadir elemento",
@@ -372,7 +372,27 @@
     "empty": "Aún no hay animaciones ni transiciones aquí.",
     "importFirst": "Importa un vídeo en Recursos para añadir tu primer elemento.",
     "close": "Cerrar detalles",
-    "sharedWith": "Compartido con"
+    "sharedWith": "Compartido con",
+    "generate": "Generar con el agente",
+    "generateDescription": "Describe la animación o transición que necesitas. El agente del espacio la diseña con tu marca y Arrumo renderiza una vista previa en bucle.",
+    "request": "¿Qué debe mostrar?",
+    "requestPlaceholder": "Un rótulo inferior con el nombre y el cargo de quien habla que entre desde la izquierda",
+    "requestHint": "Indica textos, colores, ritmo y dónde se usará. Puede tardar unos minutos.",
+    "generating": "El agente está diseñando la animación. Abre los registros del agente para seguirlo.",
+    "generatingShort": "Generando…",
+    "generateSubmit": "Generar",
+    "changeWithAgent": "Cambiar con el agente",
+    "changeDescription": "Describe qué cambiar en «{title}». El original se queda en la biblioteca y la versión cambiada se añade a su lado.",
+    "changeRequest": "¿Qué debe cambiar?",
+    "changePlaceholder": "Hazla más rápida y usa el color de acento para la barra",
+    "changeSubmit": "Crear versión cambiada",
+    "generateErrors": {
+      "agent_unavailable": "El agente del espacio no está disponible. Elige un agente en Ajustes y comprueba que su herramienta de línea de comandos está instalada.",
+      "agent_timed_out": "El agente no respondió a tiempo. Prueba con una petición más sencilla.",
+      "agent_failed": "El agente no pudo diseñar la animación. Abre los registros del agente para ver por qué.",
+      "motion_generation_failed": "No se pudo renderizar la animación. Abre los registros del agente y comprueba que FFmpeg está instalado."
+    },
+    "emptyGenerate": "Aún no hay animaciones. Usa Generar con el agente para describir una o añade un vídeo que ya tengas."
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",
@@ -1229,6 +1249,44 @@
       "not_a_page": "la dirección no es una página web",
       "no_text": "la página no tiene texto legible; puede requerir iniciar sesión o JavaScript",
       "too_many_redirects": "la página redirigió demasiadas veces"
+    }
+  },
+  "agentLogs": {
+    "open": "Registros del agente",
+    "title": "Registros del agente",
+    "description": "Lo que se pidió al agente y lo que mostró en cada ejecución. Úsalo para ver por qué falló un paso.",
+    "runs": "Ejecuciones del agente",
+    "loading": "Cargando registros del agente",
+    "error": "No se pudieron leer los registros del agente.",
+    "empty": "El agente aún no se ha ejecutado.",
+    "attempt": "intento {attempt}",
+    "agent": "Agente",
+    "duration": "Duración",
+    "seconds": "{seconds} s",
+    "exitCode": "Código de salida",
+    "problem": "Problema",
+    "output": "Salida",
+    "errors": "Errores",
+    "prompt": "Instrucciones",
+    "answer": "Respuesta",
+    "command": "Comando",
+    "nothing": "No hay nada registrado.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "status": {
+      "running": "En curso",
+      "succeeded": "Terminado",
+      "failed": "Fallido",
+      "timed_out": "Tiempo agotado",
+      "unavailable": "No disponible"
+    },
+    "stages": {
+      "context": "Contexto del espacio",
+      "script": "Guion",
+      "assets": "Recursos y animaciones",
+      "preview": "Vistas previas",
+      "supplemental_outputs": "Extras de publicación",
+      "motion_library": "Biblioteca de animaciones"
     }
   }
 }

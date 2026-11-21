@@ -10,7 +10,7 @@ use rusqlite::OptionalExtension;
 
 use crate::{
     AgentPlugin, GenerationRun, ProductionStage, SupplementalRevisionRequest, WorkspaceStore,
-    agent_run::run_structured, agent_stage::StageFailure, script_stage::AGENT_TIMEOUT,
+    agent_stage::StageFailure, script_stage::AGENT_TIMEOUT,
     supplemental_review::supplemental_revision_request,
 };
 
@@ -486,7 +486,13 @@ impl WorkspaceStore {
         let draft = match &revision {
             Some(revision) => {
                 let slots = revision_slots(revision);
-                let answer = run_structured(
+                let answer = self.run_logged_agent(
+                    crate::agent_logs::AgentLogScope {
+                        workspace_id,
+                        run_id: Some(run_id),
+                        stage: "supplemental_outputs",
+                        attempt: Some(attempt),
+                    },
                     provider,
                     &revision_prompt(snapshot, script, &slots, revision.notes.as_deref()),
                     &revision_schema(&slots),
@@ -498,7 +504,13 @@ impl WorkspaceStore {
             None => {
                 let formats: Vec<i64> = requests.keys().copied().collect();
                 let notes = self.latest_stage_notes(run_id, stage_index)?;
-                let answer = run_structured(
+                let answer = self.run_logged_agent(
+                    crate::agent_logs::AgentLogScope {
+                        workspace_id,
+                        run_id: Some(run_id),
+                        stage: "supplemental_outputs",
+                        attempt: Some(attempt),
+                    },
                     provider,
                     &supplemental_prompt(snapshot, script, &requests, notes.as_deref()),
                     &answer_schema(&formats),

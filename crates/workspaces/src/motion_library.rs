@@ -199,7 +199,9 @@ impl WorkspaceStore {
         }
         let item = self.insert_motion_library_item(workspace_id, settings, true)?;
         self.0.execute(
-            "UPDATE motion_library SET source_run_id = ?2, source_result_id = ?3, source_motion_index = ?4
+            "UPDATE motion_library SET source_run_id = ?2, source_result_id = ?3, source_motion_index = ?4,
+                 spec_json = (SELECT json_extract(result_json, '$.motion_specs[' || ?4 || ']')
+                              FROM production_results WHERE id = ?3)
              WHERE id = ?1",
             params![item.id, run_id, result_id, index],
         )?;

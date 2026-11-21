@@ -8,7 +8,6 @@ use serde_json::{Value, json};
 
 use crate::{
     AgentRunError, WorkspaceStore, agent_plugin,
-    agent_run::run_structured,
     agent_stage::agent_ready,
     source_pages::{MAX_SOURCES, fetch_page, source_url},
 };
@@ -163,7 +162,13 @@ impl WorkspaceStore {
                 unread,
             });
         }
-        let answer = run_structured(
+        let answer = self.run_logged_agent(
+            crate::agent_logs::AgentLogScope {
+                workspace_id,
+                run_id: None,
+                stage: "context",
+                attempt: None,
+            },
             provider,
             &research_prompt(&pages, &existing, notes.trim()),
             &answer_schema(),

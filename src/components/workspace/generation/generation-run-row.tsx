@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 import { StepTrack } from "@/components/workspace/step-track";
 import { VideoThumbnail } from "@/components/workspace/video-thumbnail";
+import { AgentLogs } from "./agent-logs";
 import { GenerationPlan } from "./generation-plan";
 import type { DeliveryFormat } from "./delivery-subtitles";
 
@@ -233,7 +234,10 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
 
   return (
     <aside aria-label={copy.activity} className="flex min-w-0 flex-col gap-3 border-t border-white/20 pt-3 text-white">
-      <h2 className="flex items-center gap-2 text-base"><Clock3 className="size-4" aria-hidden="true" />{copy.activity}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base"><Clock3 className="size-4" aria-hidden="true" />{copy.activity}</h2>
+        <AgentLogs workspaceId={workspaceId} runId={run.id} className="border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white" />
+      </div>
       <div>
         {historyError && <Alert variant="destructive"><AlertDescription>{copy.activityError}</AlertDescription></Alert>}
         {!activity && !historyError && <Skeleton className="h-14" aria-label={copy.loading} />}

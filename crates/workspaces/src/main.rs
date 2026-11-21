@@ -955,6 +955,38 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .generation_activity(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
             println!("{}", serde_json::to_string(&events)?);
         }
+        [database, command, workspace, request] if command == "generate-motion-item" => {
+            let item = WorkspaceStore::open(Path::new(database))?.generate_motion_library_item(
+                Path::new(database),
+                utf8(workspace)?.parse()?,
+                None,
+                utf8(request)?,
+                None,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
+        [database, command, workspace] if command == "agent-logs" => {
+            let logs = WorkspaceStore::open(Path::new(database))?.agent_logs(
+                utf8(workspace)?.parse()?,
+                None,
+                100,
+            )?;
+            println!("{}", serde_json::to_string(&logs)?);
+        }
+        [database, command, workspace, run] if command == "agent-logs" => {
+            let logs = WorkspaceStore::open(Path::new(database))?.agent_logs(
+                utf8(workspace)?.parse()?,
+                Some(utf8(run)?.parse()?),
+                100,
+            )?;
+            println!("{}", serde_json::to_string(&logs)?);
+        }
+        [database, command, workspace, log] if command == "agent-log" => {
+            let log = WorkspaceStore::open(Path::new(database))?
+                .agent_log(utf8(workspace)?.parse()?, utf8(log)?.parse()?)?
+                .ok_or_else(|| io::Error::other("No such agent log in this workspace"))?;
+            println!("{}", serde_json::to_string_pretty(&log)?);
+        }
         [database, command, workspace, run, attempt, detail] if command == "fail-generation" => {
             let run = WorkspaceStore::open(Path::new(database))?.fail_generation(
                 utf8(workspace)?.parse()?,
@@ -1258,8 +1290,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
         }
         [database, command, workspace, run] if command == "process-asset-plan" => {
-            let result = WorkspaceStore::open(Path::new(database))?
-                .process_asset_plan(utf8(workspace)?.parse()?, utf8(run)?.parse()?)?;
+            let result = WorkspaceStore::open(Path::new(database))?.process_asset_plan(
+                Path::new(database),
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+            )?;
             println!(
                 "{}",
                 serde_json::to_string(&serde_json::json!({ "resultId": result }))?
@@ -1532,7 +1567,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> | ",
-                "generation-activity <workspace-id> <run-id> | generation-notifications <workspace-id> <after-id> | ",
+                "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
                 "read-completion-notification <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
