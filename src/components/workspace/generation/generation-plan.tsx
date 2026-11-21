@@ -19,6 +19,8 @@ import NextImage from "next/image";
 import dynamic from "next/dynamic";
 import { motion, useReducedMotionConfig } from "motion/react";
 import { useLocale } from "@/lib/locale-provider";
+import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
+import { MotionPreviewDialog } from "@/components/workspace/motion-library/motion-preview-dialog";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
 import { RunMotionResults, type MotionStageResult } from "../motion-library/run-motion-results";
@@ -271,6 +273,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
           title: item.title,
           usage: "usage_markdown" in item && typeof item.usage_markdown === "string" ? item.usage_markdown : "",
           kind: "kind" in item && item.kind === "transition" ? "transition" as const : "animation" as const,
+          thumbnail: "thumbnail_asset_id" in item && typeof item.thumbnail_asset_id === "number" ? item.thumbnail_asset_id : null,
         }] : []
     )) : [];
   const previews = stage === "preview" ? previewFiles(result.result.preview_videos) : [];
@@ -461,15 +464,18 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         </>}
         {motionItems.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {motionItems.map(({ index, title, usage, kind }) => (
-              <li key={index} className="min-w-0 rounded-lg border">
-                <div className="flex min-h-20 items-center gap-2 rounded-t-lg bg-secondary px-3">
-                  <Clapperboard className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="text-sm">{motionLibrary[kind]}</span>
-                </div>
-                <div className="px-3 py-2">
+            {motionItems.map(({ index, title, usage, kind, thumbnail }) => (
+              <li key={index} className="min-w-0 overflow-hidden rounded-lg border">
+                {thumbnail !== null
+                  ? <AssetThumbnail workspaceId={workspaceId} assetId={thumbnail} kind="image" className="w-full rounded-none bg-ink/90" />
+                  : <div className="flex aspect-video items-center justify-center bg-secondary">
+                    <Clapperboard className="size-6 text-primary" aria-hidden="true" />
+                  </div>}
+                <div className="flex flex-col items-start gap-2 px-3 py-2">
+                  <span className="rounded-md border px-2 py-0.5 text-sm">{motionLibrary[kind]}</span>
                   <p className="font-semibold wrap-anywhere">{title}</p>
                   {usage && <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">{usage}</p>}
+                  <MotionPreviewDialog workspaceId={workspaceId} runId={runId} resultId={result.id} index={index} title={title} />
                 </div>
               </li>
             ))}

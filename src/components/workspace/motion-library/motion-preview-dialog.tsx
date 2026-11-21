@@ -9,12 +9,17 @@ import { useLocale } from "@/lib/locale-provider";
 
 type Preview = { video_url: string; sound_url: string | null };
 
-export function MotionPreviewDialog({ workspaceId, profileId, itemId, title }: {
+/** A library item, or an item a run's Assets stage proposes for review. */
+type Source = { profileId: number | null; itemId: number } | { runId: number; resultId: number; index: number };
+
+export function MotionPreviewDialog({ workspaceId, title, ...source }: Source & {
   workspaceId: number;
-  profileId: number | null;
-  itemId: number;
   title: string;
 }) {
+  const request = "itemId" in source
+    ? ["preview_motion_library_item", { workspaceId, profileId: source.profileId, itemId: source.itemId }] as const
+    : ["preview_run_motion_item", { workspaceId, runId: source.runId, resultId: source.resultId, index: source.index }] as const;
+  const requestKey = JSON.stringify(request);
   const { messages } = useLocale();
   const copy = messages.motionLibrary;
   const [open, setOpen] = useState(false);
@@ -25,12 +30,13 @@ export function MotionPreviewDialog({ workspaceId, profileId, itemId, title }: {
   useEffect(() => {
     if (!open) return;
     let active = true;
-    invoke<Preview>("preview_motion_library_item", { workspaceId, profileId, itemId }).then(
+    const [command, args] = JSON.parse(requestKey) as [string, Record<string, unknown>];
+    invoke<Preview>(command, args).then(
       (value) => { if (active) setPreview(value); },
       () => { if (active) setVideoError(true); },
     );
     return () => { active = false; };
-  }, [open, workspaceId, profileId, itemId]);
+  }, [open, requestKey]);
 
   return (
     <Dialog open={open} onOpenChange={(next) => {

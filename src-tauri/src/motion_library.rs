@@ -104,14 +104,36 @@ pub struct MotionPreview {
     sound_url: Option<String>,
 }
 
-#[tauri::command]
-pub async fn preview_motion_library_item(
+fn motion_preview(
+    database: &std::path::Path,
+    store: &arrumo_workspaces::WorkspaceStore,
     workspace_id: i64,
-    profile_id: Option<i64>,
-    item_id: i64,
-    app: tauri::AppHandle,
-    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+    settings: &MotionLibrarySettings,
+    stream: &crate::delivery_stream::DeliveryStream,
 ) -> Result<MotionPreview, &'static str> {
+    let failed = "motion_library_preview_failed";
+    let root = arrumo_workspaces::asset_root(database);
+    let media_url = |id, kind| {
+        let name = store
+            .managed_asset_name(workspace_id, id, kind)
+            .map_err(|_| failed)?;
+        let mime = crate::delivery_stream::managed_media_type(&name).ok_or(failed)?;
+        stream
+            .open_media(arrumo_workspaces::asset_path(&root, workspace_id, id), mime)
+            .map_err(|_| failed)
+    };
+    Ok(MotionPreview {
+        video_url: media_url(settings.preview_asset_id, "video")?,
+        sound_url: settings
+            .sound_asset_id
+            .map(|id| media_url(id, "audio"))
+            .transpose()?,
+    })
+}
+
+fn open_store(
+    app: &tauri::AppHandle,
+) -> Result<(std::path::PathBuf, arrumo_workspaces::WorkspaceStore), &'static str> {
     use tauri::Manager;
 
     let failed = "motion_library_preview_failed";
@@ -123,30 +145,41 @@ pub async fn preview_motion_library_item(
         .canonicalize()
         .map_err(|_| failed)?;
     let store = arrumo_workspaces::WorkspaceStore::open(&database).map_err(|_| failed)?;
+    Ok((database, store))
+}
+
+#[tauri::command]
+pub async fn preview_motion_library_item(
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    item_id: i64,
+    app: tauri::AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<MotionPreview, &'static str> {
+    let (database, store) = open_store(&app)?;
     let item = store
         .list_motion_library(workspace_id, profile_id)
-        .map_err(|_| failed)?
+        .map_err(|_| "motion_library_preview_failed")?
         .into_iter()
         .find(|item| item.id == item_id)
-        .ok_or(failed)?;
-    let root = arrumo_workspaces::asset_root(&database);
-    let media_url = |id, kind| {
-        let name = store
-            .managed_asset_name(workspace_id, id, kind)
-            .map_err(|_| failed)?;
-        let mime = crate::delivery_stream::managed_media_type(&name).ok_or(failed)?;
-        stream
-            .open_media(arrumo_workspaces::asset_path(&root, workspace_id, id), mime)
-            .map_err(|_| failed)
-    };
-    Ok(MotionPreview {
-        video_url: media_url(item.settings.preview_asset_id, "video")?,
-        sound_url: item
-            .settings
-            .sound_asset_id
-            .map(|id| media_url(id, "audio"))
-            .transpose()?,
-    })
+        .ok_or("motion_library_preview_failed")?;
+    motion_preview(&database, &store, workspace_id, &item.settings, &stream)
+}
+
+#[tauri::command]
+pub async fn preview_run_motion_item(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    index: usize,
+    app: tauri::AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<MotionPreview, &'static str> {
+    let (database, store) = open_store(&app)?;
+    let settings = store
+        .run_motion_item(workspace_id, run_id, result_id, index)
+        .map_err(|_| "motion_library_preview_failed")?;
+    motion_preview(&database, &store, workspace_id, &settings, &stream)
 }
 
 #[tauri::command]

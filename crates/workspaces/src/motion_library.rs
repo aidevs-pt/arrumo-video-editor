@@ -179,6 +179,30 @@ impl WorkspaceStore {
         Ok(item)
     }
 
+    /// A motion item an Assets-stage result proposes, read for previewing during review.
+    pub fn run_motion_item(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        result_id: i64,
+        index: usize,
+    ) -> rusqlite::Result<MotionLibrarySettings> {
+        let item: String = self.0.query_row(
+            "SELECT json_extract(result.result_json, '$.motion_items[' || ?4 || ']')
+             FROM production_results AS result JOIN generation_runs AS run ON run.id = result.run_id
+             WHERE run.workspace_id = ?1 AND run.id = ?2 AND result.id = ?3",
+            params![workspace_id, run_id, result_id, index as i64],
+            |row| row.get(0),
+        )?;
+        serde_json::from_str(&item).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                0,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })
+    }
+
     pub(crate) fn save_captured_motion_item(
         &self,
         workspace_id: i64,

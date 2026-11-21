@@ -931,6 +931,7 @@ fn main() {
             profiles::unshare_asset_from_profile,
             motion_library::list_motion_library,
             motion_library::preview_motion_library_item,
+            motion_library::preview_run_motion_item,
             motion_library::save_motion_result,
             motion_library::create_motion_library_item,
             motion_library::update_motion_library_item,
