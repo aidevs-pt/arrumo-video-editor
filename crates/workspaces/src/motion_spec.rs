@@ -63,6 +63,41 @@ pub(crate) struct Layer {
     pub end: f64,
     pub enter: Motion,
     pub exit: Motion,
+    /// A sound effect played as the layer arrives.
+    #[serde(default)]
+    pub sound: Sound,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Sound {
+    #[default]
+    None,
+    Whoosh,
+    Pop,
+    Click,
+    Chime,
+    Rise,
+}
+
+impl Sound {
+    /// An FFmpeg source graph producing the effect as 48 kHz stereo, or `None` for silence.
+    fn source(self) -> Option<&'static str> {
+        Some(match self {
+            Self::None => return None,
+            Self::Whoosh => {
+                "anoisesrc=d=0.5:c=pink:a=0.6,highpass=f=300,lowpass=f=3500,afade=t=in:d=0.2,afade=t=out:st=0.2:d=0.3,volume=0.5"
+            }
+            Self::Pop => "sine=f=520:d=0.12,afade=t=out:st=0.02:d=0.1,volume=0.6",
+            Self::Click => "sine=f=1800:d=0.04,afade=t=out:st=0.005:d=0.035,volume=0.5",
+            Self::Chime => {
+                "aevalsrc=0.3*sin(2*PI*880*t)*exp(-4*t)+0.2*sin(2*PI*1320*t)*exp(-5*t):d=0.9"
+            }
+            Self::Rise => {
+                "aevalsrc=0.35*sin(2*PI*(260+520*t)*t)*min(1\\,t*8):d=0.5,afade=t=out:st=0.35:d=0.15"
+            }
+        })
+    }
 }
 
 /// A validated animation, stored with results and library items so it can be rendered again.
@@ -104,7 +139,7 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
                     "type": "object",
                     "additionalProperties": false,
                     "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
-                        "color", "bold", "opacity", "start", "end", "enter", "exit"],
+                        "color", "bold", "opacity", "start", "end", "enter", "exit", "sound"],
                     "properties": {
                         "type": {"enum": ["text", "box", "image"]},
                         "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
@@ -117,7 +152,8 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
                         "start": {"type": "number", "minimum": 0},
                         "end": {"type": "number", "minimum": 0},
                         "enter": motion,
-                        "exit": motion
+                        "exit": motion,
+                        "sound": {"enum": ["none", "whoosh", "pop", "click", "chime", "rise"]}
                     }
                 }
             }
@@ -135,7 +171,9 @@ workspace image by assetId, fitted inside their box. Layers paint in order, so p
 first. start and end are seconds within the animation; enter and exit choose how a layer arrives \
 and leaves. Use the brand colours, keep strong contrast between text and what is behind it, keep \
 text short and inside the frame with a safe margin of 0.06, and stagger entrances so the motion \
-reads clearly. Text is set in a plain sans-serif font that has no emoji, pictographs or arrows, so \
+reads clearly. A layer can play a short sound as it arrives (a whoosh for slides, a pop or click for \
+items appearing, a chime for a reveal, a rise for a build-up); use them sparingly, on the beats that \
+matter, and none when the animation will sit under speech. Text is set in a plain sans-serif font that has no emoji, pictographs or arrows, so \
 write only letters, digits and common punctuation, and draw shapes, grids, bars and diagrams with box \
 layers. Leave text null for boxes and images and assetId null for text and boxes.";
 
@@ -603,8 +641,31 @@ fn render_arguments(
         "yuv444p"
     };
     write!(graph, "[{current}]format={pixel_format},setsar=1[out]").ok();
+    // Sound effects mix over the soundtrack (narration or silence) at each layer's entrance.
+    let mut mix =
+        String::from(";[1:a:0]aformat=sample_rates=48000:channel_layouts=stereo,apad[bed]");
+    let mut inputs = vec!["[bed]".to_owned()];
+    for (index, layer) in spec.layers.iter().enumerate() {
+        if let Some(source) = layer.sound.source() {
+            let delay = (layer.start * 1000.0).round() as u64;
+            write!(
+                mix,
+                ";{source},aformat=sample_rates=48000:channel_layouts=stereo,adelay={delay}:all=1[fx{index}]"
+            )
+            .ok();
+            inputs.push(format!("[fx{index}]"));
+        }
+    }
+    write!(
+        mix,
+        ";{}amix=inputs={}:normalize=0:duration=first[audio]",
+        inputs.join(""),
+        inputs.len()
+    )
+    .ok();
+    graph.push_str(&mix);
     args.extend(["-filter_complex".into(), graph]);
-    args.extend(["-map", "[out]", "-map", "1:a:0", "-af", "apad", "-t"].map(String::from));
+    args.extend(["-map", "[out]", "-map", "[audio]", "-t"].map(String::from));
     args.push(format!("{duration:.3}"));
     args.extend(
         [
@@ -784,7 +845,7 @@ mod tests {
             "layers": [
                 {"type": "box", "text": null, "assetId": null, "x": 0.5, "y": 0.8, "width": 0.6,
                  "height": 0.12, "size": 0.05, "color": "#E03030", "bold": false, "opacity": 1,
-                 "start": 0, "end": 3, "enter": "rise", "exit": "fade"},
+                 "start": 0, "end": 3, "enter": "rise", "exit": "fade", "sound": "whoosh"},
                 {"type": "text", "text": "Subscribe for more", "assetId": null, "x": 0.5, "y": 0.8,
                  "width": 0.6, "height": 0.1, "size": 0.06, "color": "#FFFFFF", "bold": true,
                  "opacity": 1, "start": 0.3, "end": 3, "enter": "slide-left", "exit": "none"},
@@ -872,5 +933,38 @@ mod tests {
             crate::source_transcripts::media_duration(&directory.path().join("out.mp4")).unwrap();
         assert!((duration - 3.0).abs() < 0.2, "{duration}");
         assert!(directory.path().join("thumb.png").is_file());
+
+        // Every effect renders and is audible.
+        for (number, sound) in ["pop", "click", "chime", "rise", "whoosh"]
+            .iter()
+            .enumerate()
+        {
+            let mut value = answer();
+            value["layers"][0]["sound"] = json!(sound);
+            let spec = MotionSpec::from_answer(&value, |_| true).unwrap();
+            let name = format!("sound-{number}.mp4");
+            render_spec(
+                &spec,
+                (160, 90),
+                directory.path(),
+                &name,
+                &resolve,
+                &mut || Ok(()),
+            )
+            .unwrap();
+            let report = Command::new("ffmpeg")
+                .args(["-v", "info", "-i"])
+                .arg(directory.path().join(&name))
+                .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
+                .output()
+                .unwrap();
+            let report = String::from_utf8_lossy(&report.stderr);
+            let peak: f64 = report
+                .lines()
+                .find_map(|line| line.split("max_volume: ").nth(1))
+                .and_then(|value| value.trim_end_matches(" dB").parse().ok())
+                .unwrap();
+            assert!(peak > -30.0, "{sound} peaked at {peak} dB");
+        }
     }
 }
