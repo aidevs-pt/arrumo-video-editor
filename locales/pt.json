@@ -1249,7 +1249,15 @@
     "selectEveryAnimation": "Escolhe uma decisão para cada animação",
     "motionNotePlaceholder": "O que deve mudar?",
     "decisionFor": "Decisão para {label}",
-    "wholeStepHint": "Ou decide sobre o passo inteiro. Isto substitui as decisões de cada animação."
+    "wholeStepHint": "Ou decide sobre o passo inteiro. Isto substitui as decisões de cada animação.",
+    "joinsTitle": "Junções revistas por {agent}",
+    "joinsTitleFallback": "Junções revistas",
+    "joinsProblems": "{count} de {total} precisam de atenção",
+    "joinsAllOk": "Todas as junções parecem limpas",
+    "joinOk": "Parece limpa",
+    "joinProblem": "Precisa de atenção",
+    "joinsHint": "O agente olhou para as imagens e a forma de onda à volta de cada junção do primeiro formato. Acrescenta à tua revisão as notas com que concordas.",
+    "joinAdd": "Acrescentar às minhas notas"
   },
   "markdownEditor": {
     "loading": "A carregar o editor de texto formatado…",

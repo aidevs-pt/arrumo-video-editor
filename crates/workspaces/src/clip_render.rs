@@ -250,6 +250,8 @@ fn loudness_pass(report: &str) -> Option<String> {
 pub(crate) struct RenderCheck {
     pub seconds: f64,
     pub expected_seconds: f64,
+    /// Where one part ends and the next begins, in seconds on the rendered timeline.
+    pub joins: Vec<f64>,
 }
 
 impl RenderCheck {
@@ -258,6 +260,7 @@ impl RenderCheck {
         json!({
             "seconds": round(self.seconds),
             "expected_seconds": round(self.expected_seconds),
+            "joins": self.joins.iter().map(|&at| round(at)).collect::<Vec<_>>(),
         })
     }
 }
@@ -1201,9 +1204,18 @@ impl ActiveRender<'_> {
             ))
             .into());
         }
+        let joins = parts
+            .iter()
+            .scan(0.0, |at, part| {
+                *at += part;
+                Some(*at)
+            })
+            .take(parts.len().saturating_sub(1))
+            .collect();
         Ok(RenderCheck {
             seconds,
             expected_seconds,
+            joins,
         })
     }
 }

@@ -668,7 +668,12 @@ impl WorkspaceStore {
         place_motion(&mut edit, &answer, &animations);
         place_music(&mut edit, &answer, &track_ids);
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
-        self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)
+        let result_id =
+            self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)?;
+        // Advisory: the cut stands for review whether or not the join check could run.
+        let _ =
+            self.review_preview_joins(database, workspace_id, run_id, attempt, result_id, provider);
+        Ok(result_id)
     }
 }
 

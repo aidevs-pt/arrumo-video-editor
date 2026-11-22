@@ -1249,7 +1249,15 @@
     "selectEveryAnimation": "Elige una decisión para cada animación",
     "motionNotePlaceholder": "¿Qué debería cambiar?",
     "decisionFor": "Decisión para {label}",
-    "wholeStepHint": "O decide sobre todo el paso. Esto sustituye las decisiones de cada animación."
+    "wholeStepHint": "O decide sobre todo el paso. Esto sustituye las decisiones de cada animación.",
+    "joinsTitle": "Uniones revisadas por {agent}",
+    "joinsTitleFallback": "Uniones revisadas",
+    "joinsProblems": "{count} de {total} necesitan un vistazo",
+    "joinsAllOk": "Todas las uniones se ven limpias",
+    "joinOk": "Se ve limpia",
+    "joinProblem": "Necesita un vistazo",
+    "joinsHint": "El agente miró los fotogramas y la forma de onda alrededor de cada unión del primer formato. Añade a tu revisión las notas con las que estés de acuerdo.",
+    "joinAdd": "Añadir a mis notas"
   },
   "markdownEditor": {
     "loading": "Cargando el editor de texto enriquecido…",

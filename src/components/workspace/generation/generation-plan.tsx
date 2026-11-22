@@ -3,7 +3,7 @@
 import { PlacedPluginActions } from "@/components/workspace/plugins/placed-actions";
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, CircleCheck, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { isScriptSections, ScriptSectionReview } from "./script-section-review";
 import { AgentProgress } from "./agent-progress";
@@ -377,7 +377,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
     key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && key !== "thumbnail_prompts"
       && !(stage === "assets" && key === "asset_plan" && isAssetPlan(result.result.asset_plan))
       && !(previews.length > 0 && isCutList(result.result.cuts) && (key === "cuts" || key === "cut_notes")) && (key !== "preview_videos" || previews.length === 0)
-    && key !== "render_checks"
+    && key !== "render_checks" && key !== "join_review"
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
@@ -563,6 +563,8 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         ))}</div>}
         {stage === "assets" && <AssetPlan plan={result.result.asset_plan} agent={agent} />}
         {previews.length > 0 && <CutList cuts={result.result.cuts} notes={result.result.cut_notes} agent={agent} />}
+        {previews.length > 0 && <JoinReview review={result.result.join_review} agent={agent} notes={draft.notes}
+          onAdd={reviewing || result.decision ? undefined : (line) => updateDraft({ ...draft, notes: [draft.notes.trim(), line].filter(Boolean).join("\n") })} />}
         {Object.keys(source).length > 0 && (
           <Collapsible defaultOpen={!markdown && !hasSupplemental && previews.length === 0}>
             <CollapsibleTrigger asChild>
@@ -698,6 +700,46 @@ function CutList({ cuts, notes, agent }: { cuts: unknown; notes: unknown; agent?
           );
         })}
       </ol>
+    </section>
+  );
+}
+
+type JoinVerdict = { at_seconds: number; ok: boolean; note: string };
+
+function isJoinReview(value: unknown): value is { summary: string; joins: JoinVerdict[] } {
+  return !!value && typeof value === "object" && Array.isArray((value as { joins?: unknown }).joins);
+}
+
+/** The agent's look at each join of the cut, from frames above the waveform. */
+function JoinReview({ review, agent, notes, onAdd }: { review: unknown; agent?: string; notes: string; onAdd?: (line: string) => void }) {
+  const { messages: { productionPlan: copy } } = useLocale();
+  if (!isJoinReview(review) || review.joins.length === 0) return null;
+  const problems = review.joins.filter((join) => !join.ok).length;
+  return (
+    <section aria-labelledby="join-review" className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 id="join-review" className="font-bold">{agent ? copy.joinsTitle.replace("{agent}", agent) : copy.joinsTitleFallback}</h3>
+        <p className="text-sm text-muted-foreground">
+          {problems ? copy.joinsProblems.replace("{count}", String(problems)).replace("{total}", String(review.joins.length)) : copy.joinsAllOk}
+        </p>
+      </div>
+      {review.summary && <p className="text-sm">{review.summary}</p>}
+      <ol className="flex flex-col divide-y rounded-lg border">
+        {review.joins.map((join) => (
+          <li key={join.at_seconds} className="grid grid-cols-[1.25rem_3.5rem_minmax(0,1fr)] items-start gap-x-3 px-3 py-2 text-sm">
+            {join.ok
+              ? <CircleCheck className="mt-0.5 size-4 text-muted-foreground" aria-label={copy.joinOk} />
+              : <TriangleAlert className="mt-0.5 size-4" aria-label={copy.joinProblem} />}
+            <span className="tabular-nums">{clock(join.at_seconds * 1000)}</span>
+            <span className={cn("min-w-0 wrap-anywhere", join.ok && "text-muted-foreground")}>
+              {join.note || copy.joinOk}
+              {!join.ok && join.note && onAdd && !notes.includes(join.note) && <Button type="button" variant="link" size="sm" className="ms-1 h-auto p-0"
+                onClick={() => onAdd(`${clock(join.at_seconds * 1000)}: ${join.note}`)}>{copy.joinAdd}</Button>}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-muted-foreground">{copy.joinsHint}</p>
     </section>
   );
 }

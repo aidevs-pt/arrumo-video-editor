@@ -58,6 +58,7 @@ mod audio_transform;
 mod caption_style;
 mod dubbing;
 mod editing_guides;
+mod join_review;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;

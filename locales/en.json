@@ -1249,7 +1249,15 @@
     "selectEveryAnimation": "Choose a decision for every animation",
     "motionNotePlaceholder": "What should change?",
     "decisionFor": "Decision for {label}",
-    "wholeStepHint": "Or decide on the whole step. This replaces the decisions on each animation."
+    "wholeStepHint": "Or decide on the whole step. This replaces the decisions on each animation.",
+    "joinsTitle": "Joins checked by {agent}",
+    "joinsTitleFallback": "Joins checked",
+    "joinsProblems": "{count} of {total} need a look",
+    "joinsAllOk": "Every join looks clean",
+    "joinOk": "Looks clean",
+    "joinProblem": "Needs a look",
+    "joinsHint": "The agent looked at frames and the waveform around each join of the first format. Add the notes you agree with to your review.",
+    "joinAdd": "Add to my notes"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",
