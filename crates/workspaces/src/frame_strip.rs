@@ -18,7 +18,7 @@ const MAX_SPAN: f64 = 120.0;
 
 /// Which video to look at.
 #[derive(Debug, Clone, Copy)]
-pub enum TimelineSource {
+pub enum FrameStripSource {
     Asset(i64),
     /// A run's final video for a format, or its preview from that attempt.
     Output {
@@ -30,7 +30,7 @@ pub enum TimelineSource {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TimelineView {
+pub struct FrameStrip {
     pub destination: String,
     /// The time of each frame, left to right, in seconds.
     pub frame_times: Vec<f64>,
@@ -64,13 +64,13 @@ fn probe(video: &Path) -> Result<(f64, bool, bool), Box<dyn Error>> {
 }
 
 /// Draws `frames` frames between `start` and `end` seconds above the waveform into a new PNG.
-pub fn render_timeline_view(
+pub fn render_frame_strip(
     video: &Path,
     start: f64,
     end: f64,
     frames: u32,
     destination: &Path,
-) -> Result<TimelineView, Box<dyn Error>> {
+) -> Result<FrameStrip, Box<dyn Error>> {
     if !destination.is_absolute()
         || destination
             .extension()
@@ -121,7 +121,7 @@ pub fn render_timeline_view(
         format!("{strip};[strip]null[out]")
     };
     let work = tempfile::tempdir()?;
-    let output: PathBuf = work.path().join("timeline.png");
+    let output: PathBuf = work.path().join("strip.png");
     let status = Command::new("ffmpeg")
         .args([
             "-nostdin",
@@ -148,7 +148,7 @@ pub fn render_timeline_view(
         .stderr(Stdio::null())
         .status()?;
     if !status.success() {
-        return Err(io::Error::other("Could not draw the timeline").into());
+        return Err(io::Error::other("Could not draw the frame strip").into());
     }
     let png = std::fs::read(&output)?;
     std::io::Write::write_all(
@@ -158,7 +158,7 @@ pub fn render_timeline_view(
             .open(destination)?,
         &png,
     )?;
-    Ok(TimelineView {
+    Ok(FrameStrip {
         destination: destination.to_string_lossy().into_owned(),
         frame_times,
         has_audio,
@@ -166,15 +166,15 @@ pub fn render_timeline_view(
 }
 
 impl WorkspaceStore {
-    /// The local file behind a timeline source, checked to belong to the workspace.
-    pub fn timeline_source_path(
+    /// The local file behind a frame strip source, checked to belong to the workspace.
+    pub fn frame_strip_source(
         &self,
         database: &Path,
         workspace_id: i64,
-        source: TimelineSource,
+        source: FrameStripSource,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let path = match source {
-            TimelineSource::Asset(asset_id) => {
+            FrameStripSource::Asset(asset_id) => {
                 let kind: String = self.0.query_row(
                     "SELECT kind FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2",
                     rusqlite::params![workspace_id, asset_id],
@@ -185,7 +185,7 @@ impl WorkspaceStore {
                 }
                 crate::asset_path(&crate::asset_root(database), workspace_id, asset_id)
             }
-            TimelineSource::Output {
+            FrameStripSource::Output {
                 run_id,
                 format_id,
                 preview_attempt,
@@ -246,16 +246,16 @@ mod tests {
             .unwrap();
         assert!(status.success());
         let destination = work.path().join("view.png");
-        let view = render_timeline_view(&video, 1.0, 3.0, 4, &destination).unwrap();
+        let view = render_frame_strip(&video, 1.0, 3.0, 4, &destination).unwrap();
         assert!(view.has_audio);
         assert_eq!(view.frame_times, vec![1.25, 1.75, 2.25, 2.75]);
         let png = std::fs::read(&destination).unwrap();
         let size = |at: usize| u32::from_be_bytes(png[at..at + 4].try_into().unwrap());
         assert_eq!((size(16), size(20)), (4 * TILE, TILE + WAVE_HEIGHT));
         assert!(
-            render_timeline_view(&video, 0.0, 1.0, 4, &destination).is_err(),
+            render_frame_strip(&video, 0.0, 1.0, 4, &destination).is_err(),
             "never overwrites"
         );
-        assert!(render_timeline_view(&video, 2.0, 1.0, 4, &work.path().join("bad.png")).is_err());
+        assert!(render_frame_strip(&video, 2.0, 1.0, 4, &work.path().join("bad.png")).is_err());
     }
 }

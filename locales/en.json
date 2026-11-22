@@ -1257,7 +1257,8 @@
     "joinOk": "Looks clean",
     "joinProblem": "Needs a look",
     "joinsHint": "The agent looked at frames and the waveform around each join of the first format. Add the notes you agree with to your review.",
-    "joinAdd": "Add to my notes"
+    "joinAdd": "Add to my notes",
+    "cutGrade": "Colour: brightness {brightness}, contrast {contrast}%, saturation {saturation}%, warmth {warmth}"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",

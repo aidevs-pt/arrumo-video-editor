@@ -663,11 +663,15 @@ function AssetPlan({ plan, agent }: { plan: unknown; agent?: string }) {
   );
 }
 
-type Cut = { asset_id: number; start_ms: number; end_ms: number };
+type Cut = { asset_id: number; start_ms: number; end_ms: number; grade?: { brightness: number; contrast: number; saturation: number; warmth: number } };
 
 function isCutList(value: unknown): value is Cut[] {
   return Array.isArray(value) && value.length > 0 && value.every((cut) =>
     cut && typeof cut.start_ms === "number" && typeof cut.end_ms === "number");
+}
+
+function signed(value: number) {
+  return value > 0 ? `+${value}` : String(value);
 }
 
 function clock(ms: number) {
@@ -695,7 +699,12 @@ function CutList({ cuts, notes, agent }: { cuts: unknown; notes: unknown; agent?
               <span className="font-bold tabular-nums text-muted-foreground">{index + 1}</span>
               <span className="truncate font-semibold" title={detail.clip}>{detail.clip ?? `#${cut.asset_id}`}</span>
               <span className="tabular-nums">{clock(cut.start_ms)}–{clock(cut.end_ms)}</span>
-              <span className="min-w-0 wrap-anywhere text-muted-foreground">{detail.purpose}</span>
+              <span className="min-w-0 wrap-anywhere text-muted-foreground">
+                {detail.purpose}
+                {cut.grade && <span className="block text-xs">{copy.cutGrade
+                  .replace("{brightness}", signed(cut.grade.brightness)).replace("{contrast}", String(cut.grade.contrast))
+                  .replace("{saturation}", String(cut.grade.saturation)).replace("{warmth}", signed(cut.grade.warmth))}</span>}
+              </span>
             </li>
           );
         })}

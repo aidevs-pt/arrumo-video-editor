@@ -211,7 +211,7 @@ struct ImportCompletedVideoVariant {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct TimelineInput {
+struct FrameStripInput {
     workspace_id: i64,
     asset_id: Option<i64>,
     run_id: Option<i64>,
@@ -420,7 +420,7 @@ pub(super) fn definitions() -> [Value; 32] {
                 "workspaceId": id, "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "assetId", "confirmedName"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
-        json!({"name": "render_timeline_view", "description": "Draw evenly spaced frames from a stretch of video above its sound's waveform into a new PNG at an absolute local path, to check a cut, join or overlay. Name a video asset with assetId, or a run's final video with runId and formatId (add previewAttempt for that attempt's preview). Returns each frame's time. Use it at decision points, not to scan a whole video.",
+        json!({"name": "render_frame_strip", "description": "Draw evenly spaced frames from a stretch of video above its sound's waveform into a new PNG at an absolute local path, to check a cut, join or overlay. Name a video asset with assetId, or a run's final video with runId and formatId (add previewAttempt for that attempt's preview). Returns each frame's time. Use it at decision points, not to scan a whole video.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "runId": id, "formatId": id, "previewAttempt": id,
                 "start": {"type": "number", "minimum": 0}, "end": {"type": "number", "exclusiveMinimum": 0, "description": "At most 120 seconds after start."},
@@ -518,22 +518,22 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
-        "render_timeline_view" => serde_json::from_value(Value::Object(arguments.clone()))
-            .map_err(|_| "Invalid timeline arguments")
-            .and_then(|args: TimelineInput| {
+        "render_frame_strip" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid frame strip arguments")
+            .and_then(|args: FrameStripInput| {
                 let source = match (args.asset_id, args.run_id, args.format_id) {
-                    (Some(asset), None, None) if args.preview_attempt.is_none() => crate::TimelineSource::Asset(asset),
-                    (None, Some(run_id), Some(format_id)) => crate::TimelineSource::Output {
+                    (Some(asset), None, None) if args.preview_attempt.is_none() => crate::FrameStripSource::Asset(asset),
+                    (None, Some(run_id), Some(format_id)) => crate::FrameStripSource::Output {
                         run_id, format_id, preview_attempt: args.preview_attempt,
                     },
                     _ => return Err("Name either assetId, or runId with formatId"),
                 };
                 let video = store
-                    .timeline_source_path(database, args.workspace_id, source)
+                    .frame_strip_source(database, args.workspace_id, source)
                     .map_err(|_| "That video was not found in the workspace")?;
-                crate::render_timeline_view(&video, args.start, args.end, args.frames, Path::new(&args.destination))
+                crate::render_frame_strip(&video, args.start, args.end, args.frames, Path::new(&args.destination))
                     .map(|view| json!(view))
-                    .map_err(|_| "Could not draw the timeline. Use 2 to 16 frames, a range of up to 120 seconds inside the video, and a new absolute .png path")
+                    .map_err(|_| "Could not draw the frame strip. Use 2 to 16 frames, a range of up to 120 seconds inside the video, and a new absolute .png path")
             }),
         "list_audio_transforms" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid audio transform arguments")

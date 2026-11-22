@@ -1555,15 +1555,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("null");
         }
         [database, command, workspace, asset, start, end, destination]
-            if command == "render-timeline-view" =>
+            if command == "render-frame-strip" =>
         {
             let database = Path::new(database);
-            let video = WorkspaceStore::open(database)?.timeline_source_path(
+            let video = WorkspaceStore::open(database)?.frame_strip_source(
                 database,
                 utf8(workspace)?.parse()?,
-                arrumo_workspaces::TimelineSource::Asset(utf8(asset)?.parse()?),
+                arrumo_workspaces::FrameStripSource::Asset(utf8(asset)?.parse()?),
             )?;
-            let view = arrumo_workspaces::render_timeline_view(
+            let view = arrumo_workspaces::render_frame_strip(
                 &video,
                 utf8(start)?.parse()?,
                 utf8(end)?.parse()?,
@@ -1724,7 +1724,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "generate-delivery-subtitles <workspace-id> <run-id> <format-id> | import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
-                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | preview-caption-style <style-json> <width> <height> <text> <destination-png> | list-editing-guides | editing-guide <id> | render-timeline-view <workspace-id> <video-asset-id> <start> <end> <destination-png> | ",
+                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | preview-caption-style <style-json> <width> <height> <text> <destination-png> | list-editing-guides | editing-guide <id> | render-frame-strip <workspace-id> <video-asset-id> <start> <end> <destination-png> | ",
                 "set-plugin-active <plugin-id> on|off | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"

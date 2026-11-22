@@ -1257,7 +1257,8 @@
     "joinOk": "Se ve limpia",
     "joinProblem": "Necesita un vistazo",
     "joinsHint": "El agente miró los fotogramas y la forma de onda alrededor de cada unión del primer formato. Añade a tu revisión las notas con las que estés de acuerdo.",
-    "joinAdd": "Añadir a mis notas"
+    "joinAdd": "Añadir a mis notas",
+    "cutGrade": "Color: brillo {brightness}, contraste {contrast} %, saturación {saturation} %, calidez {warmth}"
   },
   "markdownEditor": {
     "loading": "Cargando el editor de texto enriquecido…",

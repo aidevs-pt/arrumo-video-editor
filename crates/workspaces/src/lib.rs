@@ -58,6 +58,7 @@ mod audio_transform;
 mod caption_style;
 mod dubbing;
 mod editing_guides;
+mod frame_strip;
 mod join_review;
 mod plugin_catalog;
 mod plugin_credentials;
@@ -93,7 +94,6 @@ mod supplemental_delivery;
 mod supplemental_review;
 mod supplemental_writing;
 mod telemetry;
-mod timeline_view;
 mod transcription;
 mod video_drafts;
 mod video_generation;
@@ -136,6 +136,7 @@ pub use editing_guides::{EDITING_GUIDES, EditingGuide, editing_guide};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
+pub use frame_strip::{FrameStrip, FrameStripSource, render_frame_strip};
 pub use generation_notifications::{GenerationInbox, GenerationNotification, SystemNotice};
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{
@@ -188,7 +189,6 @@ pub use supplemental_review::{
     SupplementalRevisionRequest,
 };
 pub use telemetry::{PrivacySettings, install_crash_reporter};
-pub use timeline_view::{TimelineSource, TimelineView, render_timeline_view};
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;

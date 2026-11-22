@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 
 use crate::{
     AgentPlugin, WorkspaceStore, agent_run::MAX_IMAGES, delivery_directory,
-    preview_review::preview_files, render_timeline_view,
+    preview_review::preview_files, render_frame_strip,
 };
 
 const AGENT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
@@ -89,8 +89,8 @@ fn prompt(views: &[(f64, Vec<f64>)], cut_notes: &Value) -> String {
 }
 
 impl WorkspaceStore {
-    /// Reviews the joins of a rendered first cut and stores the verdicts with the stage result,
-    /// unless the creator has already decided on it. Returns whether a review was stored.
+    /// Reviews the joins of a rendered first cut that waits for the creator and stores the
+    /// verdicts with the stage result, unless the creator has already decided on it. Returns whether a review was stored.
     pub(crate) fn review_preview_joins(
         &self,
         database: &Path,
@@ -100,7 +100,14 @@ impl WorkspaceStore {
         result_id: i64,
         provider: &AgentPlugin,
     ) -> Result<bool, Box<dyn Error>> {
-        if !crate::agent_run::accepts_images(provider) {
+        // Only a cut that waits for a person is worth the extra agent call; autopilot moves on.
+        let awaiting: bool = self.0.query_row(
+            "SELECT EXISTS(SELECT 1 FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2 AND state = 'paused' AND pending_review_id = ?3)",
+            rusqlite::params![workspace_id, run_id, result_id],
+            |row| row.get(0),
+        )?;
+        if !awaiting || !crate::agent_run::accepts_images(provider) {
             return Ok(false);
         }
         let result: Value = serde_json::from_str(&self.0.query_row(
@@ -126,7 +133,7 @@ impl WorkspaceStore {
         for (index, &at) in joins.iter().enumerate() {
             let image = work.path().join(format!("join-{}.png", index + 1));
             let view =
-                render_timeline_view(&video, (at - WINDOW).max(0.0), at + WINDOW, FRAMES, &image)?;
+                render_frame_strip(&video, (at - WINDOW).max(0.0), at + WINDOW, FRAMES, &image)?;
             views.push((at, view.frame_times));
             images.push(image);
         }
