@@ -1445,5 +1445,9 @@
     "close": "Close the tour",
     "replay": "Take the plugin tour",
     "plugins": "Plugins, {current} of {total}"
+  },
+  "runHooks": {
+    "title": "When this video finishes",
+    "description": "Plugin actions switched on for this workspace run on their own. Turn one off to skip it for this video only."
   }
 }

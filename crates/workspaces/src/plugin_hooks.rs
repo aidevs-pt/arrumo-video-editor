@@ -18,8 +18,23 @@ impl WorkspaceStore {
         let Ok(actions) = self.plugin_actions() else {
             return 0;
         };
+        let skipped: Vec<String> = self
+            .0
+            .query_row(
+                "SELECT json_extract(snapshot_json, '$.options.skip_hooks') FROM generation_runs
+                 WHERE workspace_id = ?1 AND id = ?2",
+                [workspace_id, run_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .ok()
+            .flatten()
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .unwrap_or_default();
         let mut queued = 0;
         for entry in actions {
+            if skipped.contains(&format!("{}/{}", entry.plugin_id, entry.action.id)) {
+                continue;
+            }
             if !entry.action.hooks.iter().any(|hook| {
                 hook.event == HookEvent::VideoCompleted
                     && self.hook_switched_on(&entry.plugin_id, workspace_id, &hook.enabled_by)
@@ -201,6 +216,47 @@ mod tests {
         assert_eq!(input["video"]["title"], "Launch");
         assert_eq!(input["video"]["outputs"][0]["format"], "Landscape");
         assert_eq!(input["video"]["outputs"][0]["durationSeconds"], 12.5);
+
+        let skipping = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "skipping",
+                &crate::RunOptions {
+                    skip_hooks: vec!["fixture-hooks/upload".into()],
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .id;
+        store
+            .0
+            .execute_batch(&format!(
+                "UPDATE generation_runs SET state = 'completed', stage_index = 1,
+                 plan_json = (SELECT plan_json FROM generation_runs WHERE id = {run})
+             WHERE id = {skipping};
+             INSERT INTO production_results (run_id, stage_index, attempt, result_json)
+             VALUES ({skipping}, 0, 1, '{delivery}');"
+            ))
+            .unwrap();
+        assert_eq!(
+            store.queue_video_completed_hooks(workspace, skipping),
+            0,
+            "this video skips the hook"
+        );
+        assert!(
+            store
+                .enqueue_video_draft(
+                    workspace,
+                    draft.id,
+                    "bad",
+                    &crate::RunOptions {
+                        skip_hooks: vec!["no slash".into()],
+                        ..Default::default()
+                    }
+                )
+                .is_err()
+        );
     }
 
     #[test]

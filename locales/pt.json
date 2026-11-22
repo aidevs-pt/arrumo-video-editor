@@ -1445,5 +1445,9 @@
     "close": "Fechar a visita",
     "replay": "Ver a visita aos plugins",
     "plugins": "Plugins, {current} de {total}"
+  },
+  "runHooks": {
+    "title": "Quando este vídeo terminar",
+    "description": "As ações de plugins ativadas neste espaço de trabalho são executadas automaticamente. Desative uma para a ignorar apenas neste vídeo."
   }
 }

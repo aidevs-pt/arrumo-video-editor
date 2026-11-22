@@ -25,6 +25,9 @@ pub struct RunOptions {
     /// Supplemental settings this video changes for a format, keyed by format ID.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub format_overrides: BTreeMap<String, FormatOverride>,
+    /// Plugin hooks this video does not run, as `plugin-id/action-id`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skip_hooks: Vec<String>,
 }
 
 /// What one video changes about a format's supplemental outputs. Unset fields keep the
@@ -153,6 +156,7 @@ impl Default for RunOptions {
             provider_overrides: BTreeMap::new(),
             formats: None,
             format_overrides: BTreeMap::new(),
+            skip_hooks: Vec::new(),
         }
     }
 }
@@ -218,6 +222,16 @@ impl WorkspaceStore {
         options: &RunOptions,
     ) -> rusqlite::Result<GenerationRun> {
         let key = generation_request_key(request_key)?;
+        if options.skip_hooks.len() > 64
+            || !options.skip_hooks.iter().all(|hook| {
+                hook.split_once('/').is_some_and(|(plugin, action)| {
+                    crate::plugin_catalog::identifier(plugin)
+                        && crate::plugin_catalog::identifier(action)
+                })
+            })
+        {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let options = json!(options);
         let run = if let Some((run, replay)) = self.generation_request(workspace_id, key)? {

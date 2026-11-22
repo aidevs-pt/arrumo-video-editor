@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GenerationRunRow, runNeedsReview, runTitle, type Run } from "./generation-run-row";
 
+import { RunHooks } from "./run-hooks";
 import { RunProviders } from "./run-providers";
 import { VideoCatalogHeader } from "../videos/video-catalog-header";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
@@ -72,6 +73,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
       save_motion_to_library: fields.has("save-motion"),
       platform: String(fields.get("platform") ?? "").trim() || null,
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
+      skip_hooks: JSON.parse(String(fields.get("skip-hooks") ?? "[]")) as string[],
     };
     const payload = JSON.stringify({ draftId: selected.id, options });
     if (request.current?.payload !== payload) {
@@ -158,6 +160,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
                         <FieldDescription id="run-save-motion-description">{copy.saveMotionHint}</FieldDescription>
                       </div>
                     </Field>
+                    <RunHooks workspaceId={workspaceId} disabled={pending} />
                     <RunProviders workspaceId={workspaceId} disabled={pending} />
                     {submitError && <Alert variant="destructive"><AlertDescription>{copy.submitError}</AlertDescription></Alert>}
                     <Button className="self-start" type="submit" disabled={pending}>

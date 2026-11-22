@@ -1445,5 +1445,9 @@
     "close": "Cerrar el recorrido",
     "replay": "Ver el recorrido de complementos",
     "plugins": "Complementos, {current} de {total}"
+  },
+  "runHooks": {
+    "title": "Al terminar este vídeo",
+    "description": "Las acciones de complementos activadas en este espacio de trabajo se ejecutan solas. Desactiva una para omitirla solo en este vídeo."
   }
 }

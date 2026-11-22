@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { TagInput } from "@/components/ui/tag-input";
 import { outputOptions, VideoOutputs, type OutputChoice, type OutputPlan } from "./video-outputs";
 import { MarkdownEditor } from "@/components/markdown/editor";
+import { RunHooks } from "@/components/workspace/generation/run-hooks";
 import { RunProviders } from "@/components/workspace/generation/run-providers";
 import { profileHref, workspaceHref } from "@/components/workspace/home/workspace-links";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
@@ -123,6 +124,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
       save_motion_to_library: fields.has("save-motion"),
       platform: String(fields.get("platform") ?? "").trim() || null,
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
+      skip_hooks: JSON.parse(String(fields.get("skip-hooks") ?? "[]")) as string[],
       ...outputOptions(outputChoice, plan ?? []),
     };
     const payload = JSON.stringify({ draftId: saved.id, draft, options });
@@ -215,6 +217,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
                     <FieldDescription id="run-save-motion-description">{messages.queue.saveMotionHint}</FieldDescription>
                   </div>
                 </Field>
+                <RunHooks workspaceId={workspaceId} disabled={pending !== null} />
                 <RunProviders workspaceId={workspaceId} disabled={pending !== null} />
               </CollapsibleContent>
             </Collapsible>
