@@ -135,7 +135,10 @@ export function ProfileVideos({ workspaceId, profile }: { workspaceId: number; p
               return (
                 <li key={format.id} className="flex items-center gap-3 py-3">
                   <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate">{format.name} <span className="text-muted-foreground tabular-nums">{format.width}×{format.height}</span></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{format.name}</span>
+                    <span className="block text-sm text-muted-foreground tabular-nums">{format.width}×{format.height}</span>
+                  </span>
                   <LayerGauge layer={overridden ? "profile" : "workspace"} />
                 </li>
               );
