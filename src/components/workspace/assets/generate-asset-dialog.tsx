@@ -27,6 +27,7 @@ type LibraryAsset = { id: number; name: string; kind: Kind };
 type BestFor = { en: string; es?: string; pt?: string };
 type VideoVariant = { images: [number, number]; videos: [number, number]; minSeconds: number; maxSeconds: number; allowedSeconds: number[]; aspectRatios: string[] };
 type VideoModel = { provider: string; id: string; label: string; bestFor?: BestFor; selected: boolean; variants: VideoVariant[] };
+type SpeechModel = { provider: string; id: string; label: string; bestFor: BestFor; selected: boolean; maxTextCharacters: number };
 type ImageModel = { provider: string; id: string; label: string; bestFor: BestFor; selected: boolean; references: number; aspectRatios: string[] };
 
 const MAX_IMAGE_REFERENCES = 9;
@@ -95,6 +96,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const [references, setReferences] = useState<number[]>([]);
   const [models, setModels] = useState<VideoModel[]>([]);
   const [imageModels, setImageModels] = useState<ImageModel[]>([]);
+  const [speechModels, setSpeechModels] = useState<SpeechModel[]>([]);
   const [model, setModel] = useState("");
 
   useEffect(() => {
@@ -107,6 +109,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
     invoke<LibraryAsset[]>("list_assets", { workspaceId }).then(setLibrary, () => setLibrary([]));
     if (!imagesOnly) invoke<VideoModel[]>("list_video_models", { workspaceId }).then(setModels, () => setModels([]));
     invoke<ImageModel[]>("list_image_models", { workspaceId }).then(setImageModels, () => setImageModels([]));
+    if (!imagesOnly) invoke<SpeechModel[]>("list_speech_models", { workspaceId }).then(setSpeechModels, () => setSpeechModels([]));
   }, [imagesOnly, open, workspaceId]);
 
   const name = (entry: Provider) => pluginText.name(entry.id, entry.name);
@@ -129,8 +132,11 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const wrongRatio = kind === "video" && !unfit && !!variant?.aspectRatios.length && !variant.aspectRatios.includes(ratio);
   const imageProviderModels = imageModels.filter((entry) => entry.provider === videoProvider);
   const activeImageModel = imageProviderModels.find((entry) => entry.id === model) ?? imageProviderModels.find((entry) => entry.selected);
-  const pickable = kind === "video" ? providerModels : kind === "image" ? imageProviderModels : [];
-  const shown = kind === "video" ? activeModel : kind === "image" ? activeImageModel : undefined;
+  const speechProviderModels = speechModels.filter((entry) => entry.provider === videoProvider);
+  const activeSpeechModel = speechProviderModels.find((entry) => entry.id === model) ?? speechProviderModels.find((entry) => entry.selected);
+  const pickable = kind === "video" ? providerModels : kind === "image" ? imageProviderModels : kind === "audio" ? speechProviderModels : [];
+  const shown = kind === "video" ? activeModel : kind === "image" ? activeImageModel : kind === "audio" ? activeSpeechModel : undefined;
+  const speechLimit = Math.min(5000, activeSpeechModel?.maxTextCharacters ?? 5000);
   const prettify = (id: string) => id.replace(/-/g, " ").replace(/\b([a-z])/g, (letter) => letter.toUpperCase()).replace(/ Std$/, " Standard");
   const modelName = (id: string) => pickable.find((entry) => entry.id === id)?.label || prettify(id);
   const bestFor = (text?: BestFor) => text && (text[locale as keyof BestFor] ?? text.en);
@@ -168,7 +174,8 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
         })]);
       } else {
         onCreated([await invoke<number>("generate_library_speech", {
-          workspaceId, text: prompt.trim(), notes: notes.trim(), provider: provider || null,
+          workspaceId, text: prompt.trim(), notes: notes.trim(),
+          provider: provider || (model ? videoProvider : null), model: model || null,
         })]);
       }
       setOpen(false);
@@ -207,7 +214,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
             <FieldLabel htmlFor="generate-prompt">{kind === "audio" ? copy.speechText : copy.prompt}</FieldLabel>
             <Textarea id="generate-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending}
               placeholder={kind === "image" ? copy.promptPlaceholder : kind === "video" ? copy.videoPlaceholder : kind === "music" ? copy.musicPlaceholder : kind === "sound" ? copy.soundPlaceholder : copy.speechPlaceholder}
-              maxLength={kind === "image" ? 4000 : kind === "video" ? 2500 : kind === "music" ? 2000 : kind === "sound" ? 1000 : 5000} className="min-h-24" required />
+              maxLength={kind === "image" ? 4000 : kind === "video" ? 2500 : kind === "music" ? 2000 : kind === "sound" ? 1000 : speechLimit} className="min-h-24" required />
           </Field>
           <div className={kind === "audio" ? "grid gap-4" : made ? "grid gap-4 sm:grid-cols-[1fr_8rem]" : "grid gap-4 sm:grid-cols-[1fr_1fr_6rem]"}>
             <Field data-disabled={pending}>
