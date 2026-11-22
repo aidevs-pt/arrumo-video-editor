@@ -1,5 +1,6 @@
 "use client";
 
+import { ColorPicker } from "@/components/workspace/color-picker";
 import { invoke } from "@tauri-apps/api/core";
 import { Palette, Pencil, Upload } from "lucide-react";
 import Link from "next/link";
@@ -28,7 +29,6 @@ export type Profile = { id: number; name: string; guidance: string; color: strin
 
 const tabIds = ["videos", "context", "brand", "assets", "outputs", "animations", "calendar"] as const;
 type ProfileTab = (typeof tabIds)[number];
-const swatches = ["#E86AA8", "#4BA3F2", "#3DBB6B", "#E55D4D", "#C68820", "#138778", "#6974D6", "#AB5980"];
 
 export function ProfileRoute() {
   const { workspace, navigate } = useWorkspaceCatalog();
@@ -188,7 +188,6 @@ function ProfileColor({ workspaceId, profile, onUpdate }: {
 }) {
   const { messages: { profileHub: copy } } = useLocale();
   const [failed, setFailed] = useState(false);
-  const [custom, setCustom] = useState(profile.color ?? "#2337B4");
 
   async function choose(color: string | null) {
     setFailed(false);
@@ -212,24 +211,8 @@ function ProfileColor({ workspaceId, profile, onUpdate }: {
       <PopoverContent align="end" className="w-72">
         <p className="font-semibold">{copy.colorTitle}</p>
         <p className="mb-3 text-sm text-muted-foreground">{copy.colorHint}</p>
-        <div role="radiogroup" aria-label={copy.colorTitle} className="grid grid-cols-8 gap-1.5">
-          {swatches.map((swatch) => {
-            const selected = profile.color?.toUpperCase() === swatch;
-            return <button key={swatch} type="button" role="radio" aria-checked={selected} aria-label={swatch}
-              onClick={() => void choose(swatch)}
-              className={cn("aspect-square rounded-[4px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-attention",
-                selected && "outline-2 outline-foreground")} style={{ backgroundColor: swatch }} />;
-          })}
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <label className="flex flex-1 items-center gap-2 text-sm">
-            <input type="color" value={custom} className="size-8 cursor-pointer rounded-[4px] border bg-transparent"
-              onChange={(event) => setCustom(event.target.value)}
-              onBlur={() => { if (custom.toUpperCase() !== profile.color?.toUpperCase()) void choose(custom.toUpperCase()); }} />
-            {copy.customColor}
-          </label>
-          <Button size="sm" variant="ghost" onClick={() => void choose(null)} disabled={!profile.color}>{copy.noColor}</Button>
-        </div>
+        <ColorPicker value={profile.color ?? null} onChange={(color) => void choose(color)}
+          label={copy.colorTitle} customLabel={copy.customColor} noneLabel={copy.noColor} />
         {failed && <p role="alert" className="mt-2 text-sm text-destructive">{copy.saveError}</p>}
       </PopoverContent>
     </Popover>

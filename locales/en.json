@@ -620,8 +620,7 @@
     "form": "New profile",
     "name": "Profile name",
     "guidance": "Editing guidance (optional)",
-    "color": "Color (optional)",
-    "colorHint": "Use a hex color such as #532A9D.",
+    "color": "Color",
     "submit": "Create profile",
     "edit": "Edit",
     "editTitle": "Edit profile",
@@ -629,7 +628,8 @@
     "cancel": "Cancel",
     "updateError": "Changes couldn’t be saved. Try again.",
     "saving": "Creating…",
-    "newProfile": "New profile"
+    "newProfile": "New profile",
+    "noGuidance": "No guidance yet."
   },
   "profileFormats": {
     "missingProfile": "This profile is unavailable in the selected workspace.",
@@ -1119,7 +1119,8 @@
     "portraitCutsFrom": "{count} cuts · from {profile}",
     "portraitCutFrom": "1 cut · from {profile}",
     "portraitCutsCount": "{count} cuts",
-    "portraitCutOne": "1 cut"
+    "portraitCutOne": "1 cut",
+    "openProfile": "Open profile"
   },
   "batch": {
     "intro": "One video can come from several takes. Select the clips that belong together and group them.",

@@ -1,6 +1,8 @@
 "use client";
 
-import { ChevronRight, Layers, Plus, Settings2 } from "lucide-react";
+import { ArrowUpRight, Clapperboard, Layers, Pencil, Plus, Settings2 } from "lucide-react";
+import { ColorPicker, randomSwatch } from "@/components/workspace/color-picker";
+import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
@@ -21,8 +23,7 @@ import { profileHref } from "../home/workspace-links";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
 type Draft = { name: string; guidance: string; color: string };
-const emptyDraft: Draft = { name: "", guidance: "", color: "" };
-const profileColors = ["#E55D4D", "#C68820", "#138778", "#6974D6", "#AB5980"];
+const emptyDraft = (): Draft => ({ name: "", guidance: "", color: randomSwatch() });
 
 export function WorkspaceProfiles({
   workspace,
@@ -37,7 +38,7 @@ export function WorkspaceProfiles({
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const nameInput = useRef<HTMLInputElement>(null);
-  const editButton = useRef<HTMLButtonElement>(null);
+  const editButton = useRef<HTMLElement | null>(null);
   const [formOpen, setFormOpen] = useState(useSearchParams().get("new") === "1");
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editing, setEditing] = useState<{ id: number; draft: Draft } | null>(null);
@@ -95,7 +96,7 @@ export function WorkspaceProfiles({
         setEditing(null);
       } else {
         setProfiles((current) => [...current, profile]);
-        setNewDraft(emptyDraft);
+        setNewDraft(emptyDraft());
       }
       setFormOpen(false);
       window.dispatchEvent(new Event("arrumo:profiles-changed"));
@@ -108,8 +109,8 @@ export function WorkspaceProfiles({
 
   return (
     <WorkspaceShell>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <WorkspaceHeading>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <WorkspaceHeading className="mb-0 flex-1">
           <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
           <p>{copy.emptyHint}</p>
         </WorkspaceHeading>
@@ -134,53 +135,63 @@ export function WorkspaceProfiles({
           </Alert>
         )}
         {status === "ready" && (profiles.length ? (
-          <ul className="divide-y border-y" aria-live="polite">
-            {profiles.map((profile) => (
-              <li key={profile.id} className="px-1 py-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-                  <Link href={profileHref(workspace.id, profile.id)}
-                    className="group inline-flex min-w-0 items-center gap-2.5 rounded-sm font-semibold hover:text-primary">
-                    <span className="size-3 shrink-0 rounded-[2px] bg-muted outline-1 outline-border"
-                      style={profile.color ? { backgroundColor: profile.color } : undefined} aria-hidden="true" />
-                    <span className="wrap-anywhere">{profile.name}</span>
-                    <ChevronRight className="size-3.5 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
-                  </Link>
-                  <div className="flex flex-wrap items-baseline gap-2.5">
-                    <Button type="button" size="sm" variant="outline" disabled={saving || editing !== null}
-                      aria-label={`${copy.drafts} · ${profile.name}`} onClick={() => onDrafts(profile.id)}>
-                      {copy.drafts}
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-live="polite">
+            {profiles.map((profile) => {
+              const edit = (target?: HTMLElement) => {
+                editButton.current = target ?? null;
+                setSaveError(false);
+                setFormOpen(true);
+                setEditing({ id: profile.id, draft: { name: profile.name, guidance: profile.guidance, color: profile.color ?? "" } });
+              };
+              const busy = saving || editing !== null;
+              return <ItemContextMenu key={profile.id} label={profile.name} items={[
+                { label: messages.profileHub.openProfile, icon: ArrowUpRight, href: profileHref(workspace.id, profile.id) },
+                { label: copy.drafts, icon: Clapperboard, onSelect: () => onDrafts(profile.id) },
+                { label: copy.formats, icon: Settings2, href: `${profileHref(workspace.id, profile.id)}&tab=outputs` },
+                { label: copy.edit, icon: Pencil, onSelect: () => edit(), group: true, disabled: busy },
+              ]}>
+                <li className="group/card relative flex min-h-44 flex-col rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 motion-reduce:transition-none">
+                  <span aria-hidden="true" className="mb-4 h-1.5 w-14 rounded-[2px] bg-muted"
+                    style={profile.color ? { backgroundColor: profile.color } : undefined} />
+                  <h2 className="text-[1.375rem] leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_125]">
+                    <Link href={profileHref(workspace.id, profile.id)}
+                      className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring">
+                      {profile.name}
+                    </Link>
+                  </h2>
+                  <p className={cn("mt-1.5 line-clamp-2 text-sm", profile.guidance ? "text-muted-foreground" : "text-muted-foreground/70 italic")}>
+                    {profile.guidance.trim() || copy.noGuidance}
+                  </p>
+                  <div className="relative z-[1] mt-auto flex items-center gap-2 pt-5">
+                    <Button type="button" size="sm" disabled={busy} onClick={() => onDrafts(profile.id)}
+                      aria-label={`${copy.drafts} · ${profile.name}`}>
+                      <Clapperboard data-icon="inline-start" />{copy.drafts}
                     </Button>
-                    {saving || editing !== null ? (
-                      <Button type="button" size="sm" variant="outline" disabled>{copy.formats}</Button>
-                    ) : (
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={`${profileHref(workspace.id, profile.id)}&tab=outputs`}
-                          aria-label={`${copy.formats} · ${profile.name}`}><Settings2 data-icon="inline-start" />{copy.formats}</Link>
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      aria-label={`${copy.edit} ${profile.name}`}
-                      disabled={saving || editing !== null}
-                      onClick={(event) => {
-                        editButton.current = event.currentTarget;
-                        setSaveError(false);
-                        setFormOpen(true);
-                        setEditing({
-                          id: profile.id,
-                          draft: { name: profile.name, guidance: profile.guidance, color: profile.color ?? "" },
-                        });
-                      }}
-                    >
-                      {copy.edit}
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`${profileHref(workspace.id, profile.id)}&tab=outputs`} aria-label={`${copy.formats} · ${profile.name}`}>
+                        <Settings2 data-icon="inline-start" />{copy.formats}
+                      </Link>
+                    </Button>
+                    <Button type="button" size="icon-sm" variant="ghost" className="ms-auto" disabled={busy}
+                      aria-label={`${copy.edit} ${profile.name}`} onClick={(event) => edit(event.currentTarget)}>
+                      <Pencil />
                     </Button>
                   </div>
-                </div>
-                {profile.guidance && <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-muted-foreground">{profile.guidance}</p>}
-              </li>
-            ))}
+                </li>
+              </ItemContextMenu>;
+            })}
+            <li>
+              <button type="button" disabled={disabled} onClick={(event) => {
+                editButton.current = event.currentTarget;
+                setEditing(null);
+                setSaveError(false);
+                setFormOpen(true);
+              }} className="flex size-full min-h-44 flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-5 text-center text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 motion-reduce:transition-none">
+                <Plus className="size-5" aria-hidden="true" />
+                <span className="font-semibold">{copy.form}</span>
+                <span className="max-w-56 text-sm">{copy.emptyHint}</span>
+              </button>
+            </li>
           </ul>
         ) : (
           <Empty className="min-h-44 border border-dashed">
@@ -221,16 +232,9 @@ export function WorkspaceProfiles({
                 <Textarea id="profile-guidance" value={guidance} onChange={(event) => setField("guidance", event.target.value)} disabled={disabled} />
               </Field>
               <Field data-disabled={disabled}>
-                <FieldLabel htmlFor="profile-color">{copy.color}</FieldLabel>
-                <div className="flex gap-2" role="group" aria-label={copy.color}>
-                  {profileColors.map((value) => <Button key={value} type="button" size="icon-sm" variant="outline"
-                    aria-label={value} aria-pressed={color.toUpperCase() === value}
-                    disabled={disabled} style={{ backgroundColor: value }} onClick={() => setField("color", value)}
-                    className={cn("rounded-sm hover:outline-1 hover:outline-foreground", color.toUpperCase() === value && "outline-2 outline-offset-2 outline-foreground")} />)}
-                </div>
-                <Input id="profile-color" value={color} onChange={(event) => setField("color", event.target.value)} disabled={disabled}
-                  pattern="#[0-9A-Fa-f]{6}" aria-describedby="profile-color-hint" />
-                <FieldDescription id="profile-color-hint">{copy.colorHint}</FieldDescription>
+                <FieldLabel>{copy.color}</FieldLabel>
+                <ColorPicker value={color || null} onChange={(value) => setField("color", value ?? "")} disabled={disabled}
+                  label={copy.color} customLabel={messages.profileHub.customColor} noneLabel={messages.profileHub.noColor} />
               </Field>
               {saveError && <Alert variant="destructive" role="alert"><AlertDescription>{editing ? copy.updateError : copy.createError}</AlertDescription></Alert>}
               <DialogFooter>

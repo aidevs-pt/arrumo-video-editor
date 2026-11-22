@@ -620,8 +620,7 @@
     "form": "Nuevo perfil",
     "name": "Nombre del perfil",
     "guidance": "Indicaciones de edición (opcional)",
-    "color": "Color (opcional)",
-    "colorHint": "Usa un color hexadecimal, como #532A9D.",
+    "color": "Color",
     "submit": "Crear perfil",
     "edit": "Editar",
     "editTitle": "Editar perfil",
@@ -629,7 +628,8 @@
     "cancel": "Cancelar",
     "updateError": "No se pudieron guardar los cambios. Inténtalo de nuevo.",
     "saving": "Creando…",
-    "newProfile": "Nuevo perfil"
+    "newProfile": "Nuevo perfil",
+    "noGuidance": "Sin indicaciones todavía."
   },
   "profileFormats": {
     "missingProfile": "Este perfil no está disponible en el espacio de trabajo seleccionado.",
@@ -1119,7 +1119,8 @@
     "portraitCutsFrom": "{count} cortes · de {profile}",
     "portraitCutFrom": "1 corte · de {profile}",
     "portraitCutsCount": "{count} cortes",
-    "portraitCutOne": "1 corte"
+    "portraitCutOne": "1 corte",
+    "openProfile": "Abrir perfil"
   },
   "batch": {
     "intro": "Un vídeo puede salir de varias tomas. Selecciona los clips que van juntos y agrúpalos.",
