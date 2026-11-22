@@ -1174,7 +1174,11 @@
     "stillNeeds": "{count} still need one.",
     "stillNeedsOne": "1 still needs one.",
     "approveRest": "Approve the rest",
-    "saveToLibrary": "Save to the library when approved"
+    "saveToLibrary": "Save to the library when approved",
+    "motionDecisions": "Animation decisions:",
+    "selectEveryAnimation": "Choose a decision for every animation",
+    "motionNotePlaceholder": "What should change?",
+    "decisionFor": "Decision for {label}"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",

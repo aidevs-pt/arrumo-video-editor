@@ -1174,7 +1174,11 @@
     "stillNeeds": "Faltam {count}.",
     "stillNeedsOne": "Falta 1.",
     "approveRest": "Aprovar o resto",
-    "saveToLibrary": "Guardar na biblioteca ao aprovar"
+    "saveToLibrary": "Guardar na biblioteca ao aprovar",
+    "motionDecisions": "Decisões sobre as animações:",
+    "selectEveryAnimation": "Escolhe uma decisão para cada animação",
+    "motionNotePlaceholder": "O que deve mudar?",
+    "decisionFor": "Decisão para {label}"
   },
   "markdownEditor": {
     "loading": "A carregar o editor de texto formatado…",

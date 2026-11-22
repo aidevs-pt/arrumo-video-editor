@@ -41,7 +41,7 @@ type Decision = "approved" | "revise" | "rejected";
 type PreviewChoice = { format_id: number; decision: Decision; note?: string };
 type SupplementalChoices<T = Decision> = { text: T[]; media: T[] };
 type SupplementalReview = SupplementalChoices & { item_notes?: SupplementalChoices<string | null> };
-type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[]; supplemental?: SupplementalChoices<Decision | "">; itemNotes?: SupplementalChoices<string> };
+type ReviewDraft = { decision: Decision | ""; notes: string; motionIndexes?: number[]; motion?: Record<number, Decision>; motionNotes?: Record<number, string>; supplemental?: SupplementalChoices<Decision | "">; itemNotes?: SupplementalChoices<string> };
 
 const ScriptReviewText = dynamic(() => import("./script-review-text"), { ssr: false });
 
@@ -324,6 +324,10 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
           supplemental: hasItemReview ? itemChoices(saved.supplemental) : undefined,
           itemNotes: hasItemReview ? itemNotes(saved.itemNotes) : undefined,
           decision: isDecision(saved.decision) ? saved.decision : "",
+          motion: saved.motion && typeof saved.motion === "object"
+            ? Object.fromEntries(Object.entries(saved.motion).filter(([, value]) => isDecision(value))) as Record<number, Decision> : undefined,
+          motionNotes: saved.motionNotes && typeof saved.motionNotes === "object"
+            ? Object.fromEntries(Object.entries(saved.motionNotes).filter(([, value]) => typeof value === "string")) as Record<number, string> : undefined,
           motionIndexes: Array.isArray(saved.motionIndexes)
             ? motionItems.map(({ index }) => index).filter((index) => saved.motionIndexes.includes(index))
             : undefined,
@@ -350,8 +354,16 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const textDecisions = itemDraft?.text.filter(isDecision) ?? [];
   const mediaDecisions = itemDraft?.media.filter(isDecision) ?? [];
   const staged = textDecisions.length + mediaDecisions.length;
-  const undecided = hasItemReview ? textCount + mediaCount - staged : 0;
+  const motionReview = !hasItemReview && motionItems.length > 0;
+  const motionStaged = motionItems.filter(({ index }) => draft.motion?.[index]).length;
+  const itemMode = hasItemReview || motionReview;
+  const stagedCount = motionReview ? motionStaged : staged;
+  const undecided = hasItemReview ? textCount + mediaCount - staged : motionReview ? motionItems.length - motionStaged : 0;
   function approveRest() {
+    if (motionReview) {
+      updateDraft({ ...draft, motion: Object.fromEntries(motionItems.map(({ index }) => [index, draft.motion?.[index] ?? "approved"])) });
+      return;
+    }
     setDraft((current) => current.supplemental ? {
       ...current,
       supplemental: {
@@ -360,7 +372,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
       },
     } : current);
   }
-  const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
+  const canSend = hasItemReview ? staged === textCount + mediaCount : motionReview ? motionStaged === motionItems.length : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
     key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && key !== "thumbnail_prompts"
       && !(stage === "assets" && key === "asset_plan" && isAssetPlan(result.result.asset_plan))
@@ -376,8 +388,21 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend || reviewing) return;
-    if (await onReview(result.id, draft.decision, draft.notes,
-      draft.decision === "approved" && motionItems.length ? selectedMotion : undefined,
+    let decision = draft.decision;
+    let notes = draft.notes;
+    if (motionReview) {
+      const labels = { approved: copy.item_approved, revise: copy.item_revise, rejected: copy.item_rejected };
+      const lines = motionItems.map(({ index, title }) => {
+        const note = draft.motionNotes?.[index]?.trim();
+        return `- ${title}: ${labels[draft.motion![index]]}${note ? `. ${note}` : ""}`;
+      });
+      decision = motionItems.every(({ index }) => draft.motion?.[index] === "approved") ? "approved" : "revise";
+      notes = [decision === "revise" || draft.motionNotes && Object.values(draft.motionNotes).some((note) => note.trim())
+        ? `${copy.motionDecisions}\n${lines.join("\n")}` : "", draft.notes.trim()].filter(Boolean).join("\n\n");
+    }
+    if (!decision) return;
+    if (await onReview(result.id, decision, notes,
+      decision === "approved" && motionItems.length ? selectedMotion : undefined,
       hasSupplemental ? {
         text: textDecisions, media: mediaDecisions,
         item_notes: hasItemNotes && draft.itemNotes ? {
@@ -481,7 +506,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         {motionItems.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {motionItems.map(({ index, title, usage, kind, thumbnail }) => (
-              <li key={index} className="min-w-0 overflow-hidden rounded-lg border">
+              <li key={index} className={cn("min-w-0 overflow-hidden rounded-lg border", draft.motion?.[index] && "border-line-strong")}>
                 {thumbnail !== null
                   ? <AssetThumbnail workspaceId={workspaceId} assetId={thumbnail} kind="image" className="w-full rounded-none bg-ink/90" />
                   : <div className="flex aspect-video items-center justify-center bg-secondary">
@@ -493,7 +518,8 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
                     <span className="rounded-md border px-2 py-0.5 text-foreground">{motionLibrary[kind]}</span>
                     {usage && <span className="wrap-anywhere">{usage}</span>}
                   </span>
-                  <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                  <MotionPreviewDialog workspaceId={workspaceId} runId={runId} resultId={result.id} index={index} title={title} />
+                  <div className="flex w-full flex-wrap items-center justify-between gap-2 border-t pt-2">
                     <label className="flex items-center gap-2 text-sm">
                       <Checkbox checked={selectedMotion.includes(index)} disabled={reviewing} onCheckedChange={(checked) => {
                         updateDraft({ ...draft, motionIndexes: checked
@@ -502,8 +528,25 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
                       }} />
                       {copy.saveToLibrary}
                     </label>
-                    <MotionPreviewDialog workspaceId={workspaceId} runId={runId} resultId={result.id} index={index} title={title} />
+                    {motionReview && <div className="ms-auto flex items-center gap-1.5" role="group" aria-label={copy.decisionFor.replace("{label}", title)}>
+                      {decisions.map(({ value, icon: Icon, fill }) => {
+                        const active = draft.motion?.[index] === value;
+                        return <Button key={value} type="button" size="icon" variant="outline" disabled={reviewing} aria-pressed={active}
+                          aria-label={copy[`item_${value}`]} title={copy[`item_${value}`]} className={cn("size-8", active && fill)}
+                          onClick={() => {
+                            const motion = { ...draft.motion };
+                            if (active) delete motion[index];
+                            else motion[index] = value;
+                            updateDraft({ ...draft, motion });
+                          }}><Icon /></Button>;
+                      })}
+                    </div>}
                   </div>
+                  {motionReview && draft.motion?.[index] && draft.motion[index] !== "approved" && (
+                    <Textarea aria-label={copy.itemNoteFor.replace("{label}", title)} placeholder={copy.motionNotePlaceholder} maxLength={2000}
+                      disabled={reviewing} value={draft.motionNotes?.[index] ?? ""} className="min-h-16 text-sm"
+                      onChange={(event) => updateDraft({ ...draft, motionNotes: { ...draft.motionNotes, [index]: event.target.value } })} />
+                  )}
                 </div>
               </li>
             ))}
@@ -535,7 +578,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <form id={reviewFormId} onSubmit={(event) => void submit(event)}>
           <fieldset disabled={reviewing}>
             <FieldGroup>
-              {!hasItemReview && <Field>
+              {!itemMode && <Field>
                 <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-2">
                   {decisions.map(({ value, label, icon: Icon, fill }) => {
                     const selected = draft.decision === value;
@@ -558,20 +601,20 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         </form>
       </CardContent>
       <div className="sticky bottom-4 z-[1] flex flex-wrap mx-4 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
-        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || staged > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
+        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || stagedCount > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
-          {!hasItemReview && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
-            : hasItemReview && staged > 0 && undecided > 0 ? <>{(staged === 1 ? copy.stagedItemsOne : copy.stagedItems).replace("{count}", String(staged))}
+          {!itemMode && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
+            : itemMode && stagedCount > 0 && undecided > 0 ? <>{(stagedCount === 1 ? copy.stagedItemsOne : copy.stagedItems).replace("{count}", String(stagedCount))}
               <span className="font-normal text-white">{(undecided === 1 ? copy.stillNeedsOne : copy.stillNeeds).replace("{count}", String(undecided))}</span></>
-            : draft.decision || staged > 0 || draft.notes || hasItemNotes ? copy.unsentReview : hasItemReview ? copy.selectEveryItem : copy.selectDecision}
+            : draft.decision || stagedCount > 0 || draft.notes || hasItemNotes ? copy.unsentReview : itemMode ? (motionReview ? copy.selectEveryAnimation : copy.selectEveryItem) : copy.selectDecision}
         </p>
-        {hasItemReview && staged > 0 && undecided > 0 && <Button type="button" variant="outline" disabled={reviewing} onClick={approveRest}
+        {itemMode && stagedCount > 0 && undecided > 0 && <Button type="button" variant="outline" disabled={reviewing} onClick={approveRest}
           className="ms-auto border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">{copy.approveRest}</Button>}
         <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
           className={cn("bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100",
-            !(hasItemReview && staged > 0 && undecided > 0) && "ms-auto")}>
-          {hasItemReview ? (staged === 0 ? copy.sendNothing : staged === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(staged)))
+            !(itemMode && stagedCount > 0 && undecided > 0) && "ms-auto")}>
+          {itemMode ? (stagedCount === 0 ? copy.sendNothing : stagedCount === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(stagedCount)))
             : draft.decision ? copy.submitDecision : copy.sendNothing}
         </Button>
       </div>
