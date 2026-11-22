@@ -229,7 +229,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                 <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.search} aria-label={copy.search} className="h-10 ps-9" />
               </label>
-              {groups.length > 0 && <NativeSelect aria-label={copy.groupBy} value={grouped ? "group" : ""} className="h-10"
+              {groups.length > 0 && <NativeSelect aria-label={copy.groupBy} value={grouped ? "group" : ""}
                 onChange={(event) => setGrouped(event.target.value === "group")}>
                 <NativeSelectOption value="">{copy.noGrouping}</NativeSelectOption>
                 <NativeSelectOption value="group">{copy.groupBy}</NativeSelectOption>

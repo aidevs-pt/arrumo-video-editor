@@ -100,7 +100,7 @@ export function GenerationRunRow({ run, workspaceId, actions, menu = [] }: { run
           <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: run.snapshot.profile.color ?? "var(--border)" }} />
           {run.snapshot.profile.name}
         </span>}
-        <Link href={href} className="min-w-0 font-heading text-lg leading-tight font-[800] wrap-anywhere [font-variation-settings:'wdth'_108] hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href={href} className="min-w-0 font-semibold leading-tight wrap-anywhere hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
           {title}
         </Link>
         {!completed && run.progress && <StepTrack count={run.progress.stage_count} current={run.progress.stage_index}

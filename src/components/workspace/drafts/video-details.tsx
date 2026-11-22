@@ -165,7 +165,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               className="w-full rounded-md bg-transparent font-heading text-[clamp(2rem,4.5vw,3rem)] leading-[1.05] font-[850] outline-none [font-variation-settings:'wdth'_130] placeholder:text-muted-foreground/50 focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring" />
             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
               <span aria-hidden="true" className="size-3 rounded-[3px]" style={{ backgroundColor: profile?.color ?? "var(--border)" }} />
-              <NativeSelect aria-label={messages.drafts.profile} value={draft.profile_id ?? ""} className="h-8 font-semibold"
+              <NativeSelect aria-label={messages.drafts.profile} value={draft.profile_id ?? ""} size="sm" className="font-semibold"
                 onChange={(event) => onChange({ profile_id: event.target.value ? Number(event.target.value) : null })}>
                 <NativeSelectOption value="">{messages.drafts.noProfile}</NativeSelectOption>
                 {profiles.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{entry.name}</NativeSelectOption>)}

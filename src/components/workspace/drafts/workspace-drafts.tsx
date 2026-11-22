@@ -337,7 +337,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                     <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-1 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
                       <VideoThumbnail title={draft.title} color={draftProfile?.color} small className="w-24 opacity-70 sm:w-36" />
                       <div className="min-w-0">
-                        <h2 className="font-heading text-xl leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_112]">{draft.title}</h2>
+                        <h2 className="font-sans text-base leading-tight font-semibold wrap-anywhere [font-variation-settings:normal]">{draft.title}</h2>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                           {draftProfile && <span className="flex items-center gap-1.5 font-semibold text-foreground">
                             <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: draftProfile.color ?? "var(--border)" }} />{draftProfile.name}</span>}

@@ -133,7 +133,7 @@ function VideoPoster({ workspaceId, runId }: { workspaceId: number; runId: numbe
     return () => { active = false; };
   }, [workspaceId, runId]);
   return (
-    <span className="grid aspect-video w-22 shrink-0 place-items-center overflow-hidden rounded-sm bg-muted text-muted-foreground sm:w-28" aria-hidden="true">
+    <span className="grid aspect-video w-24 shrink-0 place-items-center overflow-hidden rounded-thumb bg-muted text-muted-foreground sm:w-36" aria-hidden="true">
       {url
         // Managed local still served by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
