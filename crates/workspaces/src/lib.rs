@@ -55,6 +55,7 @@ mod plugin_actions;
 mod plugin_activation;
 pub use plugin_activation::plugin_activation_refusal_code;
 mod audio_transform;
+mod dubbing;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
@@ -123,6 +124,7 @@ pub use context_research::{
 pub use database_snapshot::DatabaseSnapshot;
 pub use delivery_cleanup::DeliveryCleanupReport;
 pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
+pub use dubbing::DubbingProvider;
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };

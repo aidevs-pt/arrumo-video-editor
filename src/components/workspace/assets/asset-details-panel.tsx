@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { AssetThumbnail } from "./asset-thumbnail";
 import { AudioTransformDialog, type AudioTransformProvider } from "./audio-transform-dialog";
+import { DubDialog, type DubbingProvider } from "./dub-dialog";
 import type { Asset, AssetOrganization } from "./workspace-assets";
 
 type Profile = { id: number; name: string };
@@ -49,6 +50,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const [formatNames, setFormatNames] = useState<Record<number, string>>({});
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [transforms, setTransforms] = useState<AudioTransformProvider[]>([]);
+  const [dubbing, setDubbing] = useState<DubbingProvider[]>([]);
   const hasSound = single !== null && (single.kind === "audio" || single.kind === "video");
 
   useEffect(() => {
@@ -56,6 +58,8 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
     let active = true;
     invoke<AudioTransformProvider[]>("list_audio_transforms", { workspaceId })
       .then((rows) => { if (active) setTransforms(rows); }, () => {});
+    invoke<DubbingProvider[]>("list_dubbing_providers", { workspaceId })
+      .then((rows) => { if (active) setDubbing(rows); }, () => {});
     return () => { active = false; };
   }, [workspaceId, hasSound]);
 
@@ -200,6 +204,8 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
           return offer && <AudioTransformDialog key={kind} workspaceId={workspaceId} assetId={single.id}
             assetName={single.name} offer={offer} disabled={busy} onCreated={onCreated} />;
         })}
+        {hasSound && dubbing[0] && <DubDialog workspaceId={workspaceId} assetId={single.id} assetName={single.name}
+          offer={dubbing[0]} disabled={busy} onCreated={onCreated} />}
         <ConfirmTitleDelete title={single.name} size="sm" disabled={busy} copy={messages.assets.removal}
           onConfirm={(confirmedName) => invoke<boolean>("remove_asset", { workspaceId, assetId: single.id, confirmedName })}
           onDelete={() => onRemoved(single.id)} />

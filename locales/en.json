@@ -1438,6 +1438,15 @@
       "failed": "Couldn't process the sound. Check the provider and its key.",
       "close": "Close",
       "cancel": "Cancel"
+    },
+    "dub": {
+      "action": "Dub",
+      "title": "Dub into another language",
+      "description": "Make a copy of the speech in {name} translated into another language, in voices like the original.",
+      "language": "Language",
+      "wait": "Dubbing can take a few minutes.",
+      "working": "Dubbing…",
+      "confirm": "Dub"
     }
   },
   "videoDetails": {

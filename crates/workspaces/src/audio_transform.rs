@@ -94,7 +94,7 @@ fn invalid_adapter() -> io::Error {
     io::Error::other("Invalid audio transform adapter")
 }
 
-fn valid_endpoint(endpoint: &str) -> bool {
+pub(crate) fn valid_endpoint(endpoint: &str) -> bool {
     let Some((host, path)) = endpoint
         .strip_prefix("https://")
         .and_then(|raw| raw.split_once('/'))
@@ -182,7 +182,7 @@ fn transform_adapter(plugin_id: &str) -> io::Result<Option<TransformAdapter>> {
 }
 
 /// The audio container in `bytes`, from its signature.
-fn audio_extension(bytes: &[u8]) -> Option<&'static str> {
+pub(crate) fn audio_extension(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(b"ID3") || bytes.len() > 2 && bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0 {
         Some("mp3")
     } else if bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {
@@ -197,7 +197,7 @@ fn audio_extension(bytes: &[u8]) -> Option<&'static str> {
 }
 
 /// Converts a workspace media file to an MP3 of its soundtrack for upload.
-fn soundtrack_mp3(source: &Path, output: &Path) -> io::Result<()> {
+pub(crate) fn soundtrack_mp3(source: &Path, output: &Path) -> io::Result<()> {
     let status = Command::new("ffmpeg")
         .args(["-nostdin", "-v", "error", "-y", "-i"])
         .arg(source)
@@ -227,7 +227,7 @@ fn soundtrack_mp3(source: &Path, output: &Path) -> io::Result<()> {
 
 /// The provider's own short explanation of a refused request, from `detail.message`,
 /// `detail` or `message` in a JSON error body.
-fn provider_reason(response: reqwest::blocking::Response) -> Option<String> {
+pub(crate) fn provider_reason(response: reqwest::blocking::Response) -> Option<String> {
     let mut body = Vec::new();
     response.take(16 * 1024).read_to_end(&mut body).ok()?;
     let value: serde_json::Value = serde_json::from_slice(&body).ok()?;

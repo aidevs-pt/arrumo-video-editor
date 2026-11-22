@@ -87,6 +87,16 @@ struct ListInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DubAssetInput {
+    workspace_id: i64,
+    asset_id: i64,
+    language: String,
+    #[serde(default)]
+    provider: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TransformAudioInput {
     workspace_id: i64,
     asset_id: i64,
@@ -185,7 +195,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 25] {
+pub(super) fn definitions() -> [Value; 27] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -228,6 +238,19 @@ pub(super) fn definitions() -> [Value; 25] {
             }, "required": ["workspaceId", "assetId", "transform"], "additionalProperties": false}}),
         json!({"name": "list_audio_transforms",
             "description": "List which providers on for this workspace change or isolate voices, and the shortest and longest sound in seconds each takes.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "dub_asset",
+            "description": "Dub the speech of a workspace audio or video asset into another language with a dubbing provider, wait for the provider (it can take minutes) and add the dub as a new audio asset labelled Dub whose notes name the source. language is a code from list_dubbing_providers.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "assetId": {"type": "integer", "minimum": 1},
+                "language": {"type": "string", "minLength": 2, "maxLength": 12},
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+            }, "required": ["workspaceId", "assetId", "language"], "additionalProperties": false}}),
+        json!({"name": "list_dubbing_providers",
+            "description": "List the dubbing providers on for this workspace, the language codes each dubs into and the longest sound in seconds each takes.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
                 "required": ["workspaceId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
@@ -395,6 +418,14 @@ pub(super) fn call_generation(
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|error| Cow::Owned(format!("Could not make the audio: {error}")))
             }),
+        "dub_asset" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| Cow::Borrowed("Invalid dubbing arguments"))
+            .and_then(|args: DubAssetInput| {
+                store
+                    .dub_asset(database, args.workspace_id, args.asset_id, &args.language, args.provider.as_deref())
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|error| Cow::Owned(format!("Could not dub it: {error}")))
+            }),
         "transform_audio_asset" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| Cow::Borrowed("Invalid audio transform arguments"))
             .and_then(|args: TransformAudioInput| {
@@ -437,6 +468,14 @@ pub(super) fn call(
                     .audio_transform_providers(args.workspace_id)
                     .map(|providers| json!({"transforms": providers}))
                     .map_err(|_| "Could not list the audio transforms")
+            }),
+        "list_dubbing_providers" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid dubbing arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .dubbing_providers(args.workspace_id)
+                    .map(|providers| json!({"providers": providers}))
+                    .map_err(|_| "Could not list the dubbing providers")
             }),
         "list_speech_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid speech model arguments")

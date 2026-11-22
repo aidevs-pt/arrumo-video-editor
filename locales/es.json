@@ -1438,6 +1438,15 @@
       "failed": "No se pudo procesar el sonido. Revisa el proveedor y su clave.",
       "close": "Cerrar",
       "cancel": "Cancelar"
+    },
+    "dub": {
+      "action": "Doblar",
+      "title": "Doblar a otro idioma",
+      "description": "Crea una copia del habla de {name} traducida a otro idioma, con voces parecidas a las originales.",
+      "language": "Idioma",
+      "wait": "El doblaje puede tardar unos minutos.",
+      "working": "Doblando…",
+      "confirm": "Doblar"
     }
   },
   "videoDetails": {

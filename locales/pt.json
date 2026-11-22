@@ -1438,6 +1438,15 @@
       "failed": "Não foi possível processar o som. Verifica o fornecedor e a respetiva chave.",
       "close": "Fechar",
       "cancel": "Cancelar"
+    },
+    "dub": {
+      "action": "Dobrar",
+      "title": "Dobrar para outra língua",
+      "description": "Cria uma cópia da fala de {name} traduzida para outra língua, com vozes semelhantes às originais.",
+      "language": "Língua",
+      "wait": "A dobragem pode demorar alguns minutos.",
+      "working": "A dobrar…",
+      "confirm": "Dobrar"
     }
   },
   "videoDetails": {
