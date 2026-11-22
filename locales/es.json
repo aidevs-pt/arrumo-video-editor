@@ -373,7 +373,10 @@
     "placeGeneration": "generación",
     "placeFinished": "vídeo terminado",
     "opensGeneration": "Abre la generación",
-    "opensFinished": "Abre el vídeo terminado"
+    "opensFinished": "Abre el vídeo terminado",
+    "noticeUsage": "A {provider} le queda un {percent}",
+    "noticeUsageBody": "Los pasos que lo usan pueden fallar en tu próxima generación.",
+    "opensServices": "Abre Ajustes, servicios y claves"
   },
   "motionLibrary": {
     "renderer": "Renderizador instalado",

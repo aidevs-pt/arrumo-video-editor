@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useProviderUsage } from "@/components/workspace/usage/provider-usage";
+import { usePluginText } from "@/lib/plugin-text";
 import { useLocale } from "@/lib/locale-provider";
 
 type RunNotice = { run_id: number; title: string; profile: string | null; at: number };
@@ -69,7 +71,10 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   const [readHere, setReadHere] = useState<Set<number>>(new Set());
   const reviews = inbox?.reviews ?? [];
   const completions = (inbox?.completions ?? []).map((notice) => ({ ...notice, unread: notice.unread && !readHere.has(notice.run_id) }));
-  const attentionCount = reviews.length + completions.filter((notice) => notice.unread).length;
+  const usage = useProviderUsage(workspaceId);
+  const pluginText = usePluginText();
+  const lowProviders = usage?.providers.filter((entry) => (entry.level === "warning" || entry.level === "danger") && entry.remainingPercent !== null) ?? [];
+  const attentionCount = reviews.length + completions.filter((notice) => notice.unread).length + lowProviders.length;
   const unreadCompletions = completions.filter((notice) => notice.unread);
   const entries: Entry[] = [
     ...reviews.map((notice) => ({ key: `r${notice.run_id}`, kind: "review" as const, notice, unread: true, href: `/generation-run?workspace=${workspaceId}&run=${notice.run_id}` })),
@@ -102,8 +107,17 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
           </Button>
         </div>
         {failed && <p className="px-4 py-3 text-sm text-muted-foreground">{messages.queue.loadError}</p>}
-        {entries.length > 0 ? (
-          <ScrollArea className={entries.length > 4 ? "h-[26rem]" : undefined}>
+        {entries.length + lowProviders.length > 0 ? (
+          <ScrollArea className={entries.length + lowProviders.length > 4 ? "h-[26rem]" : undefined}>
+            {lowProviders.map((entry) => (
+              <DropdownMenuItem key={`u${entry.pluginId}`} onSelect={() => router.push(`/settings?workspace=${workspaceId}&scope=workspace&section=services`)}
+                className={cn("flex-col items-stretch gap-1 rounded-none border-b px-4 py-3", entry.level === "danger" ? "bg-destructive/8 focus:bg-destructive/12" : "bg-attention/15 focus:bg-attention/25")}>
+                <span className="font-semibold">{copy.noticeUsage.replace("{provider}", pluginText.name(entry.pluginId, usage?.names[entry.pluginId] ?? entry.pluginId))
+                  .replace("{percent}", new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(entry.remainingPercent! / 100))}</span>
+                <span>{copy.noticeUsageBody}</span>
+                <span className="text-xs text-muted-foreground">{copy.opensServices}</span>
+              </DropdownMenuItem>
+            ))}
             {entries.map(({ key, kind, notice, unread, href }) => (
               <DropdownMenuItem key={key} onSelect={() => router.push(href)}
                 className={cn("flex-col items-stretch gap-1 rounded-none border-b px-4 py-3 last:border-b-0", unread && "bg-primary/8 focus:bg-primary/12")}>
