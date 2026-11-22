@@ -68,6 +68,7 @@ mod preview_review;
 mod preview_settings;
 mod production_progress;
 mod profile_deliveries;
+mod profile_drafting;
 mod profile_formats;
 mod profile_organization;
 mod provider_preferences;
@@ -146,6 +147,7 @@ pub use preview_review::{PreviewFormatDecision, PreviewReplacement, PreviewRevis
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
 pub use profile_deliveries::{DeliveryOverrides, ProfileDelivery};
+pub use profile_drafting::ProfileDraft;
 pub use profile_formats::{DimensionOverrides, ProfileFormat};
 pub use profile_organization::{AssetProfileShare, MAX_PROFILE_DESCRIPTION, ProfileAsset};
 pub use provider_preferences::{CapabilityProvider, ProviderPreferences};

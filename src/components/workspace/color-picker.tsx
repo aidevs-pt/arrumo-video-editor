@@ -30,7 +30,7 @@ export function ColorPicker({ value, onChange, label, customLabel, noneLabel, di
   const isCustom = current !== null && !SWATCHES.includes(current);
 
   return <div className="flex flex-col gap-3">
-    <div role="radiogroup" aria-label={label} className="grid grid-cols-8 gap-1.5">
+    <div role="radiogroup" aria-label={label} className="grid max-w-80 grid-cols-8 gap-1.5">
       {SWATCHES.map((swatch) => {
         const selected = current === swatch;
         return <button key={swatch} type="button" role="radio" aria-checked={selected} aria-label={swatch} disabled={disabled}

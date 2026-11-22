@@ -14,6 +14,14 @@ struct WorkspaceName {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProfileDraftInput {
+    workspace_id: i64,
+    name: String,
+    about: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct WorkspaceRename {
     workspace_id: i64,
     name: String,
@@ -157,7 +165,7 @@ struct BrandColorsInput {
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 25] {
+pub(super) fn definitions() -> [Value; 26] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -214,6 +222,11 @@ pub(super) fn definitions() -> [Value; 25] {
                 "sources": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 2048}},
                 "notes": {"type": "string", "maxLength": 8000}},
                 "required": ["workspaceId"], "additionalProperties": false}}),
+        json!({"name": "draft_profile", "description": "Let the workspace's agent draft a profile's one-line description and editing guidance from its name and a few words about the videos. Returns the draft without saving it.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id,
+                "name": {"type": "string", "minLength": 1, "maxLength": 120},
+                "about": {"type": "string", "minLength": 1, "maxLength": 4000}},
+                "required": ["workspaceId", "name", "about"], "additionalProperties": false}}),
         json!({"name": "list_profiles", "description": "List the selected workspace's production profiles.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "create_profile", "description": "Create a production profile in the selected workspace.",
@@ -299,6 +312,12 @@ pub(super) fn call(
                 .set_workspace_appearance(args.workspace_id, &args.color, &args.icon, args.image_asset_id)
                 .map(|workspace| json!({"workspace": workspace}))
                 .map_err(|_| "Could not set the workspace appearance")
+        }),
+        "draft_profile" => parse(arguments).and_then(|args: ProfileDraftInput| {
+            store
+                .draft_profile(args.workspace_id, &args.name, &args.about)
+                .map(|draft| json!({"draft": draft}))
+                .map_err(|_| "Could not draft the profile")
         }),
         "get_workspace_context" => parse(arguments).and_then(|args: WorkspaceInput| {
             store

@@ -634,7 +634,18 @@
     "updateError": "Changes couldn’t be saved. Try again.",
     "saving": "Creating…",
     "newProfile": "New profile",
-    "noGuidance": "No guidance yet."
+    "noGuidance": "No guidance yet.",
+    "startBlank": "Start blank",
+    "startBlankHint": "Write the guidance yourself, then fill in context, brand and outputs.",
+    "agentDraft": "Let {agent} draft it",
+    "agentDraftHint": "Describe the videos and {agent} writes the description and editing guidance from your workspace context.",
+    "about": "What are these videos?",
+    "aboutPlaceholder": "Edited highlights of my streams. Keep the jokes, cut the waiting. Landscape, with one portrait cut of the best moment.",
+    "draftSubmit": "Draft the profile",
+    "drafting": "Drafting…",
+    "draftingHint": "{agent} is writing the guidance. This can take a minute.",
+    "agentUnavailable": "The agent isn’t available. Check it in Settings › Agent.",
+    "draftError": "The profile couldn’t be drafted. Try again or start blank."
   },
   "profileFormats": {
     "missingProfile": "This profile is unavailable in the selected workspace.",

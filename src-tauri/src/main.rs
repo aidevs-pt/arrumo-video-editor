@@ -468,6 +468,36 @@ async fn get_workspace_context(
 }
 
 #[tauri::command]
+async fn draft_profile(
+    workspace_id: i64,
+    name: String,
+    about: String,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::ProfileDraft, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .draft_profile(workspace_id, &name, &about)
+            .map_err(|error| {
+                match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
+                    Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
+                    Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
+                    Some(_) => "agent_failed",
+                    None => "profile_draft_failed",
+                }
+                .to_owned()
+            })
+    })
+    .await
+    .map_err(|_| "profile_draft_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn draft_workspace_context(
     workspace_id: i64,
     sources: Vec<String>,
@@ -1109,6 +1139,7 @@ fn main() {
             replace_asset,
             get_workspace_context,
             draft_workspace_context,
+            draft_profile,
             generate_motion_library_item,
             apply_context_import,
             set_workspace_context,

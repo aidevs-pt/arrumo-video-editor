@@ -634,7 +634,18 @@
     "updateError": "No se pudieron guardar los cambios. Inténtalo de nuevo.",
     "saving": "Creando…",
     "newProfile": "Nuevo perfil",
-    "noGuidance": "Sin indicaciones todavía."
+    "noGuidance": "Sin indicaciones todavía.",
+    "startBlank": "Empezar en blanco",
+    "startBlankHint": "Escribe tú las indicaciones y luego completa el contexto, la marca y las salidas.",
+    "agentDraft": "Deja que {agent} lo redacte",
+    "agentDraftHint": "Describe los vídeos y {agent} escribe la descripción y las indicaciones de edición a partir del contexto del espacio de trabajo.",
+    "about": "¿Qué son estos vídeos?",
+    "aboutPlaceholder": "Lo mejor de mis directos editado. Mantén las bromas, corta las esperas. Horizontal, con un corte vertical del mejor momento.",
+    "draftSubmit": "Redactar el perfil",
+    "drafting": "Redactando…",
+    "draftingHint": "{agent} está escribiendo las indicaciones. Puede tardar un minuto.",
+    "agentUnavailable": "El agente no está disponible. Revísalo en Ajustes › Agente.",
+    "draftError": "No se pudo redactar el perfil. Inténtalo de nuevo o empieza en blanco."
   },
   "profileFormats": {
     "missingProfile": "Este perfil no está disponible en el espacio de trabajo seleccionado.",
