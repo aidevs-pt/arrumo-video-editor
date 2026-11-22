@@ -167,7 +167,9 @@ export function RawFootageBatch({ workspaceId, clips, pool, profiles, initialPro
           })}
         </ul>}
         {earlier.length > 0 && <details className="group">
-          <summary className="cursor-pointer font-semibold text-muted-foreground hover:text-foreground">{copy.earlier}</summary>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 font-semibold text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="size-4 transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />{copy.earlier}
+          </summary>
           <ul className="mt-3 flex flex-wrap gap-2">
             {earlier.map((clip) => (
               <li key={clip.id}>

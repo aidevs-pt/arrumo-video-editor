@@ -16,6 +16,8 @@ import { GenerationQueue } from "@/components/workspace/generation/generation-qu
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { useWorkspaceCatalog } from "../home/workspace-router";
+import { useStudioTrail } from "../home/studio-trail";
+import { workspaceHref } from "../home/workspace-links";
 import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { DraftSourceClips } from "./draft-source-clips";
@@ -70,6 +72,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
   const canSave = Boolean(title.trim() && (sources.length || intent.trim()));
   const composing = tab === "compose" && !startInQueue;
   const sourceStep = composing && step === "source";
+  useStudioTrail(composing ? [{ label: messages.studio.videos, href: workspaceHref("drafts", workspaceId) }, { label: messages.studio.newVideo }] : null);
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {

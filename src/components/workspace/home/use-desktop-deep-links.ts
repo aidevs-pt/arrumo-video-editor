@@ -43,7 +43,8 @@ function internalRoute(value: string) {
     if (!section) return;
     const href = workspaceHref(section, workspace, section === "drafts" || section === "motion-library" ? numericId(query, "profile") : undefined);
     const draft = section === "drafts" ? numericId(query, "draft") : undefined;
-    return draft ? `${href}&draft=${draft}` : href;
+    const compose = section === "drafts" ? ["1", "scratch"].find((value) => value === query.get("compose")) : undefined;
+    return draft ? `${href}&draft=${draft}` : compose ? `${href}&compose=${compose}` : href;
   }
 }
 
