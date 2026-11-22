@@ -572,6 +572,7 @@ pub(crate) struct BundledSource {
     pub transcription_timed: Option<&'static [u8]>,
     pub speech_synthesis: Option<&'static [u8]>,
     pub image_generation: Option<&'static [u8]>,
+    pub video_generation: Option<&'static [u8]>,
     icon: Option<&'static [u8]>,
     package: Option<&'static [u8]>,
     release: Option<&'static str>,

@@ -19,6 +19,20 @@ struct ContextImportInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GenerateVideoInput {
+    workspace_id: i64,
+    prompt: String,
+    aspect_ratio: String,
+    #[serde(default)]
+    duration_seconds: Option<u32>,
+    #[serde(default)]
+    notes: String,
+    #[serde(default)]
+    provider: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct GenerateSpeechInput {
     workspace_id: i64,
     text: String,
@@ -135,7 +149,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 18] {
+pub(super) fn definitions() -> [Value; 19] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -159,6 +173,16 @@ pub(super) fn definitions() -> [Value; 18] {
                 "notes": {"type": "string", "maxLength": 8000},
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
+        json!({"name": "generate_library_video",
+            "description": "Generate a short clip with the workspace's first video provider (or one named provider) and add it to the workspace assets with the given notes. Takes minutes; the provider's duration limits apply.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "prompt": {"type": "string", "minLength": 1, "maxLength": 2500},
+                "aspectRatio": {"type": "string", "enum": ["16:9", "9:16", "1:1"]},
+                "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 60},
+                "notes": {"type": "string", "maxLength": 8000},
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+            }, "required": ["workspaceId", "prompt", "aspectRatio"], "additionalProperties": false}}),
         json!({"name": "detach_completed_media",
             "description": "Remove a post-completion attachment from a verified output while retaining the managed asset.",
             "inputSchema": {"type": "object", "properties": {
@@ -277,6 +301,14 @@ pub(super) fn call(
                     .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
+            }),
+        "generate_library_video" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid video arguments")
+            .and_then(|args: GenerateVideoInput| {
+                store
+                    .generate_library_video(database, args.workspace_id, &args.prompt, &args.aspect_ratio, args.duration_seconds, &args.notes, args.provider.as_deref())
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|_| "Could not generate the clip. Check the video provider and its key")
             }),
         "detach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid completed media arguments")

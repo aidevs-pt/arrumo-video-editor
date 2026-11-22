@@ -84,6 +84,7 @@ mod supplemental_writing;
 mod telemetry;
 mod transcription;
 mod video_drafts;
+mod video_generation;
 mod workspace_feedback;
 
 pub use a2a::serve_a2a;

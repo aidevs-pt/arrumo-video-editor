@@ -499,7 +499,7 @@
     "generate": {
       "open": "Generar",
       "title": "Generar un recurso",
-      "description": "Describe una imagen o escribe un texto para locutar. Tus proveedores lo crean y se añade a los recursos de este espacio de trabajo.",
+      "description": "Describe una imagen o un clip, o escribe un texto para locutar. Tus proveedores lo crean y se añade a los recursos de este espacio de trabajo.",
       "prompt": "Descríbela",
       "promptPlaceholder": "Ilustración plana de un escritorio desordenado con tiras de película que se apilan, cobalto y amarillo, sin texto.",
       "provider": "Hecha con",
@@ -522,7 +522,14 @@
       "speechText": "Texto para locutar",
       "speechPlaceholder": "Material desordenado dentro. Un vídeo brillante fuera.",
       "noSpeechProvider": "No hay ningún proveedor de voz activado. Actívalo en Ajustes › Servicios y claves y elige una voz en sus ajustes.",
-      "submitAudio": "Generar audio"
+      "submitAudio": "Generar audio",
+      "video": "Clip de vídeo",
+      "videoPlaceholder": "Plano macro lento de un cubo resuelto girando sobre un escritorio blanco, luz natural suave.",
+      "length": "Duración",
+      "seconds": "{count} s",
+      "noVideoProvider": "No hay ningún proveedor de vídeo activado. Actívalo en Ajustes › Servicios y claves y añade su clave.",
+      "submitVideo": "Generar clip",
+      "videoPendingHint": "Los clips tardan unos minutos. Deja este diálogo abierto hasta que el clip esté listo."
     }
   },
   "delivery": {

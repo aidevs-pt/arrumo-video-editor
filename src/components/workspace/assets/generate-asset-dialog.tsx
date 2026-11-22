@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { AudioLines, ImageIcon, Sparkles } from "lucide-react";
+import { AudioLines, Clapperboard, ImageIcon, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -17,6 +17,10 @@ import { usePluginText } from "@/lib/plugin-text";
 
 type Provider = { id: string; name: string };
 type Preferences = { available: Provider[]; effective: string[] };
+type Kind = "image" | "audio" | "video";
+
+const CAPABILITY: Record<Kind, string> = { image: "image-generation", audio: "text-to-speech", video: "video-generation" };
+const DURATIONS = [3, 5, 8, 10, 15];
 
 const SIZES = [
   { ratio: "16:9", pixels: "1920 × 1080" },
@@ -25,7 +29,7 @@ const SIZES = [
   { ratio: "4:5", pixels: "1080 × 1350" },
 ];
 
-/** Describe an image, or write text to voice, and the workspace's providers make it for the library. */
+/** Describe an image or a clip, or write text to voice, and the workspace's providers make it for the library. */
 export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
   workspaceId: number;
   disabled?: boolean;
@@ -34,9 +38,10 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
   const { messages: { assets: { generate: copy } } } = useLocale();
   const pluginText = usePluginText();
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<"image" | "audio">("image");
+  const [kind, setKind] = useState<Kind>("image");
   const [all, setAll] = useState<Record<string, Preferences>>();
-  const providers = all ? all[kind === "image" ? "image-generation" : "text-to-speech"] ?? { available: [], effective: [] } : undefined;
+  const providers = all ? all[CAPABILITY[kind]] ?? { available: [], effective: [] } : undefined;
+  const [duration, setDuration] = useState(5);
   const [prompt, setPrompt] = useState("");
   const [provider, setProvider] = useState("");
   const [ratio, setRatio] = useState("16:9");
@@ -64,6 +69,10 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
         onCreated(await invoke<number[]>("generate_library_images", {
           workspaceId, prompt: prompt.trim(), aspectRatio: ratio, count, notes: notes.trim(), provider: provider || null,
         }));
+      } else if (kind === "video") {
+        onCreated([await invoke<number>("generate_library_video", {
+          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: duration, notes: notes.trim(), provider: provider || null,
+        })]);
       } else {
         onCreated([await invoke<number>("generate_library_speech", {
           workspaceId, text: prompt.trim(), notes: notes.trim(), provider: provider || null,
@@ -90,18 +99,19 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
       </DialogHeader>
       <form onSubmit={submit}>
         <FieldGroup>
-          <Tabs value={kind} onValueChange={(value) => { setKind(value as "image" | "audio"); setProvider(""); setProblem(undefined); }}>
+          <Tabs value={kind} onValueChange={(value) => { const next = value as Kind; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setProvider(""); setProblem(undefined); }}>
             <TabsList className="w-full justify-start">
               <TabsTrigger value="image" disabled={pending} className="flex-none"><ImageIcon data-icon="inline-start" />{copy.image}</TabsTrigger>
               <TabsTrigger value="audio" disabled={pending} className="flex-none"><AudioLines data-icon="inline-start" />{copy.audio}</TabsTrigger>
+              <TabsTrigger value="video" disabled={pending} className="flex-none"><Clapperboard data-icon="inline-start" />{copy.video}</TabsTrigger>
             </TabsList>
           </Tabs>
           <Field data-disabled={pending}>
-            <FieldLabel htmlFor="generate-prompt">{kind === "image" ? copy.prompt : copy.speechText}</FieldLabel>
+            <FieldLabel htmlFor="generate-prompt">{kind === "audio" ? copy.speechText : copy.prompt}</FieldLabel>
             <Textarea id="generate-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending}
-              placeholder={kind === "image" ? copy.promptPlaceholder : copy.speechPlaceholder} maxLength={kind === "image" ? 4000 : 5000} className="min-h-24" required />
+              placeholder={kind === "image" ? copy.promptPlaceholder : kind === "video" ? copy.videoPlaceholder : copy.speechPlaceholder} maxLength={kind === "image" ? 4000 : kind === "video" ? 2500 : 5000} className="min-h-24" required />
           </Field>
-          <div className={kind === "image" ? "grid gap-4 sm:grid-cols-[1fr_1fr_6rem]" : "grid gap-4"}>
+          <div className={kind === "audio" ? "grid gap-4" : "grid gap-4 sm:grid-cols-[1fr_1fr_6rem]"}>
             <Field data-disabled={pending}>
               <FieldLabel htmlFor="generate-provider">{copy.provider}</FieldLabel>
               <NativeSelect id="generate-provider" value={provider} disabled={pending} onChange={(event) => setProvider(event.target.value)}>
@@ -109,18 +119,23 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
                 {providers?.available.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{name(entry)}</NativeSelectOption>)}
               </NativeSelect>
             </Field>
-            {kind === "image" && <><Field data-disabled={pending}>
+            {kind !== "audio" && <><Field data-disabled={pending}>
               <FieldLabel htmlFor="generate-size">{copy.size}</FieldLabel>
               <NativeSelect id="generate-size" value={ratio} disabled={pending} onChange={(event) => setRatio(event.target.value)}>
-                {SIZES.map((size) => <NativeSelectOption key={size.ratio} value={size.ratio}>{`${size.ratio}, ${size.pixels}`}</NativeSelectOption>)}
+                {SIZES.filter((size) => kind === "image" || size.ratio !== "4:5").map((size) => <NativeSelectOption key={size.ratio} value={size.ratio}>{kind === "image" ? `${size.ratio}, ${size.pixels}` : size.ratio}</NativeSelectOption>)}
               </NativeSelect>
             </Field>
-            <Field data-disabled={pending}>
+            {kind === "image" ? <Field data-disabled={pending}>
               <FieldLabel htmlFor="generate-count">{copy.variations}</FieldLabel>
               <NativeSelect id="generate-count" value={count} disabled={pending} onChange={(event) => setCount(Number(event.target.value))}>
                 {[1, 2, 3, 4].map((value) => <NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>)}
               </NativeSelect>
-            </Field></>}
+            </Field> : <Field data-disabled={pending}>
+              <FieldLabel htmlFor="generate-length">{copy.length}</FieldLabel>
+              <NativeSelect id="generate-length" value={duration} disabled={pending} onChange={(event) => setDuration(Number(event.target.value))}>
+                {DURATIONS.map((value) => <NativeSelectOption key={value} value={value}>{copy.seconds.replace("{count}", String(value))}</NativeSelectOption>)}
+              </NativeSelect>
+            </Field>}</>}
           </div>
           <Field data-disabled={pending}>
             <FieldLabel htmlFor="generate-notes">{copy.notes}</FieldLabel>
@@ -128,13 +143,13 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
               placeholder={copy.notesPlaceholder} maxLength={8000} aria-describedby="generate-notes-hint" />
             <FieldDescription id="generate-notes-hint">{copy.notesHint}</FieldDescription>
           </Field>
-          {none && <Alert><AlertDescription>{kind === "image" ? copy.noProvider : copy.noSpeechProvider}</AlertDescription></Alert>}
+          {none && <Alert><AlertDescription>{kind === "image" ? copy.noProvider : kind === "video" ? copy.noVideoProvider : copy.noSpeechProvider}</AlertDescription></Alert>}
           {problem && <Alert variant="destructive" role="alert"><AlertDescription>{problem}</AlertDescription></Alert>}
-          {pending && <p role="status" className="text-sm text-muted-foreground">{copy.pendingHint}</p>}
+          {pending && <p role="status" className="text-sm text-muted-foreground">{kind === "video" ? copy.videoPendingHint : copy.pendingHint}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{copy.cancel}</Button>
             <Button type="submit" disabled={pending || !prompt.trim() || none}>
-              {pending ? copy.generating : kind === "audio" ? copy.submitAudio : count === 1 ? copy.submitOne : copy.submitMany.replace("{count}", String(count))}
+              {pending ? copy.generating : kind === "audio" ? copy.submitAudio : kind === "video" ? copy.submitVideo : count === 1 ? copy.submitOne : copy.submitMany.replace("{count}", String(count))}
             </Button>
           </DialogFooter>
         </FieldGroup>

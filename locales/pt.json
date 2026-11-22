@@ -499,7 +499,7 @@
     "generate": {
       "open": "Gerar",
       "title": "Gerar um recurso",
-      "description": "Descreva uma imagem ou escreva um texto para narrar. Os seus fornecedores criam-no e fica nos recursos deste espaço de trabalho.",
+      "description": "Descreva uma imagem ou um clipe, ou escreva um texto para narrar. Os seus fornecedores criam-no e fica nos recursos deste espaço de trabalho.",
       "prompt": "Descreva-a",
       "promptPlaceholder": "Ilustração plana de uma secretária desarrumada com tiras de filme a empilharem-se, cobalto e amarelo, sem texto.",
       "provider": "Feita com",
@@ -522,7 +522,14 @@
       "speechText": "Texto para narrar",
       "speechPlaceholder": "Gravações desarrumadas entram. Um vídeo brilhante sai.",
       "noSpeechProvider": "Nenhum fornecedor de voz está ativo. Ative um em Definições › Serviços e chaves e escolha uma voz nas definições dele.",
-      "submitAudio": "Gerar áudio"
+      "submitAudio": "Gerar áudio",
+      "video": "Clipe de vídeo",
+      "videoPlaceholder": "Plano macro lento de um cubo resolvido a rodar numa secretária branca, luz natural suave.",
+      "length": "Duração",
+      "seconds": "{count} s",
+      "noVideoProvider": "Nenhum fornecedor de vídeo está ativo. Ative um em Definições › Serviços e chaves e adicione a chave dele.",
+      "submitVideo": "Gerar clipe",
+      "videoPendingHint": "Os clipes demoram alguns minutos. Mantenha esta janela aberta até o clipe estar pronto."
     }
   },
   "delivery": {

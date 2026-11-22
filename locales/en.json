@@ -499,7 +499,7 @@
     "generate": {
       "open": "Generate",
       "title": "Generate an asset",
-      "description": "Describe an image or write text to voice. Your providers make it and it joins this workspace’s assets.",
+      "description": "Describe an image or a clip, or write text to voice. Your providers make it and it joins this workspace’s assets.",
       "prompt": "Describe it",
       "promptPlaceholder": "Flat illustration of a messy desk of film strips snapping into a neat stack, cobalt and yellow, no text.",
       "provider": "Made with",
@@ -522,7 +522,14 @@
       "speechText": "Text to voice",
       "speechPlaceholder": "Messy footage in. Brilliant video out.",
       "noSpeechProvider": "No speech provider is on. Turn one on in Settings › Services and keys and choose a voice in its settings.",
-      "submitAudio": "Generate audio"
+      "submitAudio": "Generate audio",
+      "video": "Video clip",
+      "videoPlaceholder": "Slow macro shot of a solved cube turning on a white desk, soft daylight.",
+      "length": "Length",
+      "seconds": "{count} s",
+      "noVideoProvider": "No video provider is on. Turn one on in Settings › Services and keys and add its key.",
+      "submitVideo": "Generate clip",
+      "videoPendingHint": "Clips take a few minutes. Keep this dialog open until the clip is ready."
     }
   },
   "delivery": {
