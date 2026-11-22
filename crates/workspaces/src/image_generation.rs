@@ -270,11 +270,18 @@ impl WorkspaceStore {
     ) -> Result<(i64, String), Box<dyn Error>> {
         let image = self.generate_image(workspace_id, order, prompt, aspect_ratio)?;
         let scratch = tempfile::tempdir()?;
-        let file = scratch.path().join(format!("{stem}.{}", image.extension));
-        std::fs::write(&file, &image.bytes)?;
+        let downloaded = scratch.path().join(format!("{stem}.{}", image.extension));
+        std::fs::write(&downloaded, &image.bytes)?;
+        let file =
+            crop_to_ratio(&downloaded, aspect_ratio, scratch.path(), stem).unwrap_or(downloaded);
+        let extension = file
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or(image.extension)
+            .to_owned();
         crate::motion_artifacts::validate_motion_file(
             &file,
-            &format!("{stem}.{}", image.extension),
+            &format!("{stem}.{extension}"),
             "image",
         )
         .map_err(|_| io::Error::other("The provider's image could not be verified"))?;
@@ -284,6 +291,40 @@ impl WorkspaceStore {
             .map_err(|error| io::Error::other(error.to_string()))?;
         Ok((asset.id, image.provider))
     }
+}
+
+/// Centre-crops an image to `aspect_ratio` (such as `16:9`) when the provider could only draw a
+/// near size, such as 3:2 for wide images. Returns the cropped PNG, or `None` to keep the original.
+fn crop_to_ratio(
+    source: &Path,
+    aspect_ratio: &str,
+    folder: &Path,
+    stem: &str,
+) -> Option<std::path::PathBuf> {
+    let (width, height) = aspect_ratio.split_once(':')?;
+    let (width, height): (u32, u32) = (width.parse().ok()?, height.parse().ok()?);
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let output = folder.join(format!("{stem}-cropped.png"));
+    let ratio = format!("{width}/{height}");
+    let status = std::process::Command::new("ffmpeg")
+        .args(["-nostdin", "-loglevel", "error", "-y", "-i"])
+        .arg(source)
+        .args([
+            "-vf",
+            &format!("crop='trunc(min(iw,ih*{ratio})/2)*2':'trunc(min(ih,iw/({ratio}))/2)*2'"),
+            "-frames:v",
+            "1",
+        ])
+        .arg(&output)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .ok()?;
+    let cropped = folder.join(format!("{stem}.png"));
+    (status.success() && std::fs::rename(&output, &cropped).is_ok()).then_some(cropped)
 }
 
 fn request_image(
@@ -356,6 +397,43 @@ mod tests {
             assert_eq!(adapter.plugin_id, id);
             assert!(adapter.model.setting.is_some());
         }
+    }
+
+    #[test]
+    fn wide_images_are_cropped_to_the_requested_ratio() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = folder.path().join("wide.png");
+        let made = std::process::Command::new("ffmpeg")
+            .args([
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=red:s=1536x1024",
+                "-frames:v",
+                "1",
+            ])
+            .arg(&source)
+            .status();
+        if !made.is_ok_and(|status| status.success()) {
+            return;
+        }
+        let cropped = crop_to_ratio(&source, "16:9", folder.path(), "thumb").unwrap();
+        let probe = std::process::Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+            ])
+            .arg(&cropped)
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&probe.stdout).trim(), "1536,864");
+        assert!(crop_to_ratio(&source, "wide", folder.path(), "x").is_none());
     }
 
     #[test]
