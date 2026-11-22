@@ -101,7 +101,8 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
 
   const unfiltered = runs?.filter((run) => run.state !== "completed");
   const runProfiles = [...new Map((unfiltered ?? []).flatMap((run) => run.snapshot.profile ? [[run.snapshot.profile.id, run.snapshot.profile] as const] : [])).values()];
-  const activeRuns = profileFilter === null ? unfiltered : unfiltered?.filter((run) => run.snapshot.profile?.id === profileFilter);
+  const filter = runProfiles.some((profile) => profile.id === profileFilter) ? profileFilter : null;
+  const activeRuns = filter === null ? unfiltered : unfiltered?.filter((run) => run.snapshot.profile?.id === filter);
   const groups = activeRuns ? [
     { id: "all", label: copy.runs, runs: [...activeRuns].reverse() },
     { id: "review", label: copy.reviewFilter, runs: activeRuns.filter(runNeedsReview).reverse() },
@@ -109,7 +110,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
 
   return (
     <WorkspaceShell>
-      {catalogView ? <VideoCatalogHeader workspaceId={workspaceId} active="generations" count={activeRuns?.length} /> : (
+      {catalogView ? <VideoCatalogHeader workspaceId={workspaceId} active="generations" count={unfiltered?.length} /> : (
         <>
           <WorkspaceHeading>
             <h1 ref={heading} tabIndex={-1}>{selected?.title ?? copy.title}</h1>
@@ -180,8 +181,8 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
           <div role="group" aria-label={copy.profileFilter} className="flex flex-wrap items-center gap-2 text-sm">
             <span className="me-1 text-muted-foreground">{copy.profileFilter}</span>
             {[{ id: null, name: copy.allProfiles, color: null }, ...runProfiles].map((entry) => (
-              <Button key={entry.id ?? "all"} type="button" size="sm" variant="outline" aria-pressed={profileFilter === entry.id}
-                className={cn("font-semibold", profileFilter === entry.id ? "border-foreground bg-card" : "border-border text-muted-foreground hover:text-foreground")}
+              <Button key={entry.id ?? "all"} type="button" size="sm" variant="outline" aria-pressed={filter === entry.id}
+                className={cn("font-semibold", filter === entry.id ? "border-foreground bg-card" : "border-border text-muted-foreground hover:text-foreground")}
                 onClick={() => setProfileFilter(entry.id)}>
                 {entry.color && <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: entry.color }} />}
                 {entry.name}
