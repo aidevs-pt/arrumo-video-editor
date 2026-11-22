@@ -83,7 +83,10 @@
       "generation": "vídeo",
       "completed-video": "vídeo"
     },
-    "cues": "{count} legendas"
+    "cues": "{count} legendas",
+    "hook": {
+      "video-completed": "Também é executada automaticamente quando um vídeo termina, enquanto «{setting}» estiver ativado nas definições deste plugin."
+    }
   },
   "pluginGrants": {
     "title": "Permissões de plugins",

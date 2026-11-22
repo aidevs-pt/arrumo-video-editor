@@ -191,6 +191,7 @@ impl WorkspaceStore {
             params![run_id, index, attempt, result],
         )?;
         tx.commit()?;
+        self.queue_video_completed_hooks(workspace_id, run_id);
         Ok(completed)
     }
 }

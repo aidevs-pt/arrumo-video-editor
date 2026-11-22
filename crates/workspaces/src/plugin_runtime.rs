@@ -188,10 +188,10 @@ fn runtime_engine() -> io::Result<&'static Engine> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    const ECHO: &str = r#"
+    pub(crate) const ECHO: &str = r#"
       (component
         (core module $m
           (memory (export "mem") 2)

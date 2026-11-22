@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Check, Copy, FileUp } from "lucide-react";
+import { Check, Copy, FileUp, Zap } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,11 +24,12 @@ export type ActionInput = {
   required?: boolean;
   choices?: string[];
 };
+export type ActionHook = { event: "video-completed"; enabledBy: string };
 export type InstalledAction = {
   pluginId: string;
   pluginName: string;
   packageSha256: string;
-  action: { id: string; label: string; description: string; inputs?: ActionInput[]; placements?: ActionPlacement[] };
+  action: { id: string; label: string; description: string; inputs?: ActionInput[]; placements?: ActionPlacement[]; hooks?: ActionHook[] };
 };
 export type ActionJob = {
   id: string;
@@ -133,6 +134,10 @@ export function ActionForm({ entry, workspaceId, context = {}, onChanged }: {
 
   return <form className="flex flex-col gap-4" onSubmit={run} aria-busy={pending} noValidate>
     <p className="text-sm text-muted-foreground">{pluginText.action(entry.pluginId, entry.action.id, "description", entry.action.description)}</p>
+    {entry.action.hooks?.map((hook) => <Alert key={hook.event}>
+      <Zap />
+      <AlertDescription>{copy.hook[hook.event].replace("{setting}", pluginText.settingLabel(entry.pluginId, hook.enabledBy))}</AlertDescription>
+    </Alert>)}
     {inputs.length ? <FieldGroup className="gap-4">
       {inputs.map((input) => <InputField key={input.id} id={`${id}-${input.id}`} input={input} value={values[input.id]}
         disabled={pending} context={context} onChange={(value) => set(input.id, value)} />)}

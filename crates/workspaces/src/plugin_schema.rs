@@ -118,6 +118,26 @@ pub struct PluginAction {
     /// Where the app offers the action besides Settings (schema 9).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub placements: Vec<ActionPlacement>,
+    /// Events that run the action on their own (schema 9), each only while the boolean
+    /// setting it names is on for the workspace.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hooks: Vec<ActionHook>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActionHook {
+    pub event: HookEvent,
+    /// A boolean setting of the same plugin. The hook runs only when it resolves to `true`.
+    pub enabled_by: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum HookEvent {
+    /// A video finished and its delivery files were verified. The action receives
+    /// `{"event": "video-completed", "video": {…}}` instead of form inputs.
+    VideoCompleted,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -182,6 +202,20 @@ impl PluginAction {
             })
             && self.placements.iter().all(|place| places.insert(*place))
     }
+
+    /// Hooks are workspace actions, one per event, each switched by a declared boolean setting.
+    pub(crate) fn valid_hooks(&self, settings: &[crate::PluginSetting]) -> bool {
+        let mut events = std::collections::HashSet::new();
+        self.hooks.is_empty()
+            || self.scope == PluginActionScope::Workspace
+                && self.hooks.iter().all(|hook| {
+                    events.insert(hook.event)
+                        && settings.iter().any(|setting| {
+                            setting.id == hook.enabled_by
+                                && setting.kind == crate::PluginSettingKind::Boolean
+                        })
+                })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -234,5 +268,31 @@ mod action_form_tests {
             "id": "a", "label": "A", "description": "A", "scope": "app", "placements": ["timeline"]
         }));
         assert!(unknown.is_err(), "unknown places are refused");
+    }
+
+    #[test]
+    fn hooks_need_a_workspace_action_and_a_boolean_switch() {
+        let settings: Vec<crate::PluginSetting> = serde_json::from_value(serde_json::json!([
+            {"id": "auto-upload", "label": "Upload when ready", "description": "Upload each finished video.",
+             "kind": "boolean", "scope": "workspace", "required": false},
+            {"id": "channel", "label": "Channel", "description": "Channel name.",
+             "kind": "string", "scope": "workspace", "required": false}
+        ]))
+        .unwrap();
+        let hook = |setting: &str| serde_json::json!({"hooks": [{"event": "video-completed", "enabledBy": setting}]});
+        assert!(action(hook("auto-upload")).valid_hooks(&settings));
+        assert!(
+            !action(hook("channel")).valid_hooks(&settings),
+            "the switch is boolean"
+        );
+        assert!(!action(hook("missing")).valid_hooks(&settings));
+        let mut app = action(hook("auto-upload"));
+        app.scope = PluginActionScope::App;
+        assert!(!app.valid_hooks(&settings), "hooks run in a workspace");
+        let twice = action(serde_json::json!({"hooks": [
+            {"event": "video-completed", "enabledBy": "auto-upload"},
+            {"event": "video-completed", "enabledBy": "auto-upload"}
+        ]}));
+        assert!(!twice.valid_hooks(&settings));
     }
 }

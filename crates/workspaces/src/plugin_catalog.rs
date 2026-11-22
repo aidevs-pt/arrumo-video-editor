@@ -520,7 +520,10 @@ impl PluginManifest {
                         || blank(&action.label)
                         || blank(&action.description)
                         || !action.valid_form()
-                        || (!action.inputs.is_empty() || !action.placements.is_empty())
+                        || !action.valid_hooks(manifest.settings.as_deref().unwrap_or_default())
+                        || (!action.inputs.is_empty()
+                            || !action.placements.is_empty()
+                            || !action.hooks.is_empty())
                             && manifest.schema_version < 9
                 })
             {

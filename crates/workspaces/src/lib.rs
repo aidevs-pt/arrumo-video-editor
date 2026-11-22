@@ -53,6 +53,7 @@ mod plugin_actions;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
+mod plugin_hooks;
 mod plugin_package;
 mod plugin_registry;
 mod plugin_runtime;
@@ -134,8 +135,9 @@ pub use plugin_registry::{
 };
 pub use plugin_runtime::MAX_PLUGIN_IO_BYTES;
 pub use plugin_schema::{
-    ActionInput, ActionInputKind, ActionPlacement, PluginAction, PluginActionScope, PluginCode,
-    PluginSetting, PluginSettingKind, PluginSettingScope, PluginSurfacePlacement,
+    ActionHook, ActionInput, ActionInputKind, ActionPlacement, HookEvent, PluginAction,
+    PluginActionScope, PluginCode, PluginSetting, PluginSettingKind, PluginSettingScope,
+    PluginSurfacePlacement,
 };
 pub use plugin_settings::ResolvedPluginSetting;
 pub use plugin_surfaces::InstalledPluginSurface;

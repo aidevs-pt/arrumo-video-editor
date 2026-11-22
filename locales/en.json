@@ -83,7 +83,10 @@
       "generation": "video",
       "completed-video": "video"
     },
-    "cues": "{count} cues"
+    "cues": "{count} cues",
+    "hook": {
+      "video-completed": "Also runs on its own when a video finishes, while “{setting}” is on in this plugin’s settings."
+    }
   },
   "pluginGrants": {
     "title": "Plugin permissions",

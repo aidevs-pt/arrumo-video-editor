@@ -83,7 +83,10 @@
       "generation": "vídeo",
       "completed-video": "vídeo"
     },
-    "cues": "{count} subtítulos"
+    "cues": "{count} subtítulos",
+    "hook": {
+      "video-completed": "También se ejecuta sola al terminar un vídeo, mientras «{setting}» esté activado en los ajustes de este complemento."
+    }
   },
   "pluginGrants": {
     "title": "Permisos de complementos",

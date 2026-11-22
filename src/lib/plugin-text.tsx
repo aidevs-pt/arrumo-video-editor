@@ -19,7 +19,7 @@ type Translation = {
   settings?: Record<string, SettingText>;
   actions?: Record<string, Partial<Labelled> & { inputs?: Record<string, SettingText> }>;
 };
-type CatalogManifest = { id: string; iconNotice?: string; translations?: Record<string, Translation> };
+type CatalogManifest = { id: string; iconNotice?: string; settings?: { id: string; label: string }[]; translations?: Record<string, Translation> };
 type CatalogEntry = { manifest: CatalogManifest; iconSvg?: string };
 
 export const PLUGINS_CHANGED = "arrumo:plugins-changed";
@@ -28,6 +28,8 @@ type PluginText = {
   /** The plugin's name in the creator's language, or `fallback` (the manifest's English). */
   name: (pluginId: string, fallback: string) => string;
   description: (pluginId: string, fallback: string) => string;
+  /** A setting's label in the creator's language, falling back to the manifest's. */
+  settingLabel: (pluginId: string, setting: string) => string;
   providerLabel: (pluginId: string, fallback: string) => string;
   capability: (pluginId: string, capabilityId: string, field: keyof Named, fallback: string) => string;
   setting: (pluginId: string, settingId: string, field: "label" | "description", fallback: string) => string;
@@ -73,6 +75,8 @@ export function PluginTextProvider({ children }: { children: ReactNode }) {
       description: (id, fallback) => entry(id)?.description ?? fallback,
       providerLabel: (id, fallback) => entry(id)?.provider?.label ?? fallback,
       capability: (id, capability, field, fallback) => entry(id)?.capabilities?.[capability]?.[field] ?? fallback,
+      settingLabel: (id, setting) => entry(id)?.settings?.[setting]?.label
+        ?? plugins.get(id)?.manifest.settings?.find((item) => item.id === setting)?.label ?? setting,
       setting: (id, setting, field, fallback) => entry(id)?.settings?.[setting]?.[field] ?? fallback,
       choice: (id, setting, choice) =>
         entry(id)?.settings?.[setting]?.choices?.[choice] ?? entry(id, "en")?.settings?.[setting]?.choices?.[choice] ?? choice,
@@ -107,6 +111,7 @@ const english: PluginText = {
   description: (_, fallback) => fallback,
   providerLabel: (_, fallback) => fallback,
   capability: (_, __, ___, fallback) => fallback,
+  settingLabel: (_, setting) => setting,
   setting: (_, __, ___, fallback) => fallback,
   choice: (_, __, choice) => choice,
   action: (_, __, ___, fallback) => fallback,
