@@ -10,6 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { ThumbnailReferences, type ReferenceImage } from "@/components/workspace/outputs/thumbnail-references";
+import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
+
+/** Reference images previewed in a format's summary; the rest are counted. */
+const REFERENCE_PREVIEWS = 4;
 
 type Format = { id: number; name: string; width: number; height: number };
 type Supplemental = {
@@ -67,8 +71,10 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
         };
         const customised = Object.values(change).some((entry) => entry !== undefined);
         const Icon = format.height > format.width ? RectangleVertical : RectangleHorizontal;
-        const lines: { icon: typeof Icon; text: string }[] = [];
-        if (value.thumbnails) lines.push({ icon: ImageIcon, text: copy.makeThumbnails.replace("{count}", String(value.thumbnails)).replace("{format}", format.name.toLowerCase()) });
+        const references = (change.thumbnail_reference_ids ?? supplemental.thumbnail_reference_ids ?? [])
+          .map((id) => images.find((image) => image.id === id)).filter((image): image is ReferenceImage => !!image);
+        const lines: { icon: typeof Icon; text: string; previews?: ReferenceImage[] }[] = [];
+        if (value.thumbnails) lines.push({ icon: ImageIcon, text: copy.makeThumbnails.replace("{count}", String(value.thumbnails)).replace("{format}", format.name.toLowerCase()), previews: references });
         if (value.portrait) lines.push({ icon: RectangleVertical, text: copy.makePortrait.replace("{count}", String(value.portrait)) });
         if (value.titles || value.descriptions || value.tags) lines.push({ icon: FileText, text: [
           value.titles || value.descriptions ? copy.makeText.replace("{titles}", String(value.titles)).replace("{descriptions}", String(value.descriptions)) : "",
@@ -87,8 +93,20 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
             </div>
             {!skipped && <>
               {lines.length > 0 && <ul className="ms-6.5 flex flex-col gap-1.5 text-sm">
-                {lines.map(({ icon: LineIcon, text }) => (
-                  <li key={text} className="flex items-start gap-2"><LineIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />{text}</li>
+                {lines.map(({ icon: LineIcon, text, previews }) => (
+                  <li key={text} className="flex flex-col gap-1.5">
+                    <span className="flex items-start gap-2"><LineIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />{text}</span>
+                    {previews && previews.length > 0 && <span className="ms-5.5 flex items-center gap-2 text-xs text-muted-foreground"
+                      title={previews.map((image) => image.name).join(", ")}>
+                      <span className="flex -space-x-2">
+                        {previews.slice(0, REFERENCE_PREVIEWS).map((image) => (
+                          <AssetThumbnail key={image.id} workspaceId={workspaceId} assetId={image.id} kind="image"
+                            className="size-7 shrink-0 overflow-hidden rounded-[5px] ring-2 ring-card" />
+                        ))}
+                      </span>
+                      {previews.length === 1 ? copy.referenceOne : copy.referenceCount.replace("{count}", String(previews.length))}
+                    </span>}
+                  </li>
                 ))}
               </ul>}
               <Collapsible>

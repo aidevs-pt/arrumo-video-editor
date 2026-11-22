@@ -1242,7 +1242,9 @@
     "thumbnailGuidance": "Indicações para miniaturas",
     "portraitGuidance": "Indicações para cortes verticais",
     "specifications": "Especificações adicionais",
-    "resetFormat": "Usar as definições herdadas"
+    "resetFormat": "Usar as definições herdadas",
+    "referenceCount": "Seguindo {count} imagens de referência",
+    "referenceOne": "Seguindo 1 imagem de referência"
   },
   "scriptReview": {
     "selectAll": "Selecionar tudo",

@@ -6,6 +6,8 @@ const workspaceSections: readonly WorkspaceView[] = [
   "profiles", "context", "brand", "assets", "motion-library", "outputs", "drafts", "generations", "videos", "calendar",
 ];
 
+const profileTabs = ["context", "brand", "assets", "outputs", "animations", "calendar"] as const;
+
 function numericId(query: URLSearchParams, name: string) {
   const values = query.getAll(name);
   const id = Number(values[0]);
@@ -21,7 +23,8 @@ function internalRoute(value: string) {
   if (!workspace) return;
   if (url.pathname === "/profile") {
     const profile = numericId(query, "profile");
-    if (profile) return profileHref(workspace, profile);
+    const tab = profileTabs.find((id) => id === query.get("tab"));
+    if (profile) return tab ? `${profileHref(workspace, profile)}&tab=${tab}` : profileHref(workspace, profile);
   } else if (url.pathname === "/generation-run" || url.pathname === "/completed-video") {
     const run = numericId(query, "run");
     if (run) return url.pathname === "/completed-video"
@@ -31,7 +34,10 @@ function internalRoute(value: string) {
     return calendarHref(workspace, numericId(query, "profile"), query.get("month"));
   } else {
     const section = workspaceSections.find((view) => url.pathname === `/${view}`);
-    if (section) return workspaceHref(section, workspace, section === "drafts" || section === "motion-library" ? numericId(query, "profile") : undefined);
+    if (!section) return;
+    const href = workspaceHref(section, workspace, section === "drafts" || section === "motion-library" ? numericId(query, "profile") : undefined);
+    const draft = section === "drafts" ? numericId(query, "draft") : undefined;
+    return draft ? `${href}&draft=${draft}` : href;
   }
 }
 

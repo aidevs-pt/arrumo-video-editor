@@ -1242,7 +1242,9 @@
     "thumbnailGuidance": "Thumbnail guidance",
     "portraitGuidance": "Portrait cut guidance",
     "specifications": "Extra specifications",
-    "resetFormat": "Use the inherited settings"
+    "resetFormat": "Use the inherited settings",
+    "referenceCount": "Following {count} reference images",
+    "referenceOne": "Following 1 reference image"
   },
   "scriptReview": {
     "selectAll": "Select all",
