@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Captions, Film, Search } from "lucide-react";
+import { ArrowUpRight, Captions, Film, Puzzle, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,6 +14,9 @@ import { completedVideoHref, workspaceHref } from "@/components/workspace/home/w
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { ItemContextMenu } from "@/components/workspace/item-context-menu";
+import type { InstalledAction } from "@/components/workspace/plugins/action-form";
+import { ActionSheet, usePlacedActionLabel, usePlacedActions } from "@/components/workspace/plugins/placed-actions";
+import { completedSubtitleTracks } from "@/components/workspace/completed-videos/completed-subtitle-tracks";
 import { VideoCatalogHeader } from "./video-catalog-header";
 
 type Run = {
@@ -35,6 +38,9 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
   const [failed, setFailed] = useState(false);
   const [load, setLoad] = useState(0);
   const [search, setSearch] = useState("");
+  const actions = usePlacedActions(workspaceId, "completed-video");
+  const actionLabel = usePlacedActionLabel();
+  const [action, setAction] = useState<{ entry: InstalledAction; runId: number }>();
   const normalized = search.trim().toLocaleLowerCase(locale);
   const filtered = runs?.filter((run) => title(run).toLocaleLowerCase(locale).includes(normalized));
 
@@ -88,6 +94,7 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
               <ItemContextMenu key={run.id} label={title(run)} items={[
                 { label: messages.completedVideo.details, icon: ArrowUpRight, href: completedVideoHref(workspaceId, run.id) },
                 { label: messages.completedVideo.subtitleText, icon: Captions, href: completedVideoHref(workspaceId, run.id, undefined, "subtitles") },
+                ...actions.map((entry, index) => ({ label: actionLabel(entry), icon: Puzzle, group: index === 0, onSelect: () => setAction({ entry, runId: run.id }) })),
               ]}>
               <li>
                 <Link className="group flex items-center gap-3 px-1 py-3 hover:bg-muted/60 sm:gap-4"
@@ -106,6 +113,8 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
           </ul>
         </div>
       )}
+      <ActionSheet workspaceId={workspaceId} entry={action?.entry} onClose={() => setAction(undefined)}
+        context={action && { subtitleTracks: () => completedSubtitleTracks(workspaceId, action.runId, locale, messages.subtitleRevisions.primary) }} />
     </WorkspaceShell>
   );
 }

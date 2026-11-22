@@ -1,10 +1,12 @@
 "use client";
 
-import { PlacedPluginActions } from "@/components/workspace/plugins/placed-actions";
-import type { SubtitleTrack } from "@/components/workspace/plugins/action-form";
+import { ActionSheet, PlacedPluginActions, usePlacedActionLabel, usePlacedActions } from "@/components/workspace/plugins/placed-actions";
+import type { InstalledAction } from "@/components/workspace/plugins/action-form";
+import { ItemContextMenu } from "@/components/workspace/item-context-menu";
+import { completedSubtitleTracks } from "./completed-subtitle-tracks";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
-import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, Image, MessageSquare, Music } from "lucide-react";
+import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, Image, MessageSquare, Music, Puzzle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -142,21 +144,10 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const format = formats.find(({ format }) => format.id === formatId)?.format;
   const outputName = (output: Output) => formats.find(({ format }) => format.id === output.format_id)?.format.name ?? output.video;
 
-  /** Every subtitle track of every output: the primary one, then each added language. */
-  async function subtitleTracks(): Promise<SubtitleTrack[]> {
-    const names = new Intl.DisplayNames([locale], { type: "language" });
-    const outputs = await Promise.all(video.delivery.verified_outputs.map(async (output) => {
-      const preview = await invoke<{ languages: string[] }>("preview_completed_output", { workspaceId, runId, formatId: output.format_id });
-      return ["", ...preview.languages].map((language) => ({
-        id: `${output.format_id}:${language}`,
-        label: `${outputName(output)} · ${language ? (names.of(language) ?? language) : subtitleRevisions.primary}`,
-        load: async () => (await invoke<{ subtitles: string }>("read_completed_subtitle_revision", {
-          workspaceId, runId, formatId: output.format_id, language: language || null,
-        })).subtitles,
-      }));
-    }));
-    return outputs.flat();
-  }
+  const placed = usePlacedActions(workspaceId, "completed-video");
+  const actionLabel = usePlacedActionLabel();
+  const [placedOpen, setPlacedOpen] = useState<InstalledAction>();
+  const trackContext = { subtitleTracks: () => completedSubtitleTracks(workspaceId, runId, locale, subtitleRevisions.primary) };
 
   async function rename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -319,8 +310,16 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
         <TabsContent value="video" className="@container">
           {selected ? (
             <div className="grid items-start gap-5 @3xl:grid-cols-[minmax(0,1fr)_13rem]">
-              <CompletedOutputPreview key={selected.format_id} workspaceId={workspaceId} runId={runId}
-                formatId={selected.format_id} label={outputName(selected)} />
+              <ItemContextMenu label={savedTitle} items={[
+                { label: copy.subtitleText, icon: Captions, href: completedVideoHref(workspaceId, runId, selected.format_id, "subtitles") },
+                { label: copy.exportZip, icon: Archive, disabled: Boolean(action), onSelect: () => void exportZip() },
+                ...placed.map((entry, index) => ({ label: actionLabel(entry), icon: Puzzle, group: index === 0, onSelect: () => setPlacedOpen(entry) })),
+              ]}>
+                <div className="min-w-0">
+                  <CompletedOutputPreview key={selected.format_id} workspaceId={workspaceId} runId={runId}
+                    formatId={selected.format_id} label={outputName(selected)} />
+                </div>
+              </ItemContextMenu>
               <Card>
                 <CardHeader><CardTitle>{copy.outputFormat}</CardTitle></CardHeader>
                 <CardContent className="flex flex-col gap-3">
@@ -372,7 +371,8 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
             </div>
             <div className="flex flex-wrap gap-2">{textLinks}{mediaLinks}</div>
           </section>}
-          <PlacedPluginActions className="mt-6" workspaceId={workspaceId} placement="completed-video" context={{ subtitleTracks }} />
+          <PlacedPluginActions className="mt-6" workspaceId={workspaceId} placement="completed-video" context={trackContext} />
+          <ActionSheet workspaceId={workspaceId} entry={placedOpen} context={trackContext} onClose={() => setPlacedOpen(undefined)} />
         </TabsContent>
         <TabsContent value="details" forceMount className="flex flex-col gap-5 data-[state=inactive]:hidden">
           <RunMotionResults workspaceId={workspaceId} runId={runId} results={video.production.results}

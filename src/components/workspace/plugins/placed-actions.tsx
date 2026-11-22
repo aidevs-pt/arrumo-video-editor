@@ -8,22 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useLocale } from "@/lib/locale-provider";
 import { PLUGINS_CHANGED, PluginIcon, usePluginText } from "@/lib/plugin-text";
-import { cn } from "@/lib/utils";
 
 import { ActionForm, type ActionContext, type ActionPlacement, type InstalledAction } from "./action-form";
 
-/** The installed plugin actions declared for one place in the app, each opening its form in a side sheet.
- * Renders nothing when no plugin offers an action here. */
-export function PlacedPluginActions({ workspaceId, placement, context, className }: {
-  workspaceId: number;
-  placement: ActionPlacement;
-  context?: ActionContext;
-  className?: string;
-}) {
-  const pluginText = usePluginText();
-  const { messages: { pluginActions: copy } } = useLocale();
+/** The installed plugin actions declared for one place in the app, refreshed when plugins change. */
+export function usePlacedActions(workspaceId: number, placement: ActionPlacement) {
   const [actions, setActions] = useState<InstalledAction[]>([]);
-  const [open, setOpen] = useState<InstalledAction>();
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
@@ -41,9 +31,55 @@ export function PlacedPluginActions({ workspaceId, placement, context, className
     return () => { active = false; };
   }, [workspaceId, placement, revision]);
 
-  if (!actions.length) return null;
-  const label = (entry: InstalledAction) => pluginText.action(entry.pluginId, entry.action.id, "label", entry.action.label);
+  return actions;
+}
 
+export function usePlacedActionLabel() {
+  const pluginText = usePluginText();
+  return (entry: InstalledAction) => pluginText.action(entry.pluginId, entry.action.id, "label", entry.action.label);
+}
+
+/** One action's form in a side sheet. */
+export function ActionSheet({ workspaceId, entry, context, onClose }: {
+  workspaceId: number;
+  entry: InstalledAction | undefined;
+  context?: ActionContext;
+  onClose: () => void;
+}) {
+  const pluginText = usePluginText();
+  const label = usePlacedActionLabel();
+  return <Sheet open={!!entry} onOpenChange={(value) => { if (!value) onClose(); }}>
+    <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">
+      {entry && <>
+        <SheetHeader className="flex-row items-center gap-3 border-b pe-12">
+          <PluginIcon pluginId={entry.pluginId} className="size-9" />
+          <div className="min-w-0">
+            <SheetTitle>{label(entry)}</SheetTitle>
+            <SheetDescription>{pluginText.name(entry.pluginId, entry.pluginName)}</SheetDescription>
+          </div>
+        </SheetHeader>
+        <div className="p-4">
+          <ActionForm key={`${entry.pluginId}/${entry.action.id}`} entry={entry} workspaceId={workspaceId} context={context} />
+        </div>
+      </>}
+    </SheetContent>
+  </Sheet>;
+}
+
+/** The actions plugins offer in one place, each opening its form in a side sheet.
+ * Renders nothing when no plugin offers an action here. */
+export function PlacedPluginActions({ workspaceId, placement, context, className }: {
+  workspaceId: number;
+  placement: ActionPlacement;
+  context?: ActionContext;
+  className?: string;
+}) {
+  const { messages: { pluginActions: copy } } = useLocale();
+  const actions = usePlacedActions(workspaceId, placement);
+  const label = usePlacedActionLabel();
+  const [open, setOpen] = useState<InstalledAction>();
+
+  if (!actions.length) return null;
   return <Card size="sm" className={className}>
     <CardHeader>
       <CardTitle>{copy.placedTitle}</CardTitle>
@@ -58,21 +94,6 @@ export function PlacedPluginActions({ workspaceId, placement, context, className
         </Button>
       ))}
     </CardContent>
-    <Sheet open={!!open} onOpenChange={(value) => { if (!value) setOpen(undefined); }}>
-      <SheetContent className={cn("w-full gap-0 overflow-y-auto sm:max-w-lg")}>
-        {open && <>
-          <SheetHeader className="flex-row items-center gap-3 border-b pe-12">
-            <PluginIcon pluginId={open.pluginId} className="size-9" />
-            <div className="min-w-0">
-              <SheetTitle>{label(open)}</SheetTitle>
-              <SheetDescription>{pluginText.name(open.pluginId, open.pluginName)}</SheetDescription>
-            </div>
-          </SheetHeader>
-          <div className="p-4">
-            <ActionForm key={`${open.pluginId}/${open.action.id}`} entry={open} workspaceId={workspaceId} context={context} />
-          </div>
-        </>}
-      </SheetContent>
-    </Sheet>
+    <ActionSheet workspaceId={workspaceId} entry={open} context={context} onClose={() => setOpen(undefined)} />
   </Card>;
 }
