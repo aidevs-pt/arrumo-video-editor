@@ -25,6 +25,22 @@ export type ProviderUsage = {
 type CatalogEntry = { manifest: { id: string; name: string } };
 
 const REFRESH_MS = 30 * 60 * 1000;
+const SHARED_MS = 60 * 1000;
+type UsageRead = { providers: ProviderUsage[]; names: Record<string, string> };
+const reads = new Map<number, { at: number; read: Promise<UsageRead> }>();
+
+/** One provider read per workspace for every component asking within a minute, so each key is used once. */
+function readUsage(workspaceId: number) {
+  const cached = reads.get(workspaceId);
+  if (cached && Date.now() - cached.at < SHARED_MS) return cached.read;
+  const read = Promise.all([
+    invoke<ProviderUsage[]>("provider_usage", { workspaceId }),
+    invoke<CatalogEntry[]>("list_plugin_catalog").catch(() => [] as CatalogEntry[]),
+  ]).then(([providers, catalog]) => ({ providers, names: Object.fromEntries(catalog.map(({ manifest }) => [manifest.id, manifest.name])) }));
+  read.catch(() => reads.delete(workspaceId));
+  reads.set(workspaceId, { at: Date.now(), read });
+  return read;
+}
 
 /** Each keyed provider's allowance in this workspace, refreshed every half hour and when plugins change. */
 export function useProviderUsage(workspaceId: number | undefined) {
@@ -32,7 +48,7 @@ export function useProviderUsage(workspaceId: number | undefined) {
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    const changed = () => setRevision((value) => value + 1);
+    const changed = () => { reads.clear(); setRevision((value) => value + 1); };
     window.addEventListener(PLUGINS_CHANGED, changed);
     const timer = setInterval(changed, REFRESH_MS);
     return () => { window.removeEventListener(PLUGINS_CHANGED, changed); clearInterval(timer); };
@@ -41,27 +57,30 @@ export function useProviderUsage(workspaceId: number | undefined) {
   useEffect(() => {
     if (workspaceId === undefined) return;
     let active = true;
-    Promise.all([
-      invoke<ProviderUsage[]>("provider_usage", { workspaceId }),
-      invoke<CatalogEntry[]>("list_plugin_catalog").catch(() => [] as CatalogEntry[]),
-    ]).then(([providers, catalog]) => {
-      if (active) setUsage({ workspaceId, providers, names: Object.fromEntries(catalog.map(({ manifest }) => [manifest.id, manifest.name])) });
-    }, () => {});
+    readUsage(workspaceId).then((read) => { if (active) setUsage({ workspaceId, ...read }); }, () => {});
     return () => { active = false; };
   }, [workspaceId, revision]);
 
   return usage?.workspaceId === workspaceId ? usage : undefined;
 }
 
-function dismissKey(workspaceId: number, entry: ProviderUsage) {
+export function dismissKey(workspaceId: number, entry: ProviderUsage) {
   return `arrumo.usage-dismissed.${workspaceId}.${entry.pluginId}.${entry.level}`;
 }
 
-function wasDismissed(key: string) {
+export function wasDismissed(key: string) {
   try { return window.localStorage.getItem(key) === "1"; } catch { return false; }
 }
 
 /** Formats "12%" in the app's language. */
+export const USAGE_DISMISSED = "arrumo:usage-dismissed";
+
+/** Hides these provider warnings in the banner and the notifications until they get worse. */
+export function dismissUsage(keys: string[]) {
+  for (const key of keys) try { window.localStorage.setItem(key, "1"); } catch {}
+  window.dispatchEvent(new CustomEvent<string[]>(USAGE_DISMISSED, { detail: keys }));
+}
+
 function percent(value: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(value / 100);
 }
@@ -73,6 +92,11 @@ export function UsageBanner({ workspaceId }: { workspaceId: number }) {
   const pluginText = usePluginText();
   const usage = useProviderUsage(workspaceId);
   const [closed, setClosed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const dismissed = (event: Event) => setClosed((current) => new Set([...current, ...(event as CustomEvent<string[]>).detail]));
+    window.addEventListener(USAGE_DISMISSED, dismissed);
+    return () => window.removeEventListener(USAGE_DISMISSED, dismissed);
+  }, []);
 
   const entry = usage?.providers
     .filter((item) => (item.level === "warning" || item.level === "danger") && item.remainingPercent !== null)
@@ -83,9 +107,7 @@ export function UsageBanner({ workspaceId }: { workspaceId: number }) {
   const name = pluginText.name(entry.pluginId, usage.names[entry.pluginId] ?? entry.pluginId);
   const danger = entry.level === "danger";
   function close() {
-    const key = dismissKey(workspaceId, entry!);
-    try { window.localStorage.setItem(key, "1"); } catch {}
-    setClosed((current) => new Set(current).add(key));
+    dismissUsage([dismissKey(workspaceId, entry!)]);
   }
 
   return (

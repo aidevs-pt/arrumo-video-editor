@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useProviderUsage } from "@/components/workspace/usage/provider-usage";
+import { USAGE_DISMISSED, dismissKey, dismissUsage, useProviderUsage, wasDismissed } from "@/components/workspace/usage/provider-usage";
 import { usePluginText } from "@/lib/plugin-text";
 import { useLocale } from "@/lib/locale-provider";
 
@@ -73,7 +73,14 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   const completions = (inbox?.completions ?? []).map((notice) => ({ ...notice, unread: notice.unread && !readHere.has(notice.run_id) }));
   const usage = useProviderUsage(workspaceId);
   const pluginText = usePluginText();
-  const lowProviders = usage?.providers.filter((entry) => (entry.level === "warning" || entry.level === "danger") && entry.remainingPercent !== null) ?? [];
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const changed = (event: Event) => setDismissed((current) => new Set([...current, ...(event as CustomEvent<string[]>).detail]));
+    window.addEventListener(USAGE_DISMISSED, changed);
+    return () => window.removeEventListener(USAGE_DISMISSED, changed);
+  }, []);
+  const lowProviders = usage?.providers.filter((entry) => (entry.level === "warning" || entry.level === "danger") && entry.remainingPercent !== null)
+    .filter((entry) => { const key = dismissKey(workspaceId, entry); return !dismissed.has(key) && !wasDismissed(key); }) ?? [];
   const attentionCount = reviews.length + completions.filter((notice) => notice.unread).length + lowProviders.length;
   const unreadCompletions = completions.filter((notice) => notice.unread);
   const entries: Entry[] = [
@@ -82,6 +89,7 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   ].sort((a, b) => b.notice.at - a.notice.at);
 
   async function markAllRead() {
+    dismissUsage(lowProviders.map((entry) => dismissKey(workspaceId, entry)));
     const ids = unreadCompletions.map((notice) => notice.run_id);
     setReadHere((current) => new Set([...current, ...ids]));
     await invoke("read_all_completion_notifications", { workspaceId }).catch(() => setReadHere((current) => {
@@ -102,7 +110,7 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
       <DropdownMenuContent align="end" className="w-96 max-w-[calc(100vw-1.5rem)] p-0">
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <h2 className="font-heading text-lg leading-none font-[850] [font-variation-settings:'wdth'_120]">{copy.notifications}</h2>
-          <Button type="button" variant="outline" size="sm" disabled={!unreadCompletions.length} onClick={(event) => { event.preventDefault(); void markAllRead(); }}>
+          <Button type="button" variant="outline" size="sm" disabled={!unreadCompletions.length && !lowProviders.length} onClick={(event) => { event.preventDefault(); void markAllRead(); }}>
             {copy.markAllRead}
           </Button>
         </div>
