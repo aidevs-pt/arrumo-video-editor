@@ -306,6 +306,7 @@ impl WorkspaceStore {
             include_str!("../migrations/062-brand-color-details.sql"),
             include_str!("../migrations/063-system-notifications.sql"),
             include_str!("../migrations/064-plugin-activation.sql"),
+            include_str!("../migrations/065-agent-usage-observations.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

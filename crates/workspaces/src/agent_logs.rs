@@ -313,6 +313,19 @@ impl WorkspaceStore {
                 tick()
             },
         );
+        if let Some(event) = &provider.cli.usage_event
+            && let Some((used, resets_at, minutes)) = event.read(&transcript.output_text())
+        {
+            let _ = self.0.execute(
+                "INSERT INTO agent_usage_observations
+                     (plugin_id, used_percent, resets_at, window_minutes, observed_at)
+                 VALUES (?1, ?2, ?3, ?4, unixepoch())
+                 ON CONFLICT(plugin_id) DO UPDATE SET used_percent = excluded.used_percent,
+                     resets_at = excluded.resets_at, window_minutes = excluded.window_minutes,
+                     observed_at = excluded.observed_at",
+                params![provider.id, used, resets_at, minutes],
+            );
+        }
         // Every session left in the agent's history is recorded, even when the run failed,
         // so it can be removed once nothing needs it.
         let resume = provider

@@ -1,6 +1,7 @@
 //! Reads how much of each provider's allowance is used, through the plugins' SDK `usage.json`
 //! descriptors, so the app can warn before a provider runs out.
 
+use rusqlite::OptionalExtension;
 use std::{error::Error, io, io::Read, time::Duration};
 
 use reqwest::header::{HeaderName, HeaderValue};
@@ -245,8 +246,26 @@ impl WorkspaceStore {
             else {
                 continue;
             };
-            let Some(read) = crate::agent_cli::read_agent_usage(plugin) else {
-                continue;
+            let read = match crate::agent_cli::read_agent_usage(plugin) {
+                Some(read) => read,
+                None if plugin.cli.usage_event.is_some() => {
+                    // Known only from the agent's last run, until that window resets.
+                    let Some(seen) = self
+                        .0
+                        .query_row(
+                            "SELECT used_percent, resets_at, window_minutes
+                             FROM agent_usage_observations
+                             WHERE plugin_id = ?1 AND (resets_at IS NULL OR resets_at > unixepoch())",
+                            [&manifest.id],
+                            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                        )
+                        .optional()?
+                    else {
+                        continue;
+                    };
+                    Ok(seen)
+                }
+                None => continue,
             };
             usage.push(match read {
                 Ok((used, resets_at, window_minutes)) => ProviderUsage {
@@ -297,6 +316,25 @@ mod tests {
         assert_eq!(number(Some(&serde_json::json!("42"))), Some(42.0));
         assert_eq!(number(Some(&serde_json::json!(-1))), None);
         assert_eq!(number(Some(&serde_json::json!("unlimited"))), None);
+    }
+
+    #[test]
+    fn claude_code_usage_comes_from_its_rate_limit_events() {
+        let event = crate::agent_plugin("claude-code")
+            .and_then(|plugin| plugin.cli.usage_event.as_ref())
+            .expect("Claude Code reports usage while it runs");
+        let output = concat!(
+            "{\"type\":\"assistant\"}\n",
+            "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"unifiedWindows\":{",
+            "\"five_hour\":{\"utilization\":0.45,\"resetsAt\":1795384200},",
+            "\"seven_day\":{\"utilization\":0.13,\"resetsAt\":1795662000}}}}\n",
+            "{\"type\":\"result\"}\n",
+        );
+        assert_eq!(
+            event.read(output),
+            Some((45.0, Some(1_795_384_200), Some(300)))
+        );
+        assert_eq!(event.read("{\"type\":\"result\"}"), None);
     }
 
     #[test]

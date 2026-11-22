@@ -249,7 +249,10 @@ mod tests {
             store.install_plugin_manifest(FIXTURE).unwrap();
             store
                 .0
-                .execute_batch("DROP TABLE plugin_activation; PRAGMA user_version = 63;")
+                .execute_batch(
+                    "DROP TABLE plugin_activation; DROP TABLE agent_usage_observations;
+                     PRAGMA user_version = 63;",
+                )
                 .unwrap();
         }
         let store = WorkspaceStore::open(&path).unwrap();

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 11] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -133,6 +133,83 @@ pub(crate) struct AgentCli {
     /// Schema 11: how to read the agent's remaining allowance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_run: Option<UsageRun>,
+    /// Schema 12: the allowance the agent reports in its run output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_event: Option<UsageEvent>,
+}
+
+/// An event the agent prints during ordinary runs that reports its allowance: the line whose
+/// `typePointer` equals `typeValue`, with windows naming the share used and when it resets.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct UsageEvent {
+    pub type_pointer: String,
+    pub type_value: String,
+    pub windows: Vec<EventWindow>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct EventWindow {
+    pub used: String,
+    pub scale: UsageScale,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<i64>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum UsageScale {
+    Fraction,
+    Percent,
+}
+
+impl UsageEvent {
+    fn valid(&self) -> bool {
+        let pointer = |value: &str| value.starts_with('/') && value.len() <= 128;
+        pointer(&self.type_pointer)
+            && (1..=64).contains(&self.type_value.len())
+            && (1..=4).contains(&self.windows.len())
+            && self.windows.iter().all(|window| {
+                pointer(&window.used)
+                    && window.resets_at.as_deref().is_none_or(pointer)
+                    && window
+                        .minutes
+                        .is_none_or(|minutes| (1..=525_600).contains(&minutes))
+            })
+    }
+
+    /// The most used window in the last matching line of `output`.
+    pub(crate) fn read(&self, output: &str) -> Option<(f64, Option<i64>, Option<i64>)> {
+        output.lines().rev().find_map(|line| {
+            let event: serde_json::Value = serde_json::from_str(line.trim()).ok()?;
+            if event.pointer(&self.type_pointer)?.as_str()? != self.type_value {
+                return None;
+            }
+            self.windows
+                .iter()
+                .filter_map(|window| {
+                    let used = event.pointer(&window.used)?.as_f64()?;
+                    let percent = match window.scale {
+                        UsageScale::Fraction => used * 100.0,
+                        UsageScale::Percent => used,
+                    };
+                    percent.is_finite().then(|| {
+                        (
+                            percent.clamp(0.0, 100.0),
+                            window
+                                .resets_at
+                                .as_deref()
+                                .and_then(|at| event.pointer(at)?.as_i64()),
+                            window.minutes,
+                        )
+                    })
+                })
+                .max_by(|first, second| first.0.total_cmp(&second.0))
+        })
+    }
 }
 
 /// Reads the agent's allowance without using it: the CLI is started with `args`, each `input`
@@ -621,6 +698,11 @@ impl PluginManifest {
                     .usage_run
                     .as_ref()
                     .is_some_and(|run| manifest.schema_version < 11 || !run.valid())
+                || provider
+                    .cli
+                    .usage_event
+                    .as_ref()
+                    .is_some_and(|event| manifest.schema_version < 12 || !event.valid())
                 || provider.cli.image_run.as_ref().is_some_and(|run| {
                     manifest.schema_version < 7
                         || !run.valid()
