@@ -227,6 +227,11 @@ pub(crate) fn run_structured(
             .lock()
             .map(|bytes| bytes.clone())
             .map_err(|_| failed("Could not read the agent's answer"))?,
+        StructuredSource::StdoutLastLine => transcript
+            .output
+            .lock()
+            .map(|bytes| last_line(&bytes).to_vec())
+            .map_err(|_| failed("Could not read the agent's answer"))?,
         StructuredSource::OutputFile => {
             let file =
                 fs::File::open(&output_path).map_err(|_| failed("The agent wrote no answer"))?;
@@ -364,6 +369,13 @@ fn expand_args(
         .collect()
 }
 
+fn last_line(bytes: &[u8]) -> &[u8] {
+    bytes
+        .split(|byte| *byte == b'\n')
+        .rfind(|line| !line.trim_ascii().is_empty())
+        .unwrap_or_default()
+}
+
 fn extract_answer(run: &StructuredRun, document: &[u8]) -> Result<Value, AgentRunError> {
     let unreadable = AgentRunError::Failed("The agent's answer was not valid JSON");
     let document: Value = serde_json::from_slice(document).map_err(|_| unreadable)?;
@@ -425,6 +437,10 @@ mod tests {
         );
         assert!(extract_answer(&stdout, br#"{"is_error":true,"structured_output":{}}"#).is_err());
         assert!(extract_answer(&stdout, br#"{"is_error":false}"#).is_err());
+        assert_eq!(
+            last_line(b"{\"type\":\"system\"}\n{\"structured_output\":{\"a\":1}}\n\n"),
+            br#"{"structured_output":{"a":1}}"#
+        );
         let file = run(StructuredSource::OutputFile, None, None);
         assert_eq!(
             extract_answer(&file, br#"{"a":1}"#).unwrap(),

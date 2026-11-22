@@ -70,8 +70,22 @@ pub(crate) fn agent_steps(provider: &str, text: &str) -> Vec<AgentStep> {
         .collect();
     let mut steps: Vec<AgentStep> = Vec::new();
     for line in text.lines().map(str::trim_end) {
+        let event: Option<Value> = line
+            .starts_with('{')
+            .then(|| serde_json::from_str(line).ok())
+            .flatten();
         for (pattern, entry) in &patterns {
-            let Some(found) = pattern.captures(line) else {
+            let subject = match &entry.pointer {
+                None => line,
+                Some(pointer) => match event.as_ref().and_then(|event| event.pointer(pointer)) {
+                    Some(Value::String(text)) => text
+                        .lines()
+                        .find(|line| !line.trim().is_empty())
+                        .unwrap_or(""),
+                    _ => continue,
+                },
+            };
+            let Some(found) = pattern.captures(subject) else {
                 continue;
             };
             let text = found
@@ -439,6 +453,34 @@ mod tests {
         assert!(
             args.contains(&"--ignore-user-config".to_owned()),
             "user config stays off by default"
+        );
+    }
+
+    #[test]
+    fn claude_code_events_become_thinking_and_search_steps() {
+        let printed = concat!(
+            r#"{"type":"system","subtype":"init"}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"WebSearch","input":{"query":"cube record 2026"}}]}}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":""}]}}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Checking the record\nmore"}]}}"#,
+            "\n",
+            r#"{"type":"result","structured_output":{}}"#,
+        );
+        assert_eq!(
+            agent_steps("claude-code", printed),
+            [
+                AgentStep {
+                    kind: "search".into(),
+                    text: "cube record 2026".into()
+                },
+                AgentStep {
+                    kind: "thinking".into(),
+                    text: "Checking the record".into()
+                },
+            ]
         );
     }
 

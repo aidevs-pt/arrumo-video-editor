@@ -98,6 +98,10 @@ pub(crate) struct StructuredRun {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ProgressPattern {
+    /// For agents printing one JSON event per line: the string at this pointer is matched instead
+    /// of the whole line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pointer: Option<String>,
     pub pattern: String,
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -128,6 +132,8 @@ pub(crate) struct StructuredResult {
 pub(crate) enum StructuredSource {
     OutputFile,
     Stdout,
+    /// The last line of standard output, for agents that print one JSON event per line.
+    StdoutLastLine,
 }
 
 impl StructuredRun {
@@ -156,6 +162,12 @@ impl StructuredRun {
                 .error_pointer
                 .as_deref()
                 .is_none_or(|value| pointer(value, false))
+            && self.progress.iter().all(|entry| {
+                entry
+                    .pointer
+                    .as_deref()
+                    .is_none_or(|value| pointer(value, false))
+            })
     }
 }
 
