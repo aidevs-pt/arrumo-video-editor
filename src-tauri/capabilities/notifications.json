@@ -4,9 +4,6 @@
     "main"
   ],
   "permissions": [
-    "notification:default",
-    "core:window:allow-set-focus",
-    "core:window:allow-unminimize",
-    "core:window:allow-show"
+    "notification:default"
   ]
 }

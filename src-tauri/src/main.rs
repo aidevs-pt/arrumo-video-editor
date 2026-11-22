@@ -524,6 +524,44 @@ async fn provider_usage(
     .map_err(|_| "usage_unavailable".to_owned())?
 }
 
+/// A clicked system notification brings the window forward and asks the page to open the run
+/// or finished video it named. Only those two in-app pages are accepted.
+fn open_clicked_notifications(app: &AppHandle) {
+    use tauri::Emitter;
+    use tauri_plugin_notification::NotificationExt;
+
+    let handle = app.clone();
+    let _ = app.notification().on_action(move |performed| {
+        if performed.action_id() != "tap" {
+            return;
+        }
+        let Some(href) = performed
+            .notification()
+            .and_then(|notification| notification.extra().get("href"))
+            .and_then(|value| value.as_str())
+            .filter(|href| notice_page(href))
+        else {
+            return;
+        };
+        if let Some(window) = handle.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        let _ = handle.emit_to("main", "system-notification-open", href);
+    });
+}
+
+fn notice_page(href: &str) -> bool {
+    ["/completed-video?", "/generation-run?"]
+        .iter()
+        .any(|page| href.starts_with(page))
+        && href.len() <= 128
+        && href
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"/-?&=".contains(&byte))
+}
+
 #[tauri::command]
 async fn list_video_models(
     workspace_id: i64,
@@ -1260,6 +1298,8 @@ fn main() {
                     eprintln!("Arrumo deep-link registration failed: {error}");
                 }
             }
+
+            open_clicked_notifications(app.handle());
 
             let data_dir: PathBuf = app.path().app_local_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
