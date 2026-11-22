@@ -1295,5 +1295,13 @@
       "supplemental_outputs": "Extras de publicação",
       "motion_library": "Biblioteca de animações"
     }
+  },
+  "agentProgress": {
+    "label": "O que o agente está a fazer",
+    "thinking": "{agent} está a trabalhar · {seconds} s",
+    "producing": "A produzir: {stage}",
+    "hostWork": "O Arrumo está a renderizar e a verificar o resultado",
+    "reading": "A ler o briefing e a planear",
+    "searching": "Pesquisou na web"
   }
 }

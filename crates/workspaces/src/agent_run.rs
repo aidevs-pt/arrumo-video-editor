@@ -352,6 +352,7 @@ mod tests {
         StructuredRun {
             args: vec!["{schema}".into(), "{outputPath}".into()],
             setting_args: Vec::new(),
+            progress: Vec::new(),
             result: StructuredResult {
                 source,
                 pointer: pointer.map(Into::into),
@@ -400,6 +401,7 @@ mod tests {
                 "{outputPath}".into(),
             ],
             setting_args: Vec::new(),
+            progress: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::OutputFile,
                 pointer: None,
@@ -436,6 +438,7 @@ mod tests {
                     otherwise: None,
                 },
             ],
+            progress: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::Stdout,
                 pointer: None,

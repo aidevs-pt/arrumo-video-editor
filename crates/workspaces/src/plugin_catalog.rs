@@ -86,7 +86,19 @@ pub(crate) struct StructuredRun {
     /// Arguments chosen by the plugin's settings, inserted at `{settings}`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setting_args: Vec<SettingArgs>,
+    /// Patterns that turn the agent's printed lines into steps creators can follow.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub progress: Vec<ProgressPattern>,
     pub result: StructuredResult,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ProgressPattern {
+    pub pattern: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -42,6 +42,59 @@ pub struct AgentLogSummary {
     pub problem: Option<String>,
 }
 
+/// Something the agent did while it worked, read from its output with its plugin's patterns.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub struct AgentStep {
+    pub kind: String,
+    pub text: String,
+}
+
+/// The steps in an agent's printed output, in order, without immediate repeats.
+pub(crate) fn agent_steps(provider: &str, text: &str) -> Vec<AgentStep> {
+    let Some(run) =
+        crate::agent_plugin(provider).and_then(|plugin| plugin.cli.structured_run.as_ref())
+    else {
+        return Vec::new();
+    };
+    let patterns: Vec<(regex::Regex, &crate::plugin_catalog::ProgressPattern)> = run
+        .progress
+        .iter()
+        .filter(|entry| matches!(entry.kind.as_str(), "thinking" | "search" | "step"))
+        .filter_map(|entry| {
+            regex::RegexBuilder::new(&entry.pattern)
+                .size_limit(1 << 20)
+                .build()
+                .ok()
+                .map(|pattern| (pattern, entry))
+        })
+        .collect();
+    let mut steps: Vec<AgentStep> = Vec::new();
+    for line in text.lines().map(str::trim_end) {
+        for (pattern, entry) in &patterns {
+            let Some(found) = pattern.captures(line) else {
+                continue;
+            };
+            let text = found
+                .get(1)
+                .map(|group| group.as_str().trim().to_owned())
+                .or_else(|| entry.label.clone())
+                .unwrap_or_default();
+            let text: String = text.chars().take(200).collect();
+            if !text.is_empty() && steps.last().is_none_or(|last| last.text != text) {
+                steps.push(AgentStep {
+                    kind: entry.kind.clone(),
+                    text,
+                });
+            }
+            break;
+        }
+        if steps.len() >= 200 {
+            break;
+        }
+    }
+    steps
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentLog {
@@ -53,6 +106,7 @@ pub struct AgentLog {
     pub output: String,
     pub errors: String,
     pub answer: Option<String>,
+    pub steps: Vec<AgentStep>,
 }
 
 fn status(result: &Result<Value, AgentRunError>) -> &'static str {
@@ -267,10 +321,18 @@ impl WorkspaceStore {
                         output: row.get(12)?,
                         errors: row.get(13)?,
                         answer: row.get(14)?,
+                        steps: Vec::new(),
                     })
                 },
             )
             .optional()
+            .map(|log| {
+                log.map(|mut log| {
+                    let printed = format!("{}\n{}", log.errors, log.output);
+                    log.steps = agent_steps(&log.summary.provider, &printed);
+                    log
+                })
+            })
     }
 }
 
@@ -361,5 +423,24 @@ mod tests {
             args.contains(&"--ignore-user-config".to_owned()),
             "user config stays off by default"
         );
+    }
+
+    #[test]
+    fn codex_progress_becomes_thinking_and_search_steps() {
+        let printed = "user\nPrompt\n**Planning the hook**\nweb search: \nweb search: cube record 2026\nweb search: cube record 2026\ncodex\n{}";
+        assert_eq!(
+            agent_steps("codex", printed),
+            [
+                AgentStep {
+                    kind: "thinking".into(),
+                    text: "Planning the hook".into()
+                },
+                AgentStep {
+                    kind: "search".into(),
+                    text: "cube record 2026".into()
+                },
+            ]
+        );
+        assert!(agent_steps("unknown", printed).is_empty());
     }
 }

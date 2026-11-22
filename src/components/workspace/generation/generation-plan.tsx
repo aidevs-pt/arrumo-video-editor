@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ArrowUpRight, Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { isScriptSections, ScriptSectionReview } from "./script-section-review";
+import { AgentProgress } from "./agent-progress";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,9 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
       <div className="@container">
         <div className="grid items-start gap-5 @min-[52rem]:grid-cols-[minmax(0,1fr)_17rem]">
           <div className="flex min-w-0 flex-col gap-4">
+            {runState === "running" && currentStage && !awaiting && (
+              <AgentProgress workspaceId={workspaceId} runId={runId} agent={agent ?? copy.agentFallback} stage={stageName(currentStage)} />
+            )}
             {runState === "completed" && (
               <Card size="sm">
                 <CardHeader>
@@ -213,7 +217,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                 </CardContent>
               </Card>
             )}
-            {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && (
+            {currentStage === "assets" && !awaiting && runState !== "completed" && runState !== "cancelled" && runState !== "running" && (
               <Card size="sm">
                 <CardHeader><CardTitle className="font-heading text-lg font-[850]">{copy.assets}</CardTitle></CardHeader>
                 <CardContent className="flex flex-col items-start gap-3">
@@ -222,7 +226,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                 </CardContent>
               </Card>
             )}
-            {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && (
+            {mediaStage && !awaiting && runState !== "completed" && runState !== "cancelled" && runState !== "running" && (
               <Card size="sm">
                 <CardHeader><CardTitle className="font-heading text-lg font-[850]">{copy[mediaStage]}</CardTitle></CardHeader>
                 <CardContent>

@@ -1295,5 +1295,13 @@
       "supplemental_outputs": "Publishing extras",
       "motion_library": "Animation library"
     }
+  },
+  "agentProgress": {
+    "label": "What the agent is doing",
+    "thinking": "{agent} is working · {seconds} s",
+    "producing": "Producing the {stage}",
+    "hostWork": "Arrumo is rendering and checking the result",
+    "reading": "Reading the brief and planning",
+    "searching": "Searched the web"
   }
 }

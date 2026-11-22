@@ -107,6 +107,7 @@ dependencies = [
  "keyring",
  "libc",
  "rcgen",
+ "regex",
  "reqwest",
  "rusqlite",
  "rustls",
