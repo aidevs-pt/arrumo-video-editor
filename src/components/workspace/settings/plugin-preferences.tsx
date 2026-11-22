@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginCredentialField } from "./plugin-credential-field";
+import { ProviderOrder } from "./provider-order";
 
 type Scope = "app" | "workspace";
 export type PluginSettingDeclaration = {
@@ -99,7 +100,10 @@ export function ScopedPluginPreferences({ workspaceId }: { workspaceId: number |
     <Button variant="outline" onClick={() => { setError(false); setAttempt((value) => value + 1); }}>{workspaces.retry}</Button>
   </Alert>;
   if (!manifests) return <Skeleton className="h-12" aria-label={copy.loading} />;
-  return <PluginPreferences plugins={manifests} workspaceId={workspaceId} />;
+  return <>
+    <ProviderOrder catalog={manifests} workspaceId={workspaceId} />
+    <PluginPreferences plugins={manifests} workspaceId={workspaceId} />
+  </>;
 }
 
 /** The agent plugin's own settings, such as web search, model and reasoning effort. */

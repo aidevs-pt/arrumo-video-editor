@@ -1333,5 +1333,35 @@
     "reading": "Reading the brief and planning",
     "searching": "Searched the web",
     "lookingAtMaterial": "Looking at the workspace material it asked for"
+  },
+  "providerOrder": {
+    "title": "Which plugin does what, in order",
+    "appIntro": "Arrumo tries the first one and moves to the next if it fails or runs out.",
+    "workspaceIntro": "Change the order for this workspace only, or keep the app's.",
+    "capabilities": {
+      "transcription": "Transcription",
+      "image-generation": "Image generation",
+      "text-to-speech": "Text to speech",
+      "video-generation": "Video generation",
+      "subtitle-translation": "Subtitle translation"
+    },
+    "hints": {
+      "transcription": "Every video with footage needs one.",
+      "image-generation": "Thumbnails, style references and asset generation.",
+      "text-to-speech": "Used by Auto-dubbing for voice-overs.",
+      "video-generation": "Clips and scenes cut into your edits.",
+      "subtitle-translation": "Used by Auto-dubbing to translate subtitles."
+    },
+    "inherited": "Following the app's order.",
+    "noExtraKey": "no extra key",
+    "agentSignIn": "uses your agent sign-in",
+    "noKey": "no key needed",
+    "keySaved": "key saved",
+    "keyNeeded": "key needed",
+    "moveUp": "Move {provider} up",
+    "moveDown": "Move {provider} down",
+    "resetApp": "Use the default order",
+    "resetWorkspace": "Use the app's order",
+    "saveError": "Could not save the order. Try again."
   }
 }

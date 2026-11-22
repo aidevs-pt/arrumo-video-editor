@@ -1333,5 +1333,35 @@
     "reading": "A ler o briefing e a planear",
     "searching": "Pesquisou na web",
     "lookingAtMaterial": "A analisar o material do espaço de trabalho que pediu"
+  },
+  "providerOrder": {
+    "title": "Que plugin faz o quê, por ordem",
+    "appIntro": "O Arrumo tenta o primeiro e passa ao seguinte se falhar ou ficar sem saldo.",
+    "workspaceIntro": "Muda a ordem só para este espaço de trabalho, ou mantém a da app.",
+    "capabilities": {
+      "transcription": "Transcrição",
+      "image-generation": "Geração de imagens",
+      "text-to-speech": "Texto para voz",
+      "video-generation": "Geração de vídeo",
+      "subtitle-translation": "Tradução de legendas"
+    },
+    "hints": {
+      "transcription": "Todos os vídeos com gravações precisam de um.",
+      "image-generation": "Miniaturas, referências de estilo e geração de recursos.",
+      "text-to-speech": "Usado pelo Auto-dubbing para as locuções.",
+      "video-generation": "Clipes e cenas montados nos teus vídeos.",
+      "subtitle-translation": "Usado pelo Auto-dubbing para traduzir legendas."
+    },
+    "inherited": "Segue a ordem da app.",
+    "noExtraKey": "sem chave extra",
+    "agentSignIn": "usa a sessão do teu agente",
+    "noKey": "não precisa de chave",
+    "keySaved": "chave guardada",
+    "keyNeeded": "precisa de chave",
+    "moveUp": "Subir {provider}",
+    "moveDown": "Descer {provider}",
+    "resetApp": "Usar a ordem predefinida",
+    "resetWorkspace": "Usar a ordem da app",
+    "saveError": "Não foi possível guardar a ordem. Tenta novamente."
   }
 }

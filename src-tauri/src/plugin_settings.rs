@@ -257,6 +257,23 @@ pub fn list_provider_preferences(
         .map_err(|_| "provider_preferences_failed")
 }
 
+/// Saves the order providers are tried in for one capability; `None` returns to the inherited order.
+#[tauri::command]
+pub fn write_provider_preferences(
+    capability: String,
+    workspace_id: Option<i64>,
+    order: Option<Vec<String>>,
+    store: State<'_, Store>,
+) -> Result<BTreeMap<String, arrumo_workspaces::ProviderPreferences>, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    store
+        .set_provider_preferences(&capability, workspace_id, order.as_deref())
+        .map_err(|_| "provider_preferences_invalid")?;
+    store
+        .list_provider_preferences(workspace_id)
+        .map_err(|_| "provider_preferences_failed")
+}
+
 #[tauri::command]
 pub fn list_plugin_surfaces(
     placement: arrumo_workspaces::PluginSurfacePlacement,

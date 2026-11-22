@@ -988,6 +988,7 @@ fn main() {
             plugin_settings::process_plugin_action_job,
             plugin_settings::invoke_reviewed_plugin_action,
             plugin_settings::list_provider_preferences,
+            plugin_settings::write_provider_preferences,
             plugin_settings::list_plugin_surfaces,
             plugin_settings::read_plugin_surface_context,
             plugin_settings::list_plugin_context_requests,
