@@ -1,6 +1,6 @@
 "use client";
 
-import { usePluginText } from "@/lib/plugin-text";
+import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useId, useState, type FormEvent } from "react";
@@ -86,8 +86,8 @@ export function PluginActions({ workspaceId, revision = "" }: {
         {actions.map((entry) => {
           const key = `${entry.pluginId}:${entry.action.id}:${entry.packageSha256}`;
           return <AccordionItem key={key} value={key}>
-            <AccordionTrigger className="wrap-anywhere">
-              <span>{pluginText.action(entry.pluginId, entry.action.id, "label", entry.action.label)}<span className="block text-xs text-muted-foreground">{pluginText.name(entry.pluginId, entry.pluginName)}</span></span>
+            <AccordionTrigger className="items-center wrap-anywhere">
+              <span className="flex min-w-0 items-center gap-3"><PluginIcon pluginId={entry.pluginId} className="size-8" /><span>{pluginText.action(entry.pluginId, entry.action.id, "label", entry.action.label)}<span className="block text-xs text-muted-foreground">{pluginText.name(entry.pluginId, entry.pluginName)}</span></span></span>
             </AccordionTrigger>
             <AccordionContent><ActionForm entry={entry} workspaceId={workspaceId} onChanged={refreshHistory} /></AccordionContent>
           </AccordionItem>;

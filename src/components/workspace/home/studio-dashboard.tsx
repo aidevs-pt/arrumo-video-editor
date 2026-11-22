@@ -206,9 +206,9 @@ function PublishingWeek({ workspaceId, schedule }: { workspaceId: number; schedu
 }
 
 function SectionHeader({ id, title, href, label }: { id: string; title: string; href: string; label: string }) {
-  return <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0">
-    <h2 id={id} className="text-[1.75rem]">{title}</h2>
-    <Link href={href} className="font-semibold text-primary underline underline-offset-4">{label}</Link>
+  return <div className="mb-3 flex items-baseline justify-between gap-3">
+    <h2 id={id} className="min-w-0 text-[clamp(1.375rem,2.2vw,1.75rem)] leading-tight text-balance">{title}</h2>
+    <Link href={href} className="shrink-0 font-semibold text-primary underline underline-offset-4">{label}</Link>
   </div>;
 }
 

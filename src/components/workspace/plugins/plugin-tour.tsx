@@ -123,7 +123,7 @@ function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: 
               exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}>
               <p className="text-sm text-muted-foreground">{name(stop)}</p>
-              <DialogTitle className="mt-1 font-heading text-[clamp(1.75rem,4vw,2.5rem)] leading-tight">{text(stop.headline)}</DialogTitle>
+              <DialogTitle className="mt-1 font-heading text-[clamp(1.75rem,4vw,2.5rem)] leading-tight font-[820] [font-variation-settings:'wdth'_125]">{text(stop.headline)}</DialogTitle>
               <DialogDescription className="mt-3 text-base text-foreground/80">{text(stop.body)}</DialogDescription>
             </motion.div>
           </AnimatePresence>

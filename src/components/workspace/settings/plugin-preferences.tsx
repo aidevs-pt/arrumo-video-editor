@@ -1,6 +1,6 @@
 "use client";
 
-import { usePluginText } from "@/lib/plugin-text";
+import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
@@ -68,7 +68,9 @@ export function PluginPreferences({
             const credentials = fields.filter((field) => field.kind === "secret");
             return (
               <AccordionItem key={id} value={id}>
-                <AccordionTrigger className="wrap-anywhere">{name}</AccordionTrigger>
+                <AccordionTrigger className="items-center wrap-anywhere">
+                  <span className="flex min-w-0 items-center gap-3"><PluginIcon pluginId={id} className="size-7" />{name}</span>
+                </AccordionTrigger>
                 <AccordionContent>
                   <div className="flex flex-col gap-4">
                     {ordinary.length > 0 && <PluginFields pluginId={id} fields={ordinary} workspaceId={workspaceId} />}
@@ -125,7 +127,7 @@ export function AgentCapabilities({ pluginId, workspaceId }: { pluginId: string;
   }, [pluginId, workspaceId]);
   if (!fields?.length) return null;
   return (
-    <Card className="mt-6">
+    <Card>
       <CardHeader>
         <CardTitle>{copy.agentTitle}</CardTitle>
         <CardDescription>{copy.agentIntro}</CardDescription>

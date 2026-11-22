@@ -121,9 +121,9 @@ export function ProviderOrder({ catalog, workspaceId }: { catalog: CatalogEntry[
                 {order.map((id, index) => (
                   <motion.li key={id} layout={!reduceMotion} transition={{ duration: 0.2 }}
                     className="flex items-center gap-3 px-3 py-2.5">
-                    <span className="w-4 text-sm tabular-nums text-muted-foreground">{index + 1}</span>
-                    <span className="flex-1 font-semibold">{names.get(id)}</span>
-                    <span className="text-sm text-muted-foreground">{note(capability, id)}</span>
+                    <span className="w-4 shrink-0 text-sm tabular-nums text-muted-foreground">{index + 1}</span>
+                    <span className="flex-1 font-semibold whitespace-nowrap">{names.get(id)}</span>
+                    <span className="min-w-0 text-end text-sm text-muted-foreground">{note(capability, id)}</span>
                     {order.length > 1 && <span className="flex">
                       <Button variant="ghost" size="icon" className="size-7" disabled={index === 0 || pending === capability}
                         aria-label={copy.moveUp.replace("{provider}", names.get(id) ?? id)} onClick={() => move(index, -1)}>

@@ -94,7 +94,9 @@ function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
   const failed = results?.key === key && !results.rows;
   const now = new Date();
   const today = asDate(utcDate(now.getFullYear(), now.getMonth(), now.getDate()));
-  const monthLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(month);
+  // Only the first letter: "capitalize" would also turn Spanish "de" into "De".
+  const monthName = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(month);
+  const monthLabel = monthName.charAt(0).toLocaleUpperCase(locale) + monthName.slice(1);
   const profileName = profiles.find((profile) => profile.id === profileId)?.name;
 
   function showMonth(offset: number) {
@@ -159,7 +161,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
       <section aria-label={copy.title}>
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className={cn("capitalize leading-[1] font-[850] [font-variation-settings:'wdth'_135]", monthHref ? "text-[2rem]" : "text-[clamp(2.25rem,5vw,3.25rem)]")}>{monthLabel}</h1>
+            <h1 className={cn("leading-[1] font-[850] [font-variation-settings:'wdth'_135]", monthHref ? "text-[2rem]" : "text-[clamp(2.25rem,5vw,3.25rem)]")}>{monthLabel}</h1>
             <p className="mt-2 text-muted-foreground">{profileName && monthHref ? copy.profileIntro.replace("{profile}", profileName)
               : copy.intro.replace("{workspace}", workspace?.name ?? "")}</p>
           </div>
