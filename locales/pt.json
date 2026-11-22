@@ -595,7 +595,20 @@
     "rowSpecsHint": "Qualquer outra coisa, por palavras tuas",
     "titlesShort": "Títulos",
     "descriptionsShort": "Descrições",
-    "tagsShort": "Etiquetas"
+    "tagsShort": "Etiquetas",
+    "perFormatVideo": "por vídeo {format}",
+    "whatEach": "Como deve ser cada uma",
+    "rowPortraitFrom": "Vídeos verticais de cada vídeo {format}",
+    "written": "Escritas",
+    "overriddenHere": "Alterado aqui, o espaço de trabalho usa {value}",
+    "reset": "Repor",
+    "alwaysShipsFormat": "Cada vídeo {format} inclui sempre o ficheiro de legendas.",
+    "summaryTitle": "Um vídeo {format} novo de {profile} recebe",
+    "summaryAlways": "Sempre",
+    "summaryVideoSubtitles": "Vídeo + legendas",
+    "summarySize": "Tamanho",
+    "summaryTitles": "Títulos, descrições",
+    "summaryHint": "Junta a app, o espaço de trabalho e este perfil. Podes mudar qualquer coisa em cada vídeo."
   },
   "drafts": {
     "deleteDraft": "Eliminar rascunho",
@@ -729,7 +742,10 @@
     "inherit": "Deixe o campo vazio para herdar o valor do espaço de trabalho.",
     "save": "Guardar definições",
     "saved": "Definições guardadas.",
-    "saveError": "Não foi possível guardar as definições. Se o formato mudou, volte a abrir esta vista e tente novamente."
+    "saveError": "Não foi possível guardar as definições. Se o formato mudou, volte a abrir esta vista e tente novamente.",
+    "fromWorkspace": "Os formatos vêm de Espaço de trabalho › Saídas.",
+    "addFormat": "Adicionar um formato",
+    "size": "Tamanho"
   },
   "queue": {
     "deleteTitle": "Eliminar geração",

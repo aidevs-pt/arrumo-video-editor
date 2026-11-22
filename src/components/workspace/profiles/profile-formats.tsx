@@ -1,16 +1,16 @@
 "use client";
 
 import { useLocale } from "@/lib/locale-provider";
-import { WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor } from "lucide-react";
+import { Monitor, Plus, RectangleHorizontal, Smartphone, Square } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { FormatDelivery } from "@/components/workspace/outputs/format-delivery";
@@ -34,7 +34,7 @@ export function ProfileFormats({
   header: ReactNode;
   onOutputs: () => void;
 }) {
-  const [deliveryFormat, setDeliveryFormat] = useState<ProfileFormat | null>(null);
+  const [selectedId, setSelectedId] = useState<number>();
   const [formats, setFormats] = useState<ProfileFormat[]>();
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -82,22 +82,11 @@ export function ProfileFormats({
     }
   }
 
-  if (deliveryFormat) {
-    return <FormatDelivery
-      workspaceId={workspaceId}
-      profileId={profile.id}
-      format={deliveryFormat}
-      onBack={() => setDeliveryFormat(null)}
-    />;
-  }
+  const selected = formats?.find((format) => format.id === selectedId) ?? formats?.[0];
 
   return (
     <WorkspaceShell>
       {header}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-xl font-bold">{copy.title}</h2>
-        <Button type="button" variant="outline" onClick={onOutputs} disabled={pending !== null}>{copy.manage}</Button>
-      </div>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -108,64 +97,69 @@ export function ProfileFormats({
         </Alert>
       ) : !formats ? (
         <Skeleton className="h-44 w-full" role="status" aria-label={copy.loading} />
-      ) : formats.length === 0 ? (
+      ) : formats.length === 0 || !selected ? (
         <Empty>
           <EmptyHeader><EmptyMedia variant="icon"><Monitor /></EmptyMedia><EmptyTitle>{copy.empty}</EmptyTitle></EmptyHeader>
           <EmptyContent><Button type="button" variant="outline" onClick={onOutputs}>{copy.manage}</Button></EmptyContent>
         </Empty>
       ) : (
-        <>
-          <p id="format-inheritance" className="text-sm text-muted-foreground">{copy.inherit}</p>
-          <WorkspaceRows className="mt-4 rounded-none border-x-0 bg-transparent [&>li]:px-1">
-            {formats.map((format) => (
-              <li key={format.id}>
-                <form onSubmit={(event) => void save(event, format.id)} aria-labelledby={`profile-format-${format.id}`}
-                  onChange={() => { if (result?.id === format.id) setResult(null); }}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h2 id={`profile-format-${format.id}`} className="wrap-anywhere font-semibold">{format.name}</h2>
-                      <Badge variant="secondary" className="tabular-nums">{format.width} × {format.height}</Badge>
-                      {format.overrides.width === null && format.overrides.height === null
-                        && <Badge variant="outline">{messages.delivery.inherited}</Badge>}
-                    </div>
-                    <Button type="button" size="sm" variant="outline" disabled={pending !== null}
-                      aria-label={`${messages.delivery.title} · ${format.name}`}
-                      onClick={() => setDeliveryFormat(format)}>{messages.delivery.title}</Button>
-                  </div>
-                  <fieldset disabled={pending !== null}>
-                    <FieldGroup className="my-3 grid grid-cols-2 items-end min-[681px]:grid-cols-[repeat(2,minmax(0,1fr))_auto] max-[680px]:[&>button]:col-span-full max-[680px]:[&>button]:justify-self-start">
-                      <Field>
-                        <FieldLabel htmlFor={`profile-format-width-${format.id}`}>{copy.width}</FieldLabel>
-                        <Input id={`profile-format-width-${format.id}`} name="width" type="number" min={1} max={4294967295}
-                          aria-describedby="format-inheritance" placeholder={String(format.workspace_width)}
-                          defaultValue={format.overrides.width ?? ""} />
-                        <FieldDescription className="flex flex-wrap items-center gap-2">
-                          <LayerGauge layer={format.overrides.width === null ? "workspace" : "profile"} />
-                          <span>{messages.delivery.workspaceValue} ({format.workspace_width})</span>
-                        </FieldDescription>
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor={`profile-format-height-${format.id}`}>{copy.height}</FieldLabel>
-                        <Input id={`profile-format-height-${format.id}`} name="height" type="number" min={1} max={4294967295}
-                          aria-describedby="format-inheritance" placeholder={String(format.workspace_height)}
-                          defaultValue={format.overrides.height ?? ""} />
-                        <FieldDescription className="flex flex-wrap items-center gap-2">
-                          <LayerGauge layer={format.overrides.height === null ? "workspace" : "profile"} />
-                          <span>{messages.delivery.workspaceValue} ({format.workspace_height})</span>
-                        </FieldDescription>
-                      </Field>
-                      <Button type="submit" aria-label={`${copy.save} · ${format.name}`}>{copy.save}</Button>
-                    </FieldGroup>
-                  </fieldset>
-                  {result?.id === format.id && (
-                    result.saved ? <p role="status">{copy.saved}</p> : <p role="alert">{copy.saveError}</p>
-                  )}
-                </form>
-              </li>
-            ))}
-          </WorkspaceRows>
-        </>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ToggleGroup type="single" variant="outline" value={String(selected.id)} aria-label={copy.title}
+              onValueChange={(value) => { if (value) { setResult(null); setSelectedId(Number(value)); } }}>
+              {formats.map((format) => {
+                const Icon = format.width > format.height ? RectangleHorizontal : format.width < format.height ? Smartphone : Square;
+                return <ToggleGroupItem key={format.id} value={String(format.id)} className="px-3">
+                  <Icon aria-hidden="true" />{format.name}
+                </ToggleGroupItem>;
+              })}
+            </ToggleGroup>
+            <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              {copy.fromWorkspace}
+              <Button type="button" size="sm" variant="outline" onClick={onOutputs} disabled={pending !== null}>
+                <Plus data-icon="inline-start" />{copy.addFormat}
+              </Button>
+            </p>
+          </div>
+          <FormatDelivery key={selected.id} workspaceId={workspaceId} profileId={profile.id} profileName={profile.name}
+            format={selected} embedded before={sizeCard(selected)} />
+        </div>
       )}
     </WorkspaceShell>
   );
+
+  function sizeCard(format: ProfileFormat) {
+    const inherited = format.overrides.width === null && format.overrides.height === null;
+    return (
+      <form onSubmit={(event) => void save(event, format.id)} aria-labelledby={`profile-format-${format.id}`}
+        className="rounded-xl border bg-card p-4 sm:p-5" onChange={() => { if (result?.id === format.id) setResult(null); }}>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <h3 id={`profile-format-${format.id}`} className="min-w-0 flex-1 font-semibold">{copy.size}</h3>
+          <LayerGauge layer={inherited ? "workspace" : "profile"} />
+        </div>
+        <p id="format-inheritance" className="mb-3 text-sm text-muted-foreground">{copy.inherit}</p>
+        <fieldset disabled={pending !== null}>
+          <FieldGroup className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[repeat(2,minmax(0,10rem))_auto]">
+            <Field>
+              <FieldLabel htmlFor={`profile-format-width-${format.id}`}>{copy.width}</FieldLabel>
+              <Input id={`profile-format-width-${format.id}`} name="width" type="number" min={1} max={4294967295}
+                aria-describedby="format-inheritance" placeholder={String(format.workspace_width)}
+                defaultValue={format.overrides.width ?? ""} className="tabular-nums" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`profile-format-height-${format.id}`}>{copy.height}</FieldLabel>
+              <Input id={`profile-format-height-${format.id}`} name="height" type="number" min={1} max={4294967295}
+                aria-describedby="format-inheritance" placeholder={String(format.workspace_height)}
+                defaultValue={format.overrides.height ?? ""} className="tabular-nums" />
+            </Field>
+            <Button type="submit" variant="outline" className="col-span-full justify-self-start sm:col-span-1">{copy.save}</Button>
+          </FieldGroup>
+        </fieldset>
+        {result?.id === format.id && (
+          result.saved ? <p role="status" className="mt-2 text-sm text-muted-foreground">{copy.saved}</p>
+            : <p role="alert" className="mt-2 text-sm text-destructive">{copy.saveError}</p>
+        )}
+      </form>
+    );
+  }
 }

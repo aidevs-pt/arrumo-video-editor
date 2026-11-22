@@ -4,7 +4,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, FileText, Film } from "lucide-react";
+import { ArrowLeft, FileText, Film, Lock, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
@@ -46,7 +46,7 @@ const countFields = ["thumbnails", "titles", "descriptions"] as const;
 const textFields = ["thumbnail_guidance", "specifications"] as const;
 
 export function FormatDelivery({
-  workspaceId, profileId, format, onBack, embedded = false,
+  workspaceId, profileId, format, onBack, embedded = false, before, profileName,
 }: {
   workspaceId: number;
   profileId?: number;
@@ -54,6 +54,10 @@ export function FormatDelivery({
   onBack?: () => void;
   /** Workspace settings for one format, laid out as rows inside its card on the Outputs page. */
   embedded?: boolean;
+  /** Embedded profile mode: shown above the setting cards, such as the size overrides. */
+  before?: ReactNode;
+  /** Embedded profile mode: names the profile in the summary. */
+  profileName?: string;
 }) {
   const [delivery, setDelivery] = useState<Delivery>();
   const [profileDelivery, setProfileDelivery] = useState<ProfileDelivery>();
@@ -132,6 +136,7 @@ export function FormatDelivery({
         const custom = Object.fromEntries((Object.keys(settings) as (keyof Supplemental)[])
           .filter(overridden).map((field) => [field, settings[field]]));
         await invoke("set_profile_delivery", { workspaceId, profileId, formatId: format.id, overrides: custom });
+        setProfileDelivery(await invoke<ProfileDelivery>("get_profile_delivery", { workspaceId, profileId, formatId: format.id }));
       } else {
         await invoke("set_format_delivery", { workspaceId, formatId: format.id, settings });
       }
@@ -261,6 +266,132 @@ export function FormatDelivery({
           </div>
         </fieldset>
       </form>
+    );
+  }
+
+  if (embedded && isProfile) {
+    const formatName = format.name.toLocaleLowerCase();
+    if (loadError) return (
+      <Alert variant="destructive">
+        <AlertDescription>{copy.loadError}</AlertDescription>
+        <Button type="button" variant="outline" onClick={() => { setLoadError(false); setAttempt((value) => value + 1); }}>{copy.retry}</Button>
+      </Alert>
+    );
+    if (!delivery || !portrait || !profileDelivery) return <Skeleton className="h-52 w-full" role="status" aria-label={copy.loading} />;
+    const workspace = profileDelivery.workspace;
+    const effective = profileDelivery.effective.supplemental;
+    const layer = (field: keyof Supplemental) => profileDelivery.overrides[field] != null ? "profile" as const : "workspace" as const;
+    const groups: { key: string; title: string; fields: (keyof Supplemental)[]; workspaceValue: string; body: ReactNode }[] = [
+      { key: "thumbnails", title: copy.rowThumbnails, fields: ["thumbnails", "thumbnail_guidance", "thumbnail_reference_ids"], workspaceValue: String(workspace.thumbnails), body: <>
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          <Input name="thumbnails" type="number" min={0} max={65535} required defaultValue={delivery.supplemental.thumbnails}
+            disabled={!overridden("thumbnails")} className="w-20 tabular-nums" aria-label={copy.thumbnails} />
+          <span>{copy.perFormatVideo.replace("{format}", formatName)}</span>
+        </label>
+        <Field data-disabled={!overridden("thumbnail_guidance")}>
+          <FieldLabel htmlFor={`thumbnail_guidance-${format.id}`}>{copy.whatEach}</FieldLabel>
+          <Textarea id={`thumbnail_guidance-${format.id}`} name="thumbnail_guidance" defaultValue={delivery.supplemental.thumbnail_guidance}
+            disabled={!overridden("thumbnail_guidance")} className="min-h-16" />
+        </Field>
+        {overridden("thumbnail_reference_ids")
+          ? <ThumbnailReferences id={`delivery-reference-${format.id}`} workspaceId={workspaceId} images={images} selected={references} copy={copy}
+              onChange={setReferences} onImport={() => void importReference("thumbnail")} />
+          : <p className="text-sm text-muted-foreground">{copy.thumbnail_reference_ids}: {workspace.thumbnail_reference_ids.length || copy.empty}</p>}
+      </> },
+      ...(showPortrait ? [{ key: "portrait", title: copy.rowPortraitFrom.replace("{format}", formatName), fields: ["portrait_derivatives" as const], workspaceValue: String(workspace.portrait_derivatives.count),
+        body: overridden("portrait_derivatives")
+          ? <PortraitFields workspaceId={workspaceId} value={portrait} profiles={profiles} images={images} copy={copy}
+              onChange={setPortrait} onImportReference={() => void importReference("portrait")} compact />
+          : <p className="text-sm text-muted-foreground">{copy.portraitCount}: {workspace.portrait_derivatives.count}</p> }] : []),
+      { key: "text", title: copy.rowText, fields: ["titles", "descriptions", "tags"], workspaceValue: `${workspace.titles}, ${workspace.descriptions}`, body:
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {(["titles", "descriptions"] as const).map((field) => (
+            <label key={field} className="flex items-center gap-2 text-sm">
+              <span>{field === "titles" ? copy.titlesShort : copy.descriptionsShort}</span>
+              <Input name={field} type="number" min={0} max={65535} required defaultValue={delivery.supplemental[field]}
+                disabled={!overridden(field)} className="w-20 tabular-nums" aria-label={copy[field]} />
+            </label>
+          ))}
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox name="tags" defaultChecked={delivery.supplemental.tags} disabled={!overridden("tags")} />{copy.tagsShort}
+          </label>
+        </div> },
+      { key: "specs", title: copy.rowSpecs, fields: ["specifications"], workspaceValue: workspace.specifications.trim() ? copy.written : copy.empty, body:
+        <Textarea name="specifications" aria-label={copy.specifications} defaultValue={delivery.supplemental.specifications}
+          disabled={!overridden("specifications")} className="min-h-20" /> },
+    ];
+    const setGroup = (fields: (keyof Supplemental)[], on: boolean) => {
+      setResult(null);
+      setOverrides((current) => ({ ...current, ...Object.fromEntries(fields.map((field) => [field, on])) }));
+    };
+    const summary: [string, string, keyof Supplemental | null][] = [
+      [copy.summaryAlways, copy.summaryVideoSubtitles, null],
+      [copy.rowThumbnails, String(effective.thumbnails), "thumbnails"],
+      ...(showPortrait ? [[copy.rowPortrait, String(effective.portrait_derivatives.count), "portrait_derivatives"] as [string, string, keyof Supplemental]] : []),
+      [copy.summaryTitles, `${effective.titles}, ${effective.descriptions}`, "titles"],
+      [copy.tagsShort, effective.tags ? copy.on : copy.off, "tags"],
+      [copy.rowSpecs, effective.specifications.trim() ? copy.written : copy.empty, "specifications"],
+    ];
+    return (
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <p className="flex items-start gap-3 rounded-xl bg-secondary p-4 text-sm">
+            <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{copy.alwaysShipsFormat.replace("{format}", formatName)}
+          </p>
+          {before}
+          <form aria-busy={pending} onSubmit={save} onChange={() => setResult(null)}>
+          <fieldset disabled={pending} className="flex flex-col gap-4">
+            {groups.map((group) => {
+              const on = group.fields.some(overridden);
+              return (
+                <section key={group.key} aria-labelledby={`group-${group.key}-${format.id}`} className="rounded-xl border bg-card p-4 sm:p-5">
+                  <div className="mb-3 flex flex-wrap items-center gap-3">
+                    <Switch id={`override-${group.key}-${format.id}`} checked={on} aria-label={`${copy.override}, ${group.title}`}
+                      onCheckedChange={(checked) => setGroup(group.fields, checked)} />
+                    <h3 id={`group-${group.key}-${format.id}`} className="min-w-0 flex-1 font-semibold">{group.title}</h3>
+                    {on ? <>
+                      <span className="rounded-md bg-attention px-2 py-1 text-xs font-semibold text-ink">
+                        {copy.overriddenHere.replace("{value}", group.workspaceValue)}
+                      </span>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setGroup(group.fields, false)}>
+                        <RotateCcw data-icon="inline-start" />{copy.reset}
+                      </Button>
+                    </> : <LayerGauge layer="workspace" />}
+                  </div>
+                  <div className="flex flex-col gap-3">{group.body}</div>
+                </section>
+              );
+            })}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {result === "saved" && <p role="status" className="text-sm text-muted-foreground">{copy.saved}</p>}
+              {(result === "saveError" || result === "importReferenceError") && <p role="alert" className="text-sm text-destructive">{copy[result]}</p>}
+              <Button type="submit">{copy.save}</Button>
+            </div>
+          </fieldset>
+          </form>
+        </div>
+        <aside aria-labelledby={`summary-${format.id}`} className="lg:sticky lg:top-4">
+          <h3 id={`summary-${format.id}`} className="mb-3 font-semibold">
+            {copy.summaryTitle.replace("{format}", formatName).replace("{profile}", profileName ?? "")}
+          </h3>
+          <dl className="divide-y rounded-xl border bg-card px-4 text-sm">
+            <div className="flex items-center justify-between gap-3 py-2.5">
+              <dt className="text-muted-foreground">{copy.summarySize}</dt>
+              <dd className="tabular-nums">{format.width} × {format.height}</dd>
+            </div>
+            {summary.map(([label, value, field]) => (
+              <div key={label} className="flex items-start justify-between gap-3 py-2.5">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="flex flex-col items-end gap-1 text-end">
+                  <span className="tabular-nums">{value}</span>
+                  {field ? <LayerGauge layer={layer(field)} /> : <LayerGauge layer="app" />}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-sm text-muted-foreground">{copy.summaryHint}</p>
+        </aside>
+      </div>
     );
   }
 

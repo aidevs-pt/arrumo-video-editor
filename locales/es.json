@@ -595,7 +595,20 @@
     "rowSpecsHint": "Cualquier otra cosa, con tus palabras",
     "titlesShort": "Títulos",
     "descriptionsShort": "Descripciones",
-    "tagsShort": "Etiquetas"
+    "tagsShort": "Etiquetas",
+    "perFormatVideo": "por vídeo {format}",
+    "whatEach": "Cómo debe ser cada una",
+    "rowPortraitFrom": "Vídeos verticales de cada vídeo {format}",
+    "written": "Escritas",
+    "overriddenHere": "Cambiado aquí, el espacio de trabajo usa {value}",
+    "reset": "Restablecer",
+    "alwaysShipsFormat": "Cada vídeo {format} incluye siempre su archivo de subtítulos.",
+    "summaryTitle": "Un vídeo {format} nuevo de {profile} recibe",
+    "summaryAlways": "Siempre",
+    "summaryVideoSubtitles": "Vídeo + subtítulos",
+    "summarySize": "Tamaño",
+    "summaryTitles": "Títulos, descripciones",
+    "summaryHint": "Combinado de la app, el espacio de trabajo y este perfil. Puedes cambiar cualquier cosa en cada vídeo."
   },
   "drafts": {
     "deleteDraft": "Eliminar borrador",
@@ -729,7 +742,10 @@
     "inherit": "Deja el campo vacío para heredar el valor del espacio de trabajo.",
     "save": "Guardar ajustes",
     "saved": "Ajustes guardados.",
-    "saveError": "No se pudieron guardar los ajustes. Si el formato cambió, vuelve a abrir esta vista e inténtalo de nuevo."
+    "saveError": "No se pudieron guardar los ajustes. Si el formato cambió, vuelve a abrir esta vista e inténtalo de nuevo.",
+    "fromWorkspace": "Los formatos vienen de Espacio de trabajo › Salidas.",
+    "addFormat": "Añadir un formato",
+    "size": "Tamaño"
   },
   "queue": {
     "deleteTitle": "Eliminar generación",

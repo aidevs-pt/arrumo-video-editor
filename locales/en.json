@@ -595,7 +595,20 @@
     "rowSpecsHint": "Anything else, in plain words",
     "titlesShort": "Titles",
     "descriptionsShort": "Descriptions",
-    "tagsShort": "Tags"
+    "tagsShort": "Tags",
+    "perFormatVideo": "per {format} video",
+    "whatEach": "What each should be",
+    "rowPortraitFrom": "Portrait videos from each {format} video",
+    "written": "Written",
+    "overriddenHere": "Overridden here, workspace uses {value}",
+    "reset": "Reset",
+    "alwaysShipsFormat": "Every {format} video always ships with its subtitle file.",
+    "summaryTitle": "A new {format} {profile} video gets",
+    "summaryAlways": "Always",
+    "summaryVideoSubtitles": "Video + subtitles",
+    "summarySize": "Size",
+    "summaryTitles": "Titles, descriptions",
+    "summaryHint": "Merged from App, Workspace and this profile. You can still change any of it per video."
   },
   "drafts": {
     "deleteDraft": "Delete draft",
@@ -729,7 +742,10 @@
     "inherit": "Leave blank to inherit the workspace value shown in the field.",
     "save": "Save overrides",
     "saved": "Overrides saved.",
-    "saveError": "Overrides couldn’t be saved. If the workspace format changed, reopen this view and try again."
+    "saveError": "Overrides couldn’t be saved. If the workspace format changed, reopen this view and try again.",
+    "fromWorkspace": "Formats come from Workspace › Outputs.",
+    "addFormat": "Add a format",
+    "size": "Size"
   },
   "queue": {
     "deleteTitle": "Delete run",
