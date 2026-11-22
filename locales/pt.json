@@ -1693,7 +1693,7 @@
     "review_required": "{title} aguarda a tua revisão",
     "completed": "{title} está concluído",
     "failed": "{title} parou com um erro",
-    "body": "Em {workspace}. Abre o Arrumo para o ver.",
+    "body": "Em {workspace}. Clica para o abrir.",
     "setting": "Notificações do sistema",
     "settingHint": "Avisa também pelo sistema dos vídeos concluídos, falhados ou à espera de revisão enquanto o Arrumo está em segundo plano."
   }

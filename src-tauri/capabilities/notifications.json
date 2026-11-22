@@ -1,5 +1,12 @@
 {
   "identifier": "notifications",
-  "windows": ["main"],
-  "permissions": ["notification:default"]
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "notification:default",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:window:allow-show"
+  ]
 }

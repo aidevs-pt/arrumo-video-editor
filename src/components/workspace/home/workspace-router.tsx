@@ -44,7 +44,7 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const { messages: { workspaces: copy } } = useLocale();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [status, setStatus] = useState<Status>("loading");
-  useSystemNotifications(status === "ready");
+  useSystemNotifications(status === "ready", router.push);
   const section = pathname.replace(/\/$/, "");
   const view = section === "/completed-video" ? "videos"
     : section === "/generation-run" ? "generations"

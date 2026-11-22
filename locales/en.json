@@ -1693,7 +1693,7 @@
     "review_required": "{title} is waiting for your review",
     "completed": "{title} is finished",
     "failed": "{title} stopped with an error",
-    "body": "In {workspace}. Open Arrumo to see it.",
+    "body": "In {workspace}. Click to open it.",
     "setting": "System notifications",
     "settingHint": "Also notify finished, failed and waiting-for-review videos through your computer while Arrumo is in the background."
   }
