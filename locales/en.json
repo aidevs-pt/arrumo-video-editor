@@ -490,7 +490,8 @@
     "retry": "Retry",
     "save": "Save delivery settings",
     "saved": "Delivery settings saved.",
-    "saveError": "Delivery settings couldn’t be saved. Try again."
+    "saveError": "Delivery settings couldn’t be saved. Try again.",
+    "portraitFollowsProfile": "Cuts follow the guidance of the {profile} profile and the thumbnails its portrait format asks for."
   },
   "drafts": {
     "deleteDraft": "Delete draft",

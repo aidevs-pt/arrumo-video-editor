@@ -20,7 +20,8 @@ const emptyManual: ManualSource = {
   type: "manual", guidance: "", thumbnails_per_video: 0, thumbnail_guidance: "", thumbnail_reference_ids: [],
 };
 
-export function PortraitFields({ value, profiles, images, copy, onChange, onImportReference }: {
+export function PortraitFields({ workspaceId, value, profiles, images, copy, onChange, onImportReference }: {
+  workspaceId: number;
   value: PortraitDerivatives;
   profiles: SourceProfile[];
   images: ReferenceImage[];
@@ -56,6 +57,11 @@ export function PortraitFields({ value, profiles, images, copy, onChange, onImpo
             </Select>
           </Field>
         )}
+        {count > 0 && source.type === "profile" && (
+          <p className="text-sm text-muted-foreground">
+            {copy.portraitFollowsProfile.replace("{profile}", profiles.find((profile) => profile.id === source.profile_id)?.name ?? "")}
+          </p>
+        )}
         {count > 0 && source.type === "manual" && (
           <>
             <Field>
@@ -73,7 +79,7 @@ export function PortraitFields({ value, profiles, images, copy, onChange, onImpo
               <Textarea id="portrait-thumbnail-guidance" value={source.thumbnail_guidance}
                 onChange={(event) => onChange({ ...value, source: { ...source, thumbnail_guidance: event.target.value } })} />
             </Field>
-            <ThumbnailReferences id="portrait-reference" images={images} selected={source.thumbnail_reference_ids} copy={copy} onImport={onImportReference}
+            <ThumbnailReferences id="portrait-reference" workspaceId={workspaceId} images={images} selected={source.thumbnail_reference_ids} copy={copy} onImport={onImportReference}
               onChange={(ids) => onChange({ ...value, source: { ...source, thumbnail_reference_ids: ids } })} />
           </>
         )}

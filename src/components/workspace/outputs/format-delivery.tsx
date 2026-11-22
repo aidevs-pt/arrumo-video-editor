@@ -265,15 +265,17 @@ export function FormatDelivery({
                     {overrideControl(field)}
                   </Field>
                 ))}
+                {isProfile && !overridden("thumbnail_reference_ids") && <FieldLabel>{copy.thumbnail_reference_ids}</FieldLabel>}
                 {isProfile && overrideControl("thumbnail_reference_ids")}
                 {(!isProfile || overridden("thumbnail_reference_ids")) && (
-                  <ThumbnailReferences id="delivery-reference" images={images} selected={references} copy={copy} onChange={setReferences} onImport={() => void importReference("thumbnail")} />
+                  <ThumbnailReferences id="delivery-reference" workspaceId={workspaceId} images={images} selected={references} copy={copy} onChange={setReferences} onImport={() => void importReference("thumbnail")} />
                 )}
                 {showPortrait && portrait && (
                   <FieldGroup>
+                    {isProfile && !overridden("portrait_derivatives") && <FieldLabel>{copy.portrait_derivatives}</FieldLabel>}
                     {isProfile && overrideControl("portrait_derivatives")}
                     {(!isProfile || overridden("portrait_derivatives")) && (
-                      <PortraitFields value={portrait} profiles={profiles} images={images} copy={copy} onChange={setPortrait} onImportReference={() => void importReference("portrait")} />
+                      <PortraitFields workspaceId={workspaceId} value={portrait} profiles={profiles} images={images} copy={copy} onChange={setPortrait} onImportReference={() => void importReference("portrait")} />
                     )}
                   </FieldGroup>
                 )}

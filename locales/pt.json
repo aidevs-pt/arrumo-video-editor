@@ -490,7 +490,8 @@
     "retry": "Tentar novamente",
     "save": "Guardar definições de entrega",
     "saved": "Definições de entrega guardadas.",
-    "saveError": "Não foi possível guardar as definições de entrega. Tente novamente."
+    "saveError": "Não foi possível guardar as definições de entrega. Tente novamente.",
+    "portraitFollowsProfile": "Os cortes seguem as indicações de {profile} e as miniaturas que o seu formato vertical pede."
   },
   "drafts": {
     "deleteDraft": "Eliminar rascunho",

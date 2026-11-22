@@ -490,7 +490,8 @@
     "retry": "Reintentar",
     "save": "Guardar ajustes de entrega",
     "saved": "Ajustes de entrega guardados.",
-    "saveError": "No se pudieron guardar los ajustes de entrega. Inténtalo de nuevo."
+    "saveError": "No se pudieron guardar los ajustes de entrega. Inténtalo de nuevo.",
+    "portraitFollowsProfile": "Los cortes siguen las indicaciones de {profile} y las miniaturas que pide su formato vertical."
   },
   "drafts": {
     "deleteDraft": "Eliminar borrador",
