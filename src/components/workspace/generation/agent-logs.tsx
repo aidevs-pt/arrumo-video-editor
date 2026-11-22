@@ -90,7 +90,7 @@ function AgentLogBrowser({ workspaceId, runId }: { workspaceId: number; runId?: 
   const time = (seconds: number) => new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "medium" }).format(new Date(seconds * 1000));
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] gap-3 px-4 pb-4 md:grid-cols-[14rem_1fr] md:grid-rows-1">
-      <ol className="flex max-h-48 flex-col gap-1 overflow-y-auto md:max-h-none" aria-label={copy.runs}>
+      <ol className="flex max-h-48 flex-col gap-1 scroll-fade overflow-y-auto md:max-h-none" aria-label={copy.runs}>
         {logs.map((log) => (
           <li key={log.id}>
             <button type="button" onClick={() => setSelected(log.id)} aria-current={selected === log.id}

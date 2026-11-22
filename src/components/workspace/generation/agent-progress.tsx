@@ -77,7 +77,7 @@ export function AgentProgress({ workspaceId, runId, agent, stage }: {
           {reduceMotion ? heading : <Shimmer as="span" duration={2.4}>{heading}</Shimmer>}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
-          <div className="max-h-96 overflow-y-auto pe-1" role="log" aria-live="polite">
+          <div className="max-h-96 scroll-fade overflow-y-auto pe-1" role="log" aria-live="polite">
             {logs.map((log, round) => {
               const live = log === running;
               const searches = log.steps.filter((step) => step.kind === "search");

@@ -253,7 +253,7 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
         {historyError && <Alert variant="destructive"><AlertDescription>{copy.activityError}</AlertDescription></Alert>}
         {!activity && !historyError && <Skeleton className="h-14" aria-label={copy.loading} />}
         {activity?.length ? (
-          <ol className={cn("flex flex-col gap-0", showAll && "max-h-[28rem] overflow-y-auto pe-2")}>
+          <ol className={cn("flex flex-col gap-0", showAll && "max-h-[28rem] scroll-fade overflow-y-auto pe-2")}>
             {[...activity].reverse().slice(0, showAll ? undefined : ACTIVITY_SHOWN).map((event, index, newestFirst) => {
               const date = new Date(event.created_at * 1000);
               return (

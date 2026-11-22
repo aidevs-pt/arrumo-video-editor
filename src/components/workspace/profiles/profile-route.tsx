@@ -125,7 +125,7 @@ function ProfileHeader({ workspaceId, profile, tab, onUpdate }: {
           </Button>
         </div>
       </div>
-      <nav className="mt-8 flex gap-x-1 overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={copy.tabs}>
+      <nav className="mt-8 flex gap-x-1 scroll-fade-x overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={copy.tabs}>
         {tabIds.map((id) => (
           <Link key={id} href={id === "videos" ? href : `${href}&tab=${id}`}
             aria-current={id === tab ? "page" : undefined}
