@@ -214,6 +214,34 @@ fn narration_tracks(
         .collect()
 }
 
+/// Delivered loudness: -14 LUFS integrated with -1.5 dBTP peaks, where social platforms
+/// normalize playback.
+const MASTER_LOUDNESS: &str = "I=-14:TP=-1.5:LRA=11";
+
+/// The second loudnorm pass from the first pass's JSON report, or `None` when the audio is
+/// silent or could not be measured.
+fn loudness_pass(report: &str) -> Option<String> {
+    let start = report.rfind('{')?;
+    let end = start + report[start..].find('}')?;
+    let json: Value = serde_json::from_str(&report[start..=end]).ok()?;
+    let field = |name: &str| {
+        json.get(name)?
+            .as_str()?
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|value| value.is_finite())
+    };
+    let input = field("input_i").filter(|loudness| *loudness > -70.0)?;
+    Some(format!(
+        "loudnorm={MASTER_LOUDNESS}:measured_I={input}:measured_TP={}:measured_LRA={}:measured_thresh={}:offset={}:linear=true,aresample=48000",
+        field("input_tp")?,
+        field("input_lra")?,
+        field("input_thresh")?,
+        field("target_offset")?,
+    ))
+}
+
 /// Fades the first and last 30 ms of a cut's audio so joined cuts don't click.
 fn cut_audio_filter(length_ms: u32) -> String {
     let fade = (length_ms / 4).min(30);
@@ -675,7 +703,7 @@ impl ActiveRender<'_> {
             manifest.push_str(&format!("file {name}\n"));
         }
         fs::write(directory.join("scenes.ffconcat"), manifest)?;
-        let output = scratch.join(format!("{}.mp4", format.id));
+        let output = scratch.join(format!("{}-joined.mp4", format.id));
         let args: Vec<String> = [
             "-nostdin",
             "-v",
@@ -690,15 +718,14 @@ impl ActiveRender<'_> {
             "scenes.ffconcat",
             "-c",
             "copy",
-            "-movflags",
-            "+faststart",
             "-y",
         ]
         .map(String::from)
         .into_iter()
         .chain([output.to_string_lossy().into_owned()])
         .collect();
-        run_ffmpeg(&directory, &args, &mut check)
+        run_ffmpeg(&directory, &args, &mut check)?;
+        self.master_audio(&output, &scratch.join(format!("{}.mp4", format.id)))
     }
 
     fn inspect_clips(
@@ -739,6 +766,11 @@ impl ActiveRender<'_> {
     }
 
     fn run(&self, command: &mut Command, operation: &str) -> Result<(), Box<dyn Error>> {
+        self.run_output(command, operation).map(drop)
+    }
+
+    /// Runs FFmpeg while keeping the lease, returning what it wrote to stderr.
+    fn run_output(&self, command: &mut Command, operation: &str) -> Result<String, Box<dyn Error>> {
         self.confirm_lease()?;
         let mut process = command
             .stdin(Stdio::null())
@@ -760,7 +792,7 @@ impl ActiveRender<'_> {
                     .and_then(|reader| reader.join().ok())
                     .unwrap_or_default();
                 return if status.success() {
-                    Ok(())
+                    Ok(errors)
                 } else {
                     let tail: Vec<&str> = errors.lines().rev().take(4).collect();
                     Err(io::Error::other(format!(
@@ -785,6 +817,45 @@ impl ActiveRender<'_> {
             }
             thread::sleep(Duration::from_millis(250));
         }
+    }
+
+    /// Writes `input` to `output` with its audio at the delivery loudness, measured first so
+    /// the gain is linear. A silent video is moved unchanged.
+    fn master_audio(&self, input: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
+        let measured = self.run_output(
+            Command::new("ffmpeg")
+                .args(["-nostdin", "-hide_banner", "-nostats", "-v", "info"])
+                .args(["-protocol_whitelist", "file", "-i"])
+                .arg(input)
+                .args(["-map", "0:a:0", "-af"])
+                .arg(format!("loudnorm={MASTER_LOUDNESS}:print_format=json"))
+                .args(["-f", "null", "-"]),
+            "measuring loudness",
+        )?;
+        let Some(filter) = loudness_pass(&measured) else {
+            fs::rename(input, output)?;
+            return Ok(());
+        };
+        self.run(
+            Command::new("ffmpeg")
+                .args([
+                    "-nostdin",
+                    "-v",
+                    "error",
+                    "-protocol_whitelist",
+                    "file",
+                    "-i",
+                ])
+                .arg(input)
+                .args(["-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy", "-af"])
+                .arg(filter)
+                .args(["-c:a", "aac", "-ar", "48000", "-ac", "2"])
+                .args(["-movflags", "+faststart", "-y"])
+                .arg(output),
+            "evening out the loudness",
+        )?;
+        fs::remove_file(input)?;
+        Ok(())
     }
 
     fn inspect_source(
@@ -969,9 +1040,13 @@ impl ActiveRender<'_> {
                 "-i",
             ])
             .arg(list)
-            .args(["-c", "copy", "-movflags", "+faststart", "-y"])
-            .arg(scratch.join(format!("{id}.mp4")));
-        self.run(&mut command, "joining source clips")
+            .args(["-c", "copy", "-y"])
+            .arg(scratch.join(format!("{id}-joined.mp4")));
+        self.run(&mut command, "joining source clips")?;
+        self.master_audio(
+            &scratch.join(format!("{id}-joined.mp4")),
+            &scratch.join(format!("{id}.mp4")),
+        )
     }
 }
 
@@ -990,5 +1065,19 @@ mod tests {
             "afade=t=in:st=0:d=0.02,afade=t=out:st=0.06:d=0.02,apad"
         );
         assert_eq!(cut_audio_filter(3), "apad");
+    }
+
+    #[test]
+    fn loudness_uses_the_measurement_and_skips_silence() {
+        let loud = "[Parsed_loudnorm_0 @ 0x1]\n{\n\t\"input_i\" : \"-23.10\",\n\t\"input_tp\" : \"-6.02\",\n\t\"input_lra\" : \"3.40\",\n\t\"input_thresh\" : \"-33.30\",\n\t\"target_offset\" : \"0.12\"\n}\nsize=N/A";
+        assert_eq!(
+            super::loudness_pass(loud).as_deref(),
+            Some(
+                "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=-23.1:measured_TP=-6.02:measured_LRA=3.4:measured_thresh=-33.3:offset=0.12:linear=true,aresample=48000"
+            )
+        );
+        let silent = "{\"input_i\" : \"-inf\", \"input_tp\" : \"-inf\", \"input_lra\" : \"0.00\", \"input_thresh\" : \"-70.00\", \"target_offset\" : \"inf\"}";
+        assert_eq!(super::loudness_pass(silent), None);
+        assert_eq!(super::loudness_pass("no report"), None);
     }
 }
