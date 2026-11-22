@@ -87,6 +87,20 @@ struct ListInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RunInput {
+    workspace_id: i64,
+    run_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderInput {
+    workspace_id: i64,
+    provider: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DubAssetInput {
     workspace_id: i64,
     asset_id: i64,
@@ -195,7 +209,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 27] {
+pub(super) fn definitions() -> [Value; 31] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -307,6 +321,22 @@ pub(super) fn definitions() -> [Value; 27] {
         json!({"name": "list_workspace_assets", "description": "List managed assets and their IDs in a workspace.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
                 "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "list_workspace_footage", "description": "List the workspace's source footage: the video assets a generation can cut from.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "list_pending_reviews", "description": "List the generation runs in a workspace that wait for a person's review, with what each review is about.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "list_saved_run_motion", "description": "List which animations of a generation run are already saved to the motion library: the source result, the animation index and the profile it was shared with.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": {"type": "integer", "minimum": 1}},
+                "required": ["workspaceId", "runId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_speech_provider_status", "description": "Check a speech provider for this workspace: its audio format, character limit with the selected model, and where its key is set. Never returns the key.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "provider": {"type": "string", "minLength": 1, "maxLength": 64}},
+                "required": ["workspaceId", "provider"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "import_workspace_asset", "description": "Copy an existing media file at an absolute path on the local machine into managed workspace storage.",
             "inputSchema": {"type": "object", "properties": {
@@ -533,6 +563,38 @@ pub(super) fn call(
                     .list_assets(args.workspace_id)
                     .map(|assets| json!({"assets": assets}))
                     .map_err(|_| "Could not list workspace assets")
+            }),
+        "list_workspace_footage" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid footage arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .list_footage(args.workspace_id)
+                    .map(|footage| json!({"footage": footage}))
+                    .map_err(|_| "Could not list footage")
+            }),
+        "list_pending_reviews" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid review arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .pending_generation_reviews(args.workspace_id)
+                    .map(|reviews| json!({"reviews": reviews}))
+                    .map_err(|_| "Could not list pending reviews")
+            }),
+        "list_saved_run_motion" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid motion arguments")
+            .and_then(|args: RunInput| {
+                store
+                    .saved_run_motion(args.workspace_id, args.run_id)
+                    .map(|saved| json!({"saved": saved.into_iter().map(|(result, index, profile)| json!({"resultId": result, "motionIndex": index, "profileId": profile})).collect::<Vec<_>>()}))
+                    .map_err(|_| "Could not list saved animations")
+            }),
+        "get_speech_provider_status" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid speech provider arguments")
+            .and_then(|args: ProviderInput| {
+                store
+                    .speech_provider_status(args.workspace_id, &args.provider)
+                    .map(|status| json!({"status": status}))
+                    .map_err(|_| "Could not check the speech provider")
             }),
         "import_workspace_asset" | "import_thumbnail_reference" => {
             serde_json::from_value(Value::Object(arguments.clone()))
