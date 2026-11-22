@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -72,6 +72,18 @@ pub(crate) fn definitions() -> Vec<Value> {
 }
 
 pub(crate) fn invoke(
+    store: &mut WorkspaceStore,
+    database: &Path,
+    name: &str,
+    arguments: Map<String, Value>,
+) -> Option<Result<Value, Cow<'static, str>>> {
+    if let Some(result) = assets::call_generation(store, database, name, &arguments) {
+        return Some(result);
+    }
+    invoke_static(store, database, name, arguments).map(|result| result.map_err(Cow::Borrowed))
+}
+
+fn invoke_static(
     store: &mut WorkspaceStore,
     database: &Path,
     name: &str,

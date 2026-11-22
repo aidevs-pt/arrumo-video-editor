@@ -85,6 +85,15 @@ enum ReferenceInput {
     },
 }
 
+/// How a request uses its reference images.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReferenceUse {
+    /// Brand examples whose look to follow, not their text or subjects (thumbnails, covers).
+    Style,
+    /// Images the creator or agent picked for this image, used as its description says.
+    Follow,
+}
+
 /// A generated image stored as a workspace asset.
 pub struct GeneratedAsset {
     pub id: i64,
@@ -359,6 +368,7 @@ impl WorkspaceStore {
         prompt: &str,
         aspect_ratio: &str,
         references: &[ReferencePicture],
+        reference_use: ReferenceUse,
     ) -> io::Result<GeneratedImage> {
         let prompt = prompt.trim();
         if prompt.is_empty()
@@ -418,9 +428,14 @@ impl WorkspaceStore {
                 request_image(&client, &adapter, &model, ratio, &framed, &secret, &[])
                     .map(|image| (image, 0))
             } else {
-                let guided = format!(
-                    "{framed}\nThe attached images are the creator's style references: follow their layout, type and colours, but do not copy their text or subjects."
-                );
+                let guided = match reference_use {
+                    ReferenceUse::Style => format!(
+                        "{framed}\nThe attached images are the creator's style references: follow their layout, type and colours, but do not copy their text or subjects."
+                    ),
+                    ReferenceUse::Follow => format!(
+                        "{framed}\nThe attached images are references the creator chose for this image: use them as the description asks."
+                    ),
+                };
                 // A provider that refuses the references still gets a plain request.
                 request_image(&client, &adapter, &model, ratio, &guided, &secret, attached)
                     .map(|image| (image, attached.len()))
@@ -599,7 +614,7 @@ impl WorkspaceStore {
         let stem = library_image_stem(prompt);
         let mut made = Vec::new();
         for index in 0..count {
-            let image = self.generate_image_asset(
+            let image = self.store_generated_image(
                 database,
                 workspace_id,
                 &order,
@@ -611,6 +626,7 @@ impl WorkspaceStore {
                     format!("{stem}-{}", index + 1)
                 },
                 references,
+                ReferenceUse::Follow,
             )?;
             if !notes.trim().is_empty() {
                 self.set_asset_notes(workspace_id, image.id, notes.trim())?;
@@ -632,6 +648,30 @@ impl WorkspaceStore {
         stem: &str,
         reference_ids: &[i64],
     ) -> Result<GeneratedAsset, Box<dyn Error>> {
+        self.store_generated_image(
+            database,
+            workspace_id,
+            order,
+            prompt,
+            aspect_ratio,
+            stem,
+            reference_ids,
+            ReferenceUse::Style,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn store_generated_image(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        order: &[String],
+        prompt: &str,
+        aspect_ratio: &str,
+        stem: &str,
+        reference_ids: &[i64],
+        reference_use: ReferenceUse,
+    ) -> Result<GeneratedAsset, Box<dyn Error>> {
         let root = crate::asset_root(database);
         let references: Vec<ReferencePicture> = reference_ids
             .iter()
@@ -641,7 +681,14 @@ impl WorkspaceStore {
                 bytes: preview.bytes,
             })
             .collect();
-        let image = self.generate_image(workspace_id, order, prompt, aspect_ratio, &references)?;
+        let image = self.generate_image(
+            workspace_id,
+            order,
+            prompt,
+            aspect_ratio,
+            &references,
+            reference_use,
+        )?;
         let scratch = tempfile::tempdir()?;
         let downloaded = scratch.path().join(format!("{stem}.{}", image.extension));
         std::fs::write(&downloaded, &image.bytes)?;

@@ -127,7 +127,7 @@ fn call_tool(store: &mut WorkspaceStore, database: &Path, call: ToolCall) -> Opt
                 "content": [{"type": "text", "text": data.to_string()}],
                 "structuredContent": data
             }),
-            Err(error) => tool_error(error),
+            Err(error) => tool_error(&error),
         },
     )
 }
@@ -182,6 +182,48 @@ mod tests {
             "Studio"
         );
         assert_eq!(responses[4]["result"]["isError"], true);
+    }
+
+    #[test]
+    fn generation_failures_tell_the_agent_why() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("studio.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let call = |store: &mut WorkspaceStore, name: &str, arguments: Value| {
+            call_tool(
+                store,
+                &database,
+                ToolCall {
+                    name: name.into(),
+                    arguments: arguments.as_object().unwrap().clone(),
+                },
+            )
+            .unwrap()
+        };
+        let model_alone = call(
+            &mut store,
+            "generate_library_video",
+            json!({"workspaceId": workspace, "prompt": "Waves", "aspectRatio": "16:9", "model": "seedance-2.0"}),
+        );
+        assert_eq!(model_alone["isError"], true);
+        assert!(
+            model_alone["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("Name the provider whose model you want")
+        );
+        let foreign = call(
+            &mut store,
+            "generate_library_images",
+            json!({"workspaceId": workspace, "prompt": "Desk", "aspectRatio": "16:9", "count": 1, "references": [999]}),
+        );
+        assert!(
+            foreign["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("not in this workspace")
+        );
     }
 
     #[test]

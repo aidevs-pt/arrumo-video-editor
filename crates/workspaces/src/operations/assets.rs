@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use serde::Deserialize;
+
 use serde_json::{Map, Value, json};
 
 use crate::{AssetOrganization, BrandAssetRole, ContextImport, WorkspaceStore, asset_root};
@@ -285,15 +286,17 @@ pub(super) fn definitions() -> [Value; 20] {
     ]
 }
 
-pub(super) fn call(
+/// Generation calls, whose failures carry the host's own explanation (which model fits the
+/// references, the provider's short reason) so agents can correct the call.
+pub(super) fn call_generation(
     store: &mut WorkspaceStore,
     database: &Path,
     name: &str,
     arguments: &Map<String, Value>,
-) -> Option<Result<Value, &'static str>> {
+) -> Option<Result<Value, Cow<'static, str>>> {
     Some(match name {
         "generate_library_images" => serde_json::from_value(Value::Object(arguments.clone()))
-            .map_err(|_| "Invalid image generation arguments")
+            .map_err(|_| Cow::Borrowed("Invalid image generation arguments"))
             .and_then(|args: GenerateImagesInput| {
                 store
                     .generate_library_images(
@@ -307,8 +310,27 @@ pub(super) fn call(
                         &args.references,
                     )
                     .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider, "references": image.references})).collect::<Vec<_>>()}))
-                    .map_err(|_| "Could not generate the images. Check the image providers and their keys")
+                    .map_err(|error| Cow::Owned(format!("Could not generate the images: {error}")))
             }),
+        "generate_library_video" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| Cow::Borrowed("Invalid video arguments"))
+            .and_then(|args: GenerateVideoInput| {
+                store
+                    .generate_library_video(database, args.workspace_id, &args.prompt, &args.aspect_ratio, args.duration_seconds, &args.notes, args.provider.as_deref(), args.model.as_deref(), &args.references)
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|error| Cow::Owned(format!("Could not generate the clip: {error}")))
+            }),
+        _ => return None,
+    })
+}
+
+pub(super) fn call(
+    store: &mut WorkspaceStore,
+    database: &Path,
+    name: &str,
+    arguments: &Map<String, Value>,
+) -> Option<Result<Value, &'static str>> {
+    Some(match name {
         "generate_library_speech" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid speech arguments")
             .and_then(|args: GenerateSpeechInput| {
@@ -316,14 +338,6 @@ pub(super) fn call(
                     .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
-            }),
-        "generate_library_video" => serde_json::from_value(Value::Object(arguments.clone()))
-            .map_err(|_| "Invalid video arguments")
-            .and_then(|args: GenerateVideoInput| {
-                store
-                    .generate_library_video(database, args.workspace_id, &args.prompt, &args.aspect_ratio, args.duration_seconds, &args.notes, args.provider.as_deref(), args.model.as_deref(), &args.references)
-                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
-                    .map_err(|_| "Could not generate the clip. Check the video provider and its key")
             }),
         "list_video_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid video model arguments")

@@ -351,7 +351,8 @@ fn review_task(
     }
     match operations::invoke(store, database, &data.operation, data.arguments) {
         Some(Ok(_)) => tasks::task_for_run(store, workspace_id, run_id),
-        Some(Err(message)) => Err((-32602, message)),
+        Some(Err(std::borrow::Cow::Borrowed(message))) => Err((-32602, message)),
+        Some(Err(_)) => Err((-32602, "Review operation failed")),
         None => Err((-32603, "Review operation unavailable")),
     }
 }
