@@ -195,7 +195,7 @@ pub(super) fn definitions() -> [Value; 21] {
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
         json!({"name": "generate_library_audio",
-            "description": "Make instrumental music or a sound effect from a written description with the workspace's first provider for that kind (or one named provider), and add it to the workspace assets with the given notes, labelled Music or Sound effect. The provider sets the length limits (ElevenLabs: music 3 to 600 seconds, sound effects 0.5 to 30). Music in an approved asset plan can be laid under a video.",
+            "description": "Make instrumental music or a sound effect from a written description with the workspace's first provider for that kind (or one named provider), and add it to the workspace assets with the given notes, labelled Music or Sound effect. The provider sets the length limits; a length outside them fails with the allowed range. Music in an approved asset plan can be laid under a video.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id,
                 "kind": {"enum": ["music", "sound-effect"]},
@@ -335,6 +335,23 @@ pub(super) fn call_generation(
                     .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider, "references": image.references})).collect::<Vec<_>>()}))
                     .map_err(|error| Cow::Owned(format!("Could not generate the images: {error}")))
             }),
+        "generate_library_audio" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| Cow::Borrowed("Invalid audio arguments"))
+            .and_then(|args: GenerateAudioInput| {
+                store
+                    .generate_library_audio(
+                        database,
+                        args.workspace_id,
+                        args.kind,
+                        &args.prompt,
+                        args.seconds,
+                        &args.notes,
+                        args.provider.as_deref(),
+                        None,
+                    )
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|error| Cow::Owned(format!("Could not make the audio: {error}")))
+            }),
         "generate_library_video" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| Cow::Borrowed("Invalid video arguments"))
             .and_then(|args: GenerateVideoInput| {
@@ -361,23 +378,6 @@ pub(super) fn call(
                     .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
-            }),
-        "generate_library_audio" => serde_json::from_value(Value::Object(arguments.clone()))
-            .map_err(|_| "Invalid audio arguments")
-            .and_then(|args: GenerateAudioInput| {
-                store
-                    .generate_library_audio(
-                        database,
-                        args.workspace_id,
-                        args.kind,
-                        &args.prompt,
-                        args.seconds,
-                        &args.notes,
-                        args.provider.as_deref(),
-                        None,
-                    )
-                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
-                    .map_err(|_| "Could not make the audio. Check the provider, its key, the length and the description")
             }),
         "list_video_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid video model arguments")

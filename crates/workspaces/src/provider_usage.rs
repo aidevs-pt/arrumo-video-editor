@@ -255,7 +255,8 @@ impl WorkspaceStore {
                         .query_row(
                             "SELECT used_percent, resets_at, window_minutes
                              FROM agent_usage_observations
-                             WHERE plugin_id = ?1 AND (resets_at IS NULL OR resets_at > unixepoch())",
+                             WHERE plugin_id = ?1 AND (resets_at IS NULL OR resets_at > unixepoch())
+                             ORDER BY used_percent DESC, window_minutes DESC LIMIT 1",
                             [&manifest.id],
                             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                         )
@@ -332,7 +333,10 @@ mod tests {
         );
         assert_eq!(
             event.read(output),
-            Some((45.0, Some(1_795_384_200), Some(300)))
+            Some(vec![
+                (0, (45.0, Some(1_795_384_200), Some(300))),
+                (1, (13.0, Some(1_795_662_000), Some(10_080))),
+            ])
         );
         assert_eq!(event.read("{\"type\":\"result\"}"), None);
     }

@@ -181,16 +181,18 @@ impl UsageEvent {
             })
     }
 
-    /// The most used window in the last matching line of `output`.
-    pub(crate) fn read(&self, output: &str) -> Option<(f64, Option<i64>, Option<i64>)> {
+    /// Every declared window in the last matching line of `output`, by declaration index.
+    pub(crate) fn read(&self, output: &str) -> Option<Vec<(usize, crate::agent_cli::AgentUsage)>> {
         output.lines().rev().find_map(|line| {
             let event: serde_json::Value = serde_json::from_str(line.trim()).ok()?;
             if event.pointer(&self.type_pointer)?.as_str()? != self.type_value {
                 return None;
             }
-            self.windows
+            let windows: Vec<_> = self
+                .windows
                 .iter()
-                .filter_map(|window| {
+                .enumerate()
+                .filter_map(|(index, window)| {
                     let used = event.pointer(&window.used)?.as_f64()?;
                     let percent = match window.scale {
                         UsageScale::Fraction => used * 100.0,
@@ -198,16 +200,20 @@ impl UsageEvent {
                     };
                     percent.is_finite().then(|| {
                         (
-                            percent.clamp(0.0, 100.0),
-                            window
-                                .resets_at
-                                .as_deref()
-                                .and_then(|at| event.pointer(at)?.as_i64()),
-                            window.minutes,
+                            index,
+                            (
+                                percent.clamp(0.0, 100.0),
+                                window
+                                    .resets_at
+                                    .as_deref()
+                                    .and_then(|at| event.pointer(at)?.as_i64()),
+                                window.minutes,
+                            ),
                         )
                     })
                 })
-                .max_by(|first, second| first.0.total_cmp(&second.0))
+                .collect();
+            (!windows.is_empty()).then_some(windows)
         })
     }
 }
