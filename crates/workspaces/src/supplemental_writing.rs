@@ -694,8 +694,36 @@ impl WorkspaceStore {
                     .map_or("16:9", |request| request.aspect_ratio)
             });
             let stem = format!("thumbnail-run{run_id}-{attempt}-{}", index + 1);
+            let reference_ids: Vec<i64> = match (format, aspect) {
+                // Thumbnails at another ratio belong to portrait cuts and follow their references.
+                (Some(id), Some(_)) => crate::portrait_cuts::cut_requests(snapshot)
+                    .get(id)
+                    .map(|request| request.references.clone())
+                    .unwrap_or_default(),
+                (Some(id), None) => snapshot["formats"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .find(|entry| entry["format"]["id"].as_i64() == Some(*id))
+                    .and_then(|entry| {
+                        entry["delivery"]["supplemental"]["thumbnail_reference_ids"].as_array()
+                    })
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_i64)
+                    .collect(),
+                (None, _) => Vec::new(),
+            };
             let (asset_id, image_provider) = self
-                .generate_image_asset(database, workspace_id, &order, prompt, aspect_ratio, &stem)
+                .generate_image_asset(
+                    database,
+                    workspace_id,
+                    &order,
+                    prompt,
+                    aspect_ratio,
+                    &stem,
+                    &reference_ids,
+                )
                 .map_err(|error| {
                     StageFailure(format!("The thumbnails could not be generated: {error}"))
                 })?;

@@ -33,6 +33,81 @@ struct ImageAdapter {
     request: Value,
     response: ImageResponse,
     max_image_bytes: u64,
+    /// How to send reference images, for providers that take them.
+    #[serde(default)]
+    references: Option<ReferenceInput>,
+}
+
+/// How a provider receives reference images with a request.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "encoding", rename_all = "camelCase", deny_unknown_fields)]
+enum ReferenceInput {
+    /// A multipart form to another endpoint on the same host: the filled request's top-level
+    /// fields become form fields and each image a file part named `fileField`.
+    #[serde(rename_all = "camelCase")]
+    Multipart {
+        endpoint: String,
+        file_field: String,
+        max_images: usize,
+    },
+    /// The JSON request with `item` (using {mimeType} and {imageBase64}) appended for each image
+    /// to the array at `pointer`.
+    #[serde(rename_all = "camelCase")]
+    Json {
+        pointer: String,
+        item: Value,
+        max_images: usize,
+    },
+}
+
+/// A reference image to send with a request.
+pub(crate) struct ReferencePicture {
+    pub mime: &'static str,
+    pub bytes: Vec<u8>,
+}
+
+fn same_host(first: &str, second: &str) -> bool {
+    let host = |url: &str| {
+        url.strip_prefix("https://")
+            .and_then(|rest| rest.split('/').next())
+            .map(str::to_owned)
+    };
+    host(first).is_some() && host(first) == host(second)
+}
+
+fn valid_references(adapter: &ImageAdapter) -> bool {
+    match &adapter.references {
+        None => true,
+        Some(ReferenceInput::Multipart {
+            endpoint,
+            file_field,
+            max_images,
+        }) => {
+            same_host(endpoint, &adapter.endpoint)
+                && !endpoint.contains(['?', '#', '@'])
+                && !endpoint.contains("/../")
+                && (1..=64).contains(&file_field.len())
+                && file_field
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "_[]-".contains(c))
+                && (1..=8).contains(max_images)
+        }
+        Some(ReferenceInput::Json {
+            pointer,
+            item,
+            max_images,
+        }) => {
+            pointer.starts_with('/')
+                && pointer.len() <= 256
+                && adapter
+                    .request
+                    .pointer(pointer)
+                    .is_some_and(Value::is_array)
+                && uses(item, "{imageBase64}")
+                && serde_json::to_vec(item).is_ok_and(|bytes| bytes.len() <= 2048)
+                && (1..=8).contains(max_images)
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,6 +184,7 @@ fn image_adapter(plugin_id: &str) -> io::Result<Option<ImageAdapter>> {
         || adapter.endpoint.contains("/../")
         || serde_json::to_vec(&adapter.request).map_or(true, |body| body.len() > MAX_TEMPLATE_BYTES)
         || !uses(&adapter.request, "{prompt}")
+        || !valid_references(&adapter)
     {
         return Err(invalid_adapter());
     }
@@ -212,6 +288,7 @@ impl WorkspaceStore {
         order: &[String],
         prompt: &str,
         aspect_ratio: &str,
+        references: &[ReferencePicture],
     ) -> io::Result<GeneratedImage> {
         let prompt = prompt.trim();
         if prompt.is_empty()
@@ -246,7 +323,25 @@ impl WorkspaceStore {
             let framed = format!(
                 "{prompt}\n\nThe final image is cropped to {aspect_ratio}: keep all text and the main subject well inside the frame, away from every edge."
             );
-            match request_image(&client, &adapter, &model, ratio, &framed, &secret) {
+            let attached = match &adapter.references {
+                Some(
+                    ReferenceInput::Multipart { max_images, .. }
+                    | ReferenceInput::Json { max_images, .. },
+                ) => &references[..references.len().min(*max_images)],
+                None => &[][..],
+            };
+            let result = if attached.is_empty() {
+                request_image(&client, &adapter, &model, ratio, &framed, &secret, &[])
+            } else {
+                let guided = format!(
+                    "{framed}\nThe attached images are the creator's style references: follow their layout, type and colours, but do not copy their text or subjects."
+                );
+                // A provider that refuses the references still gets a plain request.
+                request_image(&client, &adapter, &model, ratio, &guided, &secret, attached).or_else(
+                    |_| request_image(&client, &adapter, &model, ratio, &framed, &secret, &[]),
+                )
+            };
+            match result {
                 Ok((bytes, extension)) => {
                     return Ok(GeneratedImage {
                         provider: provider.clone(),
@@ -263,6 +358,7 @@ impl WorkspaceStore {
     }
 
     /// Generates an image and stores it as a workspace asset named after `stem`.
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_image_asset(
         &self,
         database: &Path,
@@ -271,8 +367,18 @@ impl WorkspaceStore {
         prompt: &str,
         aspect_ratio: &str,
         stem: &str,
+        reference_ids: &[i64],
     ) -> Result<(i64, String), Box<dyn Error>> {
-        let image = self.generate_image(workspace_id, order, prompt, aspect_ratio)?;
+        let root = crate::asset_root(database);
+        let references: Vec<ReferencePicture> = reference_ids
+            .iter()
+            .filter_map(|id| self.image_preview(&root, workspace_id, *id).ok().flatten())
+            .map(|preview| ReferencePicture {
+                mime: preview.mime,
+                bytes: preview.bytes,
+            })
+            .collect();
+        let image = self.generate_image(workspace_id, order, prompt, aspect_ratio, &references)?;
         let scratch = tempfile::tempdir()?;
         let downloaded = scratch.path().join(format!("{stem}.{}", image.extension));
         std::fs::write(&downloaded, &image.bytes)?;
@@ -338,8 +444,9 @@ fn request_image(
     ratio: &str,
     prompt: &str,
     secret: &[u8],
+    references: &[ReferencePicture],
 ) -> io::Result<(Vec<u8>, &'static str)> {
-    let endpoint = adapter.endpoint.replace("{model}", model);
+    let mut endpoint = adapter.endpoint.replace("{model}", model);
     let (header, value) = credential_header(adapter, secret)?;
     let body = fill(
         &adapter.request,
@@ -349,14 +456,61 @@ fn request_image(
             ("{model}", model),
         ],
     );
-    let response = client
-        .post(&endpoint)
-        .header(header, value)
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .body(
-            serde_json::to_vec(&body)
-                .map_err(|_| io::Error::other("Could not encode the image request"))?,
-        )
+    let encode = || io::Error::other("Could not encode the image request");
+    let request = match (&adapter.references, references.is_empty()) {
+        (
+            Some(ReferenceInput::Multipart {
+                endpoint: edits,
+                file_field,
+                ..
+            }),
+            false,
+        ) => {
+            endpoint = edits.replace("{model}", model);
+            let mut form = reqwest::blocking::multipart::Form::new();
+            for (key, value) in body.as_object().into_iter().flatten() {
+                let text = match value {
+                    Value::String(text) => text.clone(),
+                    other => other.to_string(),
+                };
+                form = form.text(key.clone(), text);
+            }
+            for (index, picture) in references.iter().enumerate() {
+                let extension = picture.mime.trim_start_matches("image/");
+                let part = reqwest::blocking::multipart::Part::bytes(picture.bytes.clone())
+                    .file_name(format!("reference-{}.{extension}", index + 1))
+                    .mime_str(picture.mime)
+                    .map_err(|_| encode())?;
+                form = form.part(file_field.clone(), part);
+            }
+            client.post(&endpoint).header(header, value).multipart(form)
+        }
+        (Some(ReferenceInput::Json { pointer, item, .. }), false) => {
+            let mut body = body;
+            let list = body
+                .pointer_mut(pointer)
+                .and_then(Value::as_array_mut)
+                .ok_or_else(encode)?;
+            for picture in references {
+                let data = base64::engine::general_purpose::STANDARD.encode(&picture.bytes);
+                list.push(fill(
+                    item,
+                    &[("{mimeType}", picture.mime), ("{imageBase64}", &data)],
+                ));
+            }
+            client
+                .post(&endpoint)
+                .header(header, value)
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(serde_json::to_vec(&body).map_err(|_| encode())?)
+        }
+        _ => client
+            .post(&endpoint)
+            .header(header, value)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(serde_json::to_vec(&body).map_err(|_| encode())?),
+    };
+    let response = request
         .send()
         .map_err(|_| io::Error::other("The image request failed"))?;
     if !response.status().is_success() {

@@ -1266,7 +1266,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&result)?);
         }
-        [database, command, workspace, aspect, order] if command == "generate-image" => {
+        [database, command, workspace, aspect, order, rest @ ..]
+            if command == "generate-image" && rest.len() <= 1 =>
+        {
+            let references: Vec<i64> = rest
+                .first()
+                .map(|ids| {
+                    serde_json::from_str(utf8(ids)?)
+                        .map_err(Into::<Box<dyn std::error::Error>>::into)
+                })
+                .transpose()?
+                .unwrap_or_default();
             let mut prompt = String::new();
             std::io::stdin()
                 .take(16 * 1024)
@@ -1280,6 +1290,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     &prompt,
                     utf8(aspect)?,
                     "generated-image",
+                    &references,
                 )?;
             println!(
                 "{}",
@@ -1600,7 +1611,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
-                "snapshot-database <new-sqlite-file> | watch-delivery-queue | process-script-stage <workspace-id> <run-id> | process-supplemental-writing <workspace-id> <run-id> | generate-image <workspace-id> <16:9|9:16|1:1> <providers-json> (prompt on stdin) | process-asset-plan <workspace-id> <run-id> | process-preview-edit <workspace-id> <run-id> | process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
+                "snapshot-database <new-sqlite-file> | watch-delivery-queue | process-script-stage <workspace-id> <run-id> | process-supplemental-writing <workspace-id> <run-id> | generate-image <workspace-id> <16:9|9:16|1:1> <providers-json> [reference-asset-ids-json] (prompt on stdin) | process-asset-plan <workspace-id> <run-id> | process-preview-edit <workspace-id> <run-id> | process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
                 "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",

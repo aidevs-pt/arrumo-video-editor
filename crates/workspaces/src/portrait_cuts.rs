@@ -24,6 +24,8 @@ pub(crate) struct CutRequest {
     pub thumbnails_per_cut: u64,
     pub guidance: String,
     pub thumbnail_guidance: String,
+    /// Workspace images the cut thumbnails follow.
+    pub references: Vec<i64>,
 }
 
 pub(crate) fn cut_requests(snapshot: &Value) -> BTreeMap<i64, CutRequest> {
@@ -60,6 +62,12 @@ pub(crate) fn cut_requests(snapshot: &Value) -> BTreeMap<i64, CutRequest> {
                     .as_str()
                     .unwrap_or("")
                     .to_owned(),
+                references: source["thumbnail_reference_ids"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_i64)
+                    .collect(),
             },
         );
     }
@@ -445,6 +453,9 @@ impl WorkspaceStore {
                         prompt,
                         "9:16",
                         &stem,
+                        &all.get(&cut.format_id)
+                            .map(|request| request.references.clone())
+                            .unwrap_or_default(),
                     )
                     .map_err(|error| {
                         StageFailure(format!(
@@ -476,6 +487,7 @@ mod tests {
                 thumbnails_per_cut: 1,
                 guidance: String::new(),
                 thumbnail_guidance: String::new(),
+                references: Vec::new(),
             },
         )])
     }
