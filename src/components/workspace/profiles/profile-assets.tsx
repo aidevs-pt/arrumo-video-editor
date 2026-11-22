@@ -100,7 +100,7 @@ export function ProfileAssets({ workspaceId, profile }: { workspaceId: number; p
 
   return (
     <section aria-label={messages.profiles.assets}>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-[60ch] text-muted-foreground">{copy.assetsIntro.replace("{profile}", profile.name)}</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setLibraryOpen(true)} disabled={busy !== null}><FolderInput data-icon="inline-start" />{copy.addFromLibrary}</Button>

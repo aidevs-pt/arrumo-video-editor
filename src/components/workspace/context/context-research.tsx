@@ -94,7 +94,7 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
               <Link2 aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
               <Input type="url" inputMode="url" value={source} placeholder={copy.linkPlaceholder} aria-label={copy.linkLabel.replace("{number}", String(index + 1))}
                 onChange={(event) => setSources((current) => current.map((value, position) => position === index ? event.target.value : value))} />
-              {sources.length > 1 && <Button type="button" variant="ghost" size="icon" aria-label={copy.removeLink}
+              {sources.length > 1 && <Button type="button" variant="ghost" size="icon" className="size-10" aria-label={copy.removeLink}
                 onClick={() => setSources((current) => current.filter((_, position) => position !== index))}><X /></Button>}
             </div>
           ))}

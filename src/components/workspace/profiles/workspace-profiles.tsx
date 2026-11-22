@@ -108,7 +108,7 @@ export function WorkspaceProfiles({
 
   return (
     <WorkspaceShell>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <WorkspaceHeading>
           <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
           <p>{copy.emptyHint}</p>

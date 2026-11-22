@@ -149,7 +149,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
 
   return (
     <WorkspaceShell className="max-w-[90rem]">
-      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 ref={heading} tabIndex={-1} className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] outline-none [font-variation-settings:'wdth'_135]">{messages.assets.title}</h1>
           <p className="mt-2 text-lg text-muted-foreground">{copy.intro.replace("{workspace}", workspace.name)}</p>

@@ -85,8 +85,8 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
       ) : (
         <div className="flex flex-col gap-4">
           <div className="relative w-full max-w-xs">
-            <Search className="pointer-events-none absolute start-2.5 top-2 size-4 text-muted-foreground" aria-hidden="true" />
-            <Input type="search" className="ps-8" aria-label={copy.searchCompleted} placeholder={copy.searchCompleted}
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input type="search" className="ps-9" aria-label={copy.searchCompleted} placeholder={copy.searchCompleted}
               value={search} onChange={(event) => setSearch(event.target.value)} />
           </div>
           <ul className="divide-y border-y" aria-label={copy.completedVideos}>

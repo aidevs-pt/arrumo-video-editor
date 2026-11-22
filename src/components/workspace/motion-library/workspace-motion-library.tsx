@@ -123,7 +123,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
         <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
         <p>{copy.intro}</p>
       </WorkspaceHeading>}
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Field className={embedded ? "hidden" : "w-auto"}>
           <FieldLabel htmlFor="motion-scope">{copy.scope}</FieldLabel>
           <NativeSelect id="motion-scope" value={scope} disabled={!catalog || open}
