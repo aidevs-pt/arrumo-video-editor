@@ -424,7 +424,113 @@ fn agent_image(
     })
 }
 
+/// A file name from the first words of a description, such as `flat-illustration-of-a-solved`.
+fn library_image_stem(prompt: &str) -> String {
+    let mut stem = String::new();
+    for word in prompt
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+    {
+        let word: String = word
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .collect::<String>()
+            .to_ascii_lowercase();
+        if word.is_empty() {
+            continue;
+        }
+        if stem.len() + word.len() > 40 {
+            break;
+        }
+        if !stem.is_empty() {
+            stem.push('-');
+        }
+        stem.push_str(&word);
+    }
+    if stem.is_empty() {
+        "generated-image".into()
+    } else {
+        stem
+    }
+}
+
+/// Aspect ratios the Assets page offers when generating images.
+pub const ASSET_ASPECT_RATIOS: [&str; 4] = ["16:9", "9:16", "1:1", "4:5"];
+
 impl WorkspaceStore {
+    /// Generates up to four images for the workspace library, from the workspace's image
+    /// providers in order or from one chosen `provider`. Each image joins the library with
+    /// `notes`, so it is not flagged as missing context. Stops at the first
+    /// failure and returns what was made so far with the error.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_library_images(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        prompt: &str,
+        aspect_ratio: &str,
+        count: usize,
+        notes: &str,
+        provider: Option<&str>,
+    ) -> Result<Vec<GeneratedAsset>, Box<dyn Error>> {
+        let prompt = prompt.trim();
+        if prompt.is_empty() || prompt.chars().count() > MAX_PROMPT_CHARACTERS {
+            return Err(io::Error::other("Describe the image in up to 4,000 characters").into());
+        }
+        if !(1..=4).contains(&count)
+            || !ASSET_ASPECT_RATIOS.contains(&aspect_ratio)
+            || notes.len() > 8000
+        {
+            return Err(io::Error::other("Choose a size and up to four variations").into());
+        }
+        let available = self.capture_provider_orders(workspace_id, &BTreeMap::new())?;
+        let order = available
+            .get("image-generation")
+            .map(|order| order.effective.clone())
+            .unwrap_or_default();
+        let order = match provider {
+            Some(id) => {
+                let known = self
+                    .capability_index(Some(workspace_id))?
+                    .get("image-generation")
+                    .is_some_and(|providers| providers.iter().any(|entry| entry.id == id));
+                if !known {
+                    return Err(io::Error::other("That provider does not make images").into());
+                }
+                vec![id.to_owned()]
+            }
+            None => order,
+        };
+        if order.is_empty() {
+            return Err(io::Error::other(
+                "Turn on an image provider in Settings › Services and keys",
+            )
+            .into());
+        }
+        let stem = library_image_stem(prompt);
+        let mut made = Vec::new();
+        for index in 0..count {
+            let image = self.generate_image_asset(
+                database,
+                workspace_id,
+                &order,
+                prompt,
+                aspect_ratio,
+                &if count == 1 {
+                    stem.clone()
+                } else {
+                    format!("{stem}-{}", index + 1)
+                },
+                &[],
+            )?;
+            if !notes.trim().is_empty() {
+                self.set_asset_notes(workspace_id, image.id, notes.trim())?;
+            }
+            made.push(image);
+        }
+        Ok(made)
+    }
+
     /// Generates an image and stores it as a workspace asset named after `stem`.
     #[allow(clippy::too_many_arguments)]
     pub fn generate_image_asset(
@@ -618,6 +724,47 @@ fn request_image(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn library_images_are_named_from_their_description() {
+        assert_eq!(
+            library_image_stem("Flat illustration of a solved 3x3 cube, cobalt"),
+            "flat-illustration-of-a-solved-3x3-cube"
+        );
+        assert_eq!(library_image_stem("¡Ñ!"), "generated-image");
+    }
+
+    #[test]
+    fn library_images_need_a_prompt_a_size_and_one_to_four_variations() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let database = Path::new(":memory:");
+        for (prompt, ratio, count) in [
+            (" ", "16:9", 1),
+            ("Desk", "3:1", 1),
+            ("Desk", "16:9", 0),
+            ("Desk", "16:9", 5),
+        ] {
+            assert!(
+                store
+                    .generate_library_images(database, workspace, prompt, ratio, count, "", None)
+                    .is_err()
+            );
+        }
+        assert!(
+            store
+                .generate_library_images(
+                    database,
+                    workspace,
+                    "Desk",
+                    "16:9",
+                    1,
+                    "",
+                    Some("codex-not-a-provider")
+                )
+                .is_err()
+        );
+    }
     use serde_json::json;
 
     #[test]

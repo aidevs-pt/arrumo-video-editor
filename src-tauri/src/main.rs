@@ -468,6 +468,40 @@ async fn get_workspace_context(
 }
 
 #[tauri::command]
+async fn generate_library_images(
+    workspace_id: i64,
+    prompt: String,
+    aspect_ratio: String,
+    count: usize,
+    notes: String,
+    provider: Option<String>,
+    app: AppHandle,
+) -> Result<Vec<i64>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .generate_library_images(
+                &database,
+                workspace_id,
+                &prompt,
+                &aspect_ratio,
+                count,
+                &notes,
+                provider.as_deref(),
+            )
+            .map(|images| images.into_iter().map(|image| image.id).collect())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "image_generation_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn draft_profile(
     workspace_id: i64,
     name: String,
@@ -1140,6 +1174,7 @@ fn main() {
             get_workspace_context,
             draft_workspace_context,
             draft_profile,
+            generate_library_images,
             generate_motion_library_item,
             apply_context_import,
             set_workspace_context,

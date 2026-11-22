@@ -36,6 +36,7 @@ mod generation_plan;
 mod generation_queue;
 mod generation_worker;
 mod image_generation;
+pub use image_generation::ASSET_ASPECT_RATIOS;
 mod mcp;
 mod media_worker;
 mod motion_artifacts;

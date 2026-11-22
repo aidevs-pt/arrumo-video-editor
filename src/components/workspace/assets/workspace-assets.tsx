@@ -3,6 +3,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
+import { GenerateAssetDialog } from "./generate-asset-dialog";
 import { AudioLines, Copy, Film, Folder, ImageIcon, Layers, PanelRight, Search, SquareCheck, SquareMinus, Tag, TriangleAlert, Upload } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -154,9 +155,13 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
           <h1 ref={heading} tabIndex={-1} className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] outline-none [font-variation-settings:'wdth'_135]">{messages.assets.title}</h1>
           <p className="mt-2 text-lg text-muted-foreground">{copy.intro.replace("{workspace}", workspace.name)}</p>
         </div>
-        <Button onClick={() => void importFiles()} disabled={!assets || progress !== undefined}>
-          <Upload data-icon="inline-start" />{copy.upload}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <GenerateAssetDialog workspaceId={workspaceId} disabled={!assets}
+            onCreated={(ids) => { setRecent((current) => [...current, ...ids]); setAttempt((value) => value + 1); }} />
+          <Button onClick={() => void importFiles()} disabled={!assets || progress !== undefined}>
+            <Upload data-icon="inline-start" />{copy.upload}
+          </Button>
+        </div>
       </header>
       {loadError ? (
         <Alert variant="destructive">

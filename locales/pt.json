@@ -495,7 +495,29 @@
     "notesError": "Não foi possível guardar as notas. Tente novamente.",
     "pickTitle": "Selecionar ficheiros multimédia",
     "unselectAsset": "Retirar da seleção",
-    "copyName": "Copiar nome"
+    "copyName": "Copiar nome",
+    "generate": {
+      "open": "Gerar",
+      "title": "Gerar uma imagem",
+      "description": "Descreva-a e os seus fornecedores de imagens criam-na. Fica nos recursos deste espaço de trabalho.",
+      "prompt": "Descreva-a",
+      "promptPlaceholder": "Ilustração plana de uma secretária desarrumada com tiras de filme a empilharem-se, cobalto e amarelo, sem texto.",
+      "provider": "Feita com",
+      "firstAvailable": "{provider} (predefinido)",
+      "defaultOrder": "Ordem do espaço de trabalho",
+      "size": "Tamanho",
+      "variations": "Variações",
+      "notes": "Contexto para o agente",
+      "notesPlaceholder": "Fundo para o teaser de lançamento. Atrás da revelação do logótipo.",
+      "notesHint": "Fica guardado com a imagem, para não ser assinalada como sem contexto.",
+      "noProvider": "Nenhum fornecedor de imagens está ativo. Ative um em Definições › Serviços e chaves.",
+      "error": "Não foi possível gerar a imagem. Tente novamente.",
+      "pendingHint": "A gerar. Pode demorar um minuto por imagem.",
+      "cancel": "Cancelar",
+      "generating": "A gerar…",
+      "submitOne": "Gerar 1 imagem",
+      "submitMany": "Gerar {count} imagens"
+    }
   },
   "delivery": {
     "inherited": "Herdado",

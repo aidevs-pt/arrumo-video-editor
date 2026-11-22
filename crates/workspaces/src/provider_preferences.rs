@@ -112,7 +112,7 @@ impl WorkspaceStore {
             .collect()
     }
 
-    fn capability_index(
+    pub(crate) fn capability_index(
         &self,
         workspace_id: Option<i64>,
     ) -> Result<BTreeMap<String, Vec<CapabilityProvider>>, Box<dyn Error>> {

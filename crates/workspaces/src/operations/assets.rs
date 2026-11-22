@@ -19,6 +19,19 @@ struct ContextImportInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GenerateImagesInput {
+    workspace_id: i64,
+    prompt: String,
+    aspect_ratio: String,
+    count: usize,
+    #[serde(default)]
+    notes: String,
+    #[serde(default)]
+    provider: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ListInput {
     workspace_id: i64,
 }
@@ -111,12 +124,22 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 16] {
+pub(super) fn definitions() -> [Value; 17] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
     }, "required": ["workspaceId", "assetId", "role"], "additionalProperties": false});
     [
+        json!({"name": "generate_library_images",
+            "description": "Generate one to four images from a description with the workspace's image providers (in their order, or one named provider) and add them to the workspace assets with the given notes.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "prompt": {"type": "string", "minLength": 1, "maxLength": 4000},
+                "aspectRatio": {"enum": crate::ASSET_ASPECT_RATIOS},
+                "count": {"type": "integer", "minimum": 1, "maximum": 4},
+                "notes": {"type": "string", "maxLength": 8000},
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+            }, "required": ["workspaceId", "prompt", "aspectRatio", "count"], "additionalProperties": false}}),
         json!({"name": "detach_completed_media",
             "description": "Remove a post-completion attachment from a verified output while retaining the managed asset.",
             "inputSchema": {"type": "object", "properties": {
@@ -212,6 +235,22 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
+        "generate_library_images" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid image generation arguments")
+            .and_then(|args: GenerateImagesInput| {
+                store
+                    .generate_library_images(
+                        database,
+                        args.workspace_id,
+                        &args.prompt,
+                        &args.aspect_ratio,
+                        args.count,
+                        &args.notes,
+                        args.provider.as_deref(),
+                    )
+                    .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider})).collect::<Vec<_>>()}))
+                    .map_err(|_| "Could not generate the images. Check the image providers and their keys")
+            }),
         "detach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid completed media arguments")
             .and_then(|args: DetachCompletedMedia| {

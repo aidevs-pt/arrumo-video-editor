@@ -495,7 +495,29 @@
     "notesError": "Notes couldn’t be saved. Try again.",
     "pickTitle": "Select media files",
     "unselectAsset": "Remove from selection",
-    "copyName": "Copy name"
+    "copyName": "Copy name",
+    "generate": {
+      "open": "Generate",
+      "title": "Generate an image",
+      "description": "Describe it and your image providers make it. It joins this workspace’s assets.",
+      "prompt": "Describe it",
+      "promptPlaceholder": "Flat illustration of a messy desk of film strips snapping into a neat stack, cobalt and yellow, no text.",
+      "provider": "Made with",
+      "firstAvailable": "{provider} (default)",
+      "defaultOrder": "Workspace order",
+      "size": "Size",
+      "variations": "Variations",
+      "notes": "Context for the agent",
+      "notesPlaceholder": "Background for the launch teaser. Use behind the logo reveal.",
+      "notesHint": "Saved with the image, so it isn’t flagged as missing context.",
+      "noProvider": "No image provider is on. Turn one on in Settings › Services and keys.",
+      "error": "The image couldn’t be generated. Try again.",
+      "pendingHint": "Generating. This can take a minute per image.",
+      "cancel": "Cancel",
+      "generating": "Generating…",
+      "submitOne": "Generate 1 image",
+      "submitMany": "Generate {count} images"
+    }
   },
   "delivery": {
     "inherited": "Inherited",
