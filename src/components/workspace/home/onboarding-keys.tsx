@@ -1,5 +1,6 @@
 "use client";
 
+import { usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
@@ -20,6 +21,7 @@ export function OnboardingKeys({ services, onBack, onDone }: {
   onBack: () => void;
   onDone: () => void;
 }) {
+  const pluginText = usePluginText();
   const { messages: { onboarding: copy } } = useLocale();
   const [required, setRequired] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
@@ -78,16 +80,16 @@ export function OnboardingKeys({ services, onBack, onDone }: {
             <section key={key} aria-labelledby={`service-${key}`} className="grid gap-3 py-5 md:grid-cols-2 md:gap-8">
               <div>
                 <h2 id={`service-${key}`} className="flex flex-wrap items-center gap-2.5 font-heading text-[1.375rem] font-[850] [font-variation-settings:'wdth'_112]">
-                  {service.name}
+                  {pluginText.name(service.id, service.name)}
                   <span className={cn("rounded-[5px] px-2 py-0.5 font-sans text-sm [font-variation-settings:normal]",
                     isRequired ? "bg-attention font-bold text-ink" : "font-normal text-muted-foreground")}>
                     {isRequired ? copy.required : copy.optional}
                   </span>
                 </h2>
-                <p className="mt-1.5 text-muted-foreground">{service.description}</p>
+                <p className="mt-1.5 text-muted-foreground">{pluginText.description(service.id, service.description)}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <label htmlFor={`key-${key}`} className="font-semibold">{field.label}</label>
+                <label htmlFor={`key-${key}`} className="font-semibold">{pluginText.setting(service.id, field.id, "label", field.label)}</label>
                 <Input id={`key-${key}`} type="password" autoComplete="new-password" spellCheck={false} maxLength={2048}
                   placeholder={saved[key] ? "••••••••••••••" : copy.pasteKey} disabled={saving}
                   aria-describedby={`key-${key}-hint`} value={values[key] ?? ""}

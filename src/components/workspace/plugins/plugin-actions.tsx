@@ -1,5 +1,6 @@
 "use client";
 
+import { usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useId, useState, type FormEvent } from "react";
@@ -31,6 +32,7 @@ export function PluginActions({ workspaceId, revision = "" }: {
   workspaceId: number | null;
   revision?: string;
 }) {
+  const pluginText = usePluginText();
   const { messages: { pluginActions: copy, workspaces } } = useLocale();
   const [actions, setActions] = useState<InstalledAction[]>([]);
   const [failed, setFailed] = useState(false);
@@ -85,7 +87,7 @@ export function PluginActions({ workspaceId, revision = "" }: {
           const key = `${entry.pluginId}:${entry.action.id}:${entry.packageSha256}`;
           return <AccordionItem key={key} value={key}>
             <AccordionTrigger className="wrap-anywhere">
-              <span>{entry.action.label}<span className="block text-xs text-muted-foreground">{entry.pluginName}</span></span>
+              <span>{pluginText.action(entry.pluginId, entry.action.id, "label", entry.action.label)}<span className="block text-xs text-muted-foreground">{pluginText.name(entry.pluginId, entry.pluginName)}</span></span>
             </AccordionTrigger>
             <AccordionContent><ActionForm entry={entry} workspaceId={workspaceId} onChanged={refreshHistory} /></AccordionContent>
           </AccordionItem>;
@@ -100,7 +102,7 @@ export function PluginActions({ workspaceId, revision = "" }: {
         <Accordion type="single" collapsible>
           {history.map((job) => (
             <JobHistoryItem key={job.id} job={job} workspaceId={workspaceId}
-              label={actions.find((entry) => entry.pluginId === job.pluginId && entry.action.id === job.actionId)?.action.label ?? job.actionId}
+              label={pluginText.action(job.pluginId, job.actionId, "label", actions.find((entry) => entry.pluginId === job.pluginId && entry.action.id === job.actionId)?.action.label ?? job.actionId)}
               onChanged={refreshHistory} />
           ))}
         </Accordion>
@@ -110,6 +112,7 @@ export function PluginActions({ workspaceId, revision = "" }: {
 }
 
 function ActionForm({ entry, workspaceId, onChanged }: { entry: InstalledAction; workspaceId: number | null; onChanged: () => void }) {
+  const pluginText = usePluginText();
   const { messages: { pluginActions: copy } } = useLocale();
   const field = useId();
   const result = useId();
@@ -150,7 +153,7 @@ function ActionForm({ entry, workspaceId, onChanged }: { entry: InstalledAction;
 
   return <form className="flex flex-col gap-3" onSubmit={run} aria-busy={pending}>
     <Field data-invalid={error === "invalidInput"}>
-      <FieldDescription id={field + "-description"}>{entry.action.description}</FieldDescription>
+      <FieldDescription id={field + "-description"}>{pluginText.action(entry.pluginId, entry.action.id, "description", entry.action.description)}</FieldDescription>
       <FieldLabel htmlFor={field}>{copy.input}</FieldLabel>
       <Textarea id={field} aria-describedby={field + "-description"} aria-invalid={error === "invalidInput"}
         className="max-h-60 font-mono" spellCheck={false} maxLength={65_536} disabled={pending}

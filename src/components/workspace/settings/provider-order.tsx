@@ -1,5 +1,6 @@
 "use client";
 
+import { usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowDown, ArrowUp, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
@@ -33,6 +34,7 @@ const SHOWN = ["transcription", "image-generation", "text-to-speech", "video-gen
 
 /** Which plugin does each job, in the order Arrumo tries them, for the app or one workspace. */
 export function ProviderOrder({ catalog, workspaceId }: { catalog: CatalogEntry[]; workspaceId: number | null }) {
+  const pluginText = usePluginText();
   const { messages: { providerOrder: copy } } = useLocale();
   const reduceMotion = useReducedMotion();
   const [preferences, setPreferences] = useState<Record<string, Preferences>>();
@@ -98,10 +100,10 @@ export function ProviderOrder({ catalog, workspaceId }: { catalog: CatalogEntry[
       <div className="grid gap-6 md:grid-cols-2">
         {capabilities.map((capability) => {
           const entry = preferences[capability];
-          const names = new Map(entry.available.map((provider) => [provider.id, provider.name]));
+          const names = new Map(entry.available.map((provider) => [provider.id, pluginText.name(provider.id, provider.name)]));
           const order = entry.effective.filter((id) => names.has(id));
           const custom = workspaceId === null ? entry.app !== null : entry.workspaceOverride !== null;
-          const label = catalog.flatMap(({ manifest }) => manifest.capabilities?.[capability]?.name ?? []).at(0);
+          const label = catalog.flatMap(({ manifest }) => manifest.capabilities?.[capability]?.name !== undefined ? [pluginText.capability(manifest.id, capability, "name", manifest.capabilities[capability].name)] : []).at(0);
           const move = (index: number, by: number) => {
             const next = [...order];
             [next[index], next[index + by]] = [next[index + by], next[index]];

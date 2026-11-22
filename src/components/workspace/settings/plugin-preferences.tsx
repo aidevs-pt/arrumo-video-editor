@@ -1,5 +1,6 @@
 "use client";
 
+import { usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
@@ -44,11 +45,13 @@ export function PluginPreferences({
   workspaceId: number | null;
 }) {
   const { messages: { pluginPreferences: copy } } = useLocale();
+  const pluginText = usePluginText();
   const entries = plugins.map(({ manifest, bundled }) => ({
     ...manifest,
+    name: pluginText.name(manifest.id, manifest.name),
     fields: manifest.settings?.filter(({ kind, scope }) =>
       (kind !== "secret" || bundled) && (workspaceId === null || scope === "workspace"),
-    ) ?? [],
+    ).map((field) => pluginText.field(manifest.id, field)) ?? [],
   })).filter(({ fields }) => fields.length > 0);
   if (entries.length === 0) return null;
 
@@ -140,6 +143,7 @@ function PluginFields({ pluginId, fields, workspaceId }: {
   workspaceId: number | null;
 }) {
   const { messages: { pluginPreferences: copy, workspaces } } = useLocale();
+  const pluginText = usePluginText();
   const [values, setValues] = useState<Record<string, Values>>();
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -199,7 +203,7 @@ function PluginFields({ pluginId, fields, workspaceId }: {
   return <form className="flex flex-col gap-4" onSubmit={save}>
     <div className="flex flex-col divide-y">
       {fields.map((field) => values[field.id] && (
-        <PreferenceField key={field.id} field={field} values={values[field.id]} workspace={workspace}
+        <PreferenceField key={field.id} field={pluginText.field(pluginId, field)} values={values[field.id]} workspace={workspace}
           draft={field.id in drafts ? drafts[field.id] : undefined} disabled={saving}
           onChange={(value) => change(field.id, value)} />
       ))}
@@ -214,7 +218,7 @@ function PluginFields({ pluginId, fields, workspaceId }: {
 }
 
 function PreferenceField({ field, values, workspace, draft, disabled, onChange }: {
-  field: PluginSettingDeclaration;
+  field: PluginSettingDeclaration & { choiceLabels: Record<string, string> };
   values: Values;
   workspace: boolean;
   /** A pending JSON value, null to inherit, or undefined when unchanged. */
@@ -242,9 +246,9 @@ function PreferenceField({ field, values, workspace, draft, disabled, onChange }
       checked={effective === "true"} onCheckedChange={(checked) => onChange(String(checked))} />
   ) : field.choices ? (
     <Select value={shown} onValueChange={(value) => onChange(value)} disabled={disabled}>
-      <SelectTrigger id={id} aria-describedby={id + "-description"} className="w-44"><SelectValue placeholder={fallback ?? copy.unset} /></SelectTrigger>
+      <SelectTrigger id={id} aria-describedby={id + "-description"} className="w-44"><SelectValue placeholder={fallback !== undefined ? field.choiceLabels[fallback] ?? fallback : copy.unset} /></SelectTrigger>
       <SelectContent><SelectGroup>
-        {field.choices.map((choice) => <SelectItem key={choice} value={choice}>{choice}</SelectItem>)}
+        {field.choices.map((choice) => <SelectItem key={choice} value={choice}>{field.choiceLabels[choice] ?? choice}</SelectItem>)}
       </SelectGroup></SelectContent>
     </Select>
   ) : (

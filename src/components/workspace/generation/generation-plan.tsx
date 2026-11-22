@@ -1,5 +1,6 @@
 "use client";
 
+import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowUpRight, Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
@@ -16,7 +17,6 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import NextImage from "next/image";
 import dynamic from "next/dynamic";
 import { motion, useReducedMotionConfig } from "motion/react";
 import { useLocale } from "@/lib/locale-provider";
@@ -188,9 +188,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
         )}
       </section>
       {(currentStage || runState === "completed") && <div className="flex items-center gap-3 py-2 text-white">
-        <span className="grid size-11 shrink-0 place-items-center rounded-md bg-attention" aria-hidden="true">
-          <NextImage src="/arrumo-face.svg" width={26} height={26} alt="" />
-        </span>
+        <PluginIcon pluginId={agentId} tone="dark" className="size-11" />
         <div className="flex min-w-0 flex-col items-start gap-1" role="status">
           <p className={cn("flex flex-wrap gap-x-2 text-sm font-bold", awaiting ? "text-attention" : "text-white/80")}>
             {awaiting ? copy.waitingFor.replace("{agent}", agent ?? copy.agentFallback) : <>{agent && <span>{agent}</span>}<span>{queue[runState]}</span></>}

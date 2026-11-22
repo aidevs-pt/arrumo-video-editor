@@ -1,7 +1,8 @@
 "use client";
 
+import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowRight, Plus, RectangleHorizontal, RectangleVertical, Sparkles, Upload } from "lucide-react";
+import { ArrowRight, Plus, RectangleHorizontal, RectangleVertical, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -216,6 +217,7 @@ function ContextNudge({ workspaceId }: { workspaceId: number }) {
   const { messages } = useLocale();
   const [empty, setEmpty] = useState(false);
   const [agent, setAgent] = useState<string>();
+  const [agentId, setAgentId] = useState<string>();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -225,7 +227,9 @@ function ContextNudge({ workspaceId }: { workspaceId: number }) {
     ]).then(([context, settings, plugins]) => {
       if (!active) return;
       setEmpty(!context?.trim() || context === messages.context.template);
-      setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label);
+      const plugin = plugins.find(({ id }) => id === settings.effective_provider);
+      setAgent(plugin?.label);
+      setAgentId(plugin?.id);
     }, () => {});
     return () => { active = false; };
   }, [workspaceId, messages.context.template]);
@@ -234,7 +238,7 @@ function ContextNudge({ workspaceId }: { workspaceId: number }) {
   return (
     <Link href={workspaceHref("context", workspaceId)}
       className="group -mt-4 flex items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-primary sm:p-5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-attention text-ink" aria-hidden="true"><Sparkles className="size-5" /></span>
+      <PluginIcon pluginId={agentId} className="size-10" />
       <span className="min-w-0 flex-1">
         <span className="block font-bold group-hover:text-primary">{messages.dashboard.contextTitle.replace("{agent}", name)}</span>
         <span className="block text-sm text-muted-foreground">{messages.dashboard.contextHint.replace("{agent}", name)}</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowUpRight, Bot, DatabaseBackup, Gauge, KeyRound, Package, Settings2 } from "lucide-react";
 import Link from "next/link";
@@ -349,7 +350,9 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
                   <SelectTrigger id="agent-provider"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectGroup>
                     <SelectItem value={unset}>{workspaceId === null ? copy.unset : copy.inherit}</SelectItem>
-                    {plugins.map(({ id, label }) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
+                    {plugins.map(({ id, label }) => <SelectItem key={id} value={id}>
+                      <span className="flex items-center gap-2"><PluginIcon pluginId={id} className="size-5 rounded-sm" />{label}</span>
+                    </SelectItem>)}
                   </SelectGroup></SelectContent>
                 </Select>
               </Field>

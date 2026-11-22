@@ -1,5 +1,6 @@
 "use client";
 
+import { usePluginText } from "@/lib/plugin-text";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 
@@ -26,6 +27,7 @@ export function PluginSurfaces({ placement, revision = "", workspaceId }: {
   revision?: string;
   workspaceId?: number;
 }) {
+  const pluginText = usePluginText();
   const [surfaces, setSurfaces] = useState<Surface[]>([]);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -55,7 +57,7 @@ export function PluginSurfaces({ placement, revision = "", workspaceId }: {
           const key = `${surface.pluginId}:${surface.id}:${surface.packageSha256}:${workspaceId ?? "app"}`;
           return <AccordionItem key={key} value={key}>
             <AccordionTrigger className="wrap-anywhere">
-              <span>{surface.title}<span className="block text-xs text-muted-foreground">{surface.pluginName}</span></span>
+              <span>{surface.title}<span className="block text-xs text-muted-foreground">{pluginText.name(surface.pluginId, surface.pluginName)}</span></span>
             </AccordionTrigger>
             <AccordionContent><PluginDocument surface={surface} workspaceId={workspaceId} /></AccordionContent>
           </AccordionItem>;

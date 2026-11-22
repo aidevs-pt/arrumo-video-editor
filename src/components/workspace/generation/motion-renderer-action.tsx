@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { usePluginText } from "@/lib/plugin-text";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export function MotionRendererAction({ workspaceId, runId, available }: {
   runId: number;
   available: boolean;
 }) {
+  const pluginText = usePluginText();
   const { messages: { motionLibrary: copy } } = useLocale();
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [selected, setSelected] = useState("");
@@ -60,7 +62,7 @@ export function MotionRendererAction({ workspaceId, runId, available }: {
         <NativeSelect id={`motion-renderer-${runId}`} value={activeId}
           onChange={(event) => setSelected(event.target.value)} disabled={!available || pending}>
           <NativeSelectOption value="">{copy.selectRenderer}</NativeSelectOption>
-          {entries.map(({ manifest }) => <NativeSelectOption key={manifest.id} value={manifest.id}>{manifest.name}</NativeSelectOption>)}
+          {entries.map(({ manifest }) => <NativeSelectOption key={manifest.id} value={manifest.id}>{pluginText.name(manifest.id, manifest.name)}</NativeSelectOption>)}
         </NativeSelect>
         <FieldDescription>{copy.rendererHint}</FieldDescription>
       </Field>

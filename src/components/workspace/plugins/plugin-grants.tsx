@@ -1,5 +1,6 @@
 "use client";
 
+import { usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
@@ -21,6 +22,7 @@ type ContextRequest = {
 };
 
 export function PluginGrants({ workspace }: { workspace: { id: number; name: string } }) {
+  const pluginText = usePluginText();
   const { messages: { pluginGrants: copy, workspaces, pluginCatalog } } = useLocale();
   const [requests, setRequests] = useState<ContextRequest[]>([]);
   const [attempt, setAttempt] = useState(0);
@@ -76,7 +78,7 @@ export function PluginGrants({ workspace }: { workspace: { id: number; name: str
       <ul className="divide-y">
         {requests.map((request) => (
           <li key={request.pluginId + ":" + request.packageSha256} className="flex flex-wrap items-center gap-2 py-2">
-            <span className="min-w-28 flex-1 text-sm font-medium wrap-anywhere">{request.pluginName}</span>
+            <span className="min-w-28 flex-1 text-sm font-medium wrap-anywhere">{pluginText.name(request.pluginId, request.pluginName)}</span>
             <Badge variant="secondary">{request.granted ? copy.allowed : copy.denied}</Badge>
             {request.granted ? (
               <Button size="sm" variant="outline" disabled={pending || Boolean(error)} onClick={() => void change(request)}>{copy.revoke}</Button>
@@ -89,7 +91,7 @@ export function PluginGrants({ workspace }: { workspace: { id: number; name: str
                   <AlertDialogHeader>
                     <AlertDialogTitle>{copy.grant}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {copy.confirm.replace(/\{(plugin|workspace)\}/g, (_, name) => name === "plugin" ? request.pluginName : workspace.name)}
+                      {copy.confirm.replace(/\{(plugin|workspace)\}/g, (_, name) => name === "plugin" ? pluginText.name(request.pluginId, request.pluginName) : workspace.name)}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

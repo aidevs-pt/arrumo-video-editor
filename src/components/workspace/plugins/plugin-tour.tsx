@@ -1,18 +1,18 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, Puzzle, X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useLocale } from "@/lib/locale-provider";
+import { PLUGINS_CHANGED, PluginIcon, usePluginText } from "@/lib/plugin-text";
 
 type Localized = Record<string, string>;
 type Stop = { pluginId: string; name: string; headline: Localized; body: Localized };
 
-const PLUGINS_CHANGED = "arrumo:plugins-changed";
 const REPLAY = "arrumo:plugin-tour";
 
 /** Asks the tour host to introduce plugins that arrived since the creator last looked. */
@@ -69,13 +69,15 @@ export function PluginTourHost() {
 function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: boolean; onFinish: () => void }) {
   const { locale, messages: { pluginTour: copy } } = useLocale();
   const reduceMotion = useReducedMotion();
+  const pluginText = usePluginText();
   const [index, setIndex] = useState(0);
+  const name = (entry: Stop) => pluginText.name(entry.pluginId, entry.name);
   const stop = stops[index];
   const previous = stops[index - 1];
   const next = stops[index + 1];
   const text = (value: Localized) => value[locale] ?? value.en;
   const heading = stops.length === 1
-    ? (replaying ? stop.name : copy.newPlugin)
+    ? (replaying ? name(stop) : copy.newPlugin)
     : (replaying ? copy.plugins : copy.newPlugins).replace("{current}", String(index + 1)).replace("{total}", String(stops.length));
 
   return (
@@ -95,7 +97,7 @@ function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: 
               {stops.map((entry, position) => (
                 <li key={entry.pluginId} className="h-1 flex-1 rounded-full transition-colors"
                   style={{ background: position < index ? "var(--yellow)" : position === index ? "var(--on-cobalt)" : "color-mix(in oklab, var(--on-cobalt) 30%, transparent)" }}>
-                  <span className="sr-only">{entry.name}</span>
+                  <span className="sr-only">{name(entry)}</span>
                 </li>
               ))}
             </ol>
@@ -107,8 +109,8 @@ function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: 
                 transition={{ duration: 14, ease: "linear", repeat: Infinity }}>
                 <span className="absolute top-1/2 -left-2 size-4 -translate-y-1/2 rounded-sm bg-primary" />
               </motion.div>
-              <span className="absolute inset-0 m-auto grid h-10 w-16 place-items-center rounded-md bg-white/20 text-white">
-                <Puzzle className="size-5" />
+              <span className="absolute inset-0 m-auto grid size-14 place-items-center rounded-xl bg-white/10">
+                <PluginIcon pluginId={stop.pluginId} tone="dark" className="size-10" />
               </span>
             </div>
           </div>
@@ -120,7 +122,7 @@ function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: 
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}>
-              <p className="text-sm text-muted-foreground">{stop.name}</p>
+              <p className="text-sm text-muted-foreground">{name(stop)}</p>
               <DialogTitle className="mt-1 font-heading text-[clamp(1.75rem,4vw,2.5rem)] leading-tight">{text(stop.headline)}</DialogTitle>
               <DialogDescription className="mt-3 text-base text-foreground/80">{text(stop.body)}</DialogDescription>
             </motion.div>
@@ -128,13 +130,13 @@ function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             {previous && (
               <Button variant="ghost" onClick={() => setIndex(index - 1)}>
-                <ArrowLeft data-icon="inline-start" />{previous.name}
+                <ArrowLeft data-icon="inline-start" />{name(previous)}
               </Button>
             )}
             <div className="ms-auto flex flex-wrap items-center gap-2">
               {next && <Button variant="ghost" onClick={onFinish}>{copy.skip}</Button>}
               <Button onClick={() => (next ? setIndex(index + 1) : onFinish())}>
-                {next ? copy.next.replace("{name}", next.name) : copy.done}
+                {next ? copy.next.replace("{name}", name(next)) : copy.done}
               </Button>
             </div>
           </div>

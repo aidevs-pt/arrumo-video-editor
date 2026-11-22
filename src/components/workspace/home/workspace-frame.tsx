@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PluginTourHost } from "@/components/workspace/plugins/plugin-tour";
+import { PluginIcon } from "@/lib/plugin-text";
 import { CalendarDays, Check, ChevronDown, Film, FolderCog, House, Images, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -237,6 +238,7 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
   const { messages: { studio: copy } } = useLocale();
   const { setOpenMobile } = useSidebar();
   const [agent, setAgent] = useState<string | null>();
+  const [agentId, setAgentId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -244,7 +246,8 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
       invoke<AgentSettings>("get_agent_settings", { workspaceId }),
       invoke<AgentPlugin[]>("list_agent_plugins"),
     ]).then(([settings, plugins]) => {
-      if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label ?? null);
+      const plugin = plugins.find(({ id }) => id === settings.effective_provider);
+      if (active) { setAgent(plugin?.label ?? null); setAgentId(plugin?.id ?? null); }
     }, () => { if (active) setAgent(null); });
     return () => { active = false; };
   }, [workspaceId]);
@@ -259,7 +262,7 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
   return (
     <Link href={href} onClick={() => setOpenMobile(false)}
       className="mt-2 flex items-center gap-3 rounded-lg bg-[color-mix(in_oklch,var(--sidebar)_55%,var(--ink))] p-2.5 text-sidebar-foreground outline-none hover:bg-[color-mix(in_oklch,var(--sidebar)_40%,var(--ink))] focus-visible:ring-2 focus-visible:ring-attention group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
-      <FaceMark className="size-9" />
+      <PluginIcon pluginId={agentId} tone="dark" className="size-9" />
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
         <span className="block truncate text-sm font-bold">{title}</span>
         <span className="block truncate text-xs text-sidebar-foreground/80">{detail}</span>

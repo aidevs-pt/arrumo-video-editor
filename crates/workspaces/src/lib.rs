@@ -58,6 +58,7 @@ mod plugin_runtime;
 mod plugin_schema;
 mod plugin_settings;
 mod plugin_surfaces;
+mod plugin_text;
 mod plugin_tour;
 mod portrait_cuts;
 mod preview_edit;

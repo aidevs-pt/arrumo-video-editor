@@ -1,5 +1,6 @@
 "use client";
 
+import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowUpRight, Check, Info } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -25,6 +26,7 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
   loading: boolean;
   onCreate: (name: string) => Promise<void>;
 }) {
+  const pluginText = usePluginText();
   const { locale, setLocale, messages: { onboarding: copy, workspaces, agentSettings } } = useLocale();
   const [step, setStep] = useState<Step>(0);
   const [setup, setSetup] = useState<SetupData>();
@@ -140,7 +142,7 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
               <RadioGroup value={selected} onValueChange={setSelected} disabled={pending}
                 aria-label={agentSettings.providerChoice} className="gap-3 min-[1120px]:grid-cols-2">
                 {setup.agents.map((entry) => <AgentOption key={entry.id} agent={entry}
-                  description={setup.plugins.find(({ manifest }) => manifest.id === entry.id)?.manifest.description}
+                  description={pluginText.description(entry.id, setup.plugins.find(({ manifest }) => manifest.id === entry.id)?.manifest.description ?? "")}
                   selected={selected === entry.id} />)}
               </RadioGroup>
               {!setup.agents.length && <Alert><Info /><AlertDescription>{copy.noAgents}</AlertDescription></Alert>}
@@ -251,7 +253,10 @@ function AgentOption({ agent, description, selected }: {
   return <div className={cn("flex flex-col rounded-xl border bg-card", selected && "border-primary ring-1 ring-inset ring-primary")}>
     <label htmlFor={id} className="flex flex-1 cursor-pointer flex-col gap-2 p-4 sm:p-5">
       <span className="flex items-center justify-between gap-3">
-        <span className="font-heading text-xl font-bold [font-stretch:112%]">{agent.label}</span>
+        <span className="flex items-center gap-3">
+          <PluginIcon pluginId={agent.id} className="size-9" />
+          <span className="font-heading text-xl font-bold [font-stretch:112%]">{agent.label}</span>
+        </span>
         <RadioGroupItem value={agent.id} id={id} />
       </span>
       {description && <span className="text-sm text-muted-foreground">{description}</span>}

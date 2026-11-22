@@ -1,7 +1,8 @@
 "use client";
 
+import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Image as ImageIcon, Link2, LoaderCircle, Plus, Sparkles, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, Image as ImageIcon, Link2, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
   const [failure, setFailure] = useState<Failure>();
   const [draft, setDraft] = useState<Draft>();
   const [agent, setAgent] = useState<string>();
+  const [agentId, setAgentId] = useState<string>();
 
   useEffect(() => {
     let active = true;
@@ -47,7 +49,8 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
       invoke<{ effective_provider: string | null }>("get_agent_settings", { workspaceId }),
       invoke<{ id: string; label: string }[]>("list_agent_plugins"),
     ]).then(([settings, plugins]) => {
-      if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label);
+      const plugin = plugins.find(({ id }) => id === settings.effective_provider);
+      if (active) { setAgent(plugin?.label); setAgentId(plugin?.id); }
     }, () => {});
     return () => { active = false; };
   }, [workspaceId]);
@@ -75,7 +78,7 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
     <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border bg-card">
       <CollapsibleTrigger asChild>
         <button type="button" className="group flex w-full items-center gap-3 p-4 text-start sm:p-5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-attention text-ink" aria-hidden="true"><Sparkles className="size-4" /></span>
+          <PluginIcon pluginId={agentId} className="size-9" />
           <span className="min-w-0 flex-1">
             <span className="block font-bold">{copy.title.replace("{agent}", agentName)}</span>
             <span className="block text-sm text-muted-foreground">{copy.intro.replace("{agent}", agentName)}</span>

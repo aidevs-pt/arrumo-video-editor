@@ -52,6 +52,20 @@ pub struct PluginManifest {
         skip_serializing_if = "Option::is_none"
     )]
     pub introduction: Option<PluginIntroduction>,
+    /// A small SVG the plugin is shown with (schema 8).
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub icon: Option<String>,
+    /// The plugin's own text in other languages, keyed `es` and `pt` (schema 8).
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub translations: Option<BTreeMap<String, crate::plugin_text::PluginTranslation>>,
 }
 
 /// Text in the app's languages, keyed `en`, `es` and `pt`; English is required and used when a
@@ -376,6 +390,15 @@ impl PluginManifest {
         {
             return Err(invalid_manifest("Invalid plugin introduction").into());
         }
+        if (manifest.icon.is_some() || manifest.translations.is_some())
+            && manifest.schema_version < 8
+            || manifest
+                .icon
+                .as_deref()
+                .is_some_and(|icon| !crate::plugin_text::valid_icon(icon))
+        {
+            return Err(invalid_manifest("Invalid plugin icon").into());
+        }
         if manifest.capabilities.is_empty()
             || manifest.capabilities.iter().any(|(id, capability)| {
                 !identifier(id) || blank(&capability.name) || blank(&capability.description)
@@ -468,6 +491,9 @@ impl PluginManifest {
                 }))
         {
             return Err(invalid_manifest("Invalid plugin agent provider descriptor").into());
+        }
+        if !crate::plugin_text::valid_translations(&manifest) {
+            return Err(invalid_manifest("Invalid plugin translations").into());
         }
         Ok(manifest)
     }

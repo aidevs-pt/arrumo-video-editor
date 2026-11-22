@@ -1,7 +1,8 @@
 "use client";
 
+import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { FileArchive, PackagePlus, Sparkles } from "lucide-react";
+import { PackagePlus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,6 +30,7 @@ type Plugin = {
 
 export function PluginCatalog() {
   const { messages: { pluginCatalog: copy, workspaces: workspaceCopy, pluginTour: tourCopy } } = useLocale();
+  const pluginText = usePluginText();
   const [plugins, setPlugins] = useState<Plugin[]>();
   const [error, setError] = useState<"loadError" | "importError" | "removeError">();
   const [notice, setNotice] = useState<"imported" | "removed">();
@@ -122,11 +124,13 @@ export function PluginCatalog() {
           {!plugins && !error && <Skeleton className="h-24" aria-label={copy.loading} />}
           {plugins && (
             <ul className="divide-y">
-              {plugins.map(({ bundled, manifest, package: stored }) => (
+              {plugins.map(({ bundled, manifest: declared, package: stored }) => {
+                const manifest = { ...declared, name: pluginText.name(declared.id, declared.name), description: pluginText.description(declared.id, declared.description) };
+                return (
                 <li key={manifest.id} className="flex flex-wrap items-start gap-3 py-3 first:pt-0 last:pb-0">
-                  <FileArchive aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <PluginIcon pluginId={manifest.id} className="size-9" />
                   <div className="min-w-32 flex-1 wrap-anywhere">
-                    <h3 className="text-sm font-medium">{manifest.name}</h3>
+                    <h3 className="text-sm font-semibold">{manifest.name}</h3>
                     <p className="text-sm text-muted-foreground">{manifest.description}</p>
                     {stored?.release && <p className="text-xs text-muted-foreground">{stored.release.version}</p>}
                   </div>
@@ -151,7 +155,8 @@ export function PluginCatalog() {
                     </AlertDialog>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           {plugins && <PluginRegistryBrowser installedIds={plugins.map(({ manifest }) => manifest.id)} onInstalled={async () => { await load(); announcePluginChanges(); }} />}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PluginTextProvider } from "@/lib/plugin-text";
 import "./globals.css";
 import { getLocaleCatalog } from "@/lib/locale-catalog";
 import { AppearanceProvider, appearanceScript } from "@/lib/appearance";
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={cn("font-sans", anybody.variable, atkinson.variable)} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: appearanceScript }} /></head>
-      <body><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}>{children}</LocaleProvider></AppearanceProvider></body>
+      <body><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}><PluginTextProvider>{children}</PluginTextProvider></LocaleProvider></AppearanceProvider></body>
     </html>
   );
 }
