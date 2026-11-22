@@ -328,7 +328,12 @@ impl WorkspaceStore {
                 }
                 continue;
             };
-            let Some(ratio) = adapter.aspect_ratios.get(aspect_ratio) else {
+            // Other ratios are drawn at the nearest one every adapter maps, then cropped.
+            let Some(ratio) = adapter.aspect_ratios.get(aspect_ratio).or_else(|| {
+                adapter
+                    .aspect_ratios
+                    .get(nearest_mapped_ratio(aspect_ratio))
+            }) else {
                 continue;
             };
             let Some(secret) =
@@ -422,6 +427,21 @@ fn agent_image(
             0
         },
     })
+}
+
+/// The ratio among 16:9, 9:16 and 1:1 (which every adapter maps) closest to `aspect_ratio`.
+fn nearest_mapped_ratio(aspect_ratio: &str) -> &'static str {
+    let ratio = aspect_ratio
+        .split_once(':')
+        .and_then(|(width, height)| Some(width.parse::<f64>().ok()? / height.parse::<f64>().ok()?))
+        .unwrap_or(1.0);
+    if ratio > 1.25 {
+        "16:9"
+    } else if ratio < 0.75 {
+        "9:16"
+    } else {
+        "1:1"
+    }
 }
 
 /// A file name from the first words of a description, such as `flat-illustration-of-a-solved`.
@@ -724,6 +744,13 @@ fn request_image(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unmapped_ratios_are_drawn_at_the_nearest_mapped_one() {
+        assert_eq!(nearest_mapped_ratio("4:5"), "1:1");
+        assert_eq!(nearest_mapped_ratio("21:9"), "16:9");
+        assert_eq!(nearest_mapped_ratio("2:3"), "9:16");
+    }
 
     #[test]
     fn library_images_are_named_from_their_description() {
