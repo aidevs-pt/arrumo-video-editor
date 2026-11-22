@@ -195,6 +195,22 @@ impl WorkspaceStore {
         prompt: &str,
         schema: &Value,
         timeout: Duration,
+        tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+    ) -> Result<Value, AgentRunError> {
+        self.run_logged_agent_with_images(scope, provider, prompt, schema, timeout, &[], tick)
+    }
+
+    /// Runs the agent like `run_logged_agent`, also showing it `images` when its plugin can take
+    /// images.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn run_logged_agent_with_images(
+        &self,
+        scope: AgentLogScope<'_>,
+        provider: &AgentPlugin,
+        prompt: &str,
+        schema: &Value,
+        timeout: Duration,
+        images: &[std::path::PathBuf],
         mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
     ) -> Result<Value, AgentRunError> {
         // An earlier attempt that never finished was interrupted by a crash or restart.
@@ -229,6 +245,7 @@ impl WorkspaceStore {
             schema,
             timeout,
             &options,
+            images,
             &transcript,
             || {
                 if let Some(id) = log

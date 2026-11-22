@@ -305,10 +305,12 @@ impl WorkspaceStore {
         let mut pages = Vec::new();
         let mut unread = Vec::new();
         let mut found_images: Vec<String> = Vec::new();
+        let mut candidates: Vec<crate::source_pages::PageImage> = Vec::new();
         for source in sources {
             match source_url(source).and_then(|url| fetch_page(&url)) {
                 Ok(page) => {
                     found_images.extend(page.images.iter().map(|image| image.url.clone()));
+                    candidates.extend(page.images.iter().cloned());
                     pages.push(json!({
                         "url": page.url, "title": page.title, "description": page.description, "text": page.text,
                         "themeColor": page.theme_color, "images": page.images,
@@ -330,7 +332,49 @@ impl WorkspaceStore {
                 unread,
             });
         }
-        let answer = self.run_logged_agent(
+        // Agents that can see images look at the most telling ones: video thumbnails, share
+        // images and icons first.
+        let looked = tempfile::tempdir()?;
+        let mut attached: Vec<std::path::PathBuf> = Vec::new();
+        let mut shown: Vec<Value> = Vec::new();
+        if crate::agent_run::accepts_images(provider) {
+            let rank = |role: &str| match role {
+                "video_thumbnail" => 0,
+                "social" => 1,
+                "icon" => 2,
+                _ => 3,
+            };
+            candidates.sort_by_key(|image| rank(image.role));
+            for image in candidates.iter() {
+                if attached.len() >= crate::agent_run::MAX_IMAGES {
+                    break;
+                }
+                let Ok(url) = source_url(&image.url) else {
+                    continue;
+                };
+                let Ok((bytes, extension)) = crate::source_pages::fetch_image(&url) else {
+                    continue;
+                };
+                let path = looked
+                    .path()
+                    .join(format!("image-{}.{extension}", attached.len() + 1));
+                if std::fs::write(&path, bytes).is_ok() {
+                    attached.push(path);
+                    shown.push(json!({"attachedImage": attached.len(), "url": image.url, "role": image.role}));
+                }
+            }
+        }
+        let mut prompt = research_prompt(&pages, &existing, notes.trim());
+        if !shown.is_empty() {
+            prompt.push_str(&format!(
+                "\n\nYou can see {} of the images, attached in this order. Describe those from what they \
+                 actually show: for thumbnails, the layout, text treatment, faces, colours and mood, so new \
+                 thumbnails can follow their style.\nATTACHED IMAGES (JSON):\n{}",
+                shown.len(),
+                serde_json::to_string_pretty(&shown).unwrap_or_default()
+            ));
+        }
+        let answer = self.run_logged_agent_with_images(
             crate::agent_logs::AgentLogScope {
                 workspace_id,
                 run_id: None,
@@ -338,9 +382,10 @@ impl WorkspaceStore {
                 attempt: None,
             },
             provider,
-            &research_prompt(&pages, &existing, notes.trim()),
+            &prompt,
             &answer_schema(&found_images),
             AGENT_TIMEOUT,
+            &attached,
             || Ok(()),
         )?;
         let mut draft = context_draft(&answer, unread).map_err(io::Error::other)?;

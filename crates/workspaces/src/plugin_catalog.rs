@@ -86,6 +86,9 @@ pub(crate) struct StructuredRun {
     /// Arguments chosen by the plugin's settings, inserted at `{settings}`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setting_args: Vec<SettingArgs>,
+    /// Arguments attaching one image, repeated per image at `{images}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_args: Option<Vec<String>>,
     /// Patterns that turn the agent's printed lines into steps creators can follow.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub progress: Vec<ProgressPattern>,

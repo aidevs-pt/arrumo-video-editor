@@ -115,6 +115,7 @@ pub(crate) fn run_structured(
     schema: &Value,
     timeout: Duration,
     settings: &BTreeMap<String, Value>,
+    images: &[std::path::PathBuf],
     transcript: &AgentTranscript,
     mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<Value, AgentRunError> {
@@ -130,9 +131,20 @@ pub(crate) fn run_structured(
     let schema_path = directory.path().join("schema.json");
     let output_path = directory.path().join("answer.json");
     fs::write(&schema_path, &schema_text).map_err(|_| failed("Could not prepare the agent run"))?;
-    let args = expand_args(run, settings, &schema_text, &schema_path, &output_path);
+    let args = expand_args(
+        run,
+        settings,
+        images,
+        &schema_text,
+        &schema_path,
+        &output_path,
+    );
     if let Ok(mut command) = transcript.command.lock() {
-        *command = describe_command(&executable, &declared_args(run, settings));
+        // Image paths are local; the log only says how many were attached.
+        *command = describe_command(&executable, &declared_args(run, settings, &[]));
+        if !images.is_empty() {
+            command.push_str(&format!(" (+{} images)", images.len().min(MAX_IMAGES)));
+        }
     }
 
     let mut command = Command::new(executable);
@@ -286,28 +298,61 @@ pub(crate) fn setting_arguments(
     arguments
 }
 
-/// The declared arguments with `{settings}` expanded; file placeholders stay as written.
-fn declared_args(run: &StructuredRun, settings: &BTreeMap<String, Value>) -> Vec<String> {
+/// The declared arguments with `{settings}` and `{images}` expanded; file placeholders stay as
+/// written.
+fn declared_args(
+    run: &StructuredRun,
+    settings: &BTreeMap<String, Value>,
+    images: &[std::path::PathBuf],
+) -> Vec<String> {
     run.args
         .iter()
-        .flat_map(|arg| {
-            if arg == "{settings}" {
-                setting_arguments(run, settings)
-            } else {
-                vec![arg.clone()]
-            }
+        .flat_map(|arg| match arg.as_str() {
+            "{settings}" => setting_arguments(run, settings),
+            "{images}" => image_arguments(run, images),
+            _ => vec![arg.clone()],
         })
         .collect()
 }
 
+/// The plugin's image arguments repeated for each image; none when it cannot take images.
+fn image_arguments(run: &StructuredRun, images: &[std::path::PathBuf]) -> Vec<String> {
+    let Some(template) = &run.image_args else {
+        return Vec::new();
+    };
+    images
+        .iter()
+        .take(MAX_IMAGES)
+        .flat_map(|path| {
+            let path = path.to_string_lossy();
+            template
+                .iter()
+                .map(move |arg| arg.replace("{imagePath}", &path))
+        })
+        .collect()
+}
+
+/// Whether the agent can look at images it is given.
+pub(crate) fn accepts_images(plugin: &AgentPlugin) -> bool {
+    plugin
+        .cli
+        .structured_run
+        .as_ref()
+        .is_some_and(|run| run.image_args.is_some() && run.args.iter().any(|arg| arg == "{images}"))
+}
+
+/// The most images one agent run is shown.
+pub(crate) const MAX_IMAGES: usize = 8;
+
 fn expand_args(
     run: &StructuredRun,
     settings: &BTreeMap<String, Value>,
+    images: &[std::path::PathBuf],
     schema: &str,
     schema_path: &std::path::Path,
     output_path: &std::path::Path,
 ) -> Vec<std::ffi::OsString> {
-    declared_args(run, settings)
+    declared_args(run, settings, images)
         .into_iter()
         .map(|arg| match arg.as_str() {
             "{schema}" => schema.into(),
@@ -352,6 +397,7 @@ mod tests {
         StructuredRun {
             args: vec!["{schema}".into(), "{outputPath}".into()],
             setting_args: Vec::new(),
+            image_args: None,
             progress: Vec::new(),
             result: StructuredResult {
                 source,
@@ -401,6 +447,7 @@ mod tests {
                 "{outputPath}".into(),
             ],
             setting_args: Vec::new(),
+            image_args: None,
             progress: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::OutputFile,
@@ -411,6 +458,7 @@ mod tests {
         let args = expand_args(
             &declared,
             &BTreeMap::new(),
+            &[],
             "{}",
             std::path::Path::new("/s.json"),
             std::path::Path::new("/o.json"),
@@ -438,6 +486,7 @@ mod tests {
                     otherwise: None,
                 },
             ],
+            image_args: None,
             progress: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::Stdout,
@@ -450,12 +499,12 @@ mod tests {
             ("model".to_owned(), serde_json::json!("gpt-5.1")),
         ]);
         assert_eq!(
-            declared_args(&declared, &settings),
+            declared_args(&declared, &settings, &[]),
             ["exec", "-c", "web_search=\"live\"", "-m", "gpt-5.1", "-"]
         );
         let unsafe_model = BTreeMap::from([("model".to_owned(), serde_json::json!("x --yolo"))]);
         assert_eq!(
-            declared_args(&declared, &unsafe_model),
+            declared_args(&declared, &unsafe_model, &[]),
             ["exec", "-c", "web_search=\"disabled\"", "-"]
         );
     }
