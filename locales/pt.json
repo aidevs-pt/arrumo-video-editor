@@ -1613,7 +1613,8 @@
     "done": "Concluído",
     "close": "Fechar a visita",
     "replay": "Ver a visita aos plugins",
-    "plugins": "Plugins, {current} de {total}"
+    "plugins": "Plugins, {current} de {total}",
+    "replayOne": "Repetir a visita"
   },
   "runHooks": {
     "title": "Plugins que são executados automaticamente",
@@ -1640,5 +1641,21 @@
     "unreadable": "Não é possível ler",
     "manageKey": "Gerir chave",
     "vault": "As chaves ficam guardadas cifradas: os agentes usam-nas através do Arrumo e nunca as podem ler."
+  },
+  "pluginDetail": {
+    "back": "Todos os plugins",
+    "missing": "Este plugin não está instalado.",
+    "bundled": "Plugin incluído",
+    "installed": "Plugin instalado",
+    "version": "Versão {version}",
+    "settings": "Definições",
+    "actions": "Ações",
+    "noSettings": "Este plugin não tem definições.",
+    "noActions": "Este plugin não adiciona ações.",
+    "layer": "Camada de definições",
+    "layerHint": "Estes valores aplicam-se a toda a app. Um espaço de trabalho pode substituí-los em Definições › Serviços e chaves.",
+    "adds": "O que adiciona",
+    "agentsCall": "Os agentes podem chamar",
+    "agentsCallHint": "a partir da CLI, MCP e A2A."
   }
 }

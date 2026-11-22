@@ -1613,7 +1613,8 @@
     "done": "Done",
     "close": "Close the tour",
     "replay": "Take the plugin tour",
-    "plugins": "Plugins, {current} of {total}"
+    "plugins": "Plugins, {current} of {total}",
+    "replayOne": "Replay its tour"
   },
   "runHooks": {
     "title": "Plugins that run on their own",
@@ -1640,5 +1641,21 @@
     "unreadable": "Not readable",
     "manageKey": "Manage key",
     "vault": "Keys sit in an encrypted vault: agents use them through Arrumo and can never read them."
+  },
+  "pluginDetail": {
+    "back": "All plugins",
+    "missing": "This plugin isn't installed.",
+    "bundled": "Bundled plugin",
+    "installed": "Installed plugin",
+    "version": "Version {version}",
+    "settings": "Settings",
+    "actions": "Actions",
+    "noSettings": "This plugin has no settings.",
+    "noActions": "This plugin adds no actions.",
+    "layer": "Settings layer",
+    "layerHint": "These values are for the whole app. A workspace can override them in Settings › Services and keys.",
+    "adds": "What it adds",
+    "agentsCall": "Agents can call",
+    "agentsCallHint": "from the CLI, MCP and A2A."
   }
 }

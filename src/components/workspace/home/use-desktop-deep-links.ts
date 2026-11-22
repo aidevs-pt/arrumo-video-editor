@@ -35,7 +35,9 @@ function internalRoute(value: string) {
   } else if (url.pathname === "/settings") {
     const section = settingsSections.find((id) => id === query.get("section")) ?? "general";
     const scope = query.get("scope") === "workspace" ? "workspace" : "app";
-    return `/settings?workspace=${workspace}&scope=${scope}&section=${section}`;
+    const plugin = section === "plugins" ? query.get("plugin") : null;
+    const detail = plugin && /^[a-z0-9][a-z0-9-]{0,63}$/.test(plugin) ? `&plugin=${plugin}` : "";
+    return `/settings?workspace=${workspace}&scope=${scope}&section=${section}${detail}`;
   } else if (url.pathname === "/calendar") {
     return calendarHref(workspace, numericId(query, "profile"), query.get("month"));
   } else {

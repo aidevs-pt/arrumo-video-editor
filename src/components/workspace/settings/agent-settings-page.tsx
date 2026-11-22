@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { PluginCatalog } from "./plugin-catalog";
+import { PluginDetail } from "@/components/workspace/plugins/plugin-detail";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
 import { AgentCapabilities, ScopedPluginPreferences } from "./plugin-preferences";
@@ -54,7 +55,8 @@ export function AgentSettingsPage() {
   const setupWorkspace = workspaces.find(({ id }) => String(id) === query.get("setup"));
   const workspace = workspaces.find(({ id }) => String(id) === requested);
   const tab: Section = setupWorkspace ? "agent" : sections.find((value) => value === query.get("section")) ?? "general";
-  const scoped = tab === "agent" || tab === "services" || tab === "plugins";
+  const pluginDetail = tab === "plugins" ? query.get("plugin") : null;
+  const scoped = !pluginDetail && (tab === "agent" || tab === "services" || tab === "plugins");
   const settingsHref = (target: Section, scope = requested) => {
     const params = new URLSearchParams();
     if (scope) params.set("workspace", scope);
@@ -89,7 +91,7 @@ export function AgentSettingsPage() {
           );
         })}
       </nav>
-      <div className="min-w-0">
+      {pluginDetail ? <div className="min-w-0"><PluginDetail key={pluginDetail} pluginId={pluginDetail} backHref={settingsHref("plugins")} /></div> : <div className="min-w-0">
         <header className="mb-6">
           <h1 className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] [font-variation-settings:'wdth'_135]">{titles[tab][0]}</h1>
           <p className="mt-2 text-lg text-muted-foreground">{titles[tab][1]}</p>
@@ -129,7 +131,7 @@ export function AgentSettingsPage() {
               {workspace && tab === "plugins" && <PluginActions key={`actions:${workspace.id}`} workspaceId={workspace.id} />}
             </div>
           )}
-      </div>
+      </div>}
     </WorkspaceShell>
   );
 }

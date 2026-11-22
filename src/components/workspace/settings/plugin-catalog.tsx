@@ -19,6 +19,8 @@ import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { announcePluginChanges, replayPluginTour } from "@/components/workspace/plugins/plugin-tour";
 import { useLocale } from "@/lib/locale-provider";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PluginRegistryBrowser } from "./plugin-registry-browser";
 import type { PluginSettingsManifest } from "./plugin-preferences";
 
@@ -31,6 +33,13 @@ type Plugin = {
 export function PluginCatalog() {
   const { messages: { pluginCatalog: copy, workspaces: workspaceCopy, pluginTour: tourCopy } } = useLocale();
   const pluginText = usePluginText();
+  const query = useSearchParams();
+  const detailHref = (id: string) => {
+    const params = new URLSearchParams(query.toString());
+    params.set("section", "plugins");
+    params.set("plugin", id);
+    return `/settings?${params}`;
+  };
   const [plugins, setPlugins] = useState<Plugin[]>();
   const [error, setError] = useState<"loadError" | "importError" | "removeError">();
   const [notice, setNotice] = useState<"imported" | "removed">();
@@ -130,7 +139,7 @@ export function PluginCatalog() {
                 <li key={manifest.id} className="flex flex-wrap items-start gap-3 py-3 first:pt-0 last:pb-0">
                   <PluginIcon pluginId={manifest.id} className="size-9" />
                   <div className="min-w-32 flex-1 wrap-anywhere">
-                    <h3 className="text-sm font-semibold">{manifest.name}</h3>
+                    <h3 className="text-sm font-semibold"><Link className="hover:underline" href={detailHref(manifest.id)}>{manifest.name}</Link></h3>
                     <p className="text-sm text-muted-foreground">{manifest.description}</p>
                     {stored?.release && <p className="text-xs text-muted-foreground">{stored.release.version}</p>}
                     {pluginText.iconNotice(manifest.id) && <p className="mt-1 text-xs text-muted-foreground">{pluginText.iconNotice(manifest.id)}</p>}

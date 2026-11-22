@@ -139,7 +139,7 @@ export function AgentCapabilities({ pluginId, workspaceId }: { pluginId: string;
   );
 }
 
-function PluginFields({ pluginId, fields, workspaceId }: {
+export function PluginFields({ pluginId, fields, workspaceId }: {
   pluginId: string;
   fields: PluginSettingDeclaration[];
   workspaceId: number | null;

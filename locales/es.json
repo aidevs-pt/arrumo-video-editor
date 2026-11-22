@@ -1613,7 +1613,8 @@
     "done": "Hecho",
     "close": "Cerrar el recorrido",
     "replay": "Ver el recorrido de complementos",
-    "plugins": "Complementos, {current} de {total}"
+    "plugins": "Complementos, {current} de {total}",
+    "replayOne": "Repetir su recorrido"
   },
   "runHooks": {
     "title": "Complementos que se ejecutan solos",
@@ -1640,5 +1641,21 @@
     "unreadable": "No se puede leer",
     "manageKey": "Gestionar clave",
     "vault": "Las claves se guardan cifradas: los agentes las usan a través de Arrumo y nunca pueden leerlas."
+  },
+  "pluginDetail": {
+    "back": "Todos los complementos",
+    "missing": "Este complemento no está instalado.",
+    "bundled": "Complemento incluido",
+    "installed": "Complemento instalado",
+    "version": "Versión {version}",
+    "settings": "Ajustes",
+    "actions": "Acciones",
+    "noSettings": "Este complemento no tiene ajustes.",
+    "noActions": "Este complemento no añade acciones.",
+    "layer": "Capa de ajustes",
+    "layerHint": "Estos valores son para toda la app. Un espacio de trabajo puede sobrescribirlos en Ajustes › Servicios y claves.",
+    "adds": "Qué añade",
+    "agentsCall": "Los agentes pueden llamar",
+    "agentsCallHint": "desde la CLI, MCP y A2A."
   }
 }
