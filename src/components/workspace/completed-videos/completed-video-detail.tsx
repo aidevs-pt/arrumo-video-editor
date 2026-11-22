@@ -281,8 +281,8 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-4">
-        <WorkspaceHeading className="mb-0 min-w-0 flex-1 border-0 pb-0">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <WorkspaceHeading className="mb-0 flex-1 border-0 pb-0">
           <h1>{savedTitle}</h1>
           <p>{copy.files}</p>
         </WorkspaceHeading>
