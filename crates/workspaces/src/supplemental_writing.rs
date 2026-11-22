@@ -164,6 +164,7 @@ fn supplemental_prompt(
     script: Option<&str>,
     requests: &BTreeMap<i64, OutputRequest>,
     notes: Option<&str>,
+    references: &BTreeMap<i64, Vec<Value>>,
 ) -> String {
     let formats: Vec<Value> = snapshot["formats"]
         .as_array()
@@ -182,6 +183,8 @@ fn supplemental_prompt(
                 "thumbnails": request.thumbnails,
                 "thumbnailAspectRatio": request.aspect_ratio,
                 "specifications": entry["delivery"]["supplemental"]["specifications"],
+                "thumbnailGuidance": entry["delivery"]["supplemental"]["thumbnail_guidance"],
+                "thumbnailReferences": references.get(&id).cloned().unwrap_or_default(),
             }))
         })
         .collect();
@@ -202,7 +205,10 @@ fn supplemental_prompt(
          tag list when tags are requested. Different titles are alternatives for A/B testing, so vary the angle. \
          For each requested thumbnail, write one detailed image-generation prompt (kind \"thumbnail\"): describe the \
          composition, subject, mood, brand colours and any short headline text to render, sized for the format's \
-         thumbnailAspectRatio. Make each thumbnail a different idea. Never ask for real people's likenesses or logos you \
+         thumbnailAspectRatio, following the format's thumbnailGuidance. thumbnailReferences are the creator's example \
+         thumbnails with their notes; those with an attachedImage number are attached in that order, so look at them and \
+         match their layout, typography, colours and energy without copying their text or subjects. Make each thumbnail a \
+         different idea. Never ask for real people's likenesses or logos you \
          were not given.\n\
          Respect each format's specifications and the platform's conventions.\n\
          Write in the language the creator's context and brief are written in. The summary is one sentence to the creator.\n\n\
@@ -497,6 +503,75 @@ impl WorkspaceStore {
         )
     }
 
+    /// Each requested format's thumbnail references with their notes, and the image files to show
+    /// the agent when `show_in` is given (an agent that can see images).
+    fn thumbnail_references(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        snapshot: &Value,
+        requests: &BTreeMap<i64, OutputRequest>,
+        show_in: Option<&Path>,
+    ) -> Result<(BTreeMap<i64, Vec<Value>>, Vec<std::path::PathBuf>), Box<dyn Error>> {
+        let root = crate::asset_root(database);
+        let mut references = BTreeMap::new();
+        let mut attached: BTreeMap<i64, (usize, std::path::PathBuf)> = BTreeMap::new();
+        for entry in snapshot["formats"].as_array().into_iter().flatten() {
+            let Some(id) = entry["format"]["id"].as_i64() else {
+                continue;
+            };
+            if requests
+                .get(&id)
+                .is_none_or(|request| request.thumbnails == 0)
+            {
+                continue;
+            }
+            let ids = entry["delivery"]["supplemental"]["thumbnail_reference_ids"].as_array();
+            let mut described = Vec::new();
+            for asset in ids
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_i64)
+                .take(crate::agent_run::MAX_IMAGES)
+            {
+                let Some((name, notes)) = self
+                    .0
+                    .query_row(
+                        "SELECT name, notes FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2 AND kind = 'image'",
+                        rusqlite::params![workspace_id, asset],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                    )
+                    .optional()?
+                else {
+                    continue;
+                };
+                let mut shown = None;
+                if let Some(folder) = show_in {
+                    if let Some((number, _)) = attached.get(&asset) {
+                        shown = Some(*number);
+                    } else if attached.len() < crate::agent_run::MAX_IMAGES
+                        && let Ok(Some(preview)) = self.image_preview(&root, workspace_id, asset)
+                    {
+                        let extension = preview.mime.trim_start_matches("image/");
+                        let path =
+                            folder.join(format!("reference-{}.{extension}", attached.len() + 1));
+                        std::fs::write(&path, &preview.bytes)?;
+                        attached.insert(asset, (attached.len() + 1, path));
+                        shown = Some(attached.len());
+                    }
+                }
+                described.push(json!({"name": name, "notes": notes, "attachedImage": shown}));
+            }
+            references.insert(id, described);
+        }
+        let mut files: Vec<(usize, std::path::PathBuf)> = attached.into_values().collect();
+        files.sort();
+        Ok((
+            references,
+            files.into_iter().map(|(_, path)| path).collect(),
+        ))
+    }
+
     fn write_supplemental_outputs(
         &self,
         database: &Path,
@@ -555,7 +630,15 @@ impl WorkspaceStore {
             None => {
                 let formats: Vec<i64> = requests.keys().copied().collect();
                 let notes = self.latest_stage_notes(run_id, stage_index)?;
-                let answer = self.run_logged_agent(
+                let shown = tempfile::tempdir()?;
+                let (references, attached) = self.thumbnail_references(
+                    database,
+                    workspace_id,
+                    snapshot,
+                    &requests,
+                    crate::agent_run::accepts_images(provider).then_some(shown.path()),
+                )?;
+                let answer = self.run_logged_agent_with_images(
                     crate::agent_logs::AgentLogScope {
                         workspace_id,
                         run_id: Some(run_id),
@@ -563,9 +646,16 @@ impl WorkspaceStore {
                         attempt: Some(attempt),
                     },
                     provider,
-                    &supplemental_prompt(snapshot, script, &requests, notes.as_deref()),
+                    &supplemental_prompt(
+                        snapshot,
+                        script,
+                        &requests,
+                        notes.as_deref(),
+                        &references,
+                    ),
                     &answer_schema(&formats),
                     AGENT_TIMEOUT,
+                    &attached,
                     renew,
                 )?;
                 let sorted = sort_answer(&answer, &requests)
@@ -773,7 +863,12 @@ mod tests {
             Some("## Hook"),
             &requests,
             Some("Shorter titles"),
+            &BTreeMap::from([(
+                1,
+                vec![json!({"name": "bold.jpg", "notes": "Big yellow text", "attachedImage": 1})],
+            )]),
         );
+        assert!(prompt.contains("Big yellow text") && prompt.contains("thumbnailGuidance"));
         assert!(prompt.contains(r###""approvedScript": "## Hook""###));
         assert!(
             prompt.contains(r#""titles": 2"#)
