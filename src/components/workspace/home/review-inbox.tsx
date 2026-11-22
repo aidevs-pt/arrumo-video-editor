@@ -1,14 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Bell, CircleAlert, CircleCheck } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocale } from "@/lib/locale-provider";
 
-type RunNotice = { run_id: number; title: string };
+type RunNotice = { run_id: number; title: string; profile: string | null; at: number };
 
 type Inbox = { reviews: RunNotice[]; completions: (RunNotice & { unread: boolean })[] };
 
@@ -51,15 +51,40 @@ export function useGenerationInbox(workspaceId: number | undefined) {
   return state?.workspaceId === workspaceId ? state : undefined;
 }
 
+/** "4 min", "2 h", "3 d" in the app's language. */
+function ago(at: number, locale: string) {
+  const minutes = Math.max(0, Math.round((Date.now() / 1000 - at) / 60));
+  const [value, unit] = minutes < 60 ? [Math.max(1, minutes), "minute"] : minutes < 60 * 24 ? [Math.round(minutes / 60), "hour"] : [Math.round(minutes / 1440), "day"];
+  return new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "narrow" }).format(value);
+}
+
+type Entry = { key: string; kind: "review" | "completed"; notice: RunNotice; unread: boolean; href: string };
+
 export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state?: InboxState }) {
   const router = useRouter();
-  const { messages } = useLocale();
+  const { locale, messages } = useLocale();
   const copy = messages.studio;
   const inbox = state?.inbox;
   const failed = state?.failed;
+  const [readHere, setReadHere] = useState<Set<number>>(new Set());
   const reviews = inbox?.reviews ?? [];
-  const completions = inbox?.completions ?? [];
+  const completions = (inbox?.completions ?? []).map((notice) => ({ ...notice, unread: notice.unread && !readHere.has(notice.run_id) }));
   const attentionCount = reviews.length + completions.filter((notice) => notice.unread).length;
+  const unreadCompletions = completions.filter((notice) => notice.unread);
+  const entries: Entry[] = [
+    ...reviews.map((notice) => ({ key: `r${notice.run_id}`, kind: "review" as const, notice, unread: true, href: `/generation-run?workspace=${workspaceId}&run=${notice.run_id}` })),
+    ...completions.map((notice) => ({ key: `c${notice.run_id}`, kind: "completed" as const, notice, unread: notice.unread, href: `/completed-video?workspace=${workspaceId}&run=${notice.run_id}` })),
+  ].sort((a, b) => b.notice.at - a.notice.at);
+
+  async function markAllRead() {
+    const ids = unreadCompletions.map((notice) => notice.run_id);
+    setReadHere((current) => new Set([...current, ...ids]));
+    await invoke("read_all_completion_notifications", { workspaceId }).catch(() => setReadHere((current) => {
+      const next = new Set(current);
+      for (const id of ids) next.delete(id);
+      return next;
+    }));
+  }
 
   return (
     <DropdownMenu>
@@ -69,42 +94,34 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
           {attentionCount > 0 && <span aria-hidden="true" className="absolute end-1.5 top-1.5 size-2 rounded-[2px] bg-attention ring-2 ring-background" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1.5rem)]">
-        <DropdownMenuLabel className="flex items-center justify-between gap-2">
-          {copy.notifications}
-          {attentionCount > 0 && <Badge variant="secondary" className="bg-attention text-ink tabular-nums">{attentionCount}</Badge>}
-        </DropdownMenuLabel>
-        {failed && <p className="p-2 text-sm text-muted-foreground">{messages.queue.loadError}</p>}
-        {reviews.length + completions.length > 0 ? (
-          <ScrollArea className={reviews.length + completions.length > 4 ? "h-60" : "max-h-60"}>
-            {reviews.length > 0 && (
-              <DropdownMenuGroup aria-label={copy.reviewInbox}>
-                <DropdownMenuLabel className="text-xs text-muted-foreground">{copy.reviewInbox}</DropdownMenuLabel>
-                {reviews.map((review) => (
-                  <DropdownMenuItem key={review.run_id}
-                    onSelect={() => router.push(`/generation-run?workspace=${workspaceId}&run=${review.run_id}`)}>
-                    <CircleAlert aria-hidden="true" /><span className="truncate">{review.title}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            )}
-            {completions.length > 0 && (
-              <DropdownMenuGroup aria-label={copy.recentCompletions}>
-                <DropdownMenuLabel className="text-xs text-muted-foreground">{copy.recentCompletions}</DropdownMenuLabel>
-                {completions.map((completion) => (
-                  <DropdownMenuItem key={completion.run_id}
-                    onSelect={() => router.push(`/completed-video?workspace=${workspaceId}&run=${completion.run_id}`)}>
-                    <CircleCheck aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{completion.title}</span>
-                    {completion.unread && <>
-                      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-[2px] bg-attention" />
-                      <span className="sr-only">{copy.unreadCompletion}</span>
-                    </>}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            )}
+      <DropdownMenuContent align="end" className="w-96 max-w-[calc(100vw-1.5rem)] p-0">
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+          <h2 className="font-heading text-lg leading-none font-[850] [font-variation-settings:'wdth'_120]">{copy.notifications}</h2>
+          <Button type="button" variant="outline" size="sm" disabled={!unreadCompletions.length} onClick={(event) => { event.preventDefault(); void markAllRead(); }}>
+            {copy.markAllRead}
+          </Button>
+        </div>
+        {failed && <p className="px-4 py-3 text-sm text-muted-foreground">{messages.queue.loadError}</p>}
+        {entries.length > 0 ? (
+          <ScrollArea className={entries.length > 4 ? "h-[26rem]" : undefined}>
+            {entries.map(({ key, kind, notice, unread, href }) => (
+              <DropdownMenuItem key={key} onSelect={() => router.push(href)}
+                className={cn("flex-col items-stretch gap-1 rounded-none border-b px-4 py-3 last:border-b-0", unread && "bg-primary/8 focus:bg-primary/12")}>
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="font-semibold">{kind === "review" ? copy.noticeReview : copy.noticeCompleted}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{ago(notice.at, locale)}</span>
+                </span>
+                <span className="truncate">{notice.title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {notice.profile
+                    ? copy.opensIn.replace("{profile}", notice.profile).replace("{place}", kind === "review" ? copy.placeGeneration : copy.placeFinished)
+                    : kind === "review" ? copy.opensGeneration : copy.opensFinished}
+                </span>
+                {unread && <span className="sr-only">{kind === "review" ? copy.reviewInbox : copy.unreadCompletion}</span>}
+              </DropdownMenuItem>
+            ))}
           </ScrollArea>
-        ) : !failed && <p className="p-2 text-sm text-muted-foreground">
+        ) : !failed && <p className="px-4 py-3 text-sm text-muted-foreground">
           {inbox ? copy.noNotifications : messages.queue.loading}
         </p>}
       </DropdownMenuContent>

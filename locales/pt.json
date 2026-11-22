@@ -348,7 +348,15 @@
     "workspaceSettingsHint": "Aplica-se a todos os perfis e vídeos de {workspace}, salvo se um perfil indicar o contrário.",
     "workspaceCounts": "{profiles} perfis, {videos} vídeos",
     "workspaceCountsOne": "1 perfil, {videos} vídeos",
-    "importWorkspaces": "Importar"
+    "importWorkspaces": "Importar",
+    "markAllRead": "Marcar tudo como lido",
+    "noticeReview": "Pronto para a sua revisão",
+    "noticeCompleted": "Vídeo pronto",
+    "opensIn": "Abre {profile}, {place}",
+    "placeGeneration": "geração",
+    "placeFinished": "vídeo terminado",
+    "opensGeneration": "Abre a geração",
+    "opensFinished": "Abre o vídeo terminado"
   },
   "motionLibrary": {
     "renderer": "Renderizador instalado",

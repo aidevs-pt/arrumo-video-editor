@@ -241,7 +241,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 40] {
+pub(super) fn definitions() -> [Value; 41] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -375,6 +375,9 @@ pub(super) fn definitions() -> [Value; 40] {
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "read_completion_notification", "description": "Mark a completed run's notification as read. Returns whether the read state changed.",
             "inputSchema": run, "annotations": {"idempotentHint": true, "destructiveHint": false}}),
+        json!({"name": "read_all_completion_notifications", "description": "Mark every completed run's notification in a workspace as read. Returns how many changed.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id}, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true, "destructiveHint": false}}),
         json!({"name": "get_generation_plan", "description": "Read the prepared production plan for a run.",
             "inputSchema": run, "annotations": {"readOnlyHint": true}}),
         json!({"name": "replay_generation", "description": "Queue a new run from a completed video using captured or current settings. Reuse the request key for the same submission.",
@@ -632,6 +635,12 @@ pub(super) fn call(
                 .read_completion_notification(args.workspace_id, args.run_id)
                 .map(|changed| json!({"changed": changed}))
                 .map_err(|_| "Could not acknowledge completion notification")
+        }),
+        "read_all_completion_notifications" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .read_all_completion_notifications(args.workspace_id)
+                .map(|changed| json!({"changed": changed}))
+                .map_err(|_| "Could not mark notifications as read")
         }),
         "get_generation_plan" => parse(arguments).and_then(|args: RunInput| {
             store

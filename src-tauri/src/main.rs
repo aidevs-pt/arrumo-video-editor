@@ -911,6 +911,18 @@ async fn generation_inbox(
 }
 
 #[tauri::command]
+async fn read_all_completion_notifications(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<usize, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .read_all_completion_notifications(workspace_id)
+        .map_err(|_| "notification_read_failed")
+}
+
+#[tauri::command]
 async fn get_generation_run(
     workspace_id: i64,
     run_id: i64,
@@ -1257,6 +1269,7 @@ fn main() {
             get_generation_run,
             pending_generation_reviews,
             generation_inbox,
+            read_all_completion_notifications,
             control_generation,
             generation_activity,
             agent_logs,
