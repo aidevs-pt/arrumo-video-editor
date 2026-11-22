@@ -42,13 +42,13 @@ struct SpeechAdapter {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "lowercase")]
-enum AudioFormat {
+pub(crate) enum AudioFormat {
     Mp3,
     Wav,
 }
 
 impl AudioFormat {
-    fn extension(&self) -> &'static str {
+    pub(crate) fn extension(&self) -> &'static str {
         match self {
             Self::Mp3 => "mp3",
             Self::Wav => "wav",
@@ -231,7 +231,7 @@ impl WorkspaceStore {
     }
 }
 
-fn speech_client_builder() -> reqwest::blocking::ClientBuilder {
+pub(crate) fn speech_client_builder() -> reqwest::blocking::ClientBuilder {
     Client::builder()
         .https_only(true)
         .redirect(reqwest::redirect::Policy::none())
@@ -240,7 +240,7 @@ fn speech_client_builder() -> reqwest::blocking::ClientBuilder {
         .timeout(Duration::from_secs(120))
 }
 
-fn execute_speech(
+pub(crate) fn execute_speech(
     client: &Client,
     request: Request,
     format: &AudioFormat,
@@ -249,11 +249,16 @@ fn execute_speech(
 ) -> io::Result<()> {
     let response = client
         .execute(request)
-        .map_err(|_| io::Error::other("Speech request failed"))?;
+        .map_err(|_| io::Error::other("The request to the provider failed"))?;
+    let status = response.status().as_u16();
+    if matches!(status, 401 | 403) {
+        return Err(io::Error::other(format!(
+            "The provider refused the key for this (HTTP {status}). Check that the key is allowed to use it and that your plan includes it."
+        )));
+    }
     if !response.status().is_success() {
         return Err(io::Error::other(format!(
-            "Speech provider returned HTTP {}",
-            response.status().as_u16()
+            "The provider returned HTTP {status}"
         )));
     }
     let media_type = response
@@ -332,7 +337,7 @@ fn speech_adapter(plugin_id: &str) -> io::Result<(SpeechAdapter, &'static [u8])>
     Ok((adapter, bytes))
 }
 
-fn valid_key(key: &str) -> bool {
+pub(crate) fn valid_key(key: &str) -> bool {
     key.len() <= 64
         && key.starts_with(|c: char| c.is_ascii_alphabetic())
         && key

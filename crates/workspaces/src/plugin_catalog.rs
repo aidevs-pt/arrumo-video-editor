@@ -643,6 +643,7 @@ pub(crate) struct BundledSource {
     pub speech_synthesis: Option<&'static [u8]>,
     pub image_generation: Option<&'static [u8]>,
     pub video_generation: Option<&'static [u8]>,
+    pub audio_generation: Option<&'static [u8]>,
     pub usage: Option<&'static [u8]>,
     icon: Option<&'static [u8]>,
     package: Option<&'static [u8]>,

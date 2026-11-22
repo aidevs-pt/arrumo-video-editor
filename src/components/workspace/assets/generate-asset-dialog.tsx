@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { AudioLines, Check, Clapperboard, ImageIcon, Sparkles } from "lucide-react";
+import { AudioLines, Check, Clapperboard, ImageIcon, Music, Sparkles, Volume2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,6 +21,8 @@ import { AssetThumbnail } from "./asset-thumbnail";
 type Provider = { id: string; name: string };
 type Preferences = { available: Provider[]; effective: string[] };
 type Kind = "image" | "audio" | "video";
+/** What the dialog makes: library kinds, with audio split into voice, music and sound effects. */
+type Tab = Kind | "music" | "sound";
 type LibraryAsset = { id: number; name: string; kind: Kind };
 type VideoModel = { provider: string; id: string; selected: boolean; variants: { images: [number, number]; videos: [number, number] }[] };
 
@@ -31,8 +33,12 @@ function takes(model: VideoModel, images: number, videos: number) {
   return model.variants.some((variant) => images >= variant.images[0] && images <= variant.images[1] && videos >= variant.videos[0] && videos <= variant.videos[1]);
 }
 
-const CAPABILITY: Record<Kind, string> = { image: "image-generation", audio: "text-to-speech", video: "video-generation" };
+const CAPABILITY: Record<Tab, string> = {
+  image: "image-generation", audio: "text-to-speech", music: "music-generation", sound: "sound-effect-generation", video: "video-generation",
+};
 const DURATIONS = [3, 5, 8, 10, 15];
+const MUSIC_DURATIONS = [15, 30, 60, 120, 180];
+const SOUND_DURATIONS = [1, 2, 3, 5, 10];
 
 const SIZES = [
   { ratio: "16:9", pixels: "1920 × 1080" },
@@ -52,7 +58,8 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const { messages: { assets: { generate: copy } } } = useLocale();
   const pluginText = usePluginText();
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<Kind>("image");
+  const [kind, setKind] = useState<Tab>("image");
+  const made = kind === "music" || kind === "sound";
   const [all, setAll] = useState<Record<string, Preferences>>();
   const providers = all ? all[CAPABILITY[kind]] ?? { available: [], effective: [] } : undefined;
   const [duration, setDuration] = useState(5);
@@ -119,6 +126,11 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
           workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: duration, notes: notes.trim(),
           provider: provider || (model ? videoProvider : null), model: model || null, references: chosen,
         })]);
+      } else if (made) {
+        onCreated([await invoke<number>("generate_library_audio", {
+          workspaceId, kind: kind === "music" ? "music" : "sound-effect", prompt: prompt.trim(), seconds: duration,
+          notes: notes.trim(), provider: provider || null,
+        })]);
       } else {
         onCreated([await invoke<number>("generate_library_speech", {
           workspaceId, text: prompt.trim(), notes: notes.trim(), provider: provider || null,
@@ -147,19 +159,22 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       </DialogHeader>
       <form onSubmit={submit}>
         <FieldGroup>
-          {!imagesOnly && <Tabs value={kind} onValueChange={(value) => { const next = value as Kind; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setProvider(""); setModel(""); setProblem(undefined); }}>
+          {!imagesOnly && <Tabs value={kind} onValueChange={(value) => { const next = value as Tab; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setDuration(next === "music" ? 30 : next === "sound" ? 3 : 5); setProvider(""); setModel(""); setProblem(undefined); }}>
             <TabsList className="w-full justify-start">
               <TabsTrigger value="image" disabled={pending} className="flex-none"><ImageIcon data-icon="inline-start" />{copy.image}</TabsTrigger>
               <TabsTrigger value="audio" disabled={pending} className="flex-none"><AudioLines data-icon="inline-start" />{copy.audio}</TabsTrigger>
+              <TabsTrigger value="music" disabled={pending} className="flex-none"><Music data-icon="inline-start" />{copy.music}</TabsTrigger>
+              <TabsTrigger value="sound" disabled={pending} className="flex-none"><Volume2 data-icon="inline-start" />{copy.sound}</TabsTrigger>
               <TabsTrigger value="video" disabled={pending} className="flex-none"><Clapperboard data-icon="inline-start" />{copy.video}</TabsTrigger>
             </TabsList>
           </Tabs>}
           <Field data-disabled={pending}>
             <FieldLabel htmlFor="generate-prompt">{kind === "audio" ? copy.speechText : copy.prompt}</FieldLabel>
             <Textarea id="generate-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending}
-              placeholder={kind === "image" ? copy.promptPlaceholder : kind === "video" ? copy.videoPlaceholder : copy.speechPlaceholder} maxLength={kind === "image" ? 4000 : kind === "video" ? 2500 : 5000} className="min-h-24" required />
+              placeholder={kind === "image" ? copy.promptPlaceholder : kind === "video" ? copy.videoPlaceholder : kind === "music" ? copy.musicPlaceholder : kind === "sound" ? copy.soundPlaceholder : copy.speechPlaceholder}
+              maxLength={kind === "image" ? 4000 : kind === "video" ? 2500 : kind === "music" ? 2000 : kind === "sound" ? 1000 : 5000} className="min-h-24" required />
           </Field>
-          <div className={kind === "audio" ? "grid gap-4" : "grid gap-4 sm:grid-cols-[1fr_1fr_6rem]"}>
+          <div className={kind === "audio" ? "grid gap-4" : made ? "grid gap-4 sm:grid-cols-[1fr_8rem]" : "grid gap-4 sm:grid-cols-[1fr_1fr_6rem]"}>
             <Field data-disabled={pending}>
               <FieldLabel htmlFor="generate-provider">{copy.provider}</FieldLabel>
               <NativeSelect id="generate-provider" value={provider} disabled={pending} onChange={(event) => { setProvider(event.target.value); setModel(""); }}>
@@ -167,7 +182,14 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
                 {providers?.available.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{name(entry)}</NativeSelectOption>)}
               </NativeSelect>
             </Field>
-            {kind !== "audio" && <><Field data-disabled={pending}>
+            {made && <Field data-disabled={pending}>
+              <FieldLabel htmlFor="generate-length">{copy.length}</FieldLabel>
+              <NativeSelect id="generate-length" value={duration} disabled={pending} onChange={(event) => setDuration(Number(event.target.value))}>
+                {(kind === "music" ? MUSIC_DURATIONS : SOUND_DURATIONS).map((value) => <NativeSelectOption key={value} value={value}>
+                  {value >= 60 ? copy.minutes.replace("{count}", String(value / 60)) : copy.seconds.replace("{count}", String(value))}</NativeSelectOption>)}
+              </NativeSelect>
+            </Field>}
+            {kind !== "audio" && !made && <><Field data-disabled={pending}>
               <FieldLabel htmlFor="generate-size">{copy.size}</FieldLabel>
               <NativeSelect id="generate-size" value={ratio} disabled={pending} onChange={(event) => setRatio(event.target.value)}>
                 {SIZES.filter((size) => kind === "image" || size.ratio !== "4:5").map((size) => <NativeSelectOption key={size.ratio} value={size.ratio}>{kind === "image" ? `${size.ratio}, ${size.pixels}` : size.ratio}</NativeSelectOption>)}
@@ -192,7 +214,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
               {providerModels.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{modelName(entry.id)}</NativeSelectOption>)}
             </NativeSelect>
           </Field>}
-          {kind !== "audio" && !imagesOnly && <Field data-disabled={pending}>
+          {kind !== "audio" && !made && !imagesOnly && <Field data-disabled={pending}>
             <FieldLabel id="generate-references">{copy.references}</FieldLabel>
             <FieldDescription>{kind === "video" ? copy.referencesVideoHint : copy.referencesImageHint}</FieldDescription>
             {choices.length ? <div role="group" aria-labelledby="generate-references" className="scroll-fade grid max-h-44 grid-cols-4 gap-2 overflow-y-auto p-0.5 sm:grid-cols-5">
@@ -217,13 +239,13 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
               placeholder={copy.notesPlaceholder} maxLength={8000} aria-describedby="generate-notes-hint" />
             <FieldDescription id="generate-notes-hint">{copy.notesHint}</FieldDescription>
           </Field>
-          {none && <Alert><AlertDescription>{kind === "image" ? copy.noProvider : kind === "video" ? copy.noVideoProvider : copy.noSpeechProvider}</AlertDescription></Alert>}
+          {none && <Alert><AlertDescription>{kind === "image" ? copy.noProvider : kind === "video" ? copy.noVideoProvider : made ? copy.noAudioProvider : copy.noSpeechProvider}</AlertDescription></Alert>}
           {problem && <Alert variant="destructive" role="alert"><AlertDescription>{problem}</AlertDescription></Alert>}
-          {pending && <p role="status" className="text-sm text-muted-foreground">{kind === "video" ? copy.videoPendingHint : copy.pendingHint}</p>}
+          {pending && <p role="status" className="text-sm text-muted-foreground">{kind === "video" ? copy.videoPendingHint : made ? copy.audioPendingHint : copy.pendingHint}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{copy.cancel}</Button>
             <Button type="submit" disabled={pending || !prompt.trim() || none || unfit || unsupported}>
-              {pending ? copy.generating : kind === "audio" ? copy.submitAudio : kind === "video" ? copy.submitVideo : count === 1 ? copy.submitOne : copy.submitMany.replace("{count}", String(count))}
+              {pending ? copy.generating : kind === "audio" || made ? copy.submitAudio : kind === "video" ? copy.submitVideo : count === 1 ? copy.submitOne : copy.submitMany.replace("{count}", String(count))}
             </Button>
           </DialogFooter>
         </FieldGroup>

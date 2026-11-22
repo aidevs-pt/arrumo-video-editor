@@ -38,6 +38,19 @@ struct GenerateVideoInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GenerateAudioInput {
+    workspace_id: i64,
+    kind: crate::AudioKind,
+    prompt: String,
+    seconds: f64,
+    #[serde(default)]
+    notes: String,
+    #[serde(default)]
+    provider: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct GenerateSpeechInput {
     workspace_id: i64,
     text: String,
@@ -156,7 +169,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 20] {
+pub(super) fn definitions() -> [Value; 21] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -181,6 +194,16 @@ pub(super) fn definitions() -> [Value; 20] {
                 "notes": {"type": "string", "maxLength": 8000},
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
+        json!({"name": "generate_library_audio",
+            "description": "Make instrumental music or a sound effect from a written description with the workspace's first provider for that kind (or one named provider), and add it to the workspace assets with the given notes. The provider sets the length limits (ElevenLabs: music 3 to 600 seconds, sound effects 0.5 to 30). Music in an approved asset plan can be laid under a video.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "kind": {"enum": ["music", "sound-effect"]},
+                "prompt": {"type": "string", "minLength": 1, "maxLength": 10000},
+                "seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600},
+                "notes": {"type": "string", "maxLength": 8000},
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+            }, "required": ["workspaceId", "kind", "prompt", "seconds"], "additionalProperties": false}}),
         json!({"name": "generate_library_video",
             "description": "Generate a short clip with the workspace's first video provider (or one named provider) and add it to the workspace assets with the given notes. A provider may offer several models (see its plugin settings); name one with provider and model. references are workspace image or MP4 video asset IDs to animate or follow (up to 9 images and 3 videos, as the model allows); the provider picks the matching endpoint and fails with the models that fit when the chosen one can't take them. Takes minutes; the model's duration limits apply.",
             "inputSchema": {"type": "object", "properties": {
@@ -338,6 +361,22 @@ pub(super) fn call(
                     .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
+            }),
+        "generate_library_audio" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid audio arguments")
+            .and_then(|args: GenerateAudioInput| {
+                store
+                    .generate_library_audio(
+                        database,
+                        args.workspace_id,
+                        args.kind,
+                        &args.prompt,
+                        args.seconds,
+                        &args.notes,
+                        args.provider.as_deref(),
+                    )
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|_| "Could not make the audio. Check the provider, its key, the length and the description")
             }),
         "list_video_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid video model arguments")
