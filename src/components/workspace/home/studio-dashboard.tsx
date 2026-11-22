@@ -87,10 +87,10 @@ export function StudioDashboard({ workspace }: { workspace: Workspace }) {
       <header className="flex flex-col items-start gap-6 border-b-2 border-foreground pb-8">
         <h1 className="max-w-4xl text-[clamp(2.25rem,5vw,3.25rem)] leading-[.98] font-[850] tracking-[-.015em] text-balance [font-variation-settings:'wdth'_135]">{heading}</h1>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" size="lg" asChild>
+          <Button variant="outline" asChild>
             <Link href={`${workspaceHref("drafts", workspaceId)}&compose=scratch`}>{messages.videoCatalog.scratch}</Link>
           </Button>
-          <Button size="lg" asChild>
+          <Button asChild>
             <Link href={`${workspaceHref("drafts", workspaceId)}&compose=1`}><Upload data-icon="inline-start" />{messages.videoCatalog.generate}</Link>
           </Button>
         </div>

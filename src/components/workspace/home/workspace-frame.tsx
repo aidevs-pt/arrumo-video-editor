@@ -97,8 +97,8 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
   return (
     <>
       <Sidebar collapsible="icon" className="border-r-0!" mobileTitle={copy.navigation}>
-        <SidebarHeader className="relative gap-2 px-2 pt-3 pb-2">
-          <Button variant="ghost" size="icon" className="absolute end-2 top-0 md:hidden"
+        <SidebarHeader className="relative gap-2 px-2 pt-3 pb-2 max-md:pe-12">
+          <Button variant="ghost" size="icon" className="absolute end-2 top-5 text-sidebar-foreground hover:bg-white/15 hover:text-sidebar-foreground md:hidden"
             onClick={() => setOpenMobile(false)} aria-label={copy.closeNavigation}><X /></Button>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -281,7 +281,7 @@ function NavLink({ href, label, active, icon: Icon, count = 0, countLabel }: {
 }) {
   const { setOpenMobile } = useSidebar();
   return (
-    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 group-data-[collapsible=icon]:rounded-md data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground">
+    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 max-md:me-2 max-md:rounded-e-md group-data-[collapsible=icon]:rounded-md data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground">
       <Link href={href} aria-current={active ? "page" : undefined}
         aria-label={count && countLabel ? `${label}, ${count} ${countLabel}` : label}
         onClick={() => setOpenMobile(false)}>

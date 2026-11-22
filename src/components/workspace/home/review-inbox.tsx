@@ -64,7 +64,7 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="icon" aria-label={attentionCount ? `${copy.notifications}, ${copy.notificationAttention}` : copy.notifications} className="relative size-10 border-border bg-card hover:border-primary hover:bg-card hover:text-foreground aria-expanded:border-primary aria-expanded:bg-card">
+        <Button type="button" variant="outline" size="icon" aria-label={attentionCount ? `${copy.notifications}, ${copy.notificationAttention}` : copy.notifications} className="relative size-9 border-border bg-card hover:border-primary hover:bg-card hover:text-foreground aria-expanded:border-primary aria-expanded:bg-card">
           <Bell />
           {attentionCount > 0 && <span aria-hidden="true" className="absolute end-1.5 top-1.5 size-2 rounded-[2px] bg-attention ring-2 ring-background" />}
         </Button>

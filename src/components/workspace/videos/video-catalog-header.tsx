@@ -57,7 +57,7 @@ export function VideoCatalogHeader({ workspaceId, active, count }: {
           <h1 className="wrap-anywhere font-heading text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] [font-variation-settings:'wdth'_135]">{copy.title}</h1>
           <p className="mt-2 text-lg text-muted-foreground">{copy.description}</p>
         </div>
-        <Button size="lg" asChild>
+        <Button asChild>
           <Link href={`${workspaceHref("drafts", workspaceId)}&compose=1`}>
             <Upload data-icon="inline-start" />{copy.generate}
           </Link>

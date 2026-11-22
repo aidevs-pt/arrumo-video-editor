@@ -118,7 +118,7 @@ function ProfileHeader({ workspaceId, profile, tab, onUpdate }: {
         </div>
         <div className="flex flex-wrap gap-3">
           <ProfileColor workspaceId={workspaceId} profile={profile} onUpdate={onUpdate} />
-          <Button size="lg" asChild>
+          <Button asChild>
             <Link href={`${workspaceHref("drafts", workspaceId, profile.id)}&compose=1`}>
               <Upload data-icon="inline-start" />{copy.generate.replace("{profile}", profile.name)}
             </Link>
@@ -204,7 +204,7 @@ function ProfileColor({ workspaceId, profile, onUpdate }: {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="lg">
+        <Button variant="outline">
           <Palette data-icon="inline-start" />{copy.color}
           <span aria-hidden="true" className="size-3 rounded-[3px] border" style={{ backgroundColor: profile.color ?? "transparent" }} />
         </Button>
