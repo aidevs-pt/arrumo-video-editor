@@ -242,7 +242,11 @@ impl WorkspaceStore {
                 continue;
             };
             let model = self.image_model(&adapter, workspace_id);
-            match request_image(&client, &adapter, &model, ratio, prompt, &secret) {
+            // Images are cropped to the exact ratio afterwards, so nothing important may touch the edges.
+            let framed = format!(
+                "{prompt}\n\nThe final image is cropped to {aspect_ratio}: keep all text and the main subject well inside the frame, away from every edge."
+            );
+            match request_image(&client, &adapter, &model, ratio, &framed, &secret) {
                 Ok((bytes, extension)) => {
                     return Ok(GeneratedImage {
                         provider: provider.clone(),
