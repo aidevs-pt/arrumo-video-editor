@@ -475,7 +475,7 @@ mod tests {
         assert_eq!(image_extension(&[0xff, 0xd8, 0xff, 0xe0]), Some("jpg"));
         assert_eq!(image_extension(b"RIFF\0\0\0\0WEBPVP8 "), Some("webp"));
         assert_eq!(image_extension(b"<svg>"), None);
-        assert!(valid_model("gpt-image-2.5-flare") && valid_model("gemini-2.5-flash-image"));
+        assert!(valid_model("gpt-image-2.6-sunburst") && valid_model("gemini-2.5-flash-image"));
         assert!(!valid_model("../x") && !valid_model("a/b") && !valid_model(""));
     }
 }

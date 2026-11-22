@@ -9,11 +9,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
+import { ThumbnailReferences, type ReferenceImage } from "@/components/workspace/outputs/thumbnail-references";
 
 type Format = { id: number; name: string; width: number; height: number };
 type Supplemental = {
   thumbnails: number; titles: number; descriptions: number; tags: boolean;
-  thumbnail_guidance?: string; specifications?: string;
+  thumbnail_guidance?: string; specifications?: string; thumbnail_reference_ids?: number[];
   portrait_derivatives: { count: number; source?: { guidance?: string } };
 };
 export type OutputPlan = { format: Format; supplemental: Supplemental };
@@ -22,6 +23,7 @@ export type OutputPlan = { format: Format; supplemental: Supplemental };
 export type FormatOverride = {
   thumbnails?: number; titles?: number; descriptions?: number; tags?: boolean;
   thumbnail_guidance?: string; specifications?: string; portrait_count?: number; portrait_guidance?: string;
+  thumbnail_reference_ids?: number[];
 };
 export type OutputChoice = { skipped: number[]; overrides: Record<string, FormatOverride> };
 
@@ -36,13 +38,15 @@ export function outputOptions(choice: OutputChoice, plan: OutputPlan[]) {
   };
 }
 
-export function VideoOutputs({ plan, choice, onChange, disabled }: {
+export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disabled }: {
+  workspaceId: number;
+  images: ReferenceImage[];
   plan: OutputPlan[];
   choice: OutputChoice;
   onChange: (choice: OutputChoice) => void;
   disabled?: boolean;
 }) {
-  const { messages: { videoDetails: copy } } = useLocale();
+  const { messages: { videoDetails: copy, delivery } } = useLocale();
   const produced = plan.filter(({ format }) => !choice.skipped.includes(format.id)).length;
 
   function update(id: number, change: FormatOverride) {
@@ -110,6 +114,11 @@ export function VideoOutputs({ plan, choice, onChange, disabled }: {
                     disabled={disabled} onChange={(text) => update(format.id, { thumbnail_guidance: text || undefined })} />
                   {value.portrait > 0 && <Guidance label={copy.portraitGuidance} inherited={supplemental.portrait_derivatives.source?.guidance ?? ""}
                     value={change.portrait_guidance} disabled={disabled} onChange={(text) => update(format.id, { portrait_guidance: text || undefined })} />}
+                  {value.thumbnails > 0 && images.length > 0 && (
+                    <ThumbnailReferences id={`video-reference-${format.id}`} workspaceId={workspaceId} images={images} copy={delivery}
+                      selected={change.thumbnail_reference_ids ?? supplemental.thumbnail_reference_ids ?? []}
+                      onChange={(ids) => update(format.id, { thumbnail_reference_ids: ids })} />
+                  )}
                   <Guidance label={copy.specifications} inherited={supplemental.specifications ?? ""} value={change.specifications}
                     disabled={disabled} onChange={(text) => update(format.id, { specifications: text || undefined })} />
                   {customised && <button type="button" disabled={disabled}

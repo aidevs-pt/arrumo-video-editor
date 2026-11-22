@@ -16,14 +16,14 @@ export function ThumbnailReferences({ id, workspaceId, images, selected, copy, o
   selected: number[];
   copy: LocaleMessages["delivery"];
   onChange: (selected: number[]) => void;
-  onImport: () => void;
+  onImport?: () => void;
 }) {
   return (
     <FieldSet>
       <FieldLegend>{copy.thumbnail_reference_ids}</FieldLegend>
       {images.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noReferenceImages}</p> : (
         <ScrollArea className={cn("rounded-lg border", images.length > 6 && "h-72")}>
-          <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-3 p-3">
             {images.map((image) => {
               const checked = selected.includes(image.id);
               return (
@@ -50,7 +50,7 @@ export function ThumbnailReferences({ id, workspaceId, images, selected, copy, o
           </ul>
         </ScrollArea>
       )}
-      <Button type="button" size="sm" variant="outline" className="self-start" onClick={onImport}><ImagePlus data-icon="inline-start" />{copy.importReference}</Button>
+      {onImport && <Button type="button" size="sm" variant="outline" className="self-start" onClick={onImport}><ImagePlus data-icon="inline-start" />{copy.importReference}</Button>}
     </FieldSet>
   );
 }

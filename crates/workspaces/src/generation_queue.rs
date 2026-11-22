@@ -48,6 +48,9 @@ pub struct FormatOverride {
     pub portrait_count: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub portrait_guidance: Option<String>,
+    /// Workspace images to use as thumbnail references for this video.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thumbnail_reference_ids: Option<Vec<i64>>,
 }
 
 /// Applies a video's output choices to the frozen formats and marks what the video changed.
@@ -106,6 +109,12 @@ fn apply_output_overrides(
             }
             if let Some(value) = &change.specifications {
                 set("specifications", json!(value), supplemental);
+            }
+            if let Some(value) = &change.thumbnail_reference_ids {
+                if value.len() > 20 {
+                    return Err(invalid());
+                }
+                set("thumbnail_reference_ids", json!(value), supplemental);
             }
             if let Some(value) = change.portrait_count {
                 supplemental["portrait_derivatives"]["count"] = json!(value);
@@ -403,6 +412,23 @@ impl WorkspaceStore {
             .transpose()
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?
             .unwrap_or_default();
+        let references: Vec<i64> = format_overrides
+            .values()
+            .filter_map(|change| change.thumbnail_reference_ids.as_ref())
+            .flatten()
+            .copied()
+            .collect();
+        for asset in references {
+            let usable: bool = self.0.query_row(
+                "SELECT EXISTS (SELECT 1 FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2
+                 AND kind = 'image' AND superseded = 0)",
+                rusqlite::params![workspace_id, asset],
+                |row| row.get(0),
+            )?;
+            if !usable {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+        }
         let formats = apply_output_overrides(formats, chosen.as_deref(), &format_overrides)?;
         let overrides = options
             .get("provider_overrides")
@@ -636,6 +662,21 @@ mod tests {
             request.guidance.ends_with("Only the reveal."),
             "{}",
             request.guidance
+        );
+        let foreign = RunOptions {
+            format_overrides: BTreeMap::from([(
+                landscape.to_string(),
+                FormatOverride {
+                    thumbnail_reference_ids: Some(vec![999]),
+                    ..FormatOverride::default()
+                },
+            )]),
+            ..RunOptions::default()
+        };
+        assert!(
+            store
+                .enqueue_video_draft(studio, draft.id, "foreign-reference", &foreign)
+                .is_err()
         );
         assert_eq!(request.thumbnails_per_cut, 2);
     }

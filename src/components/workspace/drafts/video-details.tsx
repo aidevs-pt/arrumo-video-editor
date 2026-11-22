@@ -66,6 +66,11 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
   const [outputChoice, setOutputChoice] = useState<OutputChoice>({ skipped: [], overrides: {} });
   const [queue, setQueue] = useState<SavedDraft[]>([]);
   const plan = useDeliveryPlan(workspaceId, draft.profile_id);
+  const [images, setImages] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    invoke<{ id: number; name: string; kind: string }[]>("list_assets", { workspaceId })
+      .then((assets) => setImages(assets.filter((asset) => asset.kind === "image")), () => setImages([]));
+  }, [workspaceId]);
   const profile = profiles.find((entry) => entry.id === draft.profile_id);
   const position = draftId === null ? -1 : queue.findIndex((entry) => entry.id === draftId);
   const next = queue.find((entry, index) => entry.id !== draftId && (position === -1 || index > position)) ?? null;
@@ -218,7 +223,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               <h2 id="video-makes" className="mb-3 text-[1.0625rem] font-bold [font-family:var(--font-sans)] [font-variation-settings:normal]">
                 {agent ? copy.willMake.replace("{agent}", agent) : copy.willMakeFallback}
               </h2>
-              <VideoOutputs plan={plan ?? []} choice={outputChoice} onChange={setOutputChoice} disabled={pending !== null} />
+              <VideoOutputs workspaceId={workspaceId} images={images} plan={plan ?? []} choice={outputChoice} onChange={setOutputChoice} disabled={pending !== null} />
               <Link href={profile ? `${profileHref(workspaceId, profile.id)}&tab=outputs` : workspaceHref("outputs", workspaceId)}
                 className="mt-4 inline-block font-semibold text-primary underline underline-offset-4">
                 {copy.changeOutputs.replace("{name}", profile?.name ?? workspace.name)}
