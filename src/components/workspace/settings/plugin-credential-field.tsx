@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { CircleCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -76,18 +77,25 @@ export function PluginCredentialField({ field, pluginId, workspaceId }: {
   );
   if (!status) return <Skeleton className="h-16" aria-label={field.label} />;
   const configured = workspaceId === null ? status.appConfigured : status.workspaceConfigured;
+  // Only whether a key exists is known here; the stored value is never read back.
+  const stored = status.source !== null;
 
   return <form className="flex flex-col gap-2" onSubmit={submit}>
     <Field>
       <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
       <FieldDescription id={id + "-description"}>{field.description}</FieldDescription>
       <Input ref={input} id={id} type="password" autoComplete="new-password" spellCheck={false}
-        aria-describedby={id + "-description"} disabled={pending} maxLength={2048}
+        aria-describedby={id + "-description " + id + "-status"} disabled={pending} maxLength={2048}
+        placeholder={stored ? "••••••••••••••••" : undefined}
+        className={stored ? "placeholder:tracking-widest placeholder:text-foreground/60" : undefined}
         onChange={(event) => setHasInput(event.target.value !== "")} />
-      <FieldDescription>{copy[status.source ?? "unset"]}</FieldDescription>
+      <p id={id + "-status"} className={stored ? "flex items-center gap-1.5 text-sm font-medium text-foreground" : "text-sm text-muted-foreground"}>
+        {stored && <CircleCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />}
+        {stored ? `${copy.stored} · ${copy[status.source ?? "unset"]}` : copy.unset}
+      </p>
     </Field>
     <div className="flex flex-wrap gap-2">
-      <Button size="sm" disabled={pending || !hasInput}>{copy.save}</Button>
+      <Button size="sm" disabled={pending || !hasInput}>{stored ? copy.replace : copy.save}</Button>
       {configured && <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button type="button" variant="outline" size="sm" disabled={pending}>{copy.remove}</Button>

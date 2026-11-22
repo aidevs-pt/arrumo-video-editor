@@ -106,7 +106,9 @@
     "save": "Guardar credencial",
     "remove": "Eliminar credencial",
     "removeApp": "Se eliminará la credencial de la aplicación para este complemento. Los espacios de trabajo con su propia credencial seguirán usándola.",
-    "removeWorkspace": "Se eliminará la credencial del espacio de trabajo. Se usará la credencial de la aplicación si está configurada."
+    "removeWorkspace": "Se eliminará la credencial del espacio de trabajo. Se usará la credencial de la aplicación si está configurada.",
+    "stored": "Clave guardada",
+    "replace": "Reemplazar credencial"
   },
   "pluginPreferences": {
     "title": "Configuración de complementos",

@@ -106,7 +106,9 @@
     "save": "Guardar credencial",
     "remove": "Remover credencial",
     "removeApp": "Remove a credencial da aplicação para este plugin. Os espaços de trabalho com credencial própria continuam a utilizá-la.",
-    "removeWorkspace": "Remove a credencial do espaço de trabalho. Se estiver configurada, será usada a credencial da aplicação."
+    "removeWorkspace": "Remove a credencial do espaço de trabalho. Se estiver configurada, será usada a credencial da aplicação.",
+    "stored": "Chave guardada",
+    "replace": "Substituir credencial"
   },
   "pluginPreferences": {
     "title": "Definições dos plugins",

@@ -106,7 +106,9 @@
     "save": "Save credential",
     "remove": "Remove credential",
     "removeApp": "This removes the app credential for this plugin. Workspaces with their own credential keep using it.",
-    "removeWorkspace": "This removes the workspace credential. The workspace will use the app credential if one is configured."
+    "removeWorkspace": "This removes the workspace credential. The workspace will use the app credential if one is configured.",
+    "stored": "Key saved",
+    "replace": "Replace credential"
   },
   "pluginPreferences": {
     "title": "Plugin settings",
