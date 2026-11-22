@@ -392,7 +392,7 @@
       "cancelDelete": "Cancelar",
       "deleting": "Eliminando…"
     },
-    "title": "Animaciones y transiciones",
+    "title": "Animaciones",
     "intro": "Superposiciones y transiciones que el agente puede usar en cualquier vídeo. Genera una describiéndola y Arrumo renderiza una vista previa en bucle.",
     "scope": "Visibilidad",
     "workspaceScope": "Espacio de trabajo",

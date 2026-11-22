@@ -119,14 +119,14 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
 
   return (
     <Shell>
-      {embedded ? <p className="mb-4 max-w-[65ch] text-muted-foreground">{copy.intro}</p> : <WorkspaceHeading>
-        <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
-        <p>{copy.intro}</p>
-      </WorkspaceHeading>}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <Field className={embedded ? "hidden" : "w-auto"}>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
+        {embedded ? <p className="order-1 max-w-[65ch] basis-full text-muted-foreground">{copy.intro}</p> : <WorkspaceHeading className="order-1 mb-0 flex-1">
+          <h1 ref={heading} tabIndex={-1}>{copy.title}</h1>
+          <p>{copy.intro}</p>
+        </WorkspaceHeading>}
+        <Field className={embedded ? "hidden" : "order-3 w-full"}>
           <FieldLabel htmlFor="motion-scope">{copy.scope}</FieldLabel>
-          <NativeSelect id="motion-scope" value={scope} disabled={!catalog || open}
+          <NativeSelect id="motion-scope" className="w-60!" value={scope} disabled={!catalog || open}
             onChange={(event) => {
               const value = event.target.value;
               router.push(workspaceHref("motion-library", workspaceId, value ? Number(value) : undefined));
@@ -135,7 +135,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
             {catalog?.profiles.map((profile) => <NativeSelectOption key={profile.id} value={profile.id}>{profile.name}</NativeSelectOption>)}
           </NativeSelect>
         </Field>
-        <div className="flex flex-wrap gap-2">
+        <div className="order-2 flex flex-wrap gap-2">
         <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
           disabled={!items || open} onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
         <Dialog open={open} onOpenChange={(next) => {

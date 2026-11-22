@@ -392,7 +392,7 @@
       "cancelDelete": "Cancel",
       "deleting": "Deleting…"
     },
-    "title": "Animations and transitions",
+    "title": "Animations",
     "intro": "Overlays and transitions the agent can drop into any video. Generate one by describing it, and Arrumo renders a looping preview.",
     "scope": "Visibility",
     "workspaceScope": "Workspace",
