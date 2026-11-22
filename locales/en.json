@@ -1190,7 +1190,19 @@
     "needsContent": "Add clips or describe the video.",
     "backToFootage": "Back to footage",
     "backToBrief": "Back to the brief",
-    "removePlatform": "Remove {tag}"
+    "removePlatform": "Remove {tag}",
+    "produceFormat": "Produce the {format} video",
+    "customise": "Customise for this video",
+    "customised": "Customised for this video",
+    "countThumbnails": "Thumbnails",
+    "countPortrait": "Portrait cuts",
+    "countTitles": "Titles",
+    "countDescriptions": "Descriptions",
+    "countTags": "Tags",
+    "thumbnailGuidance": "Thumbnail guidance",
+    "portraitGuidance": "Portrait cut guidance",
+    "specifications": "Extra specifications",
+    "resetFormat": "Use the inherited settings"
   },
   "scriptReview": {
     "selectAll": "Select all",

@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronDown, FileText, Image as ImageIcon, RectangleHorizontal, RectangleVertical, Zap } from "lucide-react";
+import { ChevronDown, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,6 +11,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { TagInput } from "@/components/ui/tag-input";
+import { outputOptions, VideoOutputs, type OutputChoice, type OutputPlan } from "./video-outputs";
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { RunProviders } from "@/components/workspace/generation/run-providers";
 import { profileHref, workspaceHref } from "@/components/workspace/home/workspace-links";
@@ -21,8 +22,8 @@ export type DraftSettings = { title: string; intent: string; profile_id: number 
 export type SavedDraft = DraftSettings & { id: number };
 type Profile = { id: number; name: string; color?: string | null };
 type Format = { id: number; name: string; width: number; height: number };
-type Supplemental = { thumbnails: number; titles: number; descriptions: number; tags: boolean; portrait_derivatives: { count: number } };
-type Plan = { format: Format; supplemental: Supplemental };
+type Supplemental = OutputPlan["supplemental"];
+type Plan = OutputPlan;
 
 /** Loads what a run would deliver with the draft's current profile, resolved the same way the queue snapshots it. */
 function useDeliveryPlan(workspaceId: number, profileId: number | null) {
@@ -62,6 +63,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
   const [message, setMessage] = useState<"saved" | "saveError" | "generateError" | "needsTitle" | "needsContent" | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const [outputChoice, setOutputChoice] = useState<OutputChoice>({ skipped: [], overrides: {} });
   const [queue, setQueue] = useState<SavedDraft[]>([]);
   const plan = useDeliveryPlan(workspaceId, draft.profile_id);
   const profile = profiles.find((entry) => entry.id === draft.profile_id);
@@ -115,6 +117,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
       save_motion_to_library: fields.has("save-motion"),
       platform: String(fields.get("platform") ?? "").trim() || null,
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
+      ...outputOptions(outputChoice, plan ?? []),
     };
     const payload = JSON.stringify({ draftId: saved.id, draft, options });
     if (request.current?.payload !== payload) request.current = { key: crypto.randomUUID(), payload };
@@ -139,19 +142,6 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
 
   const agentName = agent ?? copy.willMakeFallback;
   const clips = draft.source_ids.length;
-  const outputs = (plan ?? []).flatMap(({ format, supplemental }) => {
-    const portrait = format.height > format.width;
-    const Icon = portrait ? RectangleVertical : RectangleHorizontal;
-    const lines = [{ icon: Icon, text: copy.makeVideo.replace("{format}", format.name.toLowerCase()) }];
-    if (supplemental.thumbnails) lines.push({ icon: ImageIcon, text: copy.makeThumbnails.replace("{count}", String(supplemental.thumbnails)).replace("{format}", format.name.toLowerCase()) });
-    if (supplemental.portrait_derivatives.count) lines.push({ icon: RectangleVertical, text: copy.makePortrait.replace("{count}", String(supplemental.portrait_derivatives.count)) });
-    if (supplemental.titles || supplemental.descriptions || supplemental.tags) lines.push({ icon: FileText, text: [
-      supplemental.titles || supplemental.descriptions
-        ? copy.makeText.replace("{titles}", String(supplemental.titles)).replace("{descriptions}", String(supplemental.descriptions)) : "",
-      supplemental.tags ? copy.makeTags : "",
-    ].filter(Boolean).join(", ") });
-    return lines.map((line, index) => ({ ...line, key: `${format.id}-${index}` }));
-  });
 
   return (
     <form onSubmit={generate} aria-busy={pending !== null}>
@@ -228,11 +218,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               <h2 id="video-makes" className="mb-3 text-[1.0625rem] font-bold [font-family:var(--font-sans)] [font-variation-settings:normal]">
                 {agent ? copy.willMake.replace("{agent}", agent) : copy.willMakeFallback}
               </h2>
-              <ul className="flex flex-col gap-2.5">
-                {outputs.map(({ key, icon: Icon, text }) => (
-                  <li key={key} className="flex items-start gap-2.5"><Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{text}</li>
-                ))}
-              </ul>
+              <VideoOutputs plan={plan ?? []} choice={outputChoice} onChange={setOutputChoice} disabled={pending !== null} />
               <Link href={profile ? `${profileHref(workspaceId, profile.id)}&tab=outputs` : workspaceHref("outputs", workspaceId)}
                 className="mt-4 inline-block font-semibold text-primary underline underline-offset-4">
                 {copy.changeOutputs.replace("{name}", profile?.name ?? workspace.name)}

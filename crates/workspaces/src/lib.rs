@@ -97,7 +97,9 @@ pub use format_deliveries::{
 };
 pub use generation_notifications::{GenerationInbox, GenerationNotification};
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
-pub use generation_queue::{GenerationRun, PendingReview, ReplayMode, RunOptions, RunProgress};
+pub use generation_queue::{
+    FormatOverride, GenerationRun, PendingReview, ReplayMode, RunOptions, RunProgress,
+};
 pub use generation_worker::{GenerationActivity, GenerationClaim, RunControl};
 pub use mcp::serve_mcp;
 pub use media_worker::MediaWork;

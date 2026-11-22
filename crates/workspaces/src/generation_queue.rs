@@ -19,6 +19,110 @@ pub struct RunOptions {
     pub platform: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub provider_overrides: BTreeMap<String, Vec<String>>,
+    /// Produce only these output formats for this video; all of them when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub formats: Option<Vec<i64>>,
+    /// Supplemental settings this video changes for a format, keyed by format ID.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub format_overrides: BTreeMap<String, FormatOverride>,
+}
+
+/// What one video changes about a format's supplemental outputs. Unset fields keep the
+/// profile's or workspace's value.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FormatOverride {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thumbnails: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub titles: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub descriptions: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thumbnail_guidance: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub specifications: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub portrait_count: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub portrait_guidance: Option<String>,
+}
+
+/// Applies a video's output choices to the frozen formats and marks what the video changed.
+fn apply_output_overrides(
+    formats: Vec<Value>,
+    chosen: Option<&[i64]>,
+    overrides: &BTreeMap<String, FormatOverride>,
+) -> rusqlite::Result<Vec<Value>> {
+    let invalid = || rusqlite::Error::InvalidQuery;
+    let mut kept = Vec::new();
+    for mut entry in formats {
+        let id = entry["format"]["id"].as_i64().ok_or_else(invalid)?;
+        if chosen.is_some_and(|chosen| !chosen.contains(&id)) {
+            continue;
+        }
+        if let Some(change) = overrides.get(&id.to_string()) {
+            let counts = [
+                change.thumbnails,
+                change.titles,
+                change.descriptions,
+                change.portrait_count,
+            ];
+            let texts = [
+                &change.thumbnail_guidance,
+                &change.specifications,
+                &change.portrait_guidance,
+            ];
+            if counts.iter().flatten().any(|count| *count > 10)
+                || texts
+                    .iter()
+                    .filter_map(|text| text.as_ref())
+                    .any(|text| text.len() > 8000)
+            {
+                return Err(invalid());
+            }
+            let supplemental = &mut entry["delivery"]["supplemental"];
+            let mut changed = Vec::new();
+            let mut set = |key: &str, value: Value, supplemental: &mut Value| {
+                supplemental[key] = value;
+                changed.push(key.to_owned());
+            };
+            if let Some(value) = change.thumbnails {
+                set("thumbnails", json!(value), supplemental);
+            }
+            if let Some(value) = change.titles {
+                set("titles", json!(value), supplemental);
+            }
+            if let Some(value) = change.descriptions {
+                set("descriptions", json!(value), supplemental);
+            }
+            if let Some(value) = change.tags {
+                set("tags", json!(value), supplemental);
+            }
+            if let Some(value) = &change.thumbnail_guidance {
+                set("thumbnail_guidance", json!(value), supplemental);
+            }
+            if let Some(value) = &change.specifications {
+                set("specifications", json!(value), supplemental);
+            }
+            if let Some(value) = change.portrait_count {
+                supplemental["portrait_derivatives"]["count"] = json!(value);
+                changed.push("portrait_derivatives.count".into());
+            }
+            if let Some(value) = &change.portrait_guidance {
+                supplemental["portrait_derivatives"]["source"]["guidance"] = json!(value);
+                changed.push("portrait_derivatives.guidance".into());
+            }
+            entry["video_overrides"] = json!(changed);
+        }
+        kept.push(entry);
+    }
+    if kept.is_empty() {
+        return Err(invalid());
+    }
+    Ok(kept)
 }
 
 fn default_save_motion_to_library() -> bool {
@@ -33,6 +137,8 @@ impl Default for RunOptions {
             save_motion_to_library: default_save_motion_to_library(),
             platform: None,
             provider_overrides: BTreeMap::new(),
+            formats: None,
+            format_overrides: BTreeMap::new(),
         }
     }
 }
@@ -230,6 +336,19 @@ impl WorkspaceStore {
         if formats.is_empty() {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let chosen: Option<Vec<i64>> = options
+            .get("formats")
+            .filter(|value| !value.is_null())
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        let format_overrides: BTreeMap<String, FormatOverride> = options
+            .get("format_overrides")
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?
+            .unwrap_or_default();
+        let formats = apply_output_overrides(formats, chosen.as_deref(), &format_overrides)?;
         let overrides = options
             .get("provider_overrides")
             .map(|value| serde_json::from_value(value.clone()))
@@ -511,5 +630,53 @@ mod tests {
                 .enqueue_video_draft(studio, draft.id, "attempt-one", &override_options)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn videos_choose_formats_and_override_their_outputs() {
+        let formats = vec![
+            json!({"format": {"id": 1}, "delivery": {"supplemental": {"thumbnails": 3, "titles": 3, "thumbnail_guidance": "A/B",
+                "portrait_derivatives": {"count": 3, "source": {"type": "manual", "guidance": ""}}}}}),
+            json!({"format": {"id": 2}, "delivery": {"supplemental": {"thumbnails": 0}}}),
+        ];
+        let overrides = BTreeMap::from([(
+            "1".to_owned(),
+            FormatOverride {
+                thumbnails: Some(1),
+                thumbnail_guidance: Some("Show the cube big".into()),
+                portrait_count: Some(0),
+                ..FormatOverride::default()
+            },
+        )]);
+        let kept = apply_output_overrides(formats.clone(), Some(&[1]), &overrides).unwrap();
+        assert_eq!(kept.len(), 1, "only the chosen format is produced");
+        let supplemental = &kept[0]["delivery"]["supplemental"];
+        assert_eq!(supplemental["thumbnails"], 1);
+        assert_eq!(
+            supplemental["titles"], 3,
+            "unset fields keep the profile's value"
+        );
+        assert_eq!(supplemental["thumbnail_guidance"], "Show the cube big");
+        assert_eq!(supplemental["portrait_derivatives"]["count"], 0);
+        assert_eq!(
+            kept[0]["video_overrides"],
+            json!([
+                "thumbnails",
+                "thumbnail_guidance",
+                "portrait_derivatives.count"
+            ])
+        );
+        assert!(
+            apply_output_overrides(formats.clone(), Some(&[9]), &BTreeMap::new()).is_err(),
+            "a video produces something"
+        );
+        let too_many = BTreeMap::from([(
+            "1".to_owned(),
+            FormatOverride {
+                titles: Some(50),
+                ..FormatOverride::default()
+            },
+        )]);
+        assert!(apply_output_overrides(formats, None, &too_many).is_err());
     }
 }

@@ -1190,7 +1190,19 @@
     "needsContent": "Añade clips o describe el vídeo.",
     "backToFootage": "Volver al material",
     "backToBrief": "Volver al resumen",
-    "removePlatform": "Quitar {tag}"
+    "removePlatform": "Quitar {tag}",
+    "produceFormat": "Producir el vídeo {format}",
+    "customise": "Personalizar para este vídeo",
+    "customised": "Personalizado para este vídeo",
+    "countThumbnails": "Miniaturas",
+    "countPortrait": "Cortes verticales",
+    "countTitles": "Títulos",
+    "countDescriptions": "Descripciones",
+    "countTags": "Etiquetas",
+    "thumbnailGuidance": "Indicaciones para miniaturas",
+    "portraitGuidance": "Indicaciones para cortes verticales",
+    "specifications": "Especificaciones adicionales",
+    "resetFormat": "Usar los ajustes heredados"
   },
   "scriptReview": {
     "selectAll": "Seleccionar todo",
