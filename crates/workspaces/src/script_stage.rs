@@ -212,7 +212,8 @@ impl WorkspaceStore {
             })
             .collect();
         let prompt = script_prompt(snapshot, &footage, &earlier);
-        let answer = self.run_logged_agent(
+        let answer = self.run_exploring_agent(
+            database,
             crate::agent_logs::AgentLogScope {
                 workspace_id,
                 run_id: Some(run_id),
@@ -223,6 +224,7 @@ impl WorkspaceStore {
             &prompt,
             &answer_schema(),
             AGENT_TIMEOUT,
+            &[],
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)?;
                 Ok(())

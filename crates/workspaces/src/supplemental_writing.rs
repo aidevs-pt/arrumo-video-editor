@@ -642,7 +642,8 @@ impl WorkspaceStore {
                     &requests,
                     crate::agent_run::accepts_images(provider).then_some(shown.path()),
                 )?;
-                let answer = self.run_logged_agent_with_images(
+                let answer = self.run_exploring_agent(
+                    database,
                     crate::agent_logs::AgentLogScope {
                         workspace_id,
                         run_id: Some(run_id),

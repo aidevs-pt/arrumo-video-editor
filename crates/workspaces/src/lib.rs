@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod a2a;
 mod agent_cli;
+mod agent_explore;
 mod agent_logs;
 mod agent_plugins;
 mod agent_run;

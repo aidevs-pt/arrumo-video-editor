@@ -285,7 +285,8 @@ impl WorkspaceStore {
             self.renew_generation_lease(workspace_id, run_id, attempt)?;
             Ok(())
         };
-        let answer = self.run_logged_agent(
+        let answer = self.run_exploring_agent(
+            database,
             crate::agent_logs::AgentLogScope {
                 workspace_id,
                 run_id: Some(run_id),
@@ -296,6 +297,7 @@ impl WorkspaceStore {
             &plan_prompt(snapshot, script, &library, &images, &earlier),
             &assets_answer_schema(&references, &image_ids),
             AGENT_TIMEOUT,
+            &[],
             renew,
         )?;
         let mut result = asset_plan(&answer, &library, &provider.id).map_err(io::Error::other)?;
