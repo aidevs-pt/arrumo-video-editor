@@ -58,6 +58,8 @@ struct GenerateSpeechInput {
     notes: String,
     #[serde(default)]
     provider: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -171,7 +173,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 22] {
+pub(super) fn definitions() -> [Value; 23] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -195,13 +197,19 @@ pub(super) fn definitions() -> [Value; 22] {
                 "required": ["workspaceId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "generate_library_speech",
-            "description": "Voice text with the workspace's first speech provider (or one named provider) and its configured voice, and add the audio to the workspace assets with the given notes.",
+            "description": "Voice text with the workspace's first speech provider (or one named provider) and its configured voice, and add the audio to the workspace assets with the given notes. model picks one of the named provider's speech models from list_speech_models (choose by its bestFor line and character limit).",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id,
                 "text": {"type": "string", "minLength": 1, "maxLength": 5000},
                 "notes": {"type": "string", "maxLength": 8000},
-                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+                "model": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
+        json!({"name": "list_speech_models",
+            "description": "List the named models of each speech provider on for this workspace, in provider order: label, what each is best for (per app language), whether it is selected by default and how many characters it voices per request. Use it to choose provider and model for generate_library_speech.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "generate_library_audio",
             "description": "Make instrumental music or a sound effect from a written description with the workspace's first provider for that kind (or one named provider), and add it to the workspace assets with the given notes, labelled Music or Sound effect. The provider sets the length limits; a length outside them fails with the allowed range. Music in an approved asset plan can be laid under a video.",
             "inputSchema": {"type": "object", "properties": {
@@ -361,6 +369,14 @@ pub(super) fn call_generation(
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|error| Cow::Owned(format!("Could not make the audio: {error}")))
             }),
+        "generate_library_speech" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| Cow::Borrowed("Invalid speech arguments"))
+            .and_then(|args: GenerateSpeechInput| {
+                store
+                    .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref(), args.model.as_deref())
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|error| Cow::Owned(format!("Could not voice the text: {error}")))
+            }),
         "generate_library_video" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| Cow::Borrowed("Invalid video arguments"))
             .and_then(|args: GenerateVideoInput| {
@@ -380,13 +396,13 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
-        "generate_library_speech" => serde_json::from_value(Value::Object(arguments.clone()))
-            .map_err(|_| "Invalid speech arguments")
-            .and_then(|args: GenerateSpeechInput| {
+        "list_speech_models" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid speech model arguments")
+            .and_then(|args: ListInput| {
                 store
-                    .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
-                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
-                    .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
+                    .speech_models(args.workspace_id)
+                    .map(|models| json!({"models": models}))
+                    .map_err(|_| "Could not list the speech models")
             }),
         "list_image_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid image model arguments")

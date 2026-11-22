@@ -20,7 +20,7 @@ use crate::{
 
 const MAX_AUDIO_BYTES: u64 = 16 * 1024 * 1024;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SpeechAdapter {
     schema_version: u32,
@@ -38,9 +38,55 @@ struct SpeechAdapter {
     voice_setting: Option<String>,
     /// The voice used when that setting is empty.
     default_voice: Option<String>,
+    /// Schema 2: which of `models` to use when the caller names none.
+    #[serde(default)]
+    model: Option<SpeechModelChoice>,
+    /// Schema 2: named models whose `body` fields replace the adapter's and whose limit applies.
+    #[serde(default)]
+    models: Option<BTreeMap<String, SpeechModelSpec>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct SpeechModelChoice {
+    default: String,
+    setting: Option<String>,
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SpeechModelSpec {
+    label: String,
+    best_for: crate::provider_media::Localized,
+    body: BTreeMap<String, String>,
+    max_text_characters: usize,
+}
+
+/// A named speech model a provider offers.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeechModel {
+    pub provider: String,
+    pub id: String,
+    pub label: String,
+    pub best_for: crate::provider_media::Localized,
+    pub selected: bool,
+    pub max_text_characters: usize,
+}
+
+impl SpeechAdapter {
+    /// The adapter as `model` sends it: its body fields and character limit applied.
+    fn with_model(&self, model: &str) -> SpeechAdapter {
+        let mut adapter = self.clone();
+        if let Some(spec) = self.models.as_ref().and_then(|models| models.get(model)) {
+            adapter.body.extend(spec.body.clone());
+            adapter.max_text_characters = spec.max_text_characters;
+        }
+        adapter
+    }
+}
+
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AudioFormat {
     Mp3,
@@ -86,6 +132,86 @@ impl SpeechProviderStatus {
 }
 
 impl WorkspaceStore {
+    /// The speech model to use: the caller's, then the plugin setting's, then the default.
+    fn speech_model(
+        &self,
+        adapter: &SpeechAdapter,
+        workspace_id: i64,
+        requested: Option<&str>,
+    ) -> Option<String> {
+        let choice = adapter.model.as_ref()?;
+        let models = adapter.models.as_ref()?;
+        requested
+            .map(str::to_owned)
+            .or_else(|| {
+                choice.setting.as_ref().and_then(|id| {
+                    self.plugin_settings(&adapter.plugin_id, Some(workspace_id))
+                        .ok()?
+                        .remove(id)?
+                        .effective?
+                        .as_str()
+                        .map(|value| value.trim().to_owned())
+                })
+            })
+            .filter(|model| models.contains_key(model))
+            .or_else(|| Some(choice.default.clone()))
+    }
+
+    /// The adapter for a workspace with its chosen model applied.
+    fn workspace_speech_adapter(
+        &self,
+        plugin_id: &str,
+        workspace_id: i64,
+        requested: Option<&str>,
+    ) -> io::Result<(SpeechAdapter, &'static [u8])> {
+        let (adapter, bytes) = speech_adapter(plugin_id)?;
+        if let (Some(asked), Some(models)) = (requested, &adapter.models)
+            && !models.contains_key(asked)
+        {
+            return Err(io::Error::other(format!(
+                "{plugin_id} has no speech model {asked}; it offers {}",
+                models.keys().cloned().collect::<Vec<_>>().join(", ")
+            )));
+        }
+        Ok(match self.speech_model(&adapter, workspace_id, requested) {
+            Some(model) => (adapter.with_model(&model), bytes),
+            None => (adapter, bytes),
+        })
+    }
+
+    /// The named models of each speech provider on for this workspace, in provider order.
+    pub fn speech_models(
+        &self,
+        workspace_id: i64,
+    ) -> Result<Vec<SpeechModel>, Box<dyn std::error::Error>> {
+        let order = self
+            .capture_provider_orders(workspace_id, &BTreeMap::new())?
+            .get("text-to-speech")
+            .map(|order| order.effective.clone())
+            .unwrap_or_default();
+        let mut listed = Vec::new();
+        for plugin in order {
+            let Ok((adapter, _)) = speech_adapter(&plugin) else {
+                continue;
+            };
+            let Some(models) = &adapter.models else {
+                continue;
+            };
+            let selected = self.speech_model(&adapter, workspace_id, None);
+            for (id, spec) in models {
+                listed.push(SpeechModel {
+                    provider: plugin.clone(),
+                    id: id.clone(),
+                    label: spec.label.clone(),
+                    best_for: spec.best_for.clone(),
+                    selected: selected.as_deref() == Some(id.as_str()),
+                    max_text_characters: spec.max_text_characters,
+                });
+            }
+        }
+        Ok(listed)
+    }
+
     /// The voice a plugin narrates with in a workspace: the creator's chosen voice, or the
     /// plugin's default. `None` when the plugin names neither.
     pub(crate) fn narration_voice(
@@ -111,7 +237,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         plugin_id: &str,
     ) -> io::Result<SpeechProviderStatus> {
-        let (adapter, descriptor) = speech_adapter(plugin_id)?;
+        let (adapter, descriptor) = self.workspace_speech_adapter(plugin_id, workspace_id, None)?;
         speech_endpoint(&adapter, "voice", "a")?;
         let status = self.plugin_credential_status(
             plugin_id,
@@ -136,8 +262,12 @@ impl WorkspaceStore {
         text: &str,
         notes: &str,
         provider: Option<&str>,
+        model: Option<&str>,
     ) -> Result<(i64, String), Box<dyn std::error::Error>> {
         let text = text.trim();
+        if model.is_some() && provider.is_none() {
+            return Err(io::Error::other("Name the provider whose model you want").into());
+        }
         if text.is_empty() || text.chars().count() > 5000 || notes.len() > 8000 {
             return Err(io::Error::other("Write up to 5,000 characters to voice").into());
         }
@@ -182,7 +312,7 @@ impl WorkspaceStore {
             format!("narration-{stem}")
         };
         let file = scratch.path().join(format!("{stem}.{extension}"));
-        self.synthesize_speech_to_file(workspace_id, &plugin, &voice, text, &file)?;
+        self.synthesize_speech_with_model(workspace_id, &plugin, &voice, text, &file, model)?;
         let mut writer = WorkspaceStore::open(database)?;
         let asset = writer
             .import_asset(&crate::asset_root(database), workspace_id, &file)
@@ -201,7 +331,19 @@ impl WorkspaceStore {
         text: &str,
         output: &Path,
     ) -> io::Result<()> {
-        let (adapter, _) = speech_adapter(plugin_id)?;
+        self.synthesize_speech_with_model(workspace_id, plugin_id, voice, text, output, None)
+    }
+
+    fn synthesize_speech_with_model(
+        &self,
+        workspace_id: i64,
+        plugin_id: &str,
+        voice: &str,
+        text: &str,
+        output: &Path,
+        model: Option<&str>,
+    ) -> io::Result<()> {
+        let (adapter, _) = self.workspace_speech_adapter(plugin_id, workspace_id, model)?;
         let extension = adapter.response_format.extension();
         if output.extension().and_then(|value| value.to_str()) != Some(extension) {
             return Err(io::Error::other(
@@ -321,7 +463,36 @@ fn speech_adapter(plugin_id: &str) -> io::Result<(SpeechAdapter, &'static [u8])>
             && setting.kind == PluginSettingKind::Secret
             && setting.scope == PluginSettingScope::Workspace
     });
-    if adapter.schema_version != 1
+    let models_ok = match (adapter.schema_version, &adapter.model, &adapter.models) {
+        (1, None, None) => true,
+        (2, Some(choice), Some(models)) => {
+            (1..=32).contains(&models.len())
+                && models.contains_key(&choice.default)
+                && choice.setting.as_ref().is_none_or(|id| {
+                    manifest.settings.iter().flatten().any(|setting| {
+                        &setting.id == id
+                            && setting.kind == PluginSettingKind::String
+                            && setting.choices.as_ref().is_some_and(|choices| {
+                                choices.iter().all(|choice| models.contains_key(choice))
+                            })
+                    })
+                })
+                && models.iter().all(|(id, spec)| {
+                    valid_key(id.replace('.', "_").as_str())
+                        && (1..=64).contains(&spec.label.chars().count())
+                        && spec.best_for.valid(240)
+                        && (1..=10_000).contains(&spec.max_text_characters)
+                        && spec.body.len() <= 16
+                        && !spec.body.contains_key(&adapter.text_field)
+                        && spec
+                            .body
+                            .iter()
+                            .all(|(key, value)| valid_key(key) && value.chars().count() <= 256)
+                })
+        }
+        _ => false,
+    };
+    if !models_ok
         || !voice_setting_declared
         || adapter.plugin_id != manifest.id
         || !manifest.capabilities.contains_key("text-to-speech")
@@ -441,6 +612,19 @@ mod tests {
             "textField": "text", "body": {"model": "demo"},
             "query": {"format": "voice & music"}, "responseFormat": "wav", "maxTextCharacters": 5
         })).unwrap()
+    }
+
+    #[test]
+    fn the_bundled_elevenlabs_models_change_the_body_and_limit() {
+        let (adapter, _) = speech_adapter("elevenlabs").unwrap();
+        let models = adapter.models.as_ref().expect("schema 2 models");
+        assert!(models.contains_key("eleven_v4"));
+        let v3 = adapter.with_model("eleven_v3");
+        assert_eq!(v3.body["model_id"], "eleven_v3");
+        assert_eq!(v3.max_text_characters, 5000);
+        let flash = adapter.with_model("eleven_flash_v2_5");
+        assert_eq!(flash.body["apply_text_normalization"], "on");
+        assert_eq!(adapter.with_model("unknown").body, adapter.body);
     }
 
     #[test]

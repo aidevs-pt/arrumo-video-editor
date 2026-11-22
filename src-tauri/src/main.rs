@@ -565,6 +565,26 @@ fn notice_page(href: &str) -> bool {
 }
 
 #[tauri::command]
+async fn list_speech_models(
+    workspace_id: i64,
+    app: AppHandle,
+) -> Result<Vec<arrumo_workspaces::SpeechModel>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .speech_models(workspace_id)
+            .map_err(|_| "speech_models_unavailable".to_owned())
+    })
+    .await
+    .map_err(|_| "speech_models_unavailable".to_owned())?
+}
+
+#[tauri::command]
 async fn list_image_models(
     workspace_id: i64,
     app: AppHandle,
@@ -686,6 +706,7 @@ async fn generate_library_speech(
     text: String,
     notes: String,
     provider: Option<String>,
+    model: Option<String>,
     app: AppHandle,
 ) -> Result<i64, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -696,7 +717,14 @@ async fn generate_library_speech(
             .join("workspaces.sqlite");
         WorkspaceStore::open(&database)
             .map_err(|_| "store_unavailable".to_owned())?
-            .generate_library_speech(&database, workspace_id, &text, &notes, provider.as_deref())
+            .generate_library_speech(
+                &database,
+                workspace_id,
+                &text,
+                &notes,
+                provider.as_deref(),
+                model.as_deref(),
+            )
             .map(|(id, _)| id)
             .map_err(|error| error.to_string())
     })
@@ -1501,6 +1529,7 @@ fn main() {
             generate_library_audio,
             generate_library_video,
             list_image_models,
+            list_speech_models,
             list_video_models,
             provider_usage,
             generate_motion_library_item,
