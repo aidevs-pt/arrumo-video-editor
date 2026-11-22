@@ -1,4 +1,5 @@
-import { Trash2 } from "lucide-react";
+import { Check, Copy, Trash2 } from "lucide-react";
+import { useLocale } from "@/lib/locale-provider";
 import { useId, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -38,6 +39,9 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
   const [confirmation, setConfirmation] = useState("");
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { messages } = useLocale();
+  const shared = messages.pluginActions;
 
   async function remove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,7 +85,13 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
         <form className="flex flex-col gap-4" onSubmit={remove}>
           <Field>
             <FieldLabel htmlFor={inputId}>{copy.confirmTitle}</FieldLabel>
-            <p className="select-text wrap-anywhere text-sm font-medium">{title}</p>
+            <div className="flex items-start gap-2 rounded-md border bg-muted/60 py-1.5 ps-3 pe-1.5">
+              <code className="min-w-0 flex-1 select-text py-1 font-mono text-sm wrap-anywhere">{title}</code>
+              <Button type="button" variant="ghost" size="icon-sm" title={copied ? shared.copied : shared.copy} aria-label={copied ? shared.copied : shared.copy}
+                onClick={() => void navigator.clipboard.writeText(title).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {})}>
+                {copied ? <Check /> : <Copy />}
+              </Button>
+            </div>
             <Input id={inputId} value={confirmation} onChange={(event) => setConfirmation(event.target.value)}
               disabled={pending} autoComplete="off" spellCheck={false} />
           </Field>
