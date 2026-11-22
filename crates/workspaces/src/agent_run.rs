@@ -2,6 +2,7 @@
 //! prompt with JSON following a schema. Provider flags come from the plugin manifest.
 
 use std::{
+    collections::BTreeMap,
     error::Error,
     fmt, fs,
     io::{self, Read, Write},
@@ -113,6 +114,7 @@ pub(crate) fn run_structured(
     prompt: &str,
     schema: &Value,
     timeout: Duration,
+    settings: &BTreeMap<String, Value>,
     transcript: &AgentTranscript,
     mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<Value, AgentRunError> {
@@ -128,9 +130,9 @@ pub(crate) fn run_structured(
     let schema_path = directory.path().join("schema.json");
     let output_path = directory.path().join("answer.json");
     fs::write(&schema_path, &schema_text).map_err(|_| failed("Could not prepare the agent run"))?;
-    let args = expand_args(run, &schema_text, &schema_path, &output_path);
+    let args = expand_args(run, settings, &schema_text, &schema_path, &output_path);
     if let Ok(mut command) = transcript.command.lock() {
-        *command = describe_command(&executable, &run.args);
+        *command = describe_command(&executable, &declared_args(run, settings));
     }
 
     let mut command = Command::new(executable);
@@ -247,14 +249,66 @@ fn describe_command(executable: &std::path::Path, args: &[String]) -> String {
         .join(" ")
 }
 
+/// The plugin's declared arguments for the given setting values. Values are used only when they
+/// are plain words (and, for settings with choices, one of them), so they cannot add arguments.
+pub(crate) fn setting_arguments(
+    run: &StructuredRun,
+    settings: &BTreeMap<String, Value>,
+) -> Vec<String> {
+    let plain = |value: &str| {
+        !value.is_empty()
+            && value.len() <= 64
+            && value.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
+            })
+    };
+    let mut arguments = Vec::new();
+    for entry in &run.setting_args {
+        match settings.get(&entry.setting) {
+            Some(Value::Bool(true)) => arguments.extend(entry.args.iter().cloned()),
+            Some(Value::Bool(false)) | None | Some(Value::Null) => {
+                arguments.extend(entry.otherwise.iter().flatten().cloned())
+            }
+            Some(value) => {
+                let text = match value {
+                    Value::String(text) => text.trim().to_owned(),
+                    Value::Number(number) if number.is_i64() => number.to_string(),
+                    _ => String::new(),
+                };
+                if plain(&text) {
+                    arguments.extend(entry.args.iter().map(|arg| arg.replace("{value}", &text)));
+                } else {
+                    arguments.extend(entry.otherwise.iter().flatten().cloned());
+                }
+            }
+        }
+    }
+    arguments
+}
+
+/// The declared arguments with `{settings}` expanded; file placeholders stay as written.
+fn declared_args(run: &StructuredRun, settings: &BTreeMap<String, Value>) -> Vec<String> {
+    run.args
+        .iter()
+        .flat_map(|arg| {
+            if arg == "{settings}" {
+                setting_arguments(run, settings)
+            } else {
+                vec![arg.clone()]
+            }
+        })
+        .collect()
+}
+
 fn expand_args(
     run: &StructuredRun,
+    settings: &BTreeMap<String, Value>,
     schema: &str,
     schema_path: &std::path::Path,
     output_path: &std::path::Path,
 ) -> Vec<std::ffi::OsString> {
-    run.args
-        .iter()
+    declared_args(run, settings)
+        .into_iter()
         .map(|arg| match arg.as_str() {
             "{schema}" => schema.into(),
             "{schemaPath}" => schema_path.as_os_str().to_owned(),
@@ -297,6 +351,7 @@ mod tests {
     fn run(source: StructuredSource, pointer: Option<&str>, error: Option<&str>) -> StructuredRun {
         StructuredRun {
             args: vec!["{schema}".into(), "{outputPath}".into()],
+            setting_args: Vec::new(),
             result: StructuredResult {
                 source,
                 pointer: pointer.map(Into::into),
@@ -344,6 +399,7 @@ mod tests {
                 "{schemaPath}".into(),
                 "{outputPath}".into(),
             ],
+            setting_args: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::OutputFile,
                 pointer: None,
@@ -352,6 +408,7 @@ mod tests {
         };
         let args = expand_args(
             &declared,
+            &BTreeMap::new(),
             "{}",
             std::path::Path::new("/s.json"),
             std::path::Path::new("/o.json"),
@@ -359,6 +416,44 @@ mod tests {
         assert_eq!(
             args,
             ["--schema", "{}", "x{schema}", "/s.json", "/o.json"].map(std::ffi::OsString::from)
+        );
+    }
+
+    #[test]
+    fn settings_choose_declared_arguments_and_reject_unsafe_values() {
+        use crate::plugin_catalog::SettingArgs;
+        let declared = StructuredRun {
+            args: vec!["exec".into(), "{settings}".into(), "-".into()],
+            setting_args: vec![
+                SettingArgs {
+                    setting: "web-search".into(),
+                    args: vec!["-c".into(), "web_search=\"live\"".into()],
+                    otherwise: Some(vec!["-c".into(), "web_search=\"disabled\"".into()]),
+                },
+                SettingArgs {
+                    setting: "model".into(),
+                    args: vec!["-m".into(), "{value}".into()],
+                    otherwise: None,
+                },
+            ],
+            result: StructuredResult {
+                source: StructuredSource::Stdout,
+                pointer: None,
+                error_pointer: None,
+            },
+        };
+        let settings = BTreeMap::from([
+            ("web-search".to_owned(), serde_json::json!(true)),
+            ("model".to_owned(), serde_json::json!("gpt-5.1")),
+        ]);
+        assert_eq!(
+            declared_args(&declared, &settings),
+            ["exec", "-c", "web_search=\"live\"", "-m", "gpt-5.1", "-"]
+        );
+        let unsafe_model = BTreeMap::from([("model".to_owned(), serde_json::json!("x --yolo"))]);
+        assert_eq!(
+            declared_args(&declared, &unsafe_model),
+            ["exec", "-c", "web_search=\"disabled\"", "-"]
         );
     }
 }

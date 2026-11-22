@@ -249,13 +249,21 @@ impl WorkspaceStore {
             .map(|id| self.capture_motion_renderer(id))
             .transpose()?
             .flatten();
+        let agent_settings = self.agent_settings(Some(workspace_id))?;
+        // Freeze the agent's plugin settings so the run reproduces with the same capabilities.
+        let agent_options = agent_settings
+            .effective_provider
+            .as_deref()
+            .map(|provider| self.agent_options(workspace_id, provider))
+            .unwrap_or_default();
         Ok(json!({
             "schema_version": 1,
             "motion_renderer": motion_renderer,
+            "agent_options": agent_options,
             "draft": draft,
             "options": options,
             "preview_settings": self.preview_settings()?,
-            "agent_settings": self.agent_settings(Some(workspace_id))?,
+            "agent_settings": agent_settings,
             "provider_orders": provider_orders,
             "workspace_context": self.workspace_context(workspace_id)?,
             "brand_colors": self.brand_colors(workspace_id)?,

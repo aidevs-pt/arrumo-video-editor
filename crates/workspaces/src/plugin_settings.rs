@@ -63,7 +63,7 @@ impl WorkspaceStore {
                 && (scope.is_none() || *declared_scope == PluginSettingScope::Workspace)
             {
                 let value = serde_json::from_str(&value)?;
-                if accepts_value(*kind, &value) {
+                if accepts_value(*kind, None, &value) {
                     if scope.is_some() {
                         state.workspace_override = Some(value);
                     } else {
@@ -112,7 +112,7 @@ impl WorkspaceStore {
             );
         }
         if let Some(value) = value {
-            if !accepts_value(setting.kind, value) {
+            if !accepts_value(setting.kind, setting.choices.as_deref(), value) {
                 return Err(
                     invalid_setting("Plugin setting value has the wrong type or size").into(),
                 );
@@ -143,9 +143,12 @@ impl WorkspaceStore {
     }
 }
 
-fn accepts_value(kind: PluginSettingKind, value: &Value) -> bool {
+fn accepts_value(kind: PluginSettingKind, choices: Option<&[String]>, value: &Value) -> bool {
     match kind {
-        PluginSettingKind::String => value.as_str().is_some_and(|value| value.len() <= 16 * 1024),
+        PluginSettingKind::String => value.as_str().is_some_and(|value| {
+            value.len() <= 16 * 1024
+                && choices.is_none_or(|choices| choices.iter().any(|choice| choice == value))
+        }),
         PluginSettingKind::Boolean => value.is_boolean(),
         PluginSettingKind::Integer => value.as_i64().is_some(),
         PluginSettingKind::Secret => false,

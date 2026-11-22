@@ -23,7 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { PluginCatalog } from "./plugin-catalog";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
-import { ScopedPluginPreferences } from "./plugin-preferences";
+import { AgentCapabilities, ScopedPluginPreferences } from "./plugin-preferences";
 
 type AgentPlugin = { id: string; label: string };
 type Settings = {
@@ -279,6 +279,7 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>{copy.provider}</CardTitle>
@@ -320,6 +321,8 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
         )}
       </CardContent>
     </Card>
+    {settings?.effective_provider && <AgentCapabilities pluginId={settings.effective_provider} workspaceId={workspaceId} />}
+    </>
   );
 }
 

@@ -83,7 +83,19 @@ pub(crate) struct AgentCli {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct StructuredRun {
     pub args: Vec<String>,
+    /// Arguments chosen by the plugin's settings, inserted at `{settings}`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub setting_args: Vec<SettingArgs>,
     pub result: StructuredResult,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SettingArgs {
+    pub setting: String,
+    pub args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub otherwise: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -25,6 +25,12 @@ pub struct PluginSetting {
     pub kind: PluginSettingKind,
     pub scope: PluginSettingScope,
     pub required: bool,
+    /// For string settings, the only values allowed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub choices: Option<Vec<String>>,
+    /// The value used when neither the app nor the workspace sets one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

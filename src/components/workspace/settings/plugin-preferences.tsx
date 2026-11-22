@@ -21,6 +21,8 @@ export type PluginSettingDeclaration = {
   description: string;
   kind: "string" | "integer" | "boolean" | "secret";
   scope: Scope;
+  choices?: string[];
+  default?: string | boolean | number;
 };
 export type PluginSettingsManifest = { id: string; name: string; settings?: PluginSettingDeclaration[] };
 type CatalogEntry = { bundled: boolean; manifest: PluginSettingsManifest };
@@ -98,6 +100,34 @@ export function ScopedPluginPreferences({ workspaceId }: { workspaceId: number |
   return <PluginPreferences plugins={manifests} workspaceId={workspaceId} />;
 }
 
+/** The agent plugin's own settings, such as web search, model and reasoning effort. */
+export function AgentCapabilities({ pluginId, workspaceId }: { pluginId: string; workspaceId: number | null }) {
+  const { messages: { pluginPreferences: copy } } = useLocale();
+  const [fields, setFields] = useState<PluginSettingDeclaration[]>();
+  useEffect(() => {
+    let active = true;
+    invoke<CatalogEntry[]>("list_plugin_catalog").then((catalog) => {
+      if (!active) return;
+      const manifest = catalog.find((entry) => entry.manifest.id === pluginId)?.manifest;
+      setFields(manifest?.settings?.filter(({ kind, scope }) =>
+        kind !== "secret" && (workspaceId === null || scope === "workspace")) ?? []);
+    }, () => { if (active) setFields([]); });
+    return () => { active = false; };
+  }, [pluginId, workspaceId]);
+  if (!fields?.length) return null;
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>{copy.agentTitle}</CardTitle>
+        <CardDescription>{copy.agentIntro}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <PluginFields key={`${pluginId}:${workspaceId ?? "app"}`} pluginId={pluginId} fields={fields} workspaceId={workspaceId} />
+      </CardContent>
+    </Card>
+  );
+}
+
 function PluginFields({ pluginId, fields, workspaceId }: {
   pluginId: string;
   fields: PluginSettingDeclaration[];
@@ -156,6 +186,8 @@ function PreferenceField({ field, values, workspace, saving, write }: {
     ? JSON.parse(values.effective) as string
     : values.effective ?? "";
   const [draft, setDraft] = useState<string>();
+  const fallback = field.default === undefined ? undefined
+    : typeof field.default === "boolean" ? (field.default ? copy.yes : copy.no) : String(field.default);
   const [feedback, setFeedback] = useState<"invalid" | "saveError" | "saved">();
 
   async function save(value: string | null) {
@@ -187,17 +219,19 @@ function PreferenceField({ field, values, workspace, saving, write }: {
     <Field>
       <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
       <FieldDescription id={id + "-description"}>{field.description}</FieldDescription>
-      {field.kind === "boolean" ? (
+      {field.kind === "boolean" || field.choices ? (
         <Select value={draft ?? present} onValueChange={setDraft} disabled={saving}>
-          <SelectTrigger id={id} aria-describedby={id + "-description"}><SelectValue placeholder={copy.unset} /></SelectTrigger>
+          <SelectTrigger id={id} aria-describedby={id + "-description"}><SelectValue placeholder={fallback ?? copy.unset} /></SelectTrigger>
           <SelectContent><SelectGroup>
-            <SelectItem value="true">{copy.yes}</SelectItem>
-            <SelectItem value="false">{copy.no}</SelectItem>
+            {field.choices ? field.choices.map((choice) => <SelectItem key={choice} value={choice}>{choice}</SelectItem>) : <>
+              <SelectItem value="true">{copy.yes}</SelectItem>
+              <SelectItem value="false">{copy.no}</SelectItem>
+            </>}
           </SelectGroup></SelectContent>
         </Select>
-      ) : <Input id={id} aria-describedby={id + "-description"} inputMode={field.kind === "integer" ? "numeric" : undefined}
+      ) : <Input placeholder={fallback} id={id} aria-describedby={id + "-description"} inputMode={field.kind === "integer" ? "numeric" : undefined}
         value={draft ?? present} onChange={(event) => setDraft(event.target.value)} disabled={saving} />}
-      <FieldDescription>{copy[values.source ?? "unset"]}</FieldDescription>
+      <FieldDescription>{values.source ? copy[values.source] : fallback ? copy.pluginDefault : copy.unset}</FieldDescription>
     </Field>
     <div className="flex flex-wrap gap-2">
       <Button type="submit" size="sm" disabled={saving || draft === undefined}>{copy.save}</Button>

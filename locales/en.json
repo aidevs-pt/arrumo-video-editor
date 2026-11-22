@@ -124,7 +124,10 @@
     "clear": "Clear value",
     "invalid": "Enter a valid value for this setting.",
     "saveError": "Could not save this setting. Check the value and try again.",
-    "saved": "Setting saved."
+    "saved": "Setting saved.",
+    "pluginDefault": "Using the plugin's default",
+    "agentTitle": "What the agent can do",
+    "agentIntro": "These settings come from the agent's plugin. It always works read-only and cannot run commands; turn on web search or your own plugins only if you want it to use them."
   },
   "pluginRegistry": {
     "update": "Update",

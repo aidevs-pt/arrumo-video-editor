@@ -2,6 +2,7 @@
 //! ended, so creators can see why a step failed or what the agent was thinking.
 
 use std::{
+    collections::BTreeMap,
     error::Error,
     time::{Duration, Instant},
 };
@@ -81,6 +82,56 @@ fn read_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentLogSummary> {
 }
 
 impl WorkspaceStore {
+    /// The agent plugin's non-secret settings for a workspace: chosen values, else the plugin's
+    /// defaults. These decide capabilities such as web search, model and reasoning effort.
+    pub(crate) fn agent_options(
+        &self,
+        workspace_id: i64,
+        plugin_id: &str,
+    ) -> BTreeMap<String, Value> {
+        let mut options: BTreeMap<String, Value> = self
+            .plugin_manifest(plugin_id)
+            .map(|manifest| {
+                manifest
+                    .settings
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|setting| Some((setting.id, setting.default?)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Ok(settings) = self.plugin_settings(plugin_id, Some(workspace_id)) {
+            for (id, setting) in settings {
+                if let Some(value) = setting.effective {
+                    options.insert(id, value);
+                }
+            }
+        }
+        options
+    }
+
+    /// The options a run froze when it was queued, or the workspace's current ones.
+    fn run_agent_options(
+        &self,
+        scope: AgentLogScope<'_>,
+        plugin_id: &str,
+    ) -> BTreeMap<String, Value> {
+        let frozen = scope.run_id.and_then(|run_id| {
+            let text: String = self
+                .0
+                .query_row(
+                    "SELECT json_extract(snapshot_json, '$.agent_options') FROM generation_runs
+                     WHERE workspace_id = ?1 AND id = ?2
+                       AND json_extract(snapshot_json, '$.agent_settings.effective_provider') = ?3",
+                    params![scope.workspace_id, run_id, plugin_id],
+                    |row| row.get(0),
+                )
+                .ok()?;
+            serde_json::from_str(&text).ok()
+        });
+        frozen.unwrap_or_else(|| self.agent_options(scope.workspace_id, plugin_id))
+    }
+
     /// Runs the agent like `run_structured` and records the run in the workspace's agent logs.
     /// Logging problems never fail the run itself.
     pub(crate) fn run_logged_agent(
@@ -114,32 +165,41 @@ impl WorkspaceStore {
                 |row| row.get(0),
             )
             .ok();
+        let options = self.run_agent_options(scope, &provider.id);
         let transcript = AgentTranscript::default();
         let started = Instant::now();
         let mut flushed = Instant::now();
-        let result = run_structured(provider, prompt, schema, timeout, &transcript, || {
-            if let Some(id) = log
-                && flushed.elapsed() >= FLUSH_INTERVAL
-            {
-                flushed = Instant::now();
-                let _ = self.0.execute(
-                    "UPDATE agent_logs SET command = ?2, output = ?3, errors = ?4,
+        let result = run_structured(
+            provider,
+            prompt,
+            schema,
+            timeout,
+            &options,
+            &transcript,
+            || {
+                if let Some(id) = log
+                    && flushed.elapsed() >= FLUSH_INTERVAL
+                {
+                    flushed = Instant::now();
+                    let _ = self.0.execute(
+                        "UPDATE agent_logs SET command = ?2, output = ?3, errors = ?4,
                      duration_ms = ?5 WHERE id = ?1",
-                    params![
-                        id,
-                        transcript
-                            .command
-                            .lock()
-                            .map(|c| c.clone())
-                            .unwrap_or_default(),
-                        transcript.output_text(),
-                        transcript.errors_text(),
-                        started.elapsed().as_millis() as i64
-                    ],
-                );
-            }
-            tick()
-        });
+                        params![
+                            id,
+                            transcript
+                                .command
+                                .lock()
+                                .map(|c| c.clone())
+                                .unwrap_or_default(),
+                            transcript.output_text(),
+                            transcript.errors_text(),
+                            started.elapsed().as_millis() as i64
+                        ],
+                    );
+                }
+                tick()
+            },
+        );
         if let Some(id) = log {
             let answer = result
                 .as_ref()
@@ -251,5 +311,55 @@ mod tests {
         assert_eq!(status(&Err(AgentRunError::TimedOut)), "timed_out");
         assert_eq!(status(&Err(AgentRunError::Unavailable)), "unavailable");
         assert_eq!(status(&Err(AgentRunError::Failed("x"))), "failed");
+    }
+
+    #[test]
+    fn bundled_agents_declare_their_capability_settings() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        for id in ["codex", "claude-code"] {
+            let plugin = crate::agent_plugin(id).unwrap();
+            let run = plugin.cli.structured_run.as_ref().unwrap();
+            let options = store.agent_options(workspace, id);
+            assert_eq!(options.get("web-search"), Some(&Value::Bool(false)), "{id}");
+            assert_eq!(
+                options.get("reasoning-effort"),
+                Some(&Value::String("medium".into()))
+            );
+            let args = crate::agent_run::setting_arguments(run, &options);
+            assert!(!args.is_empty(), "{id} maps its settings to arguments");
+        }
+        store
+            .set_plugin_setting(
+                "codex",
+                "web-search",
+                Some(workspace),
+                Some(&Value::Bool(true)),
+            )
+            .unwrap();
+        assert!(
+            store
+                .set_plugin_setting(
+                    "codex",
+                    "reasoning-effort",
+                    Some(workspace),
+                    Some(&Value::String("ludicrous".into()))
+                )
+                .is_err(),
+            "values outside the plugin's choices are refused"
+        );
+        let codex = crate::agent_plugin("codex")
+            .unwrap()
+            .cli
+            .structured_run
+            .as_ref()
+            .unwrap();
+        let args =
+            crate::agent_run::setting_arguments(codex, &store.agent_options(workspace, "codex"));
+        assert!(args.contains(&"web_search=\"live\"".to_owned()), "{args:?}");
+        assert!(
+            args.contains(&"--ignore-user-config".to_owned()),
+            "user config stays off by default"
+        );
     }
 }
