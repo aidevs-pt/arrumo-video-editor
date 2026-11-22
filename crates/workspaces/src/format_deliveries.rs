@@ -16,6 +16,8 @@ pub struct SupplementalOutputs {
     pub portrait_derivatives: PortraitDerivatives,
     /// Also deliver a copy of the video with the subtitles drawn into the picture.
     pub burned_captions: bool,
+    /// How those drawn subtitles look.
+    pub caption_style: crate::CaptionStyle,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -98,6 +100,9 @@ impl WorkspaceStore {
         format_id: i64,
         settings: &SupplementalOutputs,
     ) -> rusqlite::Result<()> {
+        if !settings.caption_style.valid() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         let json = serde_json::to_string(settings)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         self.0.query_row(

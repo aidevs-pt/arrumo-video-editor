@@ -666,6 +666,29 @@ async fn list_ready_plugins(
     .map_err(|_| "plugins_unavailable".to_owned())?
 }
 
+/// A PNG data URL of sample text drawn with a caption style at a format's shape.
+#[tauri::command]
+async fn preview_caption_style(
+    style: arrumo_workspaces::CaptionStyle,
+    width: u32,
+    height: u32,
+    text: String,
+) -> Result<String, String> {
+    use base64::Engine as _;
+    tauri::async_runtime::spawn_blocking(move || {
+        arrumo_workspaces::caption_preview(&style, width, height, &text)
+            .map(|png| {
+                format!(
+                    "data:image/png;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(png)
+                )
+            })
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "caption_preview_failed".to_owned())?
+}
+
 #[tauri::command]
 async fn list_audio_transforms(
     workspace_id: i64,
@@ -1654,6 +1677,7 @@ fn main() {
             list_image_models,
             list_speech_models,
             list_audio_transforms,
+            preview_caption_style,
             list_ready_plugins,
             list_dubbing_providers,
             dub_asset,

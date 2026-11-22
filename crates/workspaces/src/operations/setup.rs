@@ -209,7 +209,8 @@ pub(super) fn definitions() -> [Value; 29] {
                     "required": ["type", "profile_id"], "additionalProperties": false}
             ]}
         }, "additionalProperties": false},
-        "burned_captions": {"type": "boolean"}
+        "burned_captions": {"type": "boolean"},
+        "caption_style": crate::operations::caption_style_schema()
     }, "additionalProperties": false});
     let profile = json!({"type": "object", "properties": {"workspaceId": id, "profileId": id},
         "required": ["workspaceId", "profileId"], "additionalProperties": false});

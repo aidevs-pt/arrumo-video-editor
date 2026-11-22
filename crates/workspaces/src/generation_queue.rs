@@ -51,6 +51,9 @@ pub struct FormatOverride {
     pub portrait_count: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub burned_captions: Option<bool>,
+    /// Changes to the subtitle style for this video only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption_style: Option<crate::CaptionStyleOverrides>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub portrait_guidance: Option<String>,
     /// Workspace images to use as thumbnail references for this video.
@@ -111,6 +114,20 @@ fn apply_output_overrides(
             }
             if let Some(value) = change.burned_captions {
                 set("burned_captions", json!(value), supplemental);
+            }
+            if let Some(style) = change
+                .caption_style
+                .as_ref()
+                .filter(|style| !style.is_empty())
+            {
+                let base: crate::CaptionStyle =
+                    serde_json::from_value(supplemental["caption_style"].clone())
+                        .unwrap_or_default();
+                let styled = style.apply(&base);
+                if !styled.valid() {
+                    return Err(invalid());
+                }
+                set("caption_style", json!(styled), supplemental);
             }
             if let Some(value) = &change.thumbnail_guidance {
                 set("thumbnail_guidance", json!(value), supplemental);

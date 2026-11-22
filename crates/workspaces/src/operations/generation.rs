@@ -300,6 +300,7 @@ pub(super) fn definitions() -> [Value; 42] {
                             "descriptions": {"type": "integer", "minimum": 0}, "tags": {"type": "boolean"},
                             "thumbnail_guidance": {"type": "string"}, "specifications": {"type": "string"},
                             "portrait_count": {"type": "integer", "minimum": 0}, "burned_captions": {"type": "boolean"}, "portrait_guidance": {"type": "string"},
+                            "caption_style": crate::operations::caption_style_schema(),
                             "thumbnail_reference_ids": {"type": "array", "items": id}
                         }, "additionalProperties": false}},
                     "skip_hooks": {"type": "array", "maxItems": 64, "uniqueItems": true,

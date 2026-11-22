@@ -16,6 +16,7 @@ pub struct DeliveryOverrides {
     pub specifications: Option<String>,
     pub portrait_derivatives: Option<PortraitDerivatives>,
     pub burned_captions: Option<bool>,
+    pub caption_style: Option<crate::CaptionStyleOverrides>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -53,6 +54,10 @@ impl DeliveryOverrides {
                 .unwrap_or(&workspace.portrait_derivatives)
                 .clone(),
             burned_captions: self.burned_captions.unwrap_or(workspace.burned_captions),
+            caption_style: self.caption_style.as_ref().map_or_else(
+                || workspace.caption_style.clone(),
+                |style| style.apply(&workspace.caption_style),
+            ),
         }
     }
 }
@@ -95,6 +100,13 @@ impl WorkspaceStore {
         format_id: i64,
         overrides: &DeliveryOverrides,
     ) -> rusqlite::Result<()> {
+        if overrides
+            .caption_style
+            .as_ref()
+            .is_some_and(|style| !style.apply(&crate::CaptionStyle::default()).valid())
+        {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         let settings = serde_json::to_string(overrides)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         self.0.query_row(

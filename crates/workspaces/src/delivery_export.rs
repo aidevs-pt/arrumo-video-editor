@@ -95,14 +95,15 @@ impl WorkspaceStore {
                     return Err(io::Error::other("A delivery file changed during export").into());
                 }
             }
-            if let Some(&dimensions) = burned.get(&output.format_id) {
+            if let Some((dimensions, style)) = burned.get(&output.format_id) {
                 let work = tempfile::tempdir()?;
                 let captioned = work.path().join("captioned.mp4");
                 burn_output(
                     &source_dir,
                     output.format_id,
                     edited.as_ref().map(|latest| latest.subtitles.as_str()),
-                    dimensions,
+                    *dimensions,
+                    style,
                     &captioned,
                 )?;
                 let length = captioned.metadata()?.len();
@@ -176,8 +177,8 @@ impl WorkspaceStore {
             rusqlite::params![workspace_id, run_id],
             |row| row.get(0),
         )?;
-        let &dimensions = burned_formats(&snapshot_json)?
-            .get(&format_id)
+        let (dimensions, style) = burned_formats(&snapshot_json)?
+            .remove(&format_id)
             .ok_or_else(|| {
                 io::Error::other("That format does not ask for captions in the picture")
             })?;
@@ -201,6 +202,7 @@ impl WorkspaceStore {
             format_id,
             edited.as_ref().map(|latest| latest.subtitles.as_str()),
             dimensions,
+            &style,
             &captioned,
         )?;
         match fs::hard_link(&captioned, destination) {
@@ -220,6 +222,7 @@ fn burn_output(
     format_id: i64,
     edited: Option<&str>,
     dimensions: (u32, u32),
+    style: &crate::CaptionStyle,
     output: &Path,
 ) -> Result<(), Box<dyn Error>> {
     let subtitles = match edited {
@@ -230,14 +233,18 @@ fn burn_output(
         &source_dir.join(format!("{format_id}.mp4")).canonicalize()?,
         &subtitles,
         dimensions,
+        style,
         output,
     )
 }
 
-/// The frozen formats whose delivery adds a captioned copy, with their sizes.
+/// A format's frame size and caption style.
+type Burned = ((u32, u32), crate::CaptionStyle);
+
+/// The frozen formats whose delivery adds a captioned copy, with their sizes and caption style.
 fn burned_formats(
     snapshot: &str,
-) -> Result<std::collections::BTreeMap<i64, (u32, u32)>, Box<dyn Error>> {
+) -> Result<std::collections::BTreeMap<i64, Burned>, Box<dyn Error>> {
     let snapshot: serde_json::Value = serde_json::from_str(snapshot)?;
     Ok(snapshot["formats"]
         .as_array()
@@ -246,11 +253,17 @@ fn burned_formats(
         .filter(|entry| entry["delivery"]["supplemental"]["burned_captions"] == true)
         .filter_map(|entry| {
             let format = &entry["format"];
+            let style =
+                serde_json::from_value(entry["delivery"]["supplemental"]["caption_style"].clone())
+                    .unwrap_or_default();
             Some((
                 format["id"].as_i64()?,
                 (
-                    u32::try_from(format["width"].as_u64()?).ok()?,
-                    u32::try_from(format["height"].as_u64()?).ok()?,
+                    (
+                        u32::try_from(format["width"].as_u64()?).ok()?,
+                        u32::try_from(format["height"].as_u64()?).ok()?,
+                    ),
+                    style,
                 ),
             ))
         })
@@ -269,7 +282,7 @@ mod tests {
         let burned = super::burned_formats(&snapshot.to_string()).unwrap();
         assert_eq!(
             burned.into_iter().collect::<Vec<_>>(),
-            vec![(4, (1080, 1920))]
+            vec![(4, ((1080, 1920), crate::CaptionStyle::default()))]
         );
     }
 }

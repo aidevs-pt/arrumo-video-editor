@@ -126,3 +126,19 @@ fn invoke_static(
             .or_else(|| generation::call(store, database, name, arguments))?,
     })
 }
+
+/// The JSON schema of a caption style, or of changes to one: every field is optional.
+pub(crate) fn caption_style_schema() -> serde_json::Value {
+    let color = serde_json::json!({"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"});
+    serde_json::json!({"type": "object", "description": "How burned-in subtitles look. A profile or a video sets only the fields it changes.",
+        "properties": {
+            "font": {"enum": ["sans", "serif", "mono"]},
+            "bold": {"type": "boolean"},
+            "size": {"type": "integer", "minimum": 20, "maximum": 120, "description": "Text height in tenths of a percent of the frame's shorter side; 55 by default."},
+            "color": color, "outline_color": color,
+            "outline": {"type": "integer", "minimum": 0, "maximum": 30, "description": "Outline width as a percent of the text height."},
+            "background": {"type": "boolean", "description": "A box in the outline colour behind the text instead of an outline."},
+            "position": {"enum": ["bottom", "middle", "top"]},
+            "margin": {"type": ["integer", "null"], "minimum": 0, "maximum": 40, "description": "Percent of the frame height from the top or bottom edge; null for the automatic margin."}
+        }, "additionalProperties": false})
+}

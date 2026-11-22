@@ -55,6 +55,7 @@ mod plugin_actions;
 mod plugin_activation;
 pub use plugin_activation::plugin_activation_refusal_code;
 mod audio_transform;
+mod caption_style;
 mod dubbing;
 mod plugin_catalog;
 mod plugin_credentials;
@@ -115,6 +116,9 @@ pub use backup::{
     pending_backup_import, stage_backup_import, verify_backup,
 };
 pub use brand_assets::{BrandAsset, BrandAssetRole};
+pub use caption_style::{
+    CaptionFont, CaptionPosition, CaptionStyle, CaptionStyleOverrides, caption_preview,
+};
 pub use completed_video::CompletedVideo;
 pub use completed_video_feedback::CompletedVideoFeedback;
 pub use context_import::{ContextImport, ContextImportOutcome};
