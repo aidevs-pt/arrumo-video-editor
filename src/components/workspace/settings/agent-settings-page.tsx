@@ -103,6 +103,7 @@ export function AgentSettingsPage() {
           : (
             <div className="flex max-w-3xl flex-col gap-6">
               {tab === "general" && <GeneralSettings />}
+              {tab === "general" && <AgentSummary workspaceId={studioWorkspace ? Number(studioWorkspace) : undefined} href={settingsHref("agent")} />}
               {tab === "general" && <PrivacySettings />}
               {tab === "quality" && <QualitySettings />}
               {tab === "backup" && <BackupSettings />}
@@ -188,6 +189,40 @@ function GeneralSettings() {
           </div>
         </SettingRow>
       </div>
+    </section>
+  );
+}
+
+/** General › Agent: which agent writes the videos here, with a way to change it. */
+function AgentSummary({ workspaceId, href }: { workspaceId?: number; href: string }) {
+  const { messages: { settings: text } } = useLocale();
+  const [agent, setAgent] = useState<{ name: string | null; source: Settings["source"]; others: number }>();
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      invoke<Settings>("get_agent_settings", { workspaceId: workspaceId ?? null }),
+      invoke<AgentPlugin[]>("list_agent_plugins"),
+    ]).then(([settings, plugins]) => {
+      if (!active) return;
+      setAgent({
+        name: plugins.find(({ id }) => id === settings.effective_provider)?.label ?? null,
+        source: settings.source,
+        others: plugins.filter(({ id }) => id !== settings.effective_provider).length,
+      });
+    }, () => { if (active) setAgent({ name: null, source: null, others: 0 }); });
+    return () => { active = false; };
+  }, [workspaceId]);
+
+  return (
+    <section aria-labelledby="settings-agent-summary">
+      <h2 id="settings-agent-summary" className="mb-3 text-[1.5rem]">{text.agentHeading}</h2>
+      {agent ? <div className="rounded-xl border bg-card">
+        <SettingRow label={agent.name ?? text.noAgent} labelId="settings-agent-name"
+          hint={agent.name ? (agent.source === "workspace" ? text.agentFromWorkspace : text.agentFromApp) : text.noAgentHint}>
+          <Button asChild variant="outline"><Link href={href}>{agent.name && agent.others === 0 ? text.agentSettings : text.changeAgent}</Link></Button>
+        </SettingRow>
+      </div> : <Skeleton className="h-20" />}
     </section>
   );
 }

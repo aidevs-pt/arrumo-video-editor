@@ -306,7 +306,14 @@
     "crashReports": "Informes de errores",
     "crashReportsHint": "Envía el error y la versión de la app cuando algo falla. Sin nombres de archivo ni contenido.",
     "notInThisBuild": "Esta compilación no tiene servicio de informes, así que no se envía nada.",
-    "privacyError": "No se pudo guardar esta opción. Inténtalo de nuevo."
+    "privacyError": "No se pudo guardar esta opción. Inténtalo de nuevo.",
+    "agentHeading": "Agente",
+    "noAgent": "Aún no hay agente",
+    "noAgentHint": "Elige el agente que escribe tus guiones y planes.",
+    "agentFromApp": "Escribe todos los vídeos, salvo que un espacio de trabajo elija otro.",
+    "agentFromWorkspace": "Elegido para este espacio de trabajo.",
+    "changeAgent": "Cambiar de agente",
+    "agentSettings": "Ajustes del agente"
   },
   "studio": {
     "videos": "Vídeos",

@@ -306,7 +306,14 @@
     "crashReports": "Crash reports",
     "crashReportsHint": "Sends the error and app version when something breaks. No file names or content.",
     "notInThisBuild": "This build was made without a reporting service, so nothing is sent.",
-    "privacyError": "Could not save this choice. Try again."
+    "privacyError": "Could not save this choice. Try again.",
+    "agentHeading": "Agent",
+    "noAgent": "No agent yet",
+    "noAgentHint": "Pick the agent that writes your scripts and plans.",
+    "agentFromApp": "Writes every video, unless a workspace picks another.",
+    "agentFromWorkspace": "Picked for this workspace.",
+    "changeAgent": "Change agent",
+    "agentSettings": "Agent settings"
   },
   "studio": {
     "videos": "Videos",
