@@ -41,3 +41,7 @@ Vai a **Vídeos** → **Concluídos** e abre o vídeo finalizado. Seleciona uma 
 **Definições › Importar e exportar** guarda tudo (definições, espaços de trabalho, perfis, recursos, animações, vídeos terminados e plugins instalados) num `.zip`. As chaves de API não são incluídas: ficam no cofre de credenciais deste computador, por isso volta a adicioná-las num computador novo.
 
 Para restaurar, escolhe uma cópia no mesmo sítio. O Arrumo verifica primeiro cada ficheiro com as somas da cópia, depois mostra o que contém e pergunta antes de substituir alguma coisa. Reinicia para a restaurar e guarda os dados substituídos numa pasta chamada `workspaces.sqlite.before-import-…` junto aos teus dados, caso precises deles.
+
+## Dados e privacidade
+
+O Arrumo conta que funcionalidades são usadas e reporta erros, para saber o que melhorar. Ambas as opções estão ativas por omissão e podem ser desligadas em **Definições › Geral › Dados e privacidade**. Estão ligadas a um identificador aleatório desta instalação, nunca a ti, e nunca incluem os teus vídeos, ficheiros, textos ou chaves. As compilações que fazes tu não enviam nada.

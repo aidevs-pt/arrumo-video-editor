@@ -69,6 +69,16 @@ newer Arrumo are refused. MCP and A2A expose `export_backup`, `verify_backup`,
 `stage_backup_import`, `get_backup_import_status` and `cancel_backup_import`.
 In the app this is **Settings › Import and export**.
 
+Anonymous usage counts and crash reports are provider-neutral (`crates/workspaces/src/telemetry.rs`)
+and on by default, with switches in **Settings › General › Data and privacy**
+(`get_privacy_settings`/`set_privacy_settings` over MCP and A2A). Builds only
+send anything when compiled with `ARRUMO_USAGE_KEY` (and optionally
+`ARRUMO_USAGE_ENDPOINT`, Aptabase's event API by default) or `ARRUMO_CRASH_DSN`
+(a Sentry-style `https://<key>@<host>/<project>` DSN); contributor builds have
+neither and send nothing. Events carry the event name, a random install ID, a
+per-launch session ID, the app version and the operating system; crash messages
+keep only their first line with paths and addresses removed.
+
 To create and list profiles for workspace ID 1:
 
 ```sh

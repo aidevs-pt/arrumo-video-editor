@@ -270,7 +270,14 @@
     "appliesTo": "Aplica-se a",
     "appScope": "Todos os espaços de trabalho",
     "backup": "Importar e exportar",
-    "backupIntro": "Faz uma cópia de tudo num ficheiro, ou restaura uma cópia."
+    "backupIntro": "Faz uma cópia de tudo num ficheiro, ou restaura uma cópia.",
+    "privacy": "Dados e privacidade",
+    "usageData": "Dados de utilização anónimos",
+    "usageDataHint": "Conta que funcionalidades são usadas, ligado a esta instalação, não a ti. Sem cookies nem conteúdo.",
+    "crashReports": "Relatórios de erros",
+    "crashReportsHint": "Envia o erro e a versão da app quando algo falha. Sem nomes de ficheiros nem conteúdo.",
+    "notInThisBuild": "Esta compilação não tem serviço de relatórios, por isso nada é enviado.",
+    "privacyError": "Não foi possível guardar esta opção. Tenta novamente."
   },
   "studio": {
     "videos": "Vídeos",

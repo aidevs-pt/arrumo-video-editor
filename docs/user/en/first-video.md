@@ -41,3 +41,7 @@ Go to **Videos** → **Completed** and open the finished video. Choose an output
 **Settings › Import and export** saves everything (settings, workspaces, profiles, assets, animations, finished videos and installed plugins) to one `.zip`. API keys are not included; they stay in this computer's credential store, so add them again on a new computer.
 
 To restore, choose a backup in the same place. Arrumo checks every file against the backup's checksums first, then shows what it contains and asks before replacing anything. It restarts to restore, and keeps the data it replaced in a folder named `workspaces.sqlite.before-import-…` next to your data, in case you need it back.
+
+## Data and privacy
+
+Arrumo counts which features are used and reports crashes, to learn what to improve. Both are on by default and can be turned off in **Settings › General › Data and privacy**. They are tied to a random ID for this install, never to you, and never include your videos, files, text or keys. Builds you compile yourself send nothing.

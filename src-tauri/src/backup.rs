@@ -18,10 +18,12 @@ pub async fn export_backup(
 ) -> Result<BackupSummary, &'static str> {
     let database = database(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        WorkspaceStore::open(&database)
-            .map_err(|_| "store_unavailable")?
+        let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
+        let summary = store
             .export_backup(&database, &destination)
-            .map_err(|_| "backup_export_failed")
+            .map_err(|_| "backup_export_failed")?;
+        store.track_usage("backup_exported", &[]);
+        Ok(summary)
     })
     .await
     .map_err(|_| "backup_export_failed")?

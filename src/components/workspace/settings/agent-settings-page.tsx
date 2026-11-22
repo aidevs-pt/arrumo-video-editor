@@ -101,6 +101,7 @@ export function AgentSettingsPage() {
           : (
             <div className="flex max-w-3xl flex-col gap-6">
               {tab === "general" && <GeneralSettings />}
+              {tab === "general" && <PrivacySettings />}
               {tab === "quality" && <QualitySettings />}
               {tab === "backup" && <BackupSettings />}
               {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
@@ -132,7 +133,7 @@ export function AgentSettingsPage() {
 function SettingRow({ label, hint, labelId, children }: { label: string; hint?: string; labelId: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1 basis-64">
         <p id={labelId} className="font-semibold">{label}</p>
         {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
       </div>
@@ -184,6 +185,50 @@ function GeneralSettings() {
           </div>
         </SettingRow>
       </div>
+    </section>
+  );
+}
+
+type Privacy = { usageData: boolean; crashReports: boolean; usageAvailable: boolean; crashAvailable: boolean };
+
+function PrivacySettings() {
+  const { messages: { settings: text } } = useLocale();
+  const [privacy, setPrivacy] = useState<Privacy>();
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    invoke<Privacy>("read_privacy_settings").then((value) => { if (active) setPrivacy(value); }, () => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, []);
+
+  async function save(change: Partial<Privacy>) {
+    if (!privacy) return;
+    const next = { ...privacy, ...change };
+    setPrivacy(next);
+    try {
+      setPrivacy(await invoke<Privacy>("write_privacy_settings", { usageData: next.usageData, crashReports: next.crashReports }));
+      setFailed(false);
+    } catch {
+      setPrivacy(privacy);
+      setFailed(true);
+    }
+  }
+
+  return (
+    <section aria-labelledby="settings-privacy">
+      <h2 id="settings-privacy" className="mb-3 text-[1.5rem]">{text.privacy}</h2>
+      {failed && <Alert variant="destructive" className="mb-3"><AlertDescription>{text.privacyError}</AlertDescription></Alert>}
+      {privacy ? <div className="divide-y rounded-xl border bg-card">
+        <SettingRow label={text.usageData} labelId="settings-usage"
+          hint={privacy.usageAvailable ? text.usageDataHint : `${text.usageDataHint} ${text.notInThisBuild}`}>
+          <Switch aria-labelledby="settings-usage" checked={privacy.usageData} onCheckedChange={(usageData) => void save({ usageData })} />
+        </SettingRow>
+        <SettingRow label={text.crashReports} labelId="settings-crash"
+          hint={privacy.crashAvailable ? text.crashReportsHint : `${text.crashReportsHint} ${text.notInThisBuild}`}>
+          <Switch aria-labelledby="settings-crash" checked={privacy.crashReports} onCheckedChange={(crashReports) => void save({ crashReports })} />
+        </SettingRow>
+      </div> : !failed && <Skeleton className="h-28" />}
     </section>
   );
 }

@@ -700,11 +700,39 @@ async fn enqueue_video_draft(
     options: RunOptions,
     store: State<'_, Store>,
 ) -> Result<GenerationRun, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    let run = store
+        .enqueue_video_draft(workspace_id, draft_id, &request_key, &options)
+        .map_err(|_| "generation_enqueue_failed")?;
+    store.track_usage(
+        "video_queued",
+        &[("autopilot", serde_json::json!(options.autopilot))],
+    );
+    Ok(run)
+}
+
+#[tauri::command]
+fn read_privacy_settings(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::PrivacySettings, &'static str> {
     store
         .lock()
         .map_err(|_| "store_unavailable")?
-        .enqueue_video_draft(workspace_id, draft_id, &request_key, &options)
-        .map_err(|_| "generation_enqueue_failed")
+        .privacy_settings()
+        .map_err(|_| "privacy_settings_failed")
+}
+
+#[tauri::command]
+fn write_privacy_settings(
+    usage_data: bool,
+    crash_reports: bool,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::PrivacySettings, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_privacy_settings(usage_data, crash_reports)
+        .map_err(|_| "privacy_settings_failed")
 }
 
 #[tauri::command]
@@ -932,7 +960,10 @@ fn main() {
             if let Err(error) = arrumo_workspaces::apply_pending_import(&database) {
                 eprintln!("Arrumo could not restore the staged backup: {error}");
             }
-            app.manage(Mutex::new(WorkspaceStore::open(&database)?));
+            arrumo_workspaces::install_crash_reporter(database.clone());
+            let store = WorkspaceStore::open(&database)?;
+            store.track_usage("app_started", &[]);
+            app.manage(Mutex::new(store));
             app.manage(desktop_job_workers::DesktopJobWorkers::start(
                 app.handle().clone(),
                 database.clone(),
@@ -995,6 +1026,8 @@ fn main() {
             plugin_settings::list_provider_preferences,
             plugin_settings::write_provider_preferences,
             backup::export_backup,
+            read_privacy_settings,
+            write_privacy_settings,
             backup::stage_backup_import,
             backup::pending_backup_import,
             backup::cancel_backup_import,

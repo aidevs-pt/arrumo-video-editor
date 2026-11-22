@@ -270,7 +270,14 @@
     "appliesTo": "Applies to",
     "appScope": "Every workspace",
     "backup": "Import and export",
-    "backupIntro": "Back up everything to one file, or restore a backup."
+    "backupIntro": "Back up everything to one file, or restore a backup.",
+    "privacy": "Data and privacy",
+    "usageData": "Anonymous usage data",
+    "usageDataHint": "Counts which features are used, tied to this install, not to you. No cookies, no content.",
+    "crashReports": "Crash reports",
+    "crashReportsHint": "Sends the error and app version when something breaks. No file names or content.",
+    "notInThisBuild": "This build was made without a reporting service, so nothing is sent.",
+    "privacyError": "Could not save this choice. Try again."
   },
   "studio": {
     "videos": "Videos",

@@ -75,6 +75,7 @@ mod subtitle_revisions;
 mod supplemental_delivery;
 mod supplemental_review;
 mod supplemental_writing;
+mod telemetry;
 mod transcription;
 mod video_drafts;
 mod workspace_feedback;
@@ -150,6 +151,7 @@ pub use supplemental_review::{
     RequestedReplacement, SupplementalDecision, SupplementalItemNotes, SupplementalReview,
     SupplementalRevisionRequest,
 };
+pub use telemetry::{PrivacySettings, install_crash_reporter};
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
@@ -236,6 +238,7 @@ impl WorkspaceStore {
             include_str!("../migrations/054-motion-specs.sql"),
             include_str!("../migrations/055-generated-assets.sql"),
             include_str!("../migrations/056-footage-assets.sql"),
+            include_str!("../migrations/057-privacy-settings.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
