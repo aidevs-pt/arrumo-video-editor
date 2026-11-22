@@ -86,7 +86,8 @@
     "cues": "{count} legendas",
     "hook": {
       "video-completed": "Também é executada automaticamente quando um vídeo termina, enquanto «{setting}» estiver ativado nas definições deste plugin.",
-      "generation-failed": "Também é executada automaticamente quando uma geração falha, enquanto «{setting}» estiver ativado nas definições deste plugin."
+      "generation-failed": "Também é executada automaticamente quando uma geração falha, enquanto «{setting}» estiver ativado nas definições deste plugin.",
+      "publish-date-reached": "Também é executada automaticamente na data de publicação prevista de uma saída, enquanto «{setting}» estiver ativado nas definições deste plugin."
     }
   },
   "pluginGrants": {
@@ -1463,6 +1464,6 @@
   },
   "runHooks": {
     "title": "Plugins que são executados automaticamente",
-    "description": "As ações de plugins ativadas neste espaço de trabalho são executadas quando este vídeo terminar ou se a geração falhar. Desative uma para a ignorar apenas neste vídeo."
+    "description": "As ações de plugins ativadas neste espaço de trabalho são executadas quando este vídeo terminar, nas datas de publicação previstas ou se a geração falhar. Desative uma para a ignorar apenas neste vídeo."
   }
 }

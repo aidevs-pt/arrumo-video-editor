@@ -24,7 +24,7 @@ export type ActionInput = {
   required?: boolean;
   choices?: string[];
 };
-export type ActionHook = { event: "video-completed" | "generation-failed"; enabledBy: string };
+export type ActionHook = { event: "video-completed" | "generation-failed" | "publish-date-reached"; enabledBy: string };
 export type InstalledAction = {
   pluginId: string;
   pluginName: string;

@@ -86,7 +86,8 @@
     "cues": "{count} cues",
     "hook": {
       "video-completed": "Also runs on its own when a video finishes, while “{setting}” is on in this plugin’s settings.",
-      "generation-failed": "Also runs on its own when a generation fails, while “{setting}” is on in this plugin’s settings."
+      "generation-failed": "Also runs on its own when a generation fails, while “{setting}” is on in this plugin’s settings.",
+      "publish-date-reached": "Also runs on its own on an output’s planned publish date, while “{setting}” is on in this plugin’s settings."
     }
   },
   "pluginGrants": {
@@ -1254,8 +1255,8 @@
     "backToBrief": "Back to the brief",
     "removePlatform": "Remove {tag}",
     "produceFormat": "Produce the {format} video",
-    "customize": "Customize for this video",
-    "customized": "Customized for this video",
+    "customise": "Customize for this video",
+    "customised": "Customized for this video",
     "countThumbnails": "Thumbnails",
     "countPortrait": "Portrait cuts",
     "countTitles": "Titles",
@@ -1463,6 +1464,6 @@
   },
   "runHooks": {
     "title": "Plugins that run on their own",
-    "description": "Plugin actions switched on for this workspace run when this video finishes or if its generation fails. Turn one off to skip it for this video only."
+    "description": "Plugin actions switched on for this workspace run when this video finishes, on its planned publish dates, or if its generation fails. Turn one off to skip it for this video only."
   }
 }

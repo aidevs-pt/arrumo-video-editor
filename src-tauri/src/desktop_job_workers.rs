@@ -119,6 +119,17 @@ impl DesktopJobWorkers {
             |store| store.sweep_agent_sessions().map(|_| false).map_err(|_| ()),
         )?;
         workers.spawn(
+            "arrumo-publish-dates",
+            database.clone(),
+            Duration::from_secs(600),
+            |store| {
+                store
+                    .queue_publish_date_hooks()
+                    .map(|_| false)
+                    .map_err(|_| ())
+            },
+        )?;
+        workers.spawn(
             "arrumo-plugin-jobs",
             database,
             Duration::from_millis(500),

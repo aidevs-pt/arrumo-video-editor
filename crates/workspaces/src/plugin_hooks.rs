@@ -63,6 +63,56 @@ impl WorkspaceStore {
         )
     }
 
+    /// Queues switched-on `publish-date-reached` hooks for finished outputs whose planned date
+    /// is today or in the past week (so a day the app was closed still counts). Each output and
+    /// date runs a hook once. Returns how many outputs were due.
+    pub fn queue_publish_date_hooks(&self) -> rusqlite::Result<usize> {
+        let hooked = self.plugin_actions().is_ok_and(|actions| {
+            actions.iter().any(|entry| {
+                entry
+                    .action
+                    .hooks
+                    .iter()
+                    .any(|hook| hook.event == HookEvent::PublishDateReached)
+            })
+        });
+        if !hooked {
+            return Ok(0);
+        }
+        let due: Vec<(i64, i64, i64, String)> = self
+            .0
+            .prepare(
+                "SELECT run.workspace_id, schedule.run_id, schedule.format_id, schedule.scheduled_date
+                 FROM output_schedules schedule JOIN generation_runs run ON run.id = schedule.run_id
+                 WHERE run.state = 'completed'
+                   AND schedule.scheduled_date <= date('now', 'localtime')
+                   AND schedule.scheduled_date >= date('now', 'localtime', '-7 days')
+                 ORDER BY schedule.scheduled_date, schedule.run_id",
+            )?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (workspace_id, run_id, format_id, date) in &due {
+            self.queue_run_hooks(
+                *workspace_id,
+                *run_id,
+                HookEvent::PublishDateReached,
+                &format!("{format_id}\0{date}"),
+                || {
+                    let mut event = self.video_completed_event(*workspace_id, *run_id)?;
+                    let output = event["video"]["outputs"]
+                        .as_array()?
+                        .iter()
+                        .find(|output| output["formatId"] == *format_id)?
+                        .clone();
+                    event["event"] = json!("publish-date-reached");
+                    event["video"]["outputs"] = json!([output]);
+                    Some(event)
+                },
+            );
+        }
+        Ok(due.len())
+    }
+
     fn queue_run_hooks(
         &self,
         workspace_id: i64,
@@ -386,6 +436,87 @@ mod tests {
         assert_eq!(input["video"]["title"], "Launch");
         assert_eq!(input["video"]["attempt"], 1);
         assert_eq!(input["video"]["problem"], "Agent stopped");
+    }
+
+    #[test]
+    fn a_planned_publish_date_runs_its_hook_once_per_output() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Launch".into(),
+                    intent: "Fixture".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "fixture",
+                &crate::RunOptions::default(),
+            )
+            .unwrap()
+            .id;
+        let delivery = json!({"verified_outputs": [
+            {"format_id": 5, "video": "5.mp4", "subtitles": "5.srt", "duration_seconds": 12.5, "subtitle_cues": 3},
+            {"format_id": 6, "video": "6.mp4", "subtitles": "6.srt", "duration_seconds": 9.0, "subtitle_cues": 2}]});
+        store.0.execute_batch(&format!(
+            "UPDATE generation_runs SET state = 'completed', stage_index = 1,
+                 plan_json = '{{\"steps\": [{{\"stage\": \"verify_delivery\", \"review_required\": false}}]}}'
+             WHERE id = {run};
+             INSERT INTO production_results (run_id, stage_index, attempt, result_json)
+             VALUES ({run}, 0, 1, '{delivery}');
+             INSERT INTO output_schedules (run_id, format_id, scheduled_date) VALUES
+                 ({run}, 5, date('now', 'localtime')), ({run}, 6, date('now', 'localtime', '-30 days'));"
+        )).unwrap();
+        assert_eq!(
+            store.queue_publish_date_hooks().unwrap(),
+            0,
+            "no plugin listens yet"
+        );
+        store
+            .install_plugin_zip(hook_plugin_for("publish-date-reached").as_slice())
+            .unwrap();
+        store
+            .set_plugin_setting(
+                "fixture-hooks",
+                "auto-upload",
+                Some(workspace),
+                Some(&Value::Bool(true)),
+            )
+            .unwrap();
+        assert_eq!(
+            store.queue_publish_date_hooks().unwrap(),
+            1,
+            "a month-old date is not due"
+        );
+        assert_eq!(store.queue_publish_date_hooks().unwrap(), 1);
+        assert_eq!(
+            store
+                .list_plugin_action_jobs(Some(workspace))
+                .unwrap()
+                .len(),
+            1
+        );
+        let job = store.process_next_plugin_action_job().unwrap().unwrap();
+        let input = &serde_json::to_value(&job).unwrap()["result"]["input"];
+        assert_eq!(input["event"], "publish-date-reached");
+        assert_eq!(input["video"]["outputs"].as_array().unwrap().len(), 1);
+        assert_eq!(input["video"]["outputs"][0]["formatId"], 5);
+        store.queue_publish_date_hooks().unwrap();
+        assert_eq!(
+            store
+                .list_plugin_action_jobs(Some(workspace))
+                .unwrap()
+                .len(),
+            1,
+            "never twice"
+        );
     }
 
     #[test]

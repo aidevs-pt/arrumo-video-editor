@@ -141,6 +141,9 @@ pub enum HookEvent {
     /// A generation attempt failed. The action receives `{"event": "generation-failed",
     /// "video": {"runId", "title", "profile", "attempt", "problem"}}`.
     GenerationFailed,
+    /// A finished output's planned publish date arrived. The action receives the
+    /// `video-completed` shape with `"event": "publish-date-reached"` and only that output.
+    PublishDateReached,
 }
 
 impl HookEvent {
@@ -148,6 +151,7 @@ impl HookEvent {
         match self {
             Self::VideoCompleted => "video-completed",
             Self::GenerationFailed => "generation-failed",
+            Self::PublishDateReached => "publish-date-reached",
         }
     }
 }
