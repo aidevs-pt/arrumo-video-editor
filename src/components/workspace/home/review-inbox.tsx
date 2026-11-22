@@ -62,6 +62,20 @@ function ago(at: number, locale: string) {
 
 type Entry = { key: string; kind: "review" | "completed"; notice: RunNotice; unread: boolean; href: string };
 
+const SEEN_REVIEWS = "arrumo-seen-reviews";
+const reviewKey = (workspaceId: number, notice: RunNotice) => `${workspaceId}:${notice.run_id}:${notice.at}`;
+
+function seenReviews(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(SEEN_REVIEWS) ?? "[]") as string[]); } catch { return new Set(); }
+}
+
+function rememberReviews(keys: string[]) {
+  try {
+    const all = [...new Set([...seenReviews(), ...keys])].slice(-500);
+    localStorage.setItem(SEEN_REVIEWS, JSON.stringify(all));
+  } catch {}
+}
+
 export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state?: InboxState }) {
   const router = useRouter();
   const { locale, messages } = useLocale();
@@ -69,7 +83,9 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   const inbox = state?.inbox;
   const failed = state?.failed;
   const [readHere, setReadHere] = useState<Set<number>>(new Set());
-  const reviews = inbox?.reviews ?? [];
+  const [seen, setSeen] = useState<Set<string>>(() => seenReviews());
+  const reviews = (inbox?.reviews ?? []).map((notice) => ({ ...notice, unread: !seen.has(reviewKey(workspaceId, notice)) }));
+  const unreadReviews = reviews.filter((notice) => notice.unread);
   const completions = (inbox?.completions ?? []).map((notice) => ({ ...notice, unread: notice.unread && !readHere.has(notice.run_id) }));
   const usage = useProviderUsage(workspaceId);
   const pluginText = usePluginText();
@@ -81,15 +97,18 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
   }, []);
   const lowProviders = usage?.providers.filter((entry) => (entry.level === "warning" || entry.level === "danger") && entry.remainingPercent !== null)
     .filter((entry) => { const key = dismissKey(workspaceId, entry); return !dismissed.has(key) && !wasDismissed(key); }) ?? [];
-  const attentionCount = reviews.length + completions.filter((notice) => notice.unread).length + lowProviders.length;
+  const attentionCount = unreadReviews.length + completions.filter((notice) => notice.unread).length + lowProviders.length;
   const unreadCompletions = completions.filter((notice) => notice.unread);
   const entries: Entry[] = [
-    ...reviews.map((notice) => ({ key: `r${notice.run_id}`, kind: "review" as const, notice, unread: true, href: `/generation-run?workspace=${workspaceId}&run=${notice.run_id}` })),
+    ...reviews.map((notice) => ({ key: `r${notice.run_id}`, kind: "review" as const, notice, unread: notice.unread, href: `/generation-run?workspace=${workspaceId}&run=${notice.run_id}` })),
     ...completions.map((notice) => ({ key: `c${notice.run_id}`, kind: "completed" as const, notice, unread: notice.unread, href: `/completed-video?workspace=${workspaceId}&run=${notice.run_id}` })),
   ].sort((a, b) => b.notice.at - a.notice.at);
 
   async function markAllRead() {
     dismissUsage(lowProviders.map((entry) => dismissKey(workspaceId, entry)));
+    const reviewKeys = unreadReviews.map((notice) => reviewKey(workspaceId, notice));
+    rememberReviews(reviewKeys);
+    setSeen((current) => new Set([...current, ...reviewKeys]));
     const ids = unreadCompletions.map((notice) => notice.run_id);
     setReadHere((current) => new Set([...current, ...ids]));
     await invoke("read_all_completion_notifications", { workspaceId }).catch(() => setReadHere((current) => {
@@ -110,7 +129,7 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
       <DropdownMenuContent align="end" className="w-96 max-w-[calc(100vw-1.5rem)] p-0">
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <h2 className="font-heading text-lg leading-none font-[850] [font-variation-settings:'wdth'_120]">{copy.notifications}</h2>
-          <Button type="button" variant="outline" size="sm" disabled={!unreadCompletions.length && !lowProviders.length} onClick={(event) => { event.preventDefault(); void markAllRead(); }}>
+          <Button type="button" variant="outline" size="sm" disabled={!unreadCompletions.length && !unreadReviews.length && !lowProviders.length} onClick={(event) => { event.preventDefault(); void markAllRead(); }}>
             {copy.markAllRead}
           </Button>
         </div>
@@ -127,7 +146,14 @@ export function ReviewInbox({ workspaceId, state }: { workspaceId: number; state
               </DropdownMenuItem>
             ))}
             {entries.map(({ key, kind, notice, unread, href }) => (
-              <DropdownMenuItem key={key} onSelect={() => router.push(href)}
+              <DropdownMenuItem key={key} onSelect={() => {
+                if (kind === "review") {
+                  const opened = reviewKey(workspaceId, notice);
+                  rememberReviews([opened]);
+                  setSeen((current) => new Set([...current, opened]));
+                }
+                router.push(href);
+              }}
                 className={cn("flex-col items-stretch gap-1 rounded-none border-b px-4 py-3 last:border-b-0", unread && "bg-primary/8 focus:bg-primary/12")}>
                 <span className="flex items-baseline justify-between gap-3">
                   <span className="font-semibold">{kind === "review" ? copy.noticeReview : copy.noticeCompleted}</span>

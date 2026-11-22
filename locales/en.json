@@ -1245,7 +1245,14 @@
       "h2ControlLabel": "Heading",
       "bulletListControlLabel": "Bulleted list",
       "orderedListControlLabel": "Numbered list",
-      "blockquoteControlLabel": "Block quote"
+      "blockquoteControlLabel": "Block quote",
+      "linkControlLabel": "Add link",
+      "unlinkControlLabel": "Remove link",
+      "linkEditorInputLabel": "Link address",
+      "linkEditorInputPlaceholder": "https://example.com",
+      "linkEditorExternalLink": "Open in a new window",
+      "linkEditorInternalLink": "Open in the same window",
+      "linkEditorSave": "Save"
     }
   },
   "profileHub": {

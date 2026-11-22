@@ -1245,7 +1245,14 @@
       "h2ControlLabel": "Cabeçalho",
       "bulletListControlLabel": "Lista com marcadores",
       "orderedListControlLabel": "Lista numerada",
-      "blockquoteControlLabel": "Citação"
+      "blockquoteControlLabel": "Citação",
+      "linkControlLabel": "Adicionar ligação",
+      "unlinkControlLabel": "Remover ligação",
+      "linkEditorInputLabel": "Endereço da ligação",
+      "linkEditorInputPlaceholder": "https://example.com",
+      "linkEditorExternalLink": "Abrir numa janela nova",
+      "linkEditorInternalLink": "Abrir na mesma janela",
+      "linkEditorSave": "Guardar"
     }
   },
   "profileHub": {

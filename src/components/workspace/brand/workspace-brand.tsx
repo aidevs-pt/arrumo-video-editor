@@ -95,7 +95,7 @@ export function WorkspaceBrand({ workspace }: { workspace: Workspace }) {
                   onClick={() => void save(colors.filter((item) => item !== color.hex))}><X /></Button>
                 <input key={color.name} defaultValue={color.name} maxLength={40} placeholder={copy.namePlaceholder}
                   aria-label={copy.nameLabel.replace("{color}", color.hex)}
-                  className="-mx-1 rounded-sm px-1 py-0.5 font-semibold outline-none placeholder:font-normal placeholder:text-muted-foreground hover:bg-secondary focus-visible:bg-card focus-visible:outline-2 focus-visible:outline-ring"
+                  className="-mx-1 rounded-sm px-1 py-0.5 font-semibold outline-none placeholder:font-normal placeholder:text-muted-foreground/60 hover:bg-secondary focus-visible:bg-card focus-visible:outline-2 focus-visible:outline-ring"
                   onBlur={(event) => void saveDetails(color, event.currentTarget.value, color.forVideos)}
                   onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
                 <span className={cn("text-sm tabular-nums", color.forVideos ? "text-muted-foreground" : "text-muted-foreground/70 line-through")}>{color.hex}</span>

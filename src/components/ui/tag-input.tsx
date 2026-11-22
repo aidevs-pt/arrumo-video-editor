@@ -59,7 +59,7 @@ export function TagInput({ id, name, value, onChange, placeholder, suggestions =
       ))}
       <input id={id} value={draft} disabled={disabled} maxLength={maxLength} list={open.length ? listId : undefined}
         placeholder={value.length ? undefined : placeholder}
-        className="min-w-24 flex-1 bg-transparent py-0.5 outline-none placeholder:text-muted-foreground"
+        className="min-w-24 flex-1 bg-transparent py-0.5 outline-none placeholder:text-muted-foreground/60"
         onChange={(event) => {
           const text = event.target.value;
           if (text.includes(",")) add(text);

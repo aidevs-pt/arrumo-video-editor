@@ -1245,7 +1245,14 @@
       "h2ControlLabel": "Encabezado",
       "bulletListControlLabel": "Lista con viñetas",
       "orderedListControlLabel": "Lista numerada",
-      "blockquoteControlLabel": "Cita"
+      "blockquoteControlLabel": "Cita",
+      "linkControlLabel": "Añadir enlace",
+      "unlinkControlLabel": "Quitar enlace",
+      "linkEditorInputLabel": "Dirección del enlace",
+      "linkEditorInputPlaceholder": "https://example.com",
+      "linkEditorExternalLink": "Abrir en una ventana nueva",
+      "linkEditorInternalLink": "Abrir en la misma ventana",
+      "linkEditorSave": "Guardar"
     }
   },
   "profileHub": {

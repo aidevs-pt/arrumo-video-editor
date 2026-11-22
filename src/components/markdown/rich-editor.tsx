@@ -53,6 +53,10 @@ export function RichEditor({ id, label, value, disabled, onChange }: MarkdownEdi
           <RichTextEditor.OrderedList />
           <RichTextEditor.Blockquote />
         </RichTextEditor.ControlsGroup>
+        <RichTextEditor.ControlsGroup>
+          <RichTextEditor.Link />
+          <RichTextEditor.Unlink />
+        </RichTextEditor.ControlsGroup>
       </RichTextEditor.Toolbar>
       <RichTextEditor.Content className="min-h-56" />
     </RichTextEditor>
