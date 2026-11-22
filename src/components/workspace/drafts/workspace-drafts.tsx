@@ -74,7 +74,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
     let active = true;
     Promise.all([
       invoke<Draft[]>("list_video_drafts", { workspaceId }),
-      invoke<Asset[]>("list_assets", { workspaceId }),
+      invoke<Asset[]>("list_footage", { workspaceId }),
       invoke<CatalogEntry[]>("list_profiles", { workspaceId }),
       invoke<{ draft_id: number }[]>("list_generation_runs", { workspaceId }),
     ]).then(([items, media, entries, runs]) => {
@@ -105,7 +105,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
           continue;
         }
         try {
-          const asset = await invoke<Asset>("import_asset", { workspaceId, source });
+          const asset = await invoke<Asset>("import_asset", { workspaceId, source, footage: true });
           if (asset.kind !== "video") {
             setError("importError");
             continue;

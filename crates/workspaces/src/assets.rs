@@ -32,10 +32,38 @@ impl WorkspaceStore {
         self.0
             .prepare(
                 "SELECT id, workspace_id, name, kind, byte_size, notes FROM workspace_assets
-                 WHERE workspace_id = ?1 AND superseded = 0 AND generated = 0 ORDER BY id",
+                 WHERE workspace_id = ?1 AND superseded = 0 AND generated = 0 AND footage = 0
+                 ORDER BY id",
             )?
             .query_map([workspace_id], read_asset)?
             .collect()
+    }
+
+    /// Recordings imported to make videos, oldest first.
+    pub fn list_footage(&self, workspace_id: i64) -> rusqlite::Result<Vec<WorkspaceAsset>> {
+        self.0
+            .prepare(
+                "SELECT id, workspace_id, name, kind, byte_size, notes FROM workspace_assets
+                 WHERE workspace_id = ?1 AND superseded = 0 AND footage = 1 AND kind = 'video'
+                 ORDER BY id",
+            )?
+            .query_map([workspace_id], read_asset)?
+            .collect()
+    }
+
+    /// Imports a recording as footage for a video rather than as a library asset.
+    pub fn import_footage(
+        &mut self,
+        media_root: &Path,
+        workspace_id: i64,
+        source: &Path,
+    ) -> Result<WorkspaceAsset, Box<dyn Error + Send + Sync>> {
+        let asset = self.import_asset(media_root, workspace_id, source)?;
+        self.0.execute(
+            "UPDATE workspace_assets SET footage = 1 WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, asset.id],
+        )?;
+        Ok(asset)
     }
 
     pub fn managed_asset_name(
@@ -511,5 +539,22 @@ mod replacement_tests {
             .map(|image| image.id)
             .collect();
         assert_eq!(images, [logo.id]);
+        let recording = temp.path().join("take.mp4");
+        std::fs::write(&recording, b"video bytes").unwrap();
+        let take = store.import_footage(&root, workspace, &recording).unwrap();
+        assert!(
+            !store
+                .list_assets(workspace)
+                .unwrap()
+                .iter()
+                .any(|asset| asset.id == take.id)
+        );
+        let footage: Vec<i64> = store
+            .list_footage(workspace)
+            .unwrap()
+            .into_iter()
+            .map(|asset| asset.id)
+            .collect();
+        assert_eq!(footage, [take.id]);
     }
 }

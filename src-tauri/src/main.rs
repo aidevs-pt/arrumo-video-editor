@@ -256,10 +256,23 @@ async fn list_assets(
 }
 
 #[tauri::command]
+async fn list_footage(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<WorkspaceAsset>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .list_footage(workspace_id)
+        .map_err(|_| "asset_list_failed")
+}
+
+#[tauri::command]
 async fn import_asset(
     workspace_id: i64,
     source: PathBuf,
     thumbnail_reference: Option<bool>,
+    footage: Option<bool>,
     app: AppHandle,
     store: State<'_, Store>,
 ) -> Result<WorkspaceAsset, &'static str> {
@@ -272,6 +285,8 @@ async fn import_asset(
     let mut store = store.lock().map_err(|_| "store_unavailable")?;
     let imported = if thumbnail_reference.unwrap_or(false) {
         store.import_thumbnail_reference(&root, workspace_id, &source)
+    } else if footage.unwrap_or(false) {
+        store.import_footage(&root, workspace_id, &source)
     } else {
         store.import_asset(&root, workspace_id, &source)
     };
@@ -985,6 +1000,7 @@ fn main() {
             set_profile_delivery,
             list_assets,
             import_asset,
+            list_footage,
             preview_workspace_image,
             set_asset_notes,
             set_batch_asset_notes,

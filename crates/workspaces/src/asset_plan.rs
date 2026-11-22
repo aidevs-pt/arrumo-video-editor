@@ -206,7 +206,7 @@ impl WorkspaceStore {
             .0
             .prepare(
                 "SELECT id, name, kind, notes FROM workspace_assets
-                 WHERE workspace_id = ?1 AND superseded = 0 AND generated = 0
+                 WHERE workspace_id = ?1 AND superseded = 0 AND generated = 0 AND footage = 0
                  ORDER BY id DESC LIMIT ?2",
             )?
             .query_map(params![workspace_id, MAX_LIBRARY], |row| {
