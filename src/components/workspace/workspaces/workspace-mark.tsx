@@ -44,11 +44,11 @@ export function WorkspaceMark({ workspace, className = "size-8" }: {
   const Icon = WORKSPACE_ICONS[workspace.icon ?? ""] ?? Clapperboard;
   return (
     <span aria-hidden="true" style={image ? undefined : { backgroundColor: workspace.color ?? "var(--attention)" }}
-      className={cn("grid shrink-0 place-items-center overflow-hidden rounded-[25%] text-white", className)}>
+      className={cn("grid shrink-0 place-items-center overflow-hidden rounded-[25%] text-white", image && "bg-white ring-1 ring-black/10 ring-inset", className)}>
       {image
         // Managed local preview provided by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={image} alt="" className="size-full object-cover" />
+        ? <img src={image} alt="" className="size-full object-contain" />
         : <Icon className="size-[55%]" strokeWidth={2.25} />}
     </span>
   );

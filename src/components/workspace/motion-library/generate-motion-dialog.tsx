@@ -2,8 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { Sparkles, WandSparkles } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -71,78 +70,14 @@ export function GenerateMotionDialog<Item>({ workspaceId, profileId, basedOn, di
           {working && <p role="status" className="text-sm text-muted-foreground">{copy.generating}</p>}
           {failure && <Alert variant="destructive"><AlertDescription>{copy.generateErrors[failure]}</AlertDescription></Alert>}
           <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-            <AgentLogs workspaceId={workspaceId} />
+            <AgentLogs workspaceId={workspaceId} size="default" />
             <span className="flex gap-2">
               <Button type="button" variant="outline" disabled={working} onClick={() => setOpen(false)}>{copy.cancel}</Button>
-              <Button type="submit" disabled={working}>{working ? copy.generatingShort : basedOn ? copy.changeSubmit : copy.generateSubmit}</Button>
+              <Button type="submit" disabled={working}>{basedOn ? <WandSparkles data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}{working ? copy.generatingShort : basedOn ? copy.changeSubmit : copy.generateSubmit}</Button>
             </span>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** The library's describe-and-make bar: one line to the workspace's agent, which adds a new animation. */
-export function MotionPromptBar<Item>({ workspaceId, profileId, disabled, onCreate }: {
-  workspaceId: number;
-  profileId: number | null;
-  disabled?: boolean;
-  onCreate: (item: Item) => void;
-}) {
-  const { messages: { motionLibrary: copy } } = useLocale();
-  const [request, setRequest] = useState("");
-  const [working, setWorking] = useState(false);
-  const [failure, setFailure] = useState<Failure>();
-  const [agent, setAgent] = useState<string>();
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      invoke<{ effective_provider: string | null }>("get_agent_settings", { workspaceId }),
-      invoke<{ id: string; label: string }[]>("list_agent_plugins"),
-    ]).then(([settings, plugins]) => {
-      if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label);
-    }, () => {});
-    return () => { active = false; };
-  }, [workspaceId]);
-
-  const [missing, setMissing] = useState(false);
-  const field = useRef<HTMLInputElement>(null);
-
-  async function generate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (working) return;
-    if (!request.trim()) { setMissing(true); field.current?.focus(); return; }
-    setWorking(true);
-    setFailure(undefined);
-    try {
-      onCreate(await invoke<Item>("generate_motion_library_item", { workspaceId, profileId, request: request.trim(), basedOn: null }));
-      setRequest("");
-    } catch (error) {
-      setFailure(typeof error === "string" && error in copy.generateErrors ? error as Failure : "motion_generation_failed");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <form onSubmit={generate} aria-busy={working} noValidate
-        className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/25 bg-card p-2 focus-within:border-primary/60">
-        <div className="relative min-w-48 flex-1">
-          <Sparkles className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-primary" aria-hidden="true" />
-          <Input ref={field} value={request} onChange={(event) => { setRequest(event.target.value); setMissing(false); }} maxLength={4000} disabled={disabled || working}
-            aria-label={copy.request} placeholder={copy.barPlaceholder} aria-invalid={missing || undefined} aria-describedby={missing ? "motion-request-missing" : undefined}
-            className="h-10 cursor-text bg-background ps-9" />
-        </div>
-        <Button type="submit" disabled={disabled || working} className="max-sm:w-full">
-          {working ? copy.generatingShort : agent ? copy.makeWith.replace("{agent}", agent) : copy.generateSubmit}
-        </Button>
-      </form>
-      {missing && <p id="motion-request-missing" role="alert" className="text-sm font-semibold text-destructive">{copy.requestMissing}</p>}
-      {working && <p role="status" className="text-sm text-muted-foreground">{copy.generating}</p>}
-      {failure && <Alert variant="destructive"><AlertDescription>{copy.generateErrors[failure]}</AlertDescription></Alert>}
-    </div>
   );
 }

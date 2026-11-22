@@ -37,13 +37,13 @@ type Log = LogSummary & {
 const REFRESH_MS = 2000;
 
 /** Opens the agent runs of one generation run, or of the whole workspace when `runId` is omitted. */
-export function AgentLogs({ workspaceId, runId, className }: { workspaceId: number; runId?: number; className?: string }) {
+export function AgentLogs({ workspaceId, runId, className, size = "sm" }: { workspaceId: number; runId?: number; className?: string; size?: "sm" | "default" }) {
   const { messages: { agentLogs: copy } } = useLocale();
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className={className}>
+        <Button type="button" variant="outline" size={size} className={className}>
           <ScrollText aria-hidden="true" />{copy.open}
         </Button>
       </SheetTrigger>

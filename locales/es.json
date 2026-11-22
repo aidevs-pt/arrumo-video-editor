@@ -473,11 +473,9 @@
       "agent_failed": "El agente no pudo diseñar la animación. Abre los registros del agente para ver por qué.",
       "motion_generation_failed": "No se pudo renderizar la animación. Abre los registros del agente y comprueba que FFmpeg está instalado."
     },
-    "emptyGenerate": "Describe una arriba o añade un vídeo que ya tengas.",
+    "emptyGenerate": "Genera una con el agente o añade un vídeo que ya tengas.",
     "showDetails": "Ver detalles",
-    "barPlaceholder": "Describe una animación, como un pulgar de “me gusta” que entra rebotando por abajo a la derecha",
-    "makeWith": "Hacerla con {agent}",
-    "requestMissing": "Describe primero la animación y luego créala."
+    "emptyGenerateOnly": "Genera una con el agente: descríbela y Arrumo crea una vista previa en bucle."
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",

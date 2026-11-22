@@ -473,11 +473,9 @@
       "agent_failed": "The agent could not design the animation. Open the agent logs to see why.",
       "motion_generation_failed": "The animation could not be rendered. Open the agent logs and check that FFmpeg is installed."
     },
-    "emptyGenerate": "Describe one above, or add a video you already have.",
+    "emptyGenerate": "Generate one with the agent, or add a video you already have.",
     "showDetails": "Show details",
-    "barPlaceholder": "Describe an animation, like a “like” thumb that bounces in from the bottom right",
-    "makeWith": "Make it with {agent}",
-    "requestMissing": "Describe the animation first, then make it."
+    "emptyGenerateOnly": "Generate one with the agent: describe it and Arrumo renders a looping preview."
   },
   "assets": {
     "replaceFile": "Replace file",

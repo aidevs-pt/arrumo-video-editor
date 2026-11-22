@@ -20,7 +20,7 @@ import { workspaceHref, type Workspace } from "@/components/workspace/home/works
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
-import { GenerateMotionDialog, MotionPromptBar } from "./generate-motion-dialog";
+import { GenerateMotionDialog } from "./generate-motion-dialog";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
 
@@ -136,13 +136,15 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
           </NativeSelect>
         </Field>
         <div className="order-2 flex flex-wrap gap-2">
+        <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
+          disabled={!items || open} onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
         <Dialog open={open} onOpenChange={(next) => {
           if (saving) return;
           setSaveError(false);
           setOpen(next);
         }}>
           <DialogTrigger asChild>
-            <Button variant="outline" disabled={!items || !videos.length} onClick={() => setOperation(undefined)}><Plus data-icon="inline-start" />{copy.add}</Button>
+            <Button variant="outline" disabled={!items} className={cn(!videos.length && !open && "hidden")} onClick={() => setOperation(undefined)}><Plus data-icon="inline-start" />{copy.add}</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85dvh] overflow-y-auto" onCloseAutoFocus={(event) => {
             if (!operation) return;
@@ -191,10 +193,6 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
         </Dialog>
         </div>
       </div>
-      <div className="mb-6">
-        <MotionPromptBar<Item> workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
-          disabled={!items || open} onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
-      </div>
       {loadError ? <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription>
         <Button variant="outline" onClick={() => { setLoadError(false); setAttempt((value) => value + 1); }}>{copy.retry}</Button>
       </Alert> : !items ? <p role="status" className="text-sm text-muted-foreground">{copy.loading}</p>
@@ -202,7 +200,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
           <EmptyHeader>
             <EmptyMedia variant="icon"><Sparkles /></EmptyMedia>
             <EmptyTitle>{copy.empty}</EmptyTitle>
-            <EmptyDescription>{copy.emptyGenerate}</EmptyDescription>
+            <EmptyDescription>{videos.length ? copy.emptyGenerate : copy.emptyGenerateOnly}</EmptyDescription>
           </EmptyHeader>
         </Empty>
         : <div className={cn("grid items-start gap-6", chosen && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
