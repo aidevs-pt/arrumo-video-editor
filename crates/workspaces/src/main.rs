@@ -1554,6 +1554,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [_, command, style, width, height, text, destination]
+            if command == "preview-caption-style" =>
+        {
+            let style: arrumo_workspaces::CaptionStyleOverrides =
+                serde_json::from_str(utf8(style)?)?;
+            let png = arrumo_workspaces::caption_preview(
+                &style.apply(&arrumo_workspaces::CaptionStyle::default()),
+                utf8(width)?.parse()?,
+                utf8(height)?.parse()?,
+                utf8(text)?,
+            )?;
+            std::io::Write::write_all(
+                &mut std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(destination)?,
+                &png,
+            )?;
+            println!("null");
+        }
         [database, command, workspace, run, format] if command == "generate-delivery-subtitles" => {
             let database = Path::new(database);
             let cues = WorkspaceStore::open(database)?.generate_delivery_subtitles(
@@ -1676,7 +1696,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "generate-delivery-subtitles <workspace-id> <run-id> <format-id> | import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
-                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | ",
+                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | preview-caption-style <style-json> <width> <height> <text> <destination-png> | ",
                 "set-plugin-active <plugin-id> on|off | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"

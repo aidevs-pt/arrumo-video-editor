@@ -285,4 +285,23 @@ mod tests {
             vec![(4, ((1080, 1920), crate::CaptionStyle::default()))]
         );
     }
+
+    #[test]
+    fn the_frozen_caption_style_reaches_the_burn() {
+        let snapshot = serde_json::json!({"formats": [
+            {"format": {"id": 5, "width": 1920, "height": 1080},
+             "delivery": {"supplemental": {"burned_captions": true,
+                "caption_style": {"font": "serif", "bold": false, "size": 70, "color": "#FFCC00",
+                    "outline_color": "#000000", "outline": 5, "background": true, "position": "top", "margin": 12}}}}
+        ]});
+        let (_, style) = super::burned_formats(&snapshot.to_string())
+            .unwrap()
+            .remove(&5)
+            .unwrap();
+        assert_eq!(style.position, crate::CaptionPosition::Top);
+        assert_eq!(
+            (style.size, style.margin, style.background),
+            (70, Some(12), true)
+        );
+    }
 }

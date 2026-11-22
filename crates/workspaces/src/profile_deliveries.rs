@@ -153,6 +153,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_profile_keeps_inheriting_the_caption_fields_it_does_not_set() {
+        let workspace = SupplementalOutputs {
+            caption_style: crate::CaptionStyle {
+                color: "#FFCC00".into(),
+                size: 70,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let overrides: DeliveryOverrides =
+            serde_json::from_str(r#"{"caption_style":{"position":"top"}}"#).unwrap();
+        let style = overrides.resolve(&workspace).caption_style;
+        assert_eq!(style.position, crate::CaptionPosition::Top);
+        assert_eq!((style.color.as_str(), style.size), ("#FFCC00", 70));
+        let unset: DeliveryOverrides = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            unset.resolve(&workspace).caption_style,
+            workspace.caption_style
+        );
+    }
+
+    #[test]
     fn distinguishes_inheritance_from_explicit_zero_false_and_empty() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let studio = store.create("Studio").unwrap().id;

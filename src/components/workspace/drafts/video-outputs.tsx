@@ -13,7 +13,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { ThumbnailReferences, type ReferenceImage } from "@/components/workspace/outputs/thumbnail-references";
 import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
-import { CaptionStyleDialog, DEFAULT_CAPTION_STYLE, type CaptionStyle } from "@/components/workspace/outputs/caption-style-dialog";
+import { CaptionStyleDialog, DEFAULT_CAPTION_STYLE, captionStyleChanges, type CaptionStyle } from "@/components/workspace/outputs/caption-style-dialog";
 
 /** Reference images previewed in a format's summary; the rest are counted. */
 const REFERENCE_PREVIEWS = 4;
@@ -32,7 +32,7 @@ export type OutputPlan = { format: Format; supplemental: Supplemental };
 export type FormatOverride = {
   thumbnails?: number; titles?: number; descriptions?: number; tags?: boolean;
   thumbnail_guidance?: string; specifications?: string; portrait_count?: number; portrait_guidance?: string;
-  thumbnail_reference_ids?: number[]; burned_captions?: boolean; caption_style?: CaptionStyle;
+  thumbnail_reference_ids?: number[]; burned_captions?: boolean; caption_style?: Partial<CaptionStyle>;
 };
 export type OutputChoice = { skipped: number[]; overrides: Record<string, FormatOverride> };
 
@@ -164,8 +164,10 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
                       {change.caption_style ? copy.captionStyleChanged : copy.captionStyleInherited}
                     </span>
                     <CaptionStyleDialog format={format} disabled={disabled}
-                      value={change.caption_style ?? supplemental.caption_style ?? DEFAULT_CAPTION_STYLE}
-                      onChange={(caption_style) => update(format.id, { caption_style })} />
+                      value={{ ...(supplemental.caption_style ?? DEFAULT_CAPTION_STYLE), ...change.caption_style }}
+                      onChange={(style) => update(format.id, {
+                        caption_style: captionStyleChanges(supplemental.caption_style ?? DEFAULT_CAPTION_STYLE, style),
+                      })} />
                   </div>}
                   <Guidance label={copy.thumbnailGuidance} inherited={supplemental.thumbnail_guidance ?? ""} value={change.thumbnail_guidance}
                     disabled={disabled} onChange={(text) => update(format.id, { thumbnail_guidance: text || undefined })} />

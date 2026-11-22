@@ -32,6 +32,12 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   background: false, position: "bottom", margin: null,
 };
 
+/** The fields of `next` that differ from `base`, or undefined when none do. */
+export function captionStyleChanges(base: CaptionStyle, next: CaptionStyle): Partial<CaptionStyle> | undefined {
+  const changed = (Object.keys(next) as (keyof CaptionStyle)[]).filter((key) => next[key] !== base[key]);
+  return changed.length ? Object.fromEntries(changed.map((key) => [key, next[key]])) as Partial<CaptionStyle> : undefined;
+}
+
 /** Shows a caption style as a short line, such as "Sans, 5.5%, bottom". */
 export function useCaptionSummary() {
   const { messages } = useLocale();

@@ -918,4 +918,34 @@ mod tests {
         )]);
         assert!(apply_output_overrides(formats, None, &too_many).is_err());
     }
+
+    #[test]
+    fn a_video_changes_only_the_caption_fields_it_sets() {
+        let formats = vec![json!({"format": {"id": 1}, "delivery": {"supplemental": {
+            "caption_style": {"font": "serif", "bold": true, "size": 70, "color": "#FFFFFF",
+                "outline_color": "#000000", "outline": 10, "background": false, "position": "top", "margin": null}}}})];
+        let change = |style: &str| {
+            BTreeMap::from([(
+                "1".to_owned(),
+                FormatOverride {
+                    caption_style: Some(serde_json::from_str(style).unwrap()),
+                    ..FormatOverride::default()
+                },
+            )])
+        };
+        let kept =
+            apply_output_overrides(formats.clone(), None, &change(r##"{"color":"#00FF00"}"##))
+                .unwrap();
+        let style = &kept[0]["delivery"]["supplemental"]["caption_style"];
+        assert_eq!(
+            (
+                style["color"].as_str(),
+                style["font"].as_str(),
+                style["size"].as_u64()
+            ),
+            (Some("#00FF00"), Some("serif"), Some(70))
+        );
+        assert_eq!(kept[0]["video_overrides"], json!(["caption_style"]));
+        assert!(apply_output_overrides(formats, None, &change(r#"{"size":500}"#)).is_err());
+    }
 }

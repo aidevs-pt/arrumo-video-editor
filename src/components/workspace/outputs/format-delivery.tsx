@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CaptionStyleDialog, DEFAULT_CAPTION_STYLE, useCaptionSummary, type CaptionStyle } from "./caption-style-dialog";
+import { CaptionStyleDialog, DEFAULT_CAPTION_STYLE, captionStyleChanges, useCaptionSummary, type CaptionStyle } from "./caption-style-dialog";
 import { PortraitFields, type PortraitDerivatives, type SourceProfile } from "./portrait-fields";
 import { ThumbnailReferences, type ReferenceImage } from "./thumbnail-references";
 
@@ -159,8 +159,12 @@ export function FormatDelivery({
     setResult(null);
     try {
       if (isProfile) {
-        const custom = Object.fromEntries((Object.keys(settings) as (keyof Supplemental)[])
+        const custom: Record<string, unknown> = Object.fromEntries((Object.keys(settings) as (keyof Supplemental)[])
           .filter(overridden).map((field) => [field, settings[field]]));
+        if ("caption_style" in custom && profileDelivery) {
+          const changes = captionStyleChanges(profileDelivery.workspace.caption_style ?? DEFAULT_CAPTION_STYLE, captionStyle);
+          if (changes) custom.caption_style = changes; else delete custom.caption_style;
+        }
         await invoke("set_profile_delivery", { workspaceId, profileId, formatId: format.id, overrides: custom });
         setProfileDelivery(await invoke<ProfileDelivery>("get_profile_delivery", { workspaceId, profileId, formatId: format.id }));
       } else {
