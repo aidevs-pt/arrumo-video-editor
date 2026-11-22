@@ -75,6 +75,71 @@ pub(crate) struct AgentCli {
     pub auth_status_args: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_run: Option<StructuredRun>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_run: Option<ImageRun>,
+}
+
+/// An agent run that makes one image with the agent's own image tool. The prompt goes to stdin;
+/// the agent prints JSON events, one of which names its session, and leaves the image in a folder
+/// named after that session.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ImageRun {
+    pub args: Vec<String>,
+    /// JSON Pointer to the session ID in one of the printed events.
+    pub session_pointer: String,
+    pub output_directory: ImageOutputDirectory,
+}
+
+/// Where the agent leaves images: `path` (with `{session}`) under the directory named by the
+/// environment variable `env`, or under `fallback` inside the home directory when it is unset.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ImageOutputDirectory {
+    pub env: String,
+    pub fallback: String,
+    pub path: String,
+}
+
+impl ImageRun {
+    fn valid(&self) -> bool {
+        let segment = |part: &str| {
+            !part.is_empty()
+                && part != "."
+                && part != ".."
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+        };
+        let relative = |path: &str, session: bool| {
+            path.len() <= 128
+                && path
+                    .split('/')
+                    .all(|part| segment(part) || (session && part == "{session}"))
+                && (!session || path.split('/').any(|part| part == "{session}"))
+        };
+        (1..=40).contains(&self.args.len())
+            && self
+                .args
+                .iter()
+                .all(|arg| arg.len() <= 512 && !arg.contains('\0'))
+            && self.session_pointer.len() <= 128
+            && self.session_pointer.starts_with('/')
+            && self
+                .session_pointer
+                .split('/')
+                .skip(1)
+                .all(|part| !part.is_empty())
+            && !self.output_directory.env.is_empty()
+            && self.output_directory.env.len() <= 64
+            && self
+                .output_directory
+                .env
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+            && relative(&self.output_directory.fallback, false)
+            && relative(&self.output_directory.path, true)
+    }
 }
 
 /// A non-interactive agent run declared by the provider: the prompt goes to stdin and the answer
@@ -298,7 +363,12 @@ impl PluginManifest {
                     .cli
                     .structured_run
                     .as_ref()
-                    .is_some_and(|run| manifest.schema_version < 7 || !run.valid()))
+                    .is_some_and(|run| manifest.schema_version < 7 || !run.valid())
+                || provider.cli.image_run.as_ref().is_some_and(|run| {
+                    manifest.schema_version < 7
+                        || !run.valid()
+                        || !manifest.capabilities.contains_key("image-generation")
+                }))
         {
             return Err(invalid_manifest("Invalid plugin agent provider descriptor").into());
         }

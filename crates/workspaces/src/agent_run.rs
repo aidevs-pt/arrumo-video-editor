@@ -118,7 +118,7 @@ pub(crate) fn run_structured(
     settings: &BTreeMap<String, Value>,
     images: &[std::path::PathBuf],
     transcript: &AgentTranscript,
-    mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+    tick: impl FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<Value, AgentRunError> {
     let run = plugin
         .cli
@@ -148,10 +148,58 @@ pub(crate) fn run_structured(
         }
     }
 
+    run_agent_process(
+        executable,
+        args,
+        directory.path(),
+        prompt,
+        timeout,
+        transcript,
+        tick,
+    )?;
+    let document = match run.result.source {
+        StructuredSource::Stdout => transcript
+            .output
+            .lock()
+            .map(|bytes| bytes.clone())
+            .map_err(|_| failed("Could not read the agent's answer"))?,
+        StructuredSource::StdoutLastLine => transcript
+            .output
+            .lock()
+            .map(|bytes| last_line(&bytes).to_vec())
+            .map_err(|_| failed("Could not read the agent's answer"))?,
+        StructuredSource::OutputFile => {
+            let file =
+                fs::File::open(&output_path).map_err(|_| failed("The agent wrote no answer"))?;
+            let mut buffer = Vec::new();
+            file.take(MAX_ANSWER_BYTES + 1)
+                .read_to_end(&mut buffer)
+                .map_err(|_| failed("Could not read the agent's answer"))?;
+            buffer
+        }
+    };
+    if document.len() as u64 > MAX_ANSWER_BYTES {
+        return Err(failed("The agent's answer is too large"));
+    }
+    extract_answer(run, &document)
+}
+
+/// Starts the agent with `args`, writes the prompt to its stdin and waits for it to exit,
+/// recording its output in `transcript` and calling `tick` about every second.
+pub(crate) fn run_agent_process(
+    executable: std::path::PathBuf,
+    args: Vec<std::ffi::OsString>,
+    directory: &std::path::Path,
+    prompt: &str,
+    timeout: Duration,
+    transcript: &AgentTranscript,
+    mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+) -> Result<(), AgentRunError> {
+    let failed = |reason| AgentRunError::Failed(reason);
     let mut command = Command::new(executable);
     command
         .args(args)
-        .current_dir(directory.path())
+        .current_dir(directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -221,31 +269,7 @@ pub(crate) fn run_structured(
     if !status.success() {
         return Err(failed("The agent exited with an error"));
     }
-    let document = match run.result.source {
-        StructuredSource::Stdout => transcript
-            .output
-            .lock()
-            .map(|bytes| bytes.clone())
-            .map_err(|_| failed("Could not read the agent's answer"))?,
-        StructuredSource::StdoutLastLine => transcript
-            .output
-            .lock()
-            .map(|bytes| last_line(&bytes).to_vec())
-            .map_err(|_| failed("Could not read the agent's answer"))?,
-        StructuredSource::OutputFile => {
-            let file =
-                fs::File::open(&output_path).map_err(|_| failed("The agent wrote no answer"))?;
-            let mut buffer = Vec::new();
-            file.take(MAX_ANSWER_BYTES + 1)
-                .read_to_end(&mut buffer)
-                .map_err(|_| failed("Could not read the agent's answer"))?;
-            buffer
-        }
-    };
-    if document.len() as u64 > MAX_ANSWER_BYTES {
-        return Err(failed("The agent's answer is too large"));
-    }
-    extract_answer(run, &document)
+    Ok(())
 }
 
 /// The command line as the plugin declares it, with the schema left as a placeholder.

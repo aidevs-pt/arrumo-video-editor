@@ -241,7 +241,7 @@ fn image_data<'a>(response: &'a Value, mapping: &ImageResponse) -> Option<&'a st
     }
 }
 
-fn image_extension(bytes: &[u8]) -> Option<&'static str> {
+pub(crate) fn image_extension(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         Some("png")
     } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
@@ -318,6 +318,14 @@ impl WorkspaceStore {
         let mut failure = None;
         for provider in order {
             let Some(adapter) = image_adapter(provider)? else {
+                if let Some(agent) = crate::agent_plugin(provider)
+                    .filter(|agent| crate::agent_images::makes_images(agent))
+                {
+                    match agent_image(agent, prompt, aspect_ratio, references) {
+                        Ok(image) => return Ok(image),
+                        Err(error) => failure = Some(error),
+                    }
+                }
                 continue;
             };
             let Some(ratio) = adapter.aspect_ratios.get(aspect_ratio) else {
@@ -368,10 +376,55 @@ impl WorkspaceStore {
             }
         }
         Err(failure.unwrap_or_else(|| {
-            io::Error::other("No image provider for this run has a key. Add a Gemini or OpenAI key in Settings, Services and keys, then retry")
+            io::Error::other("No image provider for this run could make the image. Sign in to Codex, or add a Gemini or OpenAI key in Settings, Services and keys, then retry")
         }))
     }
+}
 
+/// Asks an agent plugin with its own image tool for the image; references go as attached files.
+fn agent_image(
+    agent: &crate::AgentPlugin,
+    prompt: &str,
+    aspect_ratio: &str,
+    references: &[ReferencePicture],
+) -> io::Result<GeneratedImage> {
+    let folder = tempfile::tempdir()?;
+    let mut paths = Vec::new();
+    for (index, reference) in references.iter().enumerate() {
+        let path = folder.path().join(format!(
+            "reference-{index}.{}",
+            reference.mime.trim_start_matches("image/")
+        ));
+        std::fs::write(&path, &reference.bytes)?;
+        paths.push(path);
+    }
+    let (bytes, extension) = crate::agent_images::generate_with_agent(
+        agent,
+        prompt,
+        aspect_ratio,
+        &paths,
+        Duration::from_secs(600),
+        || Ok(()),
+    )
+    .map_err(|error| io::Error::other(error.to_string()))?;
+    Ok(GeneratedImage {
+        provider: agent.id.clone(),
+        bytes,
+        extension,
+        references: if agent
+            .cli
+            .image_run
+            .as_ref()
+            .is_some_and(|run| run.args.iter().any(|arg| arg == "{images}"))
+        {
+            paths.len().min(crate::agent_run::MAX_IMAGES)
+        } else {
+            0
+        },
+    })
+}
+
+impl WorkspaceStore {
     /// Generates an image and stores it as a workspace asset named after `stem`.
     #[allow(clippy::too_many_arguments)]
     pub fn generate_image_asset(
