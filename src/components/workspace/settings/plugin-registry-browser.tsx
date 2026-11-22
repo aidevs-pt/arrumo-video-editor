@@ -146,13 +146,23 @@ export function PluginRegistryBrowser({
                                       </AlertDialogTrigger>
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle className="wrap-anywhere">{plugin.id} {release.version}</AlertDialogTitle>
+                                          <AlertDialogTitle className="wrap-anywhere">{(update ? copy.confirmUpdate : copy.confirmInstall).replace("{name}", plugin.id).replace("{version}", release.version)}</AlertDialogTitle>
                                           <AlertDialogDescription>{pluginCatalog.warning}</AlertDialogDescription>
                                         </AlertDialogHeader>
+                                        <dl className="grid gap-1 rounded-lg border bg-secondary/50 p-3 text-sm">
+                                          <dt className="font-semibold">{copy.repository}</dt>
+                                          <dd className="flex min-w-0 items-center gap-2">
+                                            <span className="min-w-0 truncate text-muted-foreground" title={plugin.repository}>{plugin.repository}</span>
+                                            <Button type="button" variant="link" size="sm" className="h-auto shrink-0 px-0" onClick={() => void openRepository(plugin.repository)}>
+                                              {copy.source}<ArrowUpRight data-icon="inline-end" />
+                                            </Button>
+                                          </dd>
+                                        </dl>
+                                        <p className="text-sm text-muted-foreground">{copy.tourNote}</p>
                                         <AlertDialogFooter>
                                           <AlertDialogCancel>{pluginCatalog.cancel}</AlertDialogCancel>
                                           <AlertDialogAction onClick={() => void install(plugin, release, listing.url, update)}>
-                                            {action}
+                                            {copy.checkedInstall}
                                           </AlertDialogAction>
                                         </AlertDialogFooter>
                                       </AlertDialogContent>

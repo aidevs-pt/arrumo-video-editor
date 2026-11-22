@@ -189,7 +189,12 @@
     "source": "Abrir repositorio de origen",
     "loadError": "No se pudo cargar el registro. Comprueba la URL HTTPS del catálogo e inténtalo de nuevo.",
     "installError": "No se pudo instalar esta versión. Vuelve a cargar el registro para comprobar si hubo cambios e inténtalo de nuevo.",
-    "sourceError": "No se pudo abrir el repositorio de origen."
+    "sourceError": "No se pudo abrir el repositorio de origen.",
+    "confirmInstall": "¿Instalar {name} {version}?",
+    "confirmUpdate": "¿Actualizar {name} a {version}?",
+    "repository": "Repositorio",
+    "tourNote": "Llega desactivado. El recorrido de complementos presenta cada complemento nuevo y tú eliges dónde puede funcionar.",
+    "checkedInstall": "Lo he revisado, instalar"
   },
   "pluginCatalog": {
     "title": "Complementos",
