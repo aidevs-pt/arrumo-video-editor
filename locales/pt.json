@@ -1662,6 +1662,6 @@
     "layerHint": "Estes valores aplicam-se a toda a app. Um espaço de trabalho pode substituí-los em Definições › Serviços e chaves.",
     "adds": "O que adiciona",
     "agentsCall": "Os agentes podem chamar",
-    "agentsCallHint": "a partir da CLI, MCP e A2A."
+    "agentsCallHint": "através de queue_plugin_action_job, a partir da CLI, MCP e A2A."
   }
 }
