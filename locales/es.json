@@ -986,7 +986,6 @@
     "thumbnailPrompt": "Indicación:"
   },
   "markdownEditor": {
-    "source": "Código Markdown",
     "loading": "Cargando el editor de texto enriquecido…",
     "toolbar": {
       "boldControlLabel": "Negrita",
@@ -1140,7 +1139,7 @@
     "keepContext": "Mantener el contexto de cada recurso",
     "group": "Grupo",
     "groupPlaceholder": "Por ejemplo, Intros y cierres",
-    "labelsHint": "Separa las etiquetas con comas. Con varios recursos se añaden a cada uno.",
+    "labelsHint": "Pulsa Intro o una coma después de cada etiqueta. Con varios recursos se añaden a cada uno.",
     "share": "Compartir con un perfil",
     "noShare": "Elige un perfil",
     "wholeProfile": "Todo el perfil",
@@ -1154,7 +1153,8 @@
     "empty": "Aún no hay nada",
     "emptyHint": "Sube intros, cierres, música, logotipos o referencias que pueda usar cualquier vídeo.",
     "noMatches": "Ningún recurso coincide con estos filtros.",
-    "showAll": "Mostrar todo"
+    "showAll": "Mostrar todo",
+    "removeLabel": "Quitar {tag}"
   },
   "videoDetails": {
     "step1": "Material grabado",
@@ -1189,7 +1189,8 @@
     "needsTitle": "Ponle un título al vídeo.",
     "needsContent": "Añade clips o describe el vídeo.",
     "backToFootage": "Volver al material",
-    "backToBrief": "Volver al resumen"
+    "backToBrief": "Volver al resumen",
+    "removePlatform": "Quitar {tag}"
   },
   "scriptReview": {
     "selectAll": "Seleccionar todo",

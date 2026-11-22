@@ -986,7 +986,6 @@
     "thumbnailPrompt": "Prompt:"
   },
   "markdownEditor": {
-    "source": "Markdown source",
     "loading": "Loading rich text editor…",
     "toolbar": {
       "boldControlLabel": "Bold",
@@ -1140,7 +1139,7 @@
     "keepContext": "Leave each asset's context as it is",
     "group": "Group",
     "groupPlaceholder": "For example, Intros and outros",
-    "labelsHint": "Separate labels with commas. For several assets they are added to each one.",
+    "labelsHint": "Press Enter or a comma after each label. For several assets they are added to each one.",
     "share": "Share with a profile",
     "noShare": "Choose a profile",
     "wholeProfile": "Whole profile",
@@ -1154,7 +1153,8 @@
     "empty": "Nothing here yet",
     "emptyHint": "Upload intros, outros, music, logos or references every video can use.",
     "noMatches": "No assets match these filters.",
-    "showAll": "Show everything"
+    "showAll": "Show everything",
+    "removeLabel": "Remove {tag}"
   },
   "videoDetails": {
     "step1": "Raw footage",
@@ -1189,7 +1189,8 @@
     "needsTitle": "Give the video a title.",
     "needsContent": "Add clips or describe the video.",
     "backToFootage": "Back to footage",
-    "backToBrief": "Back to the brief"
+    "backToBrief": "Back to the brief",
+    "removePlatform": "Remove {tag}"
   },
   "scriptReview": {
     "selectAll": "Select all",
