@@ -26,11 +26,11 @@ function ImageChoice({ workspaceId, asset, selected, onSelect }: {
 }) {
   const url = useWorkspaceImage(workspaceId, asset.id);
   return <button type="button" role="radio" aria-checked={selected} aria-label={asset.name} onClick={onSelect}
-    className={cn("aspect-square overflow-hidden rounded-[25%] bg-muted outline-offset-2 focus-visible:outline-2 focus-visible:outline-attention",
+    className={cn("aspect-square overflow-hidden rounded-[25%] bg-white ring-1 ring-black/10 ring-inset outline-offset-2 focus-visible:outline-2 focus-visible:outline-attention",
       selected && "outline-2 outline-foreground")}>
     {/* Managed local preview provided by the desktop host. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    {url && <img src={url} alt="" className="size-full object-cover" />}
+    {url && <img src={url} alt="" className="size-full object-contain" />}
   </button>;
 }
 

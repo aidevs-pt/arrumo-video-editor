@@ -125,14 +125,16 @@ function ProfileHeader({ workspaceId, profile, tab, onUpdate }: {
           </Button>
         </div>
       </div>
-      <nav className="mt-8 flex gap-x-1 scroll-fade-x overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={copy.tabs}>
+      <div className="relative mt-8 before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-border">
+      <nav className="relative z-[1] flex gap-x-1 scroll-fade-x overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={copy.tabs}>
         {tabIds.map((id) => (
           <Link key={id} href={id === "videos" ? href : `${href}&tab=${id}`}
             aria-current={id === tab ? "page" : undefined}
-            className={cn("-mb-px inline-flex min-h-11 shrink-0 items-center border-b-[3px] border-transparent px-3 font-semibold text-muted-foreground transition-colors duration-150 hover:text-foreground",
+            className={cn("inline-flex min-h-11 shrink-0 items-center border-b-[3px] border-transparent px-3 font-semibold text-muted-foreground transition-colors duration-150 hover:text-foreground",
               id === tab && "border-primary text-foreground")}>{labels[id]}</Link>
         ))}
       </nav>
+    </div>
     </header>
   );
 }
