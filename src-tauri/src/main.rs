@@ -630,6 +630,7 @@ async fn generate_library_audio(
     seconds: f64,
     notes: String,
     provider: Option<String>,
+    label: Option<String>,
     app: AppHandle,
 ) -> Result<i64, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -648,6 +649,7 @@ async fn generate_library_audio(
                 seconds,
                 &notes,
                 provider.as_deref(),
+                label.as_deref(),
             )
             .map(|(id, _)| id)
             .map_err(|error| error.to_string())

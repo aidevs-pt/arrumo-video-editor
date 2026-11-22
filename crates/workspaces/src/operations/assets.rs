@@ -195,7 +195,7 @@ pub(super) fn definitions() -> [Value; 21] {
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
         json!({"name": "generate_library_audio",
-            "description": "Make instrumental music or a sound effect from a written description with the workspace's first provider for that kind (or one named provider), and add it to the workspace assets with the given notes. The provider sets the length limits (ElevenLabs: music 3 to 600 seconds, sound effects 0.5 to 30). Music in an approved asset plan can be laid under a video.",
+            "description": "Make instrumental music or a sound effect from a written description with the workspace's first provider for that kind (or one named provider), and add it to the workspace assets with the given notes, labelled Music or Sound effect. The provider sets the length limits (ElevenLabs: music 3 to 600 seconds, sound effects 0.5 to 30). Music in an approved asset plan can be laid under a video.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id,
                 "kind": {"enum": ["music", "sound-effect"]},
@@ -374,6 +374,7 @@ pub(super) fn call(
                         args.seconds,
                         &args.notes,
                         args.provider.as_deref(),
+                        None,
                     )
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not make the audio. Check the provider, its key, the length and the description")

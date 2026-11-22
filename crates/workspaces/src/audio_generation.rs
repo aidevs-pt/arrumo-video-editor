@@ -34,6 +34,13 @@ impl AudioKind {
         }
     }
 
+    fn label(self) -> &'static str {
+        match self {
+            Self::Music => "Music",
+            Self::SoundEffect => "Sound effect",
+        }
+    }
+
     fn stem(self) -> &'static str {
         match self {
             Self::Music => "music",
@@ -235,7 +242,7 @@ fn audio_request(
 impl WorkspaceStore {
     /// Makes music or a sound effect from `prompt` with the workspace's first provider for
     /// that kind (or `provider`) and adds it to the workspace assets with `notes`. Returns the
-    /// asset ID and the provider used.
+    /// asset ID and the provider used. The asset is labelled `label`, or Music / Sound effect.
     #[allow(clippy::too_many_arguments)]
     pub fn generate_library_audio(
         &self,
@@ -246,6 +253,7 @@ impl WorkspaceStore {
         seconds: f64,
         notes: &str,
         provider: Option<&str>,
+        label: Option<&str>,
     ) -> Result<(i64, String), Box<dyn std::error::Error>> {
         if notes.len() > 8000 {
             return Err(io::Error::other("Notes are too long").into());
@@ -322,6 +330,18 @@ impl WorkspaceStore {
         if !notes.trim().is_empty() {
             writer.set_asset_notes(workspace_id, asset.id, notes.trim())?;
         }
+        let label = label
+            .map(str::trim)
+            .filter(|label| !label.is_empty())
+            .unwrap_or(kind.label());
+        writer.set_asset_organization(
+            workspace_id,
+            asset.id,
+            crate::AssetOrganization {
+                group: None,
+                labels: vec![label.to_owned()],
+            },
+        )?;
         Ok((asset.id, plugin))
     }
 }

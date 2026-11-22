@@ -129,7 +129,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       } else if (made) {
         onCreated([await invoke<number>("generate_library_audio", {
           workspaceId, kind: kind === "music" ? "music" : "sound-effect", prompt: prompt.trim(), seconds: duration,
-          notes: notes.trim(), provider: provider || null,
+          notes: notes.trim(), provider: provider || null, label: kind === "music" ? copy.music : copy.sound,
         })]);
       } else {
         onCreated([await invoke<number>("generate_library_speech", {
