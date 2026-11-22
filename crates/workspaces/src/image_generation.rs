@@ -442,7 +442,7 @@ impl WorkspaceStore {
             }
         }
         Err(failure.unwrap_or_else(|| {
-            io::Error::other("No image provider for this run could make the image. Sign in to Codex, or add a Gemini or OpenAI key in Settings, Services and keys, then retry")
+            io::Error::other("No image provider for this run could make the image. Sign in to an agent that makes images, or add an image provider key in Settings › Services and keys, then retry")
         }))
     }
 }
