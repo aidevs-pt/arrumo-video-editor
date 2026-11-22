@@ -209,7 +209,26 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 31] {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TimelineInput {
+    workspace_id: i64,
+    asset_id: Option<i64>,
+    run_id: Option<i64>,
+    format_id: Option<i64>,
+    preview_attempt: Option<i64>,
+    start: f64,
+    end: f64,
+    #[serde(default = "default_frames")]
+    frames: u32,
+    destination: String,
+}
+
+fn default_frames() -> u32 {
+    8
+}
+
+pub(super) fn definitions() -> [Value; 32] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -401,6 +420,14 @@ pub(super) fn definitions() -> [Value; 31] {
                 "workspaceId": id, "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "assetId", "confirmedName"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
+        json!({"name": "render_timeline_view", "description": "Draw evenly spaced frames from a stretch of video above its sound's waveform into a new PNG at an absolute local path, to check a cut, join or overlay. Name a video asset with assetId, or a run's final video with runId and formatId (add previewAttempt for that attempt's preview). Returns each frame's time. Use it at decision points, not to scan a whole video.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "assetId": id, "runId": id, "formatId": id, "previewAttempt": id,
+                "start": {"type": "number", "minimum": 0}, "end": {"type": "number", "exclusiveMinimum": 0, "description": "At most 120 seconds after start."},
+                "frames": {"type": "integer", "minimum": 2, "maximum": 16, "default": 8},
+                "destination": {"type": "string", "description": "Absolute path of a new .png file."}
+            }, "required": ["workspaceId", "start", "end", "destination"], "additionalProperties": false},
+            "annotations": {"destructiveHint": false}}),
     ]
 }
 
@@ -491,6 +518,23 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
+        "render_timeline_view" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid timeline arguments")
+            .and_then(|args: TimelineInput| {
+                let source = match (args.asset_id, args.run_id, args.format_id) {
+                    (Some(asset), None, None) if args.preview_attempt.is_none() => crate::TimelineSource::Asset(asset),
+                    (None, Some(run_id), Some(format_id)) => crate::TimelineSource::Output {
+                        run_id, format_id, preview_attempt: args.preview_attempt,
+                    },
+                    _ => return Err("Name either assetId, or runId with formatId"),
+                };
+                let video = store
+                    .timeline_source_path(database, args.workspace_id, source)
+                    .map_err(|_| "That video was not found in the workspace")?;
+                crate::render_timeline_view(&video, args.start, args.end, args.frames, Path::new(&args.destination))
+                    .map(|view| json!(view))
+                    .map_err(|_| "Could not draw the timeline. Use 2 to 16 frames, a range of up to 120 seconds inside the video, and a new absolute .png path")
+            }),
         "list_audio_transforms" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid audio transform arguments")
             .and_then(|args: ListInput| {

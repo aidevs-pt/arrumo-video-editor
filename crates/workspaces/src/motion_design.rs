@@ -169,8 +169,9 @@ impl WorkspaceStore {
              Design it at 16:9; it is rendered at other sizes too, so keep layouts proportional. When an \
              animation to change is included, keep what the request does not ask to change. The usage \
              says in one or two sentences when an editor should use it.\n\n\
-             BRIEF (JSON):\n{}",
-            serde_json::to_string_pretty(&brief).unwrap_or_default()
+             {guides}BRIEF (JSON):\n{}",
+            serde_json::to_string_pretty(&brief).unwrap_or_default(),
+            guides = crate::editing_guides::guide_section(&["animation"]),
         );
         let answer = self.run_logged_agent(
             crate::agent_logs::AgentLogScope {

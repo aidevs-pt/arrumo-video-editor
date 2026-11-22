@@ -77,6 +77,12 @@ pub(super) fn definitions() -> Vec<Value> {
             "annotations": {"idempotentHint": true}}),
         json!({"name": "cancel_backup_import", "description": "Discard a staged backup so nothing is replaced at the next start.",
             "inputSchema": none, "annotations": {"idempotentHint": true}}),
+        json!({"name": "list_editing_guides", "description": "List Arrumo's editing guides: the craft notes each production step's agent follows (script, visuals, animation, cutting, storyboard, portrait cuts, publishing text, review). Read one with get_editing_guide before doing that kind of work yourself.",
+            "inputSchema": none, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_editing_guide", "description": "Read one editing guide as Markdown.",
+            "inputSchema": {"type": "object", "properties": {"id": {"enum": crate::EDITING_GUIDES.map(|guide| guide.id)}},
+                "required": ["id"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
     ]
 }
 
@@ -154,6 +160,15 @@ pub(super) fn call(
         "get_backup_import_status" | "cancel_backup_import" | "get_privacy_settings" | "get_notification_settings" => {
             Err("This tool takes no arguments")
         }
+        "list_editing_guides" if arguments.is_empty() => Ok(json!({"guides": crate::EDITING_GUIDES})),
+        "list_editing_guides" => Err("This tool takes no arguments"),
+        "get_editing_guide" => arguments
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|_| arguments.len() == 1)
+            .and_then(crate::editing_guide)
+            .map(|guide| json!({"id": guide.id, "title": guide.title, "stage": guide.stage, "markdown": guide.body}))
+            .ok_or("Use a guide id from list_editing_guides"),
         _ => return None,
     })
 }

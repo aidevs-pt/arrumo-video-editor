@@ -323,7 +323,8 @@ fn preview_prompt(
          purpose, such as the script section it serves.\n\
          {revision}\
          The summary is one sentence to the creator about this cut, in the first person.\n\n\
-         BRIEF (JSON):\n{brief}",
+         {guides}BRIEF (JSON):\n{brief}",
+        guides = crate::editing_guides::guide_section(&["cutting"]),
         revision = if earlier.is_empty() {
             ""
         } else {
@@ -443,7 +444,8 @@ impl WorkspaceStore {
              {revision}\
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
-             BRIEF (JSON):\n{brief}",
+             {guides}BRIEF (JSON):\n{brief}",
+            guides = crate::editing_guides::guide_section(&["storyboard", "animation"]),
             music = if tracks.is_empty() {
                 String::new()
             } else {
@@ -762,6 +764,11 @@ mod tests {
         let footage = [json!({"clipId": 1, "durationSeconds": 3.0, "transcript": "[0:00] Hello."})];
         let first = preview_prompt(&snapshot, Some("## Hook"), &footage, &[]);
         assert!(first.contains("[0:00] Hello.") && !first.contains("earlierCuts"));
+        let guide = first.find("Cut in pauses").unwrap();
+        assert!(
+            guide < first.find("BRIEF (JSON)").unwrap(),
+            "the guide stays apart from the brief"
+        );
         let revised = preview_prompt(
             &snapshot,
             None,

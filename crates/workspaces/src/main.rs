@@ -1554,6 +1554,34 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, asset, start, end, destination]
+            if command == "render-timeline-view" =>
+        {
+            let database = Path::new(database);
+            let video = WorkspaceStore::open(database)?.timeline_source_path(
+                database,
+                utf8(workspace)?.parse()?,
+                arrumo_workspaces::TimelineSource::Asset(utf8(asset)?.parse()?),
+            )?;
+            let view = arrumo_workspaces::render_timeline_view(
+                &video,
+                utf8(start)?.parse()?,
+                utf8(end)?.parse()?,
+                8,
+                Path::new(destination),
+            )?;
+            println!("{}", serde_json::to_string(&view)?);
+        }
+        [_, command] if command == "list-editing-guides" => {
+            for guide in arrumo_workspaces::EDITING_GUIDES {
+                println!("{}\t{}\t{}", guide.id, guide.stage, guide.title);
+            }
+        }
+        [_, command, id] if command == "editing-guide" => {
+            let guide = arrumo_workspaces::editing_guide(utf8(id)?)
+                .ok_or("Use a guide id from list-editing-guides")?;
+            print!("{}", guide.body);
+        }
         [_, command, style, width, height, text, destination]
             if command == "preview-caption-style" =>
         {
@@ -1696,7 +1724,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "generate-delivery-subtitles <workspace-id> <run-id> <format-id> | import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
-                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | preview-caption-style <style-json> <width> <height> <text> <destination-png> | ",
+                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | preview-caption-style <style-json> <width> <height> <text> <destination-png> | list-editing-guides | editing-guide <id> | render-timeline-view <workspace-id> <video-asset-id> <start> <end> <destination-png> | ",
                 "set-plugin-active <plugin-id> on|off | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"

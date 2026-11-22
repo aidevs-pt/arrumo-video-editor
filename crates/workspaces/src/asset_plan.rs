@@ -124,7 +124,8 @@ fn plan_prompt(
          {guide}\n\
          {revision}\
          The summary is one sentence to the creator about the plan, in the first person.\n\n\
-         BRIEF (JSON):\n{brief}",
+         {guides}BRIEF (JSON):\n{brief}",
+        guides = crate::editing_guides::guide_section(&["visuals", "animation"]),
         max = crate::motion_design::MAX_RUN_ANIMATIONS,
         footage = if recorded {
             "They play over or between the recorded footage, so design for the footage's frame. Return none when the footage alone is better. "

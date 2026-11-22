@@ -213,8 +213,9 @@ fn supplemental_prompt(
          were not given.\n\
          Respect each format's specifications and the platform's conventions.\n\
          Write in the language the creator's context and brief are written in. The summary is one sentence to the creator.\n\n\
-         BRIEF (JSON):\n{}",
-        serde_json::to_string_pretty(&brief).unwrap_or_default()
+         {guides}BRIEF (JSON):\n{}",
+        serde_json::to_string_pretty(&brief).unwrap_or_default(),
+        guides = crate::editing_guides::guide_section(&["publishing"]),
     )
 }
 
@@ -411,8 +412,9 @@ fn revision_prompt(
          Write exactly one replacement per slot. Address each note; for rejected items, take a clearly different angle. \
          For thumbnails, write a detailed image-generation prompt, as before. Keep the same language.\n\
          The summary is one sentence to the creator about what you changed.\n\n\
-         BRIEF (JSON):\n{}",
-        serde_json::to_string_pretty(&brief).unwrap_or_default()
+         {guides}BRIEF (JSON):\n{}",
+        serde_json::to_string_pretty(&brief).unwrap_or_default(),
+        guides = crate::editing_guides::guide_section(&["publishing"]),
     )
 }
 

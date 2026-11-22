@@ -57,6 +57,7 @@ pub use plugin_activation::plugin_activation_refusal_code;
 mod audio_transform;
 mod caption_style;
 mod dubbing;
+mod editing_guides;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
@@ -91,6 +92,7 @@ mod supplemental_delivery;
 mod supplemental_review;
 mod supplemental_writing;
 mod telemetry;
+mod timeline_view;
 mod transcription;
 mod video_drafts;
 mod video_generation;
@@ -129,6 +131,7 @@ pub use database_snapshot::DatabaseSnapshot;
 pub use delivery_cleanup::DeliveryCleanupReport;
 pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
 pub use dubbing::DubbingProvider;
+pub use editing_guides::{EDITING_GUIDES, EditingGuide, editing_guide};
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
@@ -184,6 +187,7 @@ pub use supplemental_review::{
     SupplementalRevisionRequest,
 };
 pub use telemetry::{PrivacySettings, install_crash_reporter};
+pub use timeline_view::{TimelineSource, TimelineView, render_timeline_view};
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;

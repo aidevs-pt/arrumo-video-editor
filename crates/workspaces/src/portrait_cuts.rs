@@ -346,8 +346,9 @@ impl WorkspaceStore {
              real people's likenesses or logos you were not given.\n\
              {replace}\
              The summary is one sentence to the creator, in the first person, in the language of the brief.\n\n\
-             BRIEF (JSON):\n{}",
+             {guides}BRIEF (JSON):\n{}",
             serde_json::to_string_pretty(&brief).unwrap_or_default(),
+            guides = crate::editing_guides::guide_section(&["portrait"]),
             replace = if replacements.is_some() {
                 "The creator sent back the cuts under \"replace\"; choose a clearly different moment for each, addressing its note.\n"
             } else {
