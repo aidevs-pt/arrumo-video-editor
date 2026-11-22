@@ -246,6 +246,63 @@ fn loudness_pass(report: &str) -> Option<String> {
 }
 
 /// Fades the first and last 30 ms of a cut's audio so joined cuts don't click.
+/// What the host measured on one rendered format, kept with the stage result.
+#[derive(Debug, PartialEq)]
+pub(crate) struct RenderCheck {
+    pub seconds: f64,
+    pub expected_seconds: f64,
+    /// Joins whose audio peaks well above the speech around them, a likely click.
+    pub loud_joins: Vec<f64>,
+}
+
+impl RenderCheck {
+    fn to_json(&self) -> Value {
+        let round = |value: f64| (value * 1000.0).round() / 1000.0;
+        json!({
+            "seconds": round(self.seconds),
+            "expected_seconds": round(self.expected_seconds),
+            "loud_joins": self.loud_joins.iter().map(|at| round(*at)).collect::<Vec<_>>(),
+        })
+    }
+}
+
+const CHECK_RATE: u32 = 24_000;
+
+/// Every concatenated part may gain or lose an audio frame, so allow a little per part.
+fn duration_matches(seconds: f64, parts: &[f64]) -> bool {
+    let expected: f64 = parts.iter().sum();
+    (seconds - expected).abs() <= 0.1 + 0.05 * parts.len() as f64
+}
+
+/// Joins where the peak within 15 ms is at least -20 dBFS and three times the RMS of the
+/// half second either side. Cuts fade over 30 ms, so a clean join is quieter than its context.
+fn loud_joins(samples: &[i16], rate: u32, joins: &[f64]) -> Vec<f64> {
+    let at = |seconds: f64| ((seconds.max(0.0) * f64::from(rate)) as usize).min(samples.len());
+    let level = |sample: &i16| f64::from(*sample) / 32768.0;
+    joins
+        .iter()
+        .copied()
+        .filter(|&join| {
+            let peak = samples[at(join - 0.015)..at(join + 0.015)]
+                .iter()
+                .map(|sample| level(sample).abs())
+                .fold(0.0, f64::max);
+            let context = samples[at(join - 0.5)..at(join - 0.05)]
+                .iter()
+                .chain(&samples[at(join + 0.05)..at(join + 0.5)]);
+            let (sum, count) = context.fold((0.0, 0usize), |(sum, count), sample| {
+                (sum + level(sample).powi(2), count + 1)
+            });
+            let rms = if count == 0 {
+                0.0
+            } else {
+                (sum / count as f64).sqrt()
+            };
+            peak >= 0.1 && peak >= rms * 3.0
+        })
+        .collect()
+}
+
 fn cut_audio_filter(length_ms: u32) -> String {
     let fade = (length_ms / 4).min(30);
     if fade == 0 {
@@ -435,6 +492,7 @@ impl WorkspaceStore {
             let root = asset_root(database);
             let mut clip_sets = Vec::new();
             let mut filenames = Vec::new();
+            let mut checks = serde_json::Map::new();
             for output in inputs.formats {
                 let mut format = output.format;
                 if revision
@@ -480,13 +538,14 @@ impl WorkspaceStore {
                     clip_sets.push((cuts, clips));
                     clip_sets.len() - 1
                 };
-                renderer.render_format(
+                let check = renderer.render_format(
                     &root,
                     &scratch,
                     &clip_sets[clips_index].1,
                     &format,
                     &motion,
                 )?;
+                checks.insert(format.id.to_string(), check.to_json());
                 let filename = if stage == ProductionStage::Preview {
                     format!("preview-{attempt}-{}.mp4", format.id)
                 } else {
@@ -494,7 +553,7 @@ impl WorkspaceStore {
                 };
                 filenames.push((format.id, filename));
             }
-            let result = if stage == ProductionStage::Preview {
+            let mut result = if stage == ProductionStage::Preview {
                 let mut result = edit;
                 result["preview_videos"] =
                     json!(filenames.iter().map(|(_, name)| name).collect::<Vec<_>>());
@@ -502,6 +561,13 @@ impl WorkspaceStore {
             } else {
                 json!({ "primary_videos": filenames.iter().map(|(_, name)| name).collect::<Vec<_>>() })
             };
+            if checks.is_empty() {
+                if let Some(result) = result.as_object_mut() {
+                    result.remove("render_checks");
+                }
+            } else {
+                result["render_checks"] = Value::Object(checks);
+            }
             self.submit_production_result_with(
                 workspace_id,
                 run_id,
@@ -922,7 +988,7 @@ impl ActiveRender<'_> {
         clips: &[RenderClip],
         format: &Dimensions,
         motion: &EditMotion,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<RenderCheck, Box<dyn Error>> {
         let Dimensions { id, width, height } = format;
         let pixel_format = if width % 2 == 0 && height % 2 == 0 {
             "yuv420p"
@@ -939,16 +1005,21 @@ impl ActiveRender<'_> {
                 .ok()
         };
         let mut check = || -> Result<(), Box<dyn Error>> { Ok(self.confirm_lease()?) };
-        let mut insert = |cut: usize, manifest: &mut String| -> Result<(), Box<dyn Error>> {
+        let mut parts = Vec::new();
+        let mut insert = |cut: usize,
+                          manifest: &mut String,
+                          parts: &mut Vec<f64>|
+         -> Result<(), Box<dyn Error>> {
             for (number, spec) in motion.inserts_before(cut).enumerate() {
                 let name = format!("insert-{id}-{cut}-{number}.mp4");
                 render_spec(spec, (*width, *height), scratch, &name, &images, &mut check)?;
+                parts.push(probe_duration(&scratch.join(&name))?);
                 manifest.push_str(&format!("file {name}\n"));
             }
             Ok(())
         };
         for (index, clip) in clips.iter().enumerate() {
-            insert(index, &mut manifest)?;
+            insert(index, &mut manifest, &mut parts)?;
             let filename = format!("clip-{id}-{index}.mp4");
             let mut command = Command::new("ffmpeg");
             command.args([
@@ -1025,9 +1096,10 @@ impl ActiveRender<'_> {
                 ])
                 .arg(scratch.join(&filename));
             self.run(&mut command, "normalizing a source clip")?;
+            parts.push(probe_duration(&scratch.join(&filename))?);
             manifest.push_str(&format!("file {filename}\n"));
         }
-        insert(clips.len(), &mut manifest)?;
+        insert(clips.len(), &mut manifest, &mut parts)?;
         let list = scratch.join(format!("{id}.ffconcat"));
         fs::write(&list, manifest)?;
         let mut command = Command::new("ffmpeg");
@@ -1048,16 +1120,84 @@ impl ActiveRender<'_> {
             .args(["-c", "copy", "-movflags", "+faststart", "-y"])
             .arg(scratch.join(format!("{id}-joined.mp4")));
         self.run(&mut command, "joining source clips")?;
-        self.master_audio(
-            &scratch.join(format!("{id}-joined.mp4")),
-            &scratch.join(format!("{id}.mp4")),
-        )
+        let output = scratch.join(format!("{id}.mp4"));
+        self.master_audio(&scratch.join(format!("{id}-joined.mp4")), &output)?;
+        self.check_render(&output, &parts)
     }
+
+    /// Compares the finished video with its parts and listens at each join, without vision.
+    fn check_render(&self, video: &Path, parts: &[f64]) -> Result<RenderCheck, Box<dyn Error>> {
+        let seconds = probe_duration(video)?;
+        let expected_seconds = parts.iter().sum();
+        if !duration_matches(seconds, parts) {
+            return Err(io::Error::other(format!(
+                "The rendered video lasts {seconds:.2} s, but its parts add up to {expected_seconds:.2} s"
+            ))
+            .into());
+        }
+        let joins: Vec<f64> = parts
+            .iter()
+            .scan(0.0, |end, part| {
+                *end += part;
+                Some(*end)
+            })
+            .take(parts.len().saturating_sub(1))
+            .collect();
+        let mut loud = Vec::new();
+        if !joins.is_empty() {
+            let pcm = video.with_extension("pcm");
+            self.run(
+                Command::new("ffmpeg")
+                    .args([
+                        "-nostdin",
+                        "-v",
+                        "error",
+                        "-protocol_whitelist",
+                        "file",
+                        "-i",
+                    ])
+                    .arg(video)
+                    .args(["-map", "0:a:0", "-ac", "1", "-ar"])
+                    .arg(CHECK_RATE.to_string())
+                    .args(["-f", "s16le", "-y"])
+                    .arg(&pcm),
+                "listening to the joins",
+            )?;
+            let bytes = fs::read(&pcm)?;
+            fs::remove_file(&pcm)?;
+            let samples: Vec<i16> = bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| i16::from_le_bytes(*pair))
+                .collect();
+            loud = loud_joins(&samples, CHECK_RATE, &joins);
+        }
+        Ok(RenderCheck {
+            seconds,
+            expected_seconds,
+            loud_joins: loud,
+        })
+    }
+}
+
+fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
+    let output = Command::new("ffprobe")
+        .args(["-v", "error", "-protocol_whitelist", "file"])
+        .args(["-show_entries", "format=duration", "-of", "csv=p=0"])
+        .arg(path)
+        .output()?;
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|seconds| output.status.success() && seconds.is_finite())
+        .ok_or_else(|| io::Error::other("Could not measure a rendered video's duration").into())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::cut_audio_filter;
+    use super::{cut_audio_filter, duration_matches, loud_joins};
 
     #[test]
     fn cut_audio_fades_in_and_out() {
@@ -1086,5 +1226,33 @@ mod tests {
         assert_eq!(super::loudness_pass("no report"), None);
         let room_tone = loud.replace("-23.10", "-52.00");
         assert_eq!(super::loudness_pass(&room_tone), None);
+    }
+
+    #[test]
+    fn duration_allows_a_frame_per_part() {
+        assert!(duration_matches(10.12, &[4.0, 6.0]));
+        assert!(!duration_matches(10.5, &[4.0, 6.0]));
+        assert!(!duration_matches(8.0, &[4.0, 6.0]));
+    }
+
+    #[test]
+    fn a_click_at_a_join_is_heard_and_a_faded_join_is_not() {
+        let rate = 1000;
+        // Steady speech-like level either side, faded to silence at 1 s and 3 s.
+        let mut samples: Vec<i16> = (0..4000)
+            .map(|index| if index % 2 == 0 { 6000 } else { -6000 })
+            .collect();
+        for centre in [1000usize, 3000] {
+            for offset in 0..30 {
+                let gain = offset as f64 / 30.0;
+                for index in [centre - offset, centre + offset] {
+                    samples[index] = (f64::from(samples[index]) * gain) as i16;
+                }
+            }
+        }
+        samples[3000] = 20000;
+        assert_eq!(loud_joins(&samples, rate, &[1.0, 3.0]), vec![3.0]);
+        let silence = vec![0i16; 4000];
+        assert!(loud_joins(&silence, rate, &[1.0]).is_empty());
     }
 }
