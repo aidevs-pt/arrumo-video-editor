@@ -41,7 +41,9 @@
     "unscheduledHint": "Arraste um para um dia para o agendar, ou abra-o para escolher uma data.",
     "allScheduled": "Todas as saídas concluídas têm data.",
     "dragLabel": "Arraste {title} para um dia",
-    "scheduleError": "Não foi possível guardar essa data."
+    "scheduleError": "Não foi possível guardar essa data.",
+    "portraitCuts": "{count} cortes verticais",
+    "portraitCutOne": "1 corte vertical"
   },
   "pluginActions": {
     "recentJobs": "Tarefas recentes",

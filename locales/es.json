@@ -41,7 +41,9 @@
     "unscheduledHint": "Arrastra uno a un día para programarlo, o ábrelo para elegir una fecha.",
     "allScheduled": "Todas las salidas terminadas tienen fecha.",
     "dragLabel": "Arrastra {title} a un día",
-    "scheduleError": "No se pudo guardar esa fecha."
+    "scheduleError": "No se pudo guardar esa fecha.",
+    "portraitCuts": "{count} cortes verticales",
+    "portraitCutOne": "1 corte vertical"
   },
   "pluginActions": {
     "recentJobs": "Tareas recientes",

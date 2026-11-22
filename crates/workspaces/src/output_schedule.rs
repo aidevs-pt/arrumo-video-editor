@@ -16,6 +16,10 @@ pub struct ScheduledOutput {
     pub format_name: String,
     pub width: u32,
     pub height: u32,
+    /// The number of portrait cuts this output makes the way the requested profile makes its
+    /// videos, when it is listed for that profile only because of them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub portrait_cuts: Option<u32>,
 }
 
 impl WorkspaceStore {
@@ -84,13 +88,18 @@ impl WorkspaceStore {
                     json_extract(run.snapshot_json, '$.profile.color'),
                     json_extract(format.value, '$.format.name'),
                     json_extract(format.value, '$.format.width'),
-                    json_extract(format.value, '$.format.height')
+                    json_extract(format.value, '$.format.height'),
+                    CASE WHEN ?2 IS NOT NULL
+                          AND json_extract(run.snapshot_json, '$.draft.profile_id') IS NOT ?2
+                         THEN json_extract(format.value, '$.delivery.supplemental.portrait_derivatives.count') END
              FROM output_schedules AS schedule
              JOIN generation_runs AS run ON run.id = schedule.run_id
              JOIN json_each(run.snapshot_json, '$.formats') AS format
                ON json_extract(format.value, '$.format.id') = schedule.format_id
              WHERE run.workspace_id = ?1 AND run.state = 'completed'
-               AND (?2 IS NULL OR json_extract(run.snapshot_json, '$.draft.profile_id') = ?2)
+               AND (?2 IS NULL OR json_extract(run.snapshot_json, '$.draft.profile_id') = ?2
+                    OR (json_extract(format.value, '$.portrait_source.profile_id') = ?2
+                        AND json_extract(format.value, '$.delivery.supplemental.portrait_derivatives.count') > 0))
                AND schedule.scheduled_date BETWEEN ?3 AND ?4
              ORDER BY schedule.scheduled_date, run.id, schedule.format_id",
             )?
@@ -105,6 +114,7 @@ impl WorkspaceStore {
                     format_name: row.get(6)?,
                     width: row.get(7)?,
                     height: row.get(8)?,
+                    portrait_cuts: row.get(9)?,
                 })
             })?
             .collect()
@@ -121,4 +131,73 @@ fn validate_date(connection: &rusqlite::Connection, date: &str) -> rusqlite::Res
         return Err(rusqlite::Error::InvalidQuery);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{DraftSettings, RunOptions, WorkspaceStore};
+
+    #[test]
+    fn a_profile_calendar_includes_outputs_whose_portrait_cuts_follow_it() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let reviews = store
+            .create_profile(workspace, "Reviews", "", None)
+            .unwrap()
+            .id;
+        let shorts = store
+            .create_profile(workspace, "Shorts", "", None)
+            .unwrap()
+            .id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Launch".into(),
+                    intent: "Fixture".into(),
+                    profile_id: Some(reviews),
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "fixture", &RunOptions::default())
+            .unwrap()
+            .id;
+        let formats = serde_json::json!([
+            {"format": {"id": 5, "name": "Landscape", "width": 1920, "height": 1080},
+             "portrait_source": {"profile_id": shorts},
+             "delivery": {"supplemental": {"portrait_derivatives": {"count": 2}}}},
+            {"format": {"id": 6, "name": "Square", "width": 1080, "height": 1080}}
+        ]);
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET state = 'completed',
+                     snapshot_json = json_set(snapshot_json, '$.formats', json(?2)) WHERE id = ?1",
+                rusqlite::params![run, formats.to_string()],
+            )
+            .unwrap();
+        store.0.execute_batch(&format!(
+            "INSERT INTO output_schedules VALUES ({run}, 5, '2026-12-01'), ({run}, 6, '2026-12-02');"
+        )).unwrap();
+
+        let own = store
+            .scheduled_outputs(workspace, Some(reviews), "2026-12-01", "2026-12-31")
+            .unwrap();
+        assert_eq!(own.len(), 2);
+        assert!(own.iter().all(|output| output.portrait_cuts.is_none()));
+        let source = store
+            .scheduled_outputs(workspace, Some(shorts), "2026-12-01", "2026-12-31")
+            .unwrap();
+        assert_eq!(source.len(), 1);
+        assert_eq!((source[0].format_id, source[0].portrait_cuts), (5, Some(2)));
+        assert_eq!(
+            store
+                .scheduled_outputs(workspace, None, "2026-12-01", "2026-12-31")
+                .unwrap()
+                .len(),
+            2
+        );
+    }
 }

@@ -41,7 +41,9 @@
     "unscheduledHint": "Drag one onto a day to schedule it, or open it to pick a date.",
     "allScheduled": "Every finished output has a date.",
     "dragLabel": "Drag {title} to a day",
-    "scheduleError": "That date couldn't be saved."
+    "scheduleError": "That date couldn't be saved.",
+    "portraitCuts": "{count} portrait cuts",
+    "portraitCutOne": "1 portrait cut"
   },
   "pluginActions": {
     "recentJobs": "Recent jobs",

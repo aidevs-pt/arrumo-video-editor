@@ -27,6 +27,8 @@ type Output = {
   format_name: string;
   width: number;
   height: number;
+  /** Set when the output is listed for this profile only because its portrait cuts follow it. */
+  portrait_cuts?: number;
 };
 
 function utcDate(year: number, month: number, day: number) {
@@ -268,18 +270,23 @@ function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
 }
 
 function OutputList({ rows, workspaceId }: { rows: Output[]; workspaceId: number }) {
+  const { messages: { calendar: copy } } = useLocale();
   if (rows.length === 0) return null;
   return <ul className="flex min-w-0 flex-col gap-1">
     {rows.map((row) => {
-      const Orientation = row.width === row.height ? Square : isPortrait(row) ? RectangleVertical : RectangleHorizontal;
+      const cuts = row.portrait_cuts;
+      const Orientation = cuts || isPortrait(row) ? RectangleVertical : row.width === row.height ? Square : RectangleHorizontal;
+      const detail = cuts ? (cuts === 1 ? copy.portraitCutOne : copy.portraitCuts.replace("{count}", String(cuts))) : row.format_name;
       const color = row.profile_color && /^#[0-9a-f]{6}$/i.test(row.profile_color) ? row.profile_color : undefined;
       return <li key={`${row.run_id}-${row.format_id}`} className="min-w-0" draggable
         onDragStart={(event) => event.dataTransfer.setData("text/plain", `${row.run_id}-${row.format_id}`)}>
-        <Link href={completedVideoHref(workspaceId, row.run_id, row.format_id)} title={`${row.title}, ${row.format_name}`}
-          className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm hover:brightness-95 focus-visible:outline-2 focus-visible:outline-ring"
+        <Link href={completedVideoHref(workspaceId, row.run_id, row.format_id)} title={`${row.title}, ${detail}`}
+          className={cn("flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm hover:brightness-95 focus-visible:outline-2 focus-visible:outline-ring",
+            cuts && "border border-dashed border-current/30")}
           style={{ backgroundColor: color ? `color-mix(in oklch, ${color} 18%, var(--card))` : "var(--secondary)" }}>
           <Orientation aria-hidden="true" className="size-3.5 shrink-0" style={{ color }} />
           <span className="truncate">{row.title}</span>
+          {cuts ? <span className="sr-only">, {detail}</span> : null}
         </Link>
       </li>;
     })}
