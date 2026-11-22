@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { FieldDescription, Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -356,7 +356,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const staged = textDecisions.length + mediaDecisions.length;
   const motionReview = !hasItemReview && motionItems.length > 0;
   const motionStaged = motionItems.filter(({ index }) => draft.motion?.[index]).length;
-  const itemMode = hasItemReview || motionReview;
+  const footerItems = hasItemReview || (motionReview && !draft.decision);
   const stagedCount = motionReview ? motionStaged : staged;
   const undecided = hasItemReview ? textCount + mediaCount - staged : motionReview ? motionItems.length - motionStaged : 0;
   function approveRest() {
@@ -372,7 +372,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
       },
     } : current);
   }
-  const canSend = hasItemReview ? staged === textCount + mediaCount : motionReview ? motionStaged === motionItems.length : Boolean(draft.decision);
+  const canSend = hasItemReview ? staged === textCount + mediaCount : motionReview ? Boolean(draft.decision) || motionStaged === motionItems.length : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
     key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && key !== "thumbnail_prompts"
       && !(stage === "assets" && key === "asset_plan" && isAssetPlan(result.result.asset_plan))
@@ -390,13 +390,13 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
     if (!canSend || reviewing) return;
     let decision = draft.decision;
     let notes = draft.notes;
-    if (motionReview) {
+    if (motionReview && !draft.decision) {
       const labels = { approved: copy.item_approved, revise: copy.item_revise, rejected: copy.item_rejected };
       const lines = motionItems.map(({ index, title }) => {
         const note = draft.motionNotes?.[index]?.trim();
         return `- ${title}: ${labels[draft.motion![index]]}${note ? `. ${note}` : ""}`;
       });
-      decision = motionItems.every(({ index }) => draft.motion?.[index] === "approved") ? "approved" : "revise";
+      decision = motionItems.every(({ index }) => draft.motion?.[index] === "approved") && !draft.notes.trim() ? "approved" : "revise";
       notes = [decision === "revise" || draft.motionNotes && Object.values(draft.motionNotes).some((note) => note.trim())
         ? `${copy.motionDecisions}\n${lines.join("\n")}` : "", draft.notes.trim()].filter(Boolean).join("\n\n");
     }
@@ -578,7 +578,8 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <form id={reviewFormId} onSubmit={(event) => void submit(event)}>
           <fieldset disabled={reviewing}>
             <FieldGroup>
-              {!itemMode && <Field>
+              {!hasItemReview && <Field>
+                {motionReview && <FieldDescription>{copy.wholeStepHint}</FieldDescription>}
                 <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-2">
                   {decisions.map(({ value, label, icon: Icon, fill }) => {
                     const selected = draft.decision === value;
@@ -604,17 +605,17 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || stagedCount > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
-          {!itemMode && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
-            : itemMode && stagedCount > 0 && undecided > 0 ? <>{(stagedCount === 1 ? copy.stagedItemsOne : copy.stagedItems).replace("{count}", String(stagedCount))}
+          {!footerItems && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
+            : footerItems && stagedCount > 0 && undecided > 0 ? <>{(stagedCount === 1 ? copy.stagedItemsOne : copy.stagedItems).replace("{count}", String(stagedCount))}
               <span className="font-normal text-white">{(undecided === 1 ? copy.stillNeedsOne : copy.stillNeeds).replace("{count}", String(undecided))}</span></>
-            : draft.decision || stagedCount > 0 || draft.notes || hasItemNotes ? copy.unsentReview : itemMode ? (motionReview ? copy.selectEveryAnimation : copy.selectEveryItem) : copy.selectDecision}
+            : draft.decision || stagedCount > 0 || draft.notes || hasItemNotes ? copy.unsentReview : footerItems ? (motionReview ? copy.selectEveryAnimation : copy.selectEveryItem) : copy.selectDecision}
         </p>
-        {itemMode && stagedCount > 0 && undecided > 0 && <Button type="button" variant="outline" disabled={reviewing} onClick={approveRest}
+        {footerItems && stagedCount > 0 && undecided > 0 && <Button type="button" variant="outline" disabled={reviewing} onClick={approveRest}
           className="ms-auto border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">{copy.approveRest}</Button>}
         <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
           className={cn("bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100",
-            !(itemMode && stagedCount > 0 && undecided > 0) && "ms-auto")}>
-          {itemMode ? (stagedCount === 0 ? copy.sendNothing : stagedCount === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(stagedCount)))
+            !(footerItems && stagedCount > 0 && undecided > 0) && "ms-auto")}>
+          {footerItems ? (stagedCount === 0 ? copy.sendNothing : stagedCount === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(stagedCount)))
             : draft.decision ? copy.submitDecision : copy.sendNothing}
         </Button>
       </div>

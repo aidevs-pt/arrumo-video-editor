@@ -1179,7 +1179,8 @@
     "motionDecisions": "Animation decisions:",
     "selectEveryAnimation": "Choose a decision for every animation",
     "motionNotePlaceholder": "What should change?",
-    "decisionFor": "Decision for {label}"
+    "decisionFor": "Decision for {label}",
+    "wholeStepHint": "Or decide on the whole step. This replaces the decisions on each animation."
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",

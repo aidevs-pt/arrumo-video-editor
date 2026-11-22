@@ -1179,7 +1179,8 @@
     "motionDecisions": "Decisões sobre as animações:",
     "selectEveryAnimation": "Escolhe uma decisão para cada animação",
     "motionNotePlaceholder": "O que deve mudar?",
-    "decisionFor": "Decisão para {label}"
+    "decisionFor": "Decisão para {label}",
+    "wholeStepHint": "Ou decide sobre o passo inteiro. Isto substitui as decisões de cada animação."
   },
   "markdownEditor": {
     "loading": "A carregar o editor de texto formatado…",
