@@ -1094,7 +1094,7 @@
     "downloadError": "Could not save the subtitles. Check the folder and try again.",
     "completedAt": "Completed {date}",
     "story": "How it was made",
-    "storyHint": "Comment on any step; the agent reads it next time.",
+    "storyHint": "Comment on any step; the agent reads it when this video is generated again.",
     "settingsUsed": "Settings used"
   },
   "productionPlan": {

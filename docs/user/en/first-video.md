@@ -38,7 +38,7 @@ The desktop verifies the delivery when all enabled formats have managed MP4 and 
 
 ## Open and export the result
 
-Go to **Videos** → **Completed** and open the finished video. Choose an output to preview it or open **Subtitle text** to inspect its cues. Use **Export ZIP** to save the verified delivery files to a new ZIP. Below the video, **How it was made** lists each step with any feedback you left, where you can comment so the agent reads it next time, plus the animations used and the activity log. **Settings used** offers a replay with the captured or current settings and lets you rename the video.
+Go to **Videos** → **Completed** and open the finished video. Choose an output to preview it or open **Subtitle text** to inspect its cues. Use **Export ZIP** to save the verified delivery files to a new ZIP. Below the video, **How it was made** lists each step with any feedback you left, where you can comment so the agent reads it when this video is generated again, plus the animations used and the activity log. **Settings used** offers a replay with the captured or current settings and lets you rename the video.
 
 ## Back up and restore
 

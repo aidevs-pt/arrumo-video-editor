@@ -38,7 +38,7 @@ La aplicación de escritorio verifica la entrega cuando todos los formatos activ
 
 ## Abre y exporta el resultado
 
-Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una salida para previsualizarla o abre **Texto de los subtítulos** para consultar sus marcas de tiempo. Usa **Exportar ZIP** para guardar los archivos verificados en un ZIP nuevo. Debajo del vídeo, **Cómo se hizo** muestra cada paso con los comentarios que dejaste, donde puedes comentar para que el agente lo lea la próxima vez, además de las animaciones usadas y el registro de actividad. **Ajustes usados** ofrece repetirlo con los ajustes capturados o los actuales y permite renombrar el vídeo.
+Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una salida para previsualizarla o abre **Texto de los subtítulos** para consultar sus marcas de tiempo. Usa **Exportar ZIP** para guardar los archivos verificados en un ZIP nuevo. Debajo del vídeo, **Cómo se hizo** muestra cada paso con los comentarios que dejaste, donde puedes comentar para que el agente lo lea cuando este vídeo se vuelva a generar, además de las animaciones usadas y el registro de actividad. **Ajustes usados** ofrece repetirlo con los ajustes capturados o los actuales y permite renombrar el vídeo.
 
 ## Copia de seguridad y restauración
 

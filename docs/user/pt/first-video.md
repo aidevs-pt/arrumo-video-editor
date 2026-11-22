@@ -38,7 +38,7 @@ A aplicação de computador verifica a entrega quando todos os formatos ativos t
 
 ## Abre e exporta o resultado
 
-Vai a **Vídeos** → **Concluídos** e abre o vídeo finalizado. Seleciona uma saída para a pré-visualizar ou abre **Texto das legendas** para consultar as suas marcas temporais. Usa **Exportar ZIP** para guardar os ficheiros verificados num novo ZIP. Por baixo do vídeo, **Como foi feito** mostra cada passo com o feedback que deixaste, onde podes comentar para o agente ler da próxima vez, além das animações usadas e do registo de atividade. **Definições usadas** permite repetir com as definições capturadas ou atuais e mudar o nome do vídeo.
+Vai a **Vídeos** → **Concluídos** e abre o vídeo finalizado. Seleciona uma saída para a pré-visualizar ou abre **Texto das legendas** para consultar as suas marcas temporais. Usa **Exportar ZIP** para guardar os ficheiros verificados num novo ZIP. Por baixo do vídeo, **Como foi feito** mostra cada passo com o feedback que deixaste, onde podes comentar para o agente ler quando este vídeo for gerado de novo, além das animações usadas e do registo de atividade. **Definições usadas** permite repetir com as definições capturadas ou atuais e mudar o nome do vídeo.
 
 ## Cópia de segurança e restauro
 

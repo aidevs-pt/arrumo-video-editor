@@ -48,9 +48,10 @@ export function useProviderUsage(workspaceId: number | undefined) {
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    const changed = () => { reads.clear(); setRevision((value) => value + 1); };
+    const refresh = () => setRevision((value) => value + 1);
+    const changed = () => { reads.clear(); refresh(); };
     window.addEventListener(PLUGINS_CHANGED, changed);
-    const timer = setInterval(changed, REFRESH_MS);
+    const timer = setInterval(refresh, REFRESH_MS);
     return () => { window.removeEventListener(PLUGINS_CHANGED, changed); clearInterval(timer); };
   }, []);
 
