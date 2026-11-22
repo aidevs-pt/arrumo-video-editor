@@ -409,7 +409,7 @@
       "agent_failed": "The agent could not design the animation. Open the agent logs to see why.",
       "motion_generation_failed": "The animation could not be rendered. Open the agent logs and check that FFmpeg is installed."
     },
-    "emptyGenerate": "No animations yet. Use Generate with agent to describe one, or add a video you already have."
+    "emptyGenerate": "Use Generate with agent to describe one, or add a video you already have."
   },
   "assets": {
     "replaceFile": "Replace file",

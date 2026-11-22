@@ -409,7 +409,7 @@
       "agent_failed": "O agente não conseguiu desenhar a animação. Abra os registos do agente para ver porquê.",
       "motion_generation_failed": "Não foi possível renderizar a animação. Abra os registos do agente e confirme que o FFmpeg está instalado."
     },
-    "emptyGenerate": "Ainda não há animações. Use Gerar com o agente para descrever uma ou adicione um vídeo que já tenha."
+    "emptyGenerate": "Use Gerar com o agente para descrever uma ou adicione um vídeo que já tenha."
   },
   "assets": {
     "replaceFile": "Substituir ficheiro",

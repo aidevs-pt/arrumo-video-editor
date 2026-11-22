@@ -1,10 +1,11 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Pencil, Plus, Volume2, X } from "lucide-react";
+import { Copy, Pencil, Plus, Sparkles, Volume2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -193,9 +194,13 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
       {loadError ? <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription>
         <Button variant="outline" onClick={() => { setLoadError(false); setAttempt((value) => value + 1); }}>{copy.retry}</Button>
       </Alert> : !items ? <p role="status" className="text-sm text-muted-foreground">{copy.loading}</p>
-        : items.length === 0 ? <div className="rounded-xl border p-6">
-          <p className="text-sm text-muted-foreground">{copy.emptyGenerate}</p>
-        </div>
+        : items.length === 0 ? <Empty className="min-h-56 rounded-xl border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Sparkles /></EmptyMedia>
+            <EmptyTitle>{copy.empty}</EmptyTitle>
+            <EmptyDescription>{copy.emptyGenerate}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
         : <div className={cn("grid items-start gap-6", chosen && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
             {items.map(({ id, settings }) => <li key={id} className="min-w-0">

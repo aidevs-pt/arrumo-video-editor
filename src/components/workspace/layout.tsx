@@ -11,7 +11,7 @@ export function WorkspaceShell({ className, ...props }: ComponentProps<"main">) 
 export function WorkspaceHeading({ className, children, ...props }: ComponentProps<"div">) {
   return (
     <div className={cn("mb-6", className)} {...props}>
-      <div className="min-w-0 [&>h1]:wrap-anywhere [&>h1]:text-[clamp(1.625rem,4vw,2.125rem)] [&>h1]:leading-[1.03] [&>h1]:font-[820] [&>h1]:tracking-[-0.01em] [&>h1]:outline-none [&>p]:mt-1.5 [&>p]:max-w-[65ch] [&>p]:text-sm [&>p]:text-muted-foreground">
+      <div className="min-w-0 [&>h1]:wrap-anywhere [&>h1]:text-[clamp(2.25rem,5vw,3.25rem)] [&>h1]:leading-[1] [&>h1]:font-[850] [&>h1]:outline-none [&>h1]:[font-variation-settings:'wdth'_135] [&>p]:mt-2 [&>p]:max-w-[65ch] [&>p]:text-lg [&>p]:text-muted-foreground">
         {children}
       </div>
     </div>
