@@ -168,9 +168,11 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                 <li key={step.stage} aria-current={current ? "step" : undefined}
                   className="relative flex min-w-0 flex-col gap-1.5 pt-1.5 pb-2.5">
                   <span className={cn("h-[30px] rounded-xs border", complete
-                    ? "border-white/85 bg-white/85" : current ? "border-transparent bg-attention" : "border-white/35")} aria-hidden="true" />
+                    ? "border-white/85 bg-white/85" : current ? (runState === "paused"
+                      ? "border-white/85 bg-[repeating-linear-gradient(135deg,rgb(255_255_255_/_30%)_0,rgb(255_255_255_/_30%)_4px,transparent_4px,transparent_9px)]"
+                      : "border-transparent bg-attention") : "border-white/35")} aria-hidden="true" />
                   <span className={cn("min-w-0 px-1 text-xs font-bold wrap-anywhere",
-                    current ? "text-attention" : "text-white/85")}>{copy[step.stage]}</span>
+                    current && runState !== "paused" ? "text-attention" : "text-white/85")}>{copy[step.stage]}</span>
                   <span className="absolute inset-x-0 bottom-0 h-1.5 border-t border-white/30 bg-[repeating-linear-gradient(to_right,transparent_0,transparent_calc(25%_-_1px),rgb(255_255_255_/_20%)_calc(25%_-_1px),rgb(255_255_255_/_20%)_25%)]" aria-hidden="true" />
                   {complete && <span className="sr-only">{copy.stageComplete}</span>}
                   {step.review_required && current && <span className="sr-only">{copy.reviewRequired}</span>}
