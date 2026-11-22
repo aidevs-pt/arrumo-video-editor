@@ -105,6 +105,7 @@ export function AgentSettingsPage() {
           : (
             <div className="flex max-w-3xl flex-col gap-6">
               {tab === "general" && <GeneralSettings />}
+              {tab === "general" && <NotificationSettings />}
               {tab === "general" && <AgentSummary workspaceId={studioWorkspace ? Number(studioWorkspace) : undefined} href={settingsHref("agent")} />}
               {tab === "general" && <PrivacySettings />}
               {tab === "quality" && <QualitySettings />}
@@ -191,6 +192,36 @@ function GeneralSettings() {
           </div>
         </SettingRow>
       </div>
+    </section>
+  );
+}
+
+/** General › Notifications: whether generation events also reach the operating system. */
+function NotificationSettings() {
+  const { messages: { systemNotifications: copy, settings: text } } = useLocale();
+  const [system, setSystem] = useState<boolean>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    invoke<boolean>("read_notification_settings").then((value) => { if (active) setSystem(value); }, () => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, []);
+  async function change(value: boolean) {
+    setSystem(value);
+    setFailed(false);
+    try { setSystem(await invoke<boolean>("write_notification_settings", { system: value })); }
+    catch { setSystem(!value); setFailed(true); }
+  }
+  return (
+    <section aria-labelledby="settings-notifications">
+      <h2 id="settings-notifications" className="mb-3 text-[1.5rem]">{text.notifications}</h2>
+      <div className="rounded-xl border bg-card">
+        <SettingRow label={copy.setting} hint={copy.settingHint} labelId="settings-system-notifications">
+          {system === undefined && !failed ? <Skeleton className="h-6 w-11" />
+            : <Switch aria-labelledby="settings-system-notifications" checked={system ?? false} disabled={system === undefined} onCheckedChange={(value) => void change(value)} />}
+        </SettingRow>
+      </div>
+      {failed && <p role="alert" className="mt-2 text-sm text-destructive">{text.notificationsError}</p>}
     </section>
   );
 }

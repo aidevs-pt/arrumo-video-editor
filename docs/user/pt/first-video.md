@@ -20,6 +20,8 @@ Abre **Saídas** e verifica os formatos ativos. Para a entrega ser verificada, c
 4. Ativa **Gerar automaticamente as legendas em falta** se quiseres que o Arrumo envie o áudio de cada formato renderizado sem SRT para um fornecedor selecionado para a execução. Esta opção está desativada por predefinição.
 5. Seleciona **Gerar este vídeo**. Abre **Em produção** para acompanhar a execução.
 
+Enquanto o Arrumo está em segundo plano, os vídeos concluídos, falhados ou à espera de revisão também aparecem nas notificações do teu computador. Desativa-as em **Definições › Geral › Notificações**.
+
 ## Revê e termina a entrega
 
 Numa execução guiada, abre **Rever execução** quando houver uma decisão pendente. Verifica o guião, os recursos ou a pré-visualização disponíveis. Prepara as tuas decisões e envia-as quando terminares. Se precisares de alterações, descreve-as nas notas da etapa antes de enviar a decisão.

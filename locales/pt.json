@@ -329,7 +329,9 @@
     "agentFromApp": "Escreve todos os vídeos, salvo se um espaço de trabalho escolher outro.",
     "agentFromWorkspace": "Escolhido para este espaço de trabalho.",
     "changeAgent": "Mudar de agente",
-    "agentSettings": "Definições do agente"
+    "agentSettings": "Definições do agente",
+    "notifications": "Notificações",
+    "notificationsError": "Não foi possível mudar as notificações. Tenta de novo."
   },
   "studio": {
     "videos": "Vídeos",
@@ -1686,5 +1688,13 @@
     "adds": "O que adiciona",
     "agentsCall": "Os agentes podem chamar",
     "agentsCallHint": "através de queue_plugin_action_job, a partir da CLI, MCP e A2A."
+  },
+  "systemNotifications": {
+    "review_required": "{title} aguarda a tua revisão",
+    "completed": "{title} está concluído",
+    "failed": "{title} parou com um erro",
+    "body": "Em {workspace}. Abre o Arrumo para o ver.",
+    "setting": "Notificações do sistema",
+    "settingHint": "Avisa também pelo sistema dos vídeos concluídos, falhados ou à espera de revisão enquanto o Arrumo está em segundo plano."
   }
 }

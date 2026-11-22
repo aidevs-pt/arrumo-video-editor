@@ -329,7 +329,9 @@
     "agentFromApp": "Writes every video, unless a workspace picks another.",
     "agentFromWorkspace": "Picked for this workspace.",
     "changeAgent": "Change agent",
-    "agentSettings": "Agent settings"
+    "agentSettings": "Agent settings",
+    "notifications": "Notifications",
+    "notificationsError": "Couldn't change notifications. Try again."
   },
   "studio": {
     "videos": "Videos",
@@ -1686,5 +1688,13 @@
     "adds": "What it adds",
     "agentsCall": "Agents can call",
     "agentsCallHint": "through queue_plugin_action_job, from the CLI, MCP and A2A."
+  },
+  "systemNotifications": {
+    "review_required": "{title} is waiting for your review",
+    "completed": "{title} is finished",
+    "failed": "{title} stopped with an error",
+    "body": "In {workspace}. Open Arrumo to see it.",
+    "setting": "System notifications",
+    "settingHint": "Also notify finished, failed and waiting-for-review videos through your computer while Arrumo is in the background."
   }
 }

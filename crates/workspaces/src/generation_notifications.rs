@@ -137,6 +137,70 @@ impl WorkspaceStore {
     }
 }
 
+/// A generation event for the operating system's notification center.
+#[derive(Debug, Serialize, PartialEq)]
+pub struct SystemNotice {
+    pub id: i64,
+    /// `review_required`, `completed` or `failed`.
+    pub kind: String,
+    pub workspace_id: i64,
+    pub workspace: String,
+    pub run_id: i64,
+    pub title: String,
+}
+
+impl WorkspaceStore {
+    /// Whether generation events also go to the operating system's notifications. On by default.
+    pub fn system_notifications(&self) -> rusqlite::Result<bool> {
+        self.0.query_row(
+            "SELECT system FROM notification_settings WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn set_system_notifications(&self, enabled: bool) -> rusqlite::Result<bool> {
+        self.0.execute(
+            "UPDATE notification_settings SET system = ?1 WHERE id = 1",
+            [enabled],
+        )?;
+        self.system_notifications()
+    }
+
+    /// The newest generation event, so a watcher starts after what already happened.
+    pub fn latest_generation_notification(&self) -> rusqlite::Result<i64> {
+        self.0.query_row(
+            "SELECT COALESCE(MAX(id), 0) FROM generation_notifications",
+            [],
+            |row| row.get(0),
+        )
+    }
+
+    /// Generation events after `after_id` in every workspace, oldest first.
+    pub fn system_notices_after(&self, after_id: i64) -> rusqlite::Result<Vec<SystemNotice>> {
+        self.0
+            .prepare(
+                "SELECT notice.id, notice.kind, run.workspace_id, workspace.name, run.id,
+                        COALESCE(run.display_title, json_extract(run.snapshot_json, '$.draft.title'))
+                 FROM generation_notifications AS notice
+                 JOIN generation_runs AS run ON run.id = notice.run_id
+                 JOIN workspaces AS workspace ON workspace.id = run.workspace_id
+                 WHERE notice.id > ?1 ORDER BY notice.id LIMIT 20",
+            )?
+            .query_map([after_id], |row| {
+                Ok(SystemNotice {
+                    id: row.get(0)?,
+                    kind: row.get(1)?,
+                    workspace_id: row.get(2)?,
+                    workspace: row.get(3)?,
+                    run_id: row.get(4)?,
+                    title: row.get(5)?,
+                })
+            })?
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +264,69 @@ mod tests {
                 .all(|notice| !notice.unread)
         );
         assert!(store.generation_inbox(other).unwrap().completions[0].unread);
+    }
+
+    #[test]
+    fn system_notices_follow_every_workspace_from_where_the_watcher_started() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Cube".into(),
+                    intent: "Brief".into(),
+                    source_ids: vec![],
+                    profile_id: None,
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "a", &RunOptions::default())
+            .unwrap();
+        let start = store.latest_generation_notification().unwrap();
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET state = 'failed' WHERE id = ?1",
+                [run.id],
+            )
+            .unwrap();
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET state = 'completed' WHERE id = ?1",
+                [run.id],
+            )
+            .unwrap();
+        let notices = store.system_notices_after(start).unwrap();
+        assert_eq!(
+            notices
+                .iter()
+                .map(|notice| notice.kind.as_str())
+                .collect::<Vec<_>>(),
+            ["failed", "completed"]
+        );
+        assert_eq!(
+            (notices[0].workspace.as_str(), notices[0].title.as_str()),
+            ("Studio", "Cube")
+        );
+        assert!(
+            store
+                .system_notices_after(notices[1].id)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .generation_inbox(workspace)
+                .unwrap()
+                .reviews
+                .is_empty()
+        );
+
+        assert!(store.system_notifications().unwrap());
+        assert!(!store.set_system_notifications(false).unwrap());
+        assert!(!store.system_notifications().unwrap());
     }
 }

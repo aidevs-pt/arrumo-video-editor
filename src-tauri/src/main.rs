@@ -959,6 +959,50 @@ fn write_privacy_settings(
 }
 
 #[tauri::command]
+fn read_notification_settings(store: State<'_, Store>) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .system_notifications()
+        .map_err(|_| "notification_settings_failed")
+}
+
+#[tauri::command]
+fn write_notification_settings(
+    system: bool,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_system_notifications(system)
+        .map_err(|_| "notification_settings_failed")
+}
+
+/// Generation events after `after` in every workspace, plus the newest id, for the system
+/// notification watcher. Pass `null` to only learn where to start.
+#[tauri::command]
+fn system_notices(
+    after: Option<i64>,
+    store: State<'_, Store>,
+) -> Result<serde_json::Value, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    let latest = store
+        .latest_generation_notification()
+        .map_err(|_| "notifications_failed")?;
+    let notices = match after {
+        Some(after) => store
+            .system_notices_after(after)
+            .map_err(|_| "notifications_failed")?,
+        None => Vec::new(),
+    };
+    let enabled = store
+        .system_notifications()
+        .map_err(|_| "notifications_failed")?;
+    Ok(serde_json::json!({"latest": latest, "enabled": enabled, "notices": notices}))
+}
+
+#[tauri::command]
 async fn pending_generation_reviews(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -1178,6 +1222,7 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .register_uri_scheme_protocol("arrumo-panel", plugin_settings::serve_plugin_surface)
         .manage(delivery_stream::DeliveryStream::default())
         .setup(|app| {
@@ -1267,6 +1312,9 @@ fn main() {
             backup::export_backup,
             read_privacy_settings,
             write_privacy_settings,
+            read_notification_settings,
+            write_notification_settings,
+            system_notices,
             backup::stage_backup_import,
             backup::pending_backup_import,
             backup::cancel_backup_import,

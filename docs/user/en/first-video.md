@@ -20,6 +20,8 @@ Open **Outputs** and check which formats are enabled. Each enabled format needs 
 4. Turn on **Generate missing subtitles automatically** if you want Arrumo to send audio from each rendered format missing an SRT to a provider selected for the run. This option is off by default.
 5. Select **Generate this video**. Open **Generating** to follow the run.
 
+While Arrumo is in the background, finished, failed and waiting-for-review videos also appear in your computer's notifications. Turn them off in **Settings › General › Notifications**.
+
 ## Review and finish the delivery
 
 For a guided run, open **Review run** when a stage needs a decision. Check the available script, media, or preview. Stage your decisions and send them when you are ready. If you want a revision, describe the change in the stage’s notes before sending.

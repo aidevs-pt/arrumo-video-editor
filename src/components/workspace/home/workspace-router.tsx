@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { useDesktopDeepLinks } from "./use-desktop-deep-links";
+import { useSystemNotifications } from "./use-system-notifications";
 import { WorkspaceFrame } from "./workspace-frame";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
 export { workspaceHref, completedVideoHref } from "./workspace-links";
@@ -43,6 +44,7 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
   const { messages: { workspaces: copy } } = useLocale();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [status, setStatus] = useState<Status>("loading");
+  useSystemNotifications(status === "ready");
   const section = pathname.replace(/\/$/, "");
   const view = section === "/completed-video" ? "videos"
     : section === "/generation-run" ? "generations"

@@ -20,6 +20,8 @@ Abre **Salidas** y comprueba qué formatos están activados. Para que la entrega
 4. Activa **Generar automáticamente los subtítulos que falten** si quieres que Arrumo envíe el audio de cada formato renderizado sin SRT a un proveedor seleccionado para la ejecución. Esta opción viene desactivada.
 5. Selecciona **Generar este vídeo**. Abre la pestaña **En producción** para seguir el proceso.
 
+Mientras Arrumo está en segundo plano, los vídeos terminados, fallidos o pendientes de revisión también aparecen en las notificaciones de tu equipo. Desactívalas en **Ajustes › General › Notificaciones**.
+
 ## Revisa y termina la entrega
 
 En una ejecución guiada, abre **Revisar proceso** cuando haya una decisión pendiente. Comprueba el guion, los recursos o la vista previa disponibles. Prepara tus decisiones y envíalas cuando hayas terminado. Si necesitas una revisión, describe el cambio en las notas de la etapa antes de enviarla.

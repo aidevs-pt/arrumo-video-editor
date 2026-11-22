@@ -114,7 +114,7 @@ pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_direc
 pub use format_deliveries::{
     FormatDelivery, PortraitDerivatives, PortraitSource, RequiredOutput, SupplementalOutputs,
 };
-pub use generation_notifications::{GenerationInbox, GenerationNotification};
+pub use generation_notifications::{GenerationInbox, GenerationNotification, SystemNotice};
 pub use generation_plan::{GenerationPlan, PlanStep, ProductionStage};
 pub use generation_queue::{
     FormatOverride, GenerationRun, PendingReview, ReplayMode, RunOptions, RunProgress,
@@ -297,6 +297,7 @@ impl WorkspaceStore {
             include_str!("../migrations/060-workspace-appearance.sql"),
             include_str!("../migrations/061-context-sources.sql"),
             include_str!("../migrations/062-brand-color-details.sql"),
+            include_str!("../migrations/063-system-notifications.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

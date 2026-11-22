@@ -1,4 +1,4 @@
-//! App-wide operations: full backups, privacy choices and the plugin tour.
+//! App-wide operations: full backups, privacy and notification choices and the plugin tour.
 use std::path::Path;
 
 use serde::Deserialize;
@@ -62,6 +62,11 @@ pub(super) fn definitions() -> Vec<Value> {
         json!({"name": "set_privacy_settings", "description": "Allow or stop anonymous usage counts and crash reports.",
             "inputSchema": {"type": "object", "properties": {"usageData": {"type": "boolean"}, "crashReports": {"type": "boolean"}},
                 "required": ["usageData", "crashReports"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "get_notification_settings", "description": "Read whether finished, failed and waiting-for-review videos also raise operating system notifications.",
+            "inputSchema": none, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_notification_settings", "description": "Turn operating system notifications for generation events on or off for the whole app.",
+            "inputSchema": {"type": "object", "properties": {"system": {"type": "boolean"}}, "required": ["system"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
         json!({"name": "get_plugin_tour", "description": "List the plugin introductions the creator has not seen yet (pending), or every plugin's introduction (all).",
             "inputSchema": {"type": "object", "properties": {"all": {"type": "boolean"}}, "additionalProperties": false},
@@ -135,7 +140,18 @@ pub(super) fn call(
                     .map(|settings| json!({"privacy": settings}))
                     .map_err(|_| "Could not save privacy settings")
             }),
-        "get_backup_import_status" | "cancel_backup_import" | "get_privacy_settings" => {
+        "get_notification_settings" if arguments.is_empty() => store
+            .system_notifications()
+            .map(|system| json!({"notifications": {"system": system}}))
+            .map_err(|_| "Could not read notification settings"),
+        "set_notification_settings" => match (arguments.len(), arguments.get("system").and_then(Value::as_bool)) {
+            (1, Some(system)) => store
+                .set_system_notifications(system)
+                .map(|system| json!({"notifications": {"system": system}}))
+                .map_err(|_| "Could not save notification settings"),
+            _ => Err("Expected a system boolean"),
+        },
+        "get_backup_import_status" | "cancel_backup_import" | "get_privacy_settings" | "get_notification_settings" => {
             Err("This tool takes no arguments")
         }
         _ => return None,
