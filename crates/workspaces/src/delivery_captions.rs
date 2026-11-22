@@ -12,6 +12,59 @@ fn timestamp(millis: u64) -> String {
     )
 }
 
+/// libass styles SRT on a 288-line canvas scaled to the video's height. Text is about 5.5% of
+/// the shorter side; portrait captions sit higher, above the controls short-video apps overlay.
+pub(crate) fn burned_caption_style(width: u32, height: u32) -> String {
+    let canvas = |share: f64| share * 288.0;
+    let size = canvas(0.055) * f64::from(width.min(height)) / f64::from(height);
+    let margin = canvas(if height > width { 0.2 } else { 0.07 });
+    format!(
+        "FontName=Sans,Bold=1,FontSize={size:.1},PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline={:.1},Shadow=0,Alignment=2,MarginV={margin:.0}",
+        size * 0.1
+    )
+}
+
+/// Draws `subtitles` into a copy of `video` at `output`, keeping its audio as it is.
+pub(crate) fn burn_captions(
+    video: &std::path::Path,
+    subtitles: &str,
+    (width, height): (u32, u32),
+    output: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = output
+        .parent()
+        .ok_or_else(|| io::Error::other("The captioned copy needs a directory"))?;
+    std::fs::write(directory.join("captions.srt"), subtitles)?;
+    let status = std::process::Command::new("ffmpeg")
+        .args([
+            "-nostdin",
+            "-v",
+            "error",
+            "-protocol_whitelist",
+            "file",
+            "-i",
+        ])
+        .arg(video)
+        .arg("-vf")
+        .arg(format!(
+            "subtitles=filename=captions.srt:charenc=UTF-8:force_style='{}'",
+            burned_caption_style(width, height)
+        ))
+        .args([
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+        ])
+        .args(["-c:a", "copy", "-movflags", "+faststart", "-y"])
+        .arg(output)
+        .current_dir(directory)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()?;
+    if !status.success() {
+        return Err(io::Error::other("Could not draw the subtitles into the video").into());
+    }
+    Ok(())
+}
+
 pub(crate) fn render_srt(words: &[TranscriptWord], duration: f64) -> io::Result<String> {
     let mut output = String::new();
     let mut cue_number = 0;
@@ -78,6 +131,14 @@ pub(crate) fn render_srt(words: &[TranscriptWord], duration: f64) -> io::Result<
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn caption_size_follows_the_shorter_side() {
+        let landscape = super::burned_caption_style(1920, 1080);
+        let portrait = super::burned_caption_style(1080, 1920);
+        assert!(landscape.contains("FontSize=15.8,") && landscape.contains("MarginV=20"));
+        assert!(portrait.contains("FontSize=8.9,") && portrait.contains("MarginV=58"));
+    }
+
     use super::*;
 
     #[test]

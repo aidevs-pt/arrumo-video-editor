@@ -50,6 +50,8 @@ pub struct FormatOverride {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub portrait_count: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub burned_captions: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub portrait_guidance: Option<String>,
     /// Workspace images to use as thumbnail references for this video.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -106,6 +108,9 @@ fn apply_output_overrides(
             }
             if let Some(value) = change.tags {
                 set("tags", json!(value), supplemental);
+            }
+            if let Some(value) = change.burned_captions {
+                set("burned_captions", json!(value), supplemental);
             }
             if let Some(value) = &change.thumbnail_guidance {
                 set("thumbnail_guidance", json!(value), supplemental);

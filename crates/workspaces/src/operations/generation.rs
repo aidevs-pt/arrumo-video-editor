@@ -290,7 +290,7 @@ pub(super) fn definitions() -> [Value; 41] {
                             "thumbnails": {"type": "integer", "minimum": 0}, "titles": {"type": "integer", "minimum": 0},
                             "descriptions": {"type": "integer", "minimum": 0}, "tags": {"type": "boolean"},
                             "thumbnail_guidance": {"type": "string"}, "specifications": {"type": "string"},
-                            "portrait_count": {"type": "integer", "minimum": 0}, "portrait_guidance": {"type": "string"},
+                            "portrait_count": {"type": "integer", "minimum": 0}, "burned_captions": {"type": "boolean"}, "portrait_guidance": {"type": "string"},
                             "thumbnail_reference_ids": {"type": "array", "items": id}
                         }, "additionalProperties": false}},
                     "skip_hooks": {"type": "array", "maxItems": 64, "uniqueItems": true,

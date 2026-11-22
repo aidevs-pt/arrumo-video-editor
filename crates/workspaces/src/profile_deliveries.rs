@@ -15,6 +15,7 @@ pub struct DeliveryOverrides {
     pub thumbnail_reference_ids: Option<Vec<i64>>,
     pub specifications: Option<String>,
     pub portrait_derivatives: Option<PortraitDerivatives>,
+    pub burned_captions: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -51,6 +52,7 @@ impl DeliveryOverrides {
                 .as_ref()
                 .unwrap_or(&workspace.portrait_derivatives)
                 .clone(),
+            burned_captions: self.burned_captions.unwrap_or(workspace.burned_captions),
         }
     }
 }

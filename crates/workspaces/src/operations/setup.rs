@@ -208,7 +208,8 @@ pub(super) fn definitions() -> [Value; 29] {
                 {"type": "object", "properties": {"type": {"const": "profile"}, "profile_id": id},
                     "required": ["type", "profile_id"], "additionalProperties": false}
             ]}
-        }, "additionalProperties": false}
+        }, "additionalProperties": false},
+        "burned_captions": {"type": "boolean"}
     }, "additionalProperties": false});
     let profile = json!({"type": "object", "properties": {"workspaceId": id, "profileId": id},
         "required": ["workspaceId", "profileId"], "additionalProperties": false});

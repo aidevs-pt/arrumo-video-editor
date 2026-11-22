@@ -29,6 +29,7 @@ type Supplemental = {
   thumbnail_reference_ids: number[];
   specifications: string;
   portrait_derivatives: PortraitDerivatives;
+  burned_captions: boolean;
 };
 
 type Delivery = {
@@ -128,6 +129,7 @@ export function FormatDelivery({
       specifications: String(fields.get("specifications") ?? ""),
       thumbnail_reference_ids: references,
       portrait_derivatives: portrait,
+      burned_captions: fields.has("burned_captions"),
     };
     setPending(true);
     setResult(null);
@@ -257,6 +259,10 @@ export function FormatDelivery({
               <Checkbox name="tags" defaultChecked={delivery.supplemental.tags} />{copy.tagsShort}
             </label>
           </div>)}
+          {row(copy.rowCaptions, copy.rowCaptionsHint,
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox name="burned_captions" defaultChecked={delivery.supplemental.burned_captions} />{copy.burned_captions}
+            </label>)}
           {row(copy.rowSpecs, copy.rowSpecsHint,
             <Textarea name="specifications" aria-label={copy.specifications} defaultValue={delivery.supplemental.specifications} className="min-h-20" />)}
           <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-4 sm:px-5">
@@ -316,6 +322,10 @@ export function FormatDelivery({
             <Checkbox name="tags" defaultChecked={delivery.supplemental.tags} disabled={!overridden("tags")} />{copy.tagsShort}
           </label>
         </div> },
+      { key: "captions", title: copy.rowCaptions, fields: ["burned_captions"], workspaceValue: workspace.burned_captions ? copy.on : copy.off, body:
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox name="burned_captions" defaultChecked={delivery.supplemental.burned_captions} disabled={!overridden("burned_captions")} />{copy.burned_captions}
+        </label> },
       { key: "specs", title: copy.rowSpecs, fields: ["specifications"], workspaceValue: workspace.specifications.trim() ? copy.written : copy.empty, body:
         <Textarea name="specifications" aria-label={copy.specifications} defaultValue={delivery.supplemental.specifications}
           disabled={!overridden("specifications")} className="min-h-20" /> },
@@ -330,6 +340,7 @@ export function FormatDelivery({
       ...(showPortrait ? [[copy.rowPortrait, String(effective.portrait_derivatives.count), "portrait_derivatives"] as [string, string, keyof Supplemental]] : []),
       [copy.summaryTitles, `${effective.titles}, ${effective.descriptions}`, "titles"],
       [copy.tagsShort, effective.tags ? copy.on : copy.off, "tags"],
+      [copy.rowCaptions, effective.burned_captions ? copy.on : copy.off, "burned_captions"],
       [copy.rowSpecs, effective.specifications.trim() ? copy.written : copy.empty, "specifications"],
     ];
     return (
@@ -448,6 +459,14 @@ export function FormatDelivery({
                     <FieldLabel htmlFor="tags">{copy.tags}</FieldLabel>
                   </Field>
                   {overrideControl("tags")}
+                </Field>
+                <Field>
+                  <Field orientation="horizontal">
+                    <Checkbox id="burned_captions" name="burned_captions" disabled={isProfile && !overridden("burned_captions")}
+                      defaultChecked={delivery.supplemental.burned_captions} />
+                    <FieldLabel htmlFor="burned_captions">{copy.burned_captions}</FieldLabel>
+                  </Field>
+                  {overrideControl("burned_captions")}
                 </Field>
                 <Separator />
                 {textFields.map((field) => (

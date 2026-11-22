@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, FileText, Image as ImageIcon, RectangleHorizontal, RectangleVertical, RotateCcw } from "lucide-react";
+import { Captions, ChevronDown, FileText, Image as ImageIcon, RectangleHorizontal, RectangleVertical, RotateCcw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useId, useState } from "react";
@@ -22,6 +22,7 @@ type Supplemental = {
   thumbnails: number; titles: number; descriptions: number; tags: boolean;
   thumbnail_guidance?: string; specifications?: string; thumbnail_reference_ids?: number[];
   portrait_derivatives: { count: number; source?: { guidance?: string } };
+  burned_captions?: boolean;
 };
 export type OutputPlan = { format: Format; supplemental: Supplemental };
 
@@ -29,7 +30,7 @@ export type OutputPlan = { format: Format; supplemental: Supplemental };
 export type FormatOverride = {
   thumbnails?: number; titles?: number; descriptions?: number; tags?: boolean;
   thumbnail_guidance?: string; specifications?: string; portrait_count?: number; portrait_guidance?: string;
-  thumbnail_reference_ids?: number[];
+  thumbnail_reference_ids?: number[]; burned_captions?: boolean;
 };
 export type OutputChoice = { skipped: number[]; overrides: Record<string, FormatOverride> };
 
@@ -90,6 +91,7 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
           descriptions: change.descriptions ?? supplemental.descriptions,
           tags: change.tags ?? supplemental.tags,
           portrait: change.portrait_count ?? supplemental.portrait_derivatives.count,
+          captioned: change.burned_captions ?? supplemental.burned_captions ?? false,
         };
         const customised = Object.values(change).some((entry) => entry !== undefined);
         const Icon = format.height > format.width ? RectangleVertical : RectangleHorizontal;
@@ -98,6 +100,7 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
         const lines: { icon: typeof Icon; text: string; previews?: ReferenceImage[] }[] = [];
         if (value.thumbnails) lines.push({ icon: ImageIcon, text: copy.makeThumbnails.replace("{count}", String(value.thumbnails)).replace("{format}", format.name.toLowerCase()), previews: references });
         if (value.portrait) lines.push({ icon: RectangleVertical, text: copy.makePortrait.replace("{count}", String(value.portrait)) });
+        if (value.captioned) lines.push({ icon: Captions, text: copy.makeCaptioned });
         if (value.titles || value.descriptions || value.tags) lines.push({ icon: FileText, text: [
           value.titles || value.descriptions ? copy.makeText.replace("{titles}", String(value.titles)).replace("{descriptions}", String(value.descriptions)) : "",
           value.tags ? copy.makeTags : "",
@@ -149,6 +152,10 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
                   </div>
                   <label className="flex items-center justify-between gap-3 text-sm font-semibold">{copy.countTags}
                     <Switch checked={value.tags} disabled={disabled} onCheckedChange={(tags) => update(format.id, { tags })} />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 text-sm font-semibold">{copy.countCaptioned}
+                    <Switch checked={value.captioned} disabled={disabled}
+                      onCheckedChange={(burned_captions) => update(format.id, { burned_captions })} />
                   </label>
                   <Guidance label={copy.thumbnailGuidance} inherited={supplemental.thumbnail_guidance ?? ""} value={change.thumbnail_guidance}
                     disabled={disabled} onChange={(text) => update(format.id, { thumbnail_guidance: text || undefined })} />

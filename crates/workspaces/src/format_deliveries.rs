@@ -14,6 +14,8 @@ pub struct SupplementalOutputs {
     pub thumbnail_reference_ids: Vec<i64>,
     pub specifications: String,
     pub portrait_derivatives: PortraitDerivatives,
+    /// Also deliver a copy of the video with the subtitles drawn into the picture.
+    pub burned_captions: bool,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
