@@ -882,7 +882,10 @@
     "anotherLink": "Pega otro enlace",
     "addLink": "Añadir",
     "learnAfter": "Tras crear el espacio, {agent} los lee y sugiere contexto y perfiles para que marques.",
-    "createAndRead": "Crear {name} y leer los enlaces"
+    "createAndRead": "Crear {name} y leer los enlaces",
+    "recommended": "Recomendado",
+    "orThisOne": "O este",
+    "oneTranscriber": "La transcripción necesita una clave: {providers}. Se recomienda la primera."
   },
   "workspaces": {
     "missing": "No se encontró este espacio de trabajo.",

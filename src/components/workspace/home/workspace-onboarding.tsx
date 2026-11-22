@@ -162,9 +162,9 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
             <AlertDescription>{copy.connectionNote}</AlertDescription>
           </Alert> : null}
           {saveError && <SetupError>{agentSettings.saveError}</SetupError>}
-          <footer className="mt-auto flex justify-between gap-4 pt-10">
+          <footer className="sticky bottom-0 z-10 mt-auto flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 py-4 backdrop-blur-sm mt-10">
             <p className="self-center text-sm text-muted-foreground">{copy.stepCount.replace("{step}", "1")}</p>
-            <Button disabled={!agent || pending} onClick={() => void chooseProvider()}>{agent ? copy.useAgent.replace("{agent}", agent.label) : copy.next}</Button>
+            <Button size="lg" disabled={!agent || pending} onClick={() => void chooseProvider()}>{agent ? copy.useAgent.replace("{agent}", agent.label) : copy.next}</Button>
           </footer>
         </>}
         {step === 1 && <>
@@ -199,9 +199,9 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
             <FieldDescription>{links.length || link.trim() ? copy.learnAfter.replace("{agent}", agent?.label ?? copy.agent) : copy.workspaceHint}</FieldDescription>
           </Field>
           {saveError && <SetupError>{workspaces.createError}</SetupError>}
-          <footer className="mt-auto flex justify-between gap-4 pt-10">
+          <footer className="sticky bottom-0 z-10 mt-auto flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 py-4 backdrop-blur-sm mt-10">
             <Back onClick={back} disabled={pending}>{copy.back}</Back>
-            <Button type="submit" disabled={pending || !name.trim()}>{pending ? workspaces.creating
+            <Button type="submit" size="lg" disabled={pending || !name.trim()}>{pending ? workspaces.creating
               : links.length || link.trim() ? copy.createAndRead.replace("{name}", name.trim() || workspaces.name) : workspaces.create}</Button>
           </footer>
         </form>}
@@ -253,7 +253,7 @@ function ArrumoFace() {
 }
 
 function Back({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
-  return <Button type="button" variant="ghost" disabled={disabled} onClick={onClick}><ArrowLeft data-icon="inline-start" />{children}</Button>;
+  return <Button type="button" variant="ghost" size="lg" disabled={disabled} onClick={onClick}><ArrowLeft data-icon="inline-start" />{children}</Button>;
 }
 
 function SetupError({ children }: { children: ReactNode }) {

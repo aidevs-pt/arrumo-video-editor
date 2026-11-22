@@ -882,7 +882,10 @@
     "anotherLink": "Paste another link",
     "addLink": "Add",
     "learnAfter": "After creating the workspace, {agent} reads these and suggests context and profiles for you to tick.",
-    "createAndRead": "Create {name} and read the links"
+    "createAndRead": "Create {name} and read the links",
+    "recommended": "Recommended",
+    "orThisOne": "Or this one",
+    "oneTranscriber": "Transcription needs one key: {providers}. The first is recommended."
   },
   "workspaces": {
     "missing": "This workspace could not be found.",
