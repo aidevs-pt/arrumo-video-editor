@@ -1,7 +1,9 @@
 "use client";
 
 import { ChevronDown, FileText, Image as ImageIcon, RectangleHorizontal, RectangleVertical, RotateCcw } from "lucide-react";
-import { useId } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useId, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,13 +53,33 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
   disabled?: boolean;
 }) {
   const { messages: { videoDetails: copy, delivery } } = useLocale();
+  const [imported, setImported] = useState<ReferenceImage[]>([]);
+  const [importFailed, setImportFailed] = useState(false);
+  images = [...images, ...imported.filter((image) => !images.some((entry) => entry.id === image.id))];
   const produced = plan.filter(({ format }) => !choice.skipped.includes(format.id)).length;
+
+  async function importReference(formatId: number, selected: number[]) {
+    const source = await open({
+      title: delivery.importReference,
+      filters: [{ name: delivery.thumbnail_reference_ids, extensions: ["png", "jpg", "jpeg", "webp", "gif", "avif"] }],
+    });
+    if (typeof source !== "string") return;
+    try {
+      const image = await invoke<ReferenceImage>("import_asset", { workspaceId, source, thumbnailReference: true });
+      setImportFailed(false);
+      setImported((current) => [...current, image]);
+      update(formatId, { thumbnail_reference_ids: [...selected, image.id] });
+    } catch {
+      setImportFailed(true);
+    }
+  }
 
   function update(id: number, change: FormatOverride) {
     onChange({ ...choice, overrides: { ...choice.overrides, [id]: { ...choice.overrides[id], ...change } } });
   }
 
-  return (
+  return (<>
+    {importFailed && <p role="alert" className="mb-2 text-sm text-destructive">{delivery.importReferenceError}</p>}
     <ul className="flex flex-col divide-y">
       {plan.map(({ format, supplemental }) => {
         const skipped = choice.skipped.includes(format.id);
@@ -132,10 +154,12 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
                     disabled={disabled} onChange={(text) => update(format.id, { thumbnail_guidance: text || undefined })} />
                   {value.portrait > 0 && <Guidance label={copy.portraitGuidance} inherited={supplemental.portrait_derivatives.source?.guidance ?? ""}
                     value={change.portrait_guidance} disabled={disabled} onChange={(text) => update(format.id, { portrait_guidance: text || undefined })} />}
-                  {value.thumbnails > 0 && images.length > 0 && (
+                  {value.thumbnails > 0 && (
                     <ThumbnailReferences id={`video-reference-${format.id}`} workspaceId={workspaceId} images={images} copy={delivery}
                       selected={change.thumbnail_reference_ids ?? supplemental.thumbnail_reference_ids ?? []}
-                      onChange={(ids) => update(format.id, { thumbnail_reference_ids: ids })} />
+                      onChange={(ids) => update(format.id, { thumbnail_reference_ids: ids })}
+                      onImport={disabled ? undefined : () => void importReference(format.id,
+                        change.thumbnail_reference_ids ?? supplemental.thumbnail_reference_ids ?? [])} />
                   )}
                   <Guidance label={copy.specifications} inherited={supplemental.specifications ?? ""} value={change.specifications}
                     disabled={disabled} onChange={(text) => update(format.id, { specifications: text || undefined })} />
@@ -151,7 +175,7 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
         );
       })}
     </ul>
-  );
+  </>);
 }
 
 function Count({ label, value, inherited, disabled, onChange }: {

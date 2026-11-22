@@ -530,7 +530,8 @@
     "save": "Save delivery settings",
     "saved": "Delivery settings saved.",
     "saveError": "Delivery settings couldn’t be saved. Try again.",
-    "portraitFollowsProfile": "Cuts follow the guidance of the {profile} profile and the thumbnails its portrait format asks for."
+    "portraitFollowsProfile": "Cuts follow the guidance of the {profile} profile and the thumbnails its portrait format asks for.",
+    "uploadReference": "Upload"
   },
   "drafts": {
     "deleteDraft": "Delete draft",

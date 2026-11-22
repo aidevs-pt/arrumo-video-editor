@@ -530,7 +530,8 @@
     "save": "Guardar definições de entrega",
     "saved": "Definições de entrega guardadas.",
     "saveError": "Não foi possível guardar as definições de entrega. Tente novamente.",
-    "portraitFollowsProfile": "Os cortes seguem as indicações de {profile} e as miniaturas que o seu formato vertical pede."
+    "portraitFollowsProfile": "Os cortes seguem as indicações de {profile} e as miniaturas que o seu formato vertical pede.",
+    "uploadReference": "Carregar"
   },
   "drafts": {
     "deleteDraft": "Eliminar rascunho",

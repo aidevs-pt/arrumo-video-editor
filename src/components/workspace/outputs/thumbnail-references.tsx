@@ -1,6 +1,5 @@
 import type { LocaleMessages } from "@/lib/locales";
 import { Check, ImagePlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { FieldLegend, FieldSet } from "@/components/ui/field";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
@@ -21,7 +20,7 @@ export function ThumbnailReferences({ id, workspaceId, images, selected, copy, o
   return (
     <FieldSet>
       <FieldLegend>{copy.thumbnail_reference_ids}</FieldLegend>
-      {images.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noReferenceImages}</p> : (
+      {images.length === 0 && !onImport ? <p className="text-sm text-muted-foreground">{copy.noReferenceImages}</p> : (
         <ScrollArea className={cn("rounded-lg border", images.length > 6 && "h-72")}>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-3 p-3">
             {images.map((image) => {
@@ -47,10 +46,17 @@ export function ThumbnailReferences({ id, workspaceId, images, selected, copy, o
                 </li>
               );
             })}
+            {onImport && <li className="p-1.5">
+              <button type="button" onClick={onImport}
+                className="flex aspect-video w-full flex-col items-center justify-center gap-1 rounded-thumb border border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none motion-reduce:transition-none">
+                <ImagePlus className="size-5" aria-hidden="true" />
+                <span className="sr-only">{copy.importReference}</span>
+              </button>
+              <span className="mt-1.5 block truncate text-xs font-medium text-muted-foreground" aria-hidden="true">{copy.uploadReference}</span>
+            </li>}
           </ul>
         </ScrollArea>
       )}
-      {onImport && <Button type="button" size="sm" variant="outline" className="self-start" onClick={onImport}><ImagePlus data-icon="inline-start" />{copy.importReference}</Button>}
     </FieldSet>
   );
 }
