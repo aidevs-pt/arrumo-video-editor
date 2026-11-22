@@ -43,6 +43,13 @@ export function ProfileContext({ workspace, profile, onUpdate }: {
     return () => { active = false; };
   }, [profile.id, workspaceId]);
 
+  // The workspace context's headings, as a short summary of what the profile inherits.
+  const sections = (workspaceContext ?? "").split("\n")
+    .map((line) => line.match(/^#{1,3}\s+(.+?)\s*#*$/)?.[1].replace(/[*_`]/g, "").trim())
+    .filter((heading): heading is string => Boolean(heading))
+    .slice(0, 4)
+    .map((heading) => /^\p{Lu}[\p{Ll}]*(\s|$)/u.test(heading) ? heading.charAt(0).toLocaleLowerCase() + heading.slice(1) : heading);
+
   return (
     <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="flex min-w-0 flex-col gap-10">
@@ -51,7 +58,7 @@ export function ProfileContext({ workspace, profile, onUpdate }: {
           <CollapsibleTrigger className="group flex w-full items-center gap-3 p-4 text-start">
             <span className="min-w-0 flex-1">
               <LayerGauge layer="workspace" />
-              <span className="mt-1 block font-semibold">{copy.inherited.replace("{workspace}", workspace.name)}</span>
+              <span className="mt-1 block font-semibold">{copy.inherited.replace("{workspace}", workspace.name)}{sections.length > 0 && `: ${sections.join(", ")}`}</span>
             </span>
             <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-150 group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
