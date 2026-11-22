@@ -142,6 +142,53 @@ fn with_motion_schema(mut schema: Value, animations: usize) -> Value {
     schema
 }
 
+/// Lets the agent lay one of the run's approved audio tracks under the whole video.
+fn with_music_schema(mut schema: Value, tracks: &[i64]) -> Value {
+    if tracks.is_empty() {
+        return schema;
+    }
+    schema["properties"]["music"] = json!({"type": "array", "maxItems": 1, "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["assetId"], "properties": {"assetId": {"enum": tracks}},
+    }});
+    if let Some(required) = schema["required"].as_array_mut() {
+        required.push(json!("music"));
+    }
+    schema
+}
+
+/// Records the background track the agent chose, if it is one it was offered.
+fn place_music(edit: &mut Value, answer: &Value, tracks: &[i64]) {
+    if let Some(id) = answer["music"]
+        .as_array()
+        .and_then(|music| music.first())
+        .and_then(|track| track["assetId"].as_i64())
+        .filter(|id| tracks.contains(id))
+    {
+        edit["music"] = json!({"asset_id": id});
+    }
+}
+
+/// Approved asset-plan entries that are workspace audio, as background music candidates.
+fn approved_tracks(plan: Option<&Value>) -> Vec<(i64, Value)> {
+    let mut tracks: Vec<(i64, Value)> = Vec::new();
+    for entry in plan.and_then(Value::as_array).into_iter().flatten() {
+        let id = entry["reference"]
+            .as_str()
+            .and_then(|reference| reference.strip_prefix("asset-"))
+            .and_then(|id| id.parse().ok());
+        if let Some(id) = id.filter(|_| entry["kind"] == "audio")
+            && !tracks.iter().any(|(known, _)| *known == id)
+        {
+            tracks.push((
+                id,
+                json!({"assetId": id, "name": entry["name"], "use": entry["use"]}),
+            ));
+        }
+    }
+    tracks
+}
+
 /// Adds the agent's animation placements to `edit`, renumbering cuts it dropped. Placements on
 /// dropped cuts or unknown animations are skipped.
 fn place_motion(edit: &mut Value, answer: &Value, animations: &[Value]) {
@@ -536,11 +583,23 @@ impl WorkspaceStore {
                 })
             })
             .collect();
-        let animations: Vec<Value> = self
-            .approved_stage_result(run_id, "assets")?
+        let assets = self.approved_stage_result(run_id, "assets")?;
+        let animations: Vec<Value> = assets
+            .as_ref()
             .and_then(|result| result["motion_specs"].as_array().cloned())
             .unwrap_or_default();
+        let tracks = approved_tracks(assets.as_ref().map(|result| &result["asset_plan"]));
+        let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
         let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
+        if !tracks.is_empty() {
+            let summaries: Vec<&Value> = tracks.iter().map(|(_, summary)| summary).collect();
+            prompt.push_str(&format!(
+                "\n\nThe creator approved these audio tracks for this video. If one is meant as background \
+                 music, return it in music and Arrumo plays it under the whole video, quieter while anyone \
+                 speaks. Return an empty list when none is music for the whole video.\nAPPROVED AUDIO (JSON):\n{}",
+                serde_json::to_string_pretty(&summaries).unwrap_or_default()
+            ));
+        }
         if !animations.is_empty() {
             let summaries: Vec<Value> = animations
                 .iter()
@@ -571,7 +630,10 @@ impl WorkspaceStore {
             },
             provider,
             &prompt,
-            &with_motion_schema(answer_schema(&sources), animations.len()),
+            &with_music_schema(
+                with_motion_schema(answer_schema(&sources), animations.len()),
+                &track_ids,
+            ),
             AGENT_TIMEOUT,
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
@@ -582,6 +644,7 @@ impl WorkspaceStore {
         let mut edit =
             preview_edit(&answer, &clips, &spoken, &provider.id).map_err(io::Error::other)?;
         place_motion(&mut edit, &answer, &animations);
+        place_music(&mut edit, &answer, &track_ids);
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
         self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)
     }
@@ -590,6 +653,35 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn approved_audio_becomes_the_music_the_agent_may_lay() {
+        let plan = json!([
+            {"reference": "asset-14", "kind": "audio", "name": "Theme", "use": "Under the whole video"},
+            {"reference": "asset-14", "kind": "audio", "name": "Theme", "use": "Again"},
+            {"reference": "asset-10", "kind": "image", "name": "Logo", "use": "Intro"},
+            {"reference": "motion-2", "kind": "audio", "name": "Odd", "use": ""}
+        ]);
+        let tracks = super::approved_tracks(Some(&plan));
+        let ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
+        assert_eq!(ids, vec![14]);
+        let schema =
+            super::with_music_schema(json!({"properties": {}, "required": ["cuts"]}), &ids);
+        assert_eq!(schema["required"], json!(["cuts", "music"]));
+        assert!(
+            super::with_music_schema(json!({"required": []}), &[])
+                .get("properties")
+                .is_none()
+        );
+
+        let mut edit = json!({});
+        super::place_music(&mut edit, &json!({"music": [{"assetId": 99}]}), &ids);
+        assert!(edit.get("music").is_none());
+        super::place_music(&mut edit, &json!({"music": []}), &ids);
+        assert!(edit.get("music").is_none());
+        super::place_music(&mut edit, &json!({"music": [{"assetId": 14}]}), &ids);
+        assert_eq!(edit["music"], json!({"asset_id": 14}));
+    }
 
     #[test]
     fn edits_clamp_to_clip_durations_and_drop_empty_cuts() {

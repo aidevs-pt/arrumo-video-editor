@@ -415,6 +415,7 @@ impl WorkspaceStore {
             validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
         }
         let motion = self.edit_motion(workspace_id, &edit)?;
+        let music = self.edit_music(&asset_root(database), workspace_id, &edit)?;
 
         let revision = if stage == ProductionStage::Preview {
             crate::preview_review::preview_revision(&self.0, run_id, index)?
@@ -510,6 +511,7 @@ impl WorkspaceStore {
                     &clip_sets[clips_index].1,
                     &format,
                     &motion,
+                    music.as_deref(),
                 )?;
                 checks.insert(format.id.to_string(), check.to_json());
                 let filename = if stage == ProductionStage::Preview {
@@ -606,7 +608,8 @@ impl WorkspaceStore {
             let cuts = preview_cuts(&edit, source_ids)?;
             let clips = renderer.inspect_clips(&root, source_ids, cuts.as_deref())?;
             let motion = self.edit_motion(workspace_id, &edit)?;
-            renderer.render_format(&root, directory, &clips, &format, &motion)?;
+            let music = self.edit_music(&root, workspace_id, &edit)?;
+            renderer.render_format(&root, directory, &clips, &format, &motion, music.as_deref())?;
         }
         Ok(directory.join("0.mp4"))
     }
@@ -646,6 +649,30 @@ impl WorkspaceStore {
             inserts,
             overlays,
         })
+    }
+
+    /// The workspace audio file an edit lays under the video as background music, if any.
+    fn edit_music(
+        &self,
+        root: &Path,
+        workspace_id: i64,
+        edit: &Value,
+    ) -> Result<Option<PathBuf>, Box<dyn Error>> {
+        let Some(music) = edit.get("music") else {
+            return Ok(None);
+        };
+        let invalid =
+            || io::Error::other("The edit's music is not an audio file in this workspace");
+        let id = music["asset_id"].as_i64().ok_or_else(invalid)?;
+        self.0
+            .query_row(
+                "SELECT 1 FROM workspace_assets
+                 WHERE workspace_id = ?1 AND id = ?2 AND kind = 'audio' AND superseded = 0",
+                params![workspace_id, id],
+                |_| Ok(()),
+            )
+            .map_err(|_| invalid())?;
+        Ok(Some(asset_path(root, workspace_id, id).canonicalize()?))
     }
 
     /// The validated scenes of a storyboard edit, or `None` for an edit of recorded footage.
@@ -954,6 +981,7 @@ impl ActiveRender<'_> {
         clips: &[RenderClip],
         format: &Dimensions,
         motion: &EditMotion,
+        music: Option<&Path>,
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let Dimensions { id, width, height } = format;
         let pixel_format = if width % 2 == 0 && height % 2 == 0 {
@@ -1087,8 +1115,44 @@ impl ActiveRender<'_> {
             .arg(scratch.join(format!("{id}-joined.mp4")));
         self.run(&mut command, "joining source clips")?;
         let output = scratch.join(format!("{id}.mp4"));
-        self.master_audio(&scratch.join(format!("{id}-joined.mp4")), &output)?;
+        let joined = scratch.join(format!("{id}-joined.mp4"));
+        match music {
+            Some(music) => {
+                let mastered = scratch.join(format!("{id}-mastered.mp4"));
+                self.master_audio(&joined, &mastered)?;
+                self.lay_music(&mastered, music, &output)?;
+                fs::remove_file(mastered)?;
+            }
+            None => self.master_audio(&joined, &output)?,
+        }
         self.check_render(&output, &parts)
+    }
+
+    /// Loops `music` under the mastered speech at a background level, lowered about 10 dB while
+    /// anyone speaks and faded out over the last 1.5 seconds, then limited to the delivery peak.
+    fn lay_music(&self, input: &Path, music: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
+        let fade_at = (probe_duration(input)? - 1.5).max(0.0);
+        let stereo = "aformat=sample_rates=48000:channel_layouts=stereo";
+        self.run(
+            Command::new("ffmpeg")
+                .args(["-nostdin", "-v", "error", "-protocol_whitelist", "file", "-i"])
+                .arg(input)
+                .args(["-stream_loop", "-1", "-i"])
+                .arg(music)
+                .arg("-filter_complex")
+                .arg(format!(
+                    "[1:a:0]{stereo},loudnorm=I=-30:TP=-9:LRA=7[bed];\
+                     [0:a:0]{stereo},asplit=2[speech][key];\
+                     [bed][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=400[ducked];\
+                     [speech][ducked]amix=inputs=2:normalize=0:duration=first,\
+                     afade=t=out:st={fade_at:.3}:d=1.5,alimiter=limit=0.84:level=false,aresample=48000[audio]"
+                ))
+                .args(["-map", "0:v:0", "-map", "[audio]", "-c:v", "copy"])
+                .args(["-c:a", "aac", "-ar", "48000", "-ac", "2"])
+                .args(["-movflags", "+faststart", "-y"])
+                .arg(output),
+            "laying the music under the video",
+        )
     }
 
     /// Compares the finished video's duration with the parts it was joined from.
