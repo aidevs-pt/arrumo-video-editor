@@ -544,7 +544,7 @@
       "music": "Música",
       "open": "Generar",
       "title": "Generar un recurso",
-      "description": "Describe una imagen o un clip, o escribe un texto para locutar. Tus proveedores lo crean y se añade a los recursos de este espacio de trabajo.",
+      "description": "Describe una imagen, un clip, música o un efecto de sonido, o escribe un texto para locutar. Tus proveedores lo crean y se añade a los recursos de este espacio de trabajo.",
       "prompt": "Descríbela",
       "promptPlaceholder": "Ilustración plana de un escritorio desordenado con tiras de película que se apilan, cobalto y amarillo, sin texto.",
       "provider": "Hecha con",

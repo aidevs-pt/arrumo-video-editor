@@ -544,7 +544,7 @@
       "music": "Music",
       "open": "Generate",
       "title": "Generate an asset",
-      "description": "Describe an image or a clip, or write text to voice. Your providers make it and it joins this workspace’s assets.",
+      "description": "Describe an image, a clip, music or a sound effect, or write text to voice. Your providers make it and it joins this workspace’s assets.",
       "prompt": "Describe it",
       "promptPlaceholder": "Flat illustration of a messy desk of film strips snapping into a neat stack, cobalt and yellow, no text.",
       "provider": "Made with",
