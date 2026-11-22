@@ -282,7 +282,20 @@ pub(super) fn definitions() -> [Value; 40] {
                     "autopilot": {"type": "boolean"}, "generate_delivery_subtitles": {"type": "boolean", "default": false}, "save_motion_to_library": {"type": "boolean", "default": true}, "platform": {"type": ["string", "null"]},
                     "provider_overrides": {"type": "object", "additionalProperties": {
                         "type": "array", "items": {"type": "string"}, "uniqueItems": true
-                    }}
+                    }},
+                    "formats": {"type": ["array", "null"], "items": id, "uniqueItems": true,
+                        "description": "Produce only these output format IDs; all of them when omitted."},
+                    "format_overrides": {"type": "object", "description": "What this video changes about a format, keyed by format ID.",
+                        "additionalProperties": {"type": "object", "properties": {
+                            "thumbnails": {"type": "integer", "minimum": 0}, "titles": {"type": "integer", "minimum": 0},
+                            "descriptions": {"type": "integer", "minimum": 0}, "tags": {"type": "boolean"},
+                            "thumbnail_guidance": {"type": "string"}, "specifications": {"type": "string"},
+                            "portrait_count": {"type": "integer", "minimum": 0}, "portrait_guidance": {"type": "string"},
+                            "thumbnail_reference_ids": {"type": "array", "items": id}
+                        }, "additionalProperties": false}},
+                    "skip_hooks": {"type": "array", "maxItems": 64, "uniqueItems": true,
+                        "items": {"type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*/[a-z][a-z0-9]*(-[a-z0-9]+)*$"},
+                        "description": "Plugin hooks this video does not run, as plugin-id/action-id."}
                 }, "additionalProperties": false}
             }, "required": ["workspaceId", "draftId", "requestKey"], "additionalProperties": false}}),
         json!({"name": "control_generation", "description": "Pause, resume, retry, or cancel a generation run.",
