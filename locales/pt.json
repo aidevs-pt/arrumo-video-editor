@@ -1101,7 +1101,12 @@
     "finishedTitle": "O seu vídeo está pronto",
     "finishedDescription": "Veja-o, descarregue os ficheiros de cada formato, agende-o e diga ao agente o que manter da próxima vez.",
     "openFinished": "Abrir o vídeo terminado",
-    "thumbnailPrompt": "Instrução:"
+    "thumbnailPrompt": "Instrução:",
+    "stagedItems": "{count} decisões preparadas.",
+    "stagedItemsOne": "1 decisão preparada.",
+    "stillNeeds": "Faltam {count}.",
+    "stillNeedsOne": "Falta 1.",
+    "approveRest": "Aprovar o resto"
   },
   "markdownEditor": {
     "loading": "A carregar o editor de texto formatado…",

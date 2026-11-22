@@ -350,6 +350,16 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const textDecisions = itemDraft?.text.filter(isDecision) ?? [];
   const mediaDecisions = itemDraft?.media.filter(isDecision) ?? [];
   const staged = textDecisions.length + mediaDecisions.length;
+  const undecided = hasItemReview ? textCount + mediaCount - staged : 0;
+  function approveRest() {
+    setDraft((current) => current.supplemental ? {
+      ...current,
+      supplemental: {
+        text: current.supplemental.text.map((value) => value || "approved"),
+        media: current.supplemental.media.map((value) => value || "approved"),
+      },
+    } : current);
+  }
   const canSend = hasItemReview ? staged === textCount + mediaCount : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
     key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && key !== "thumbnail_prompts"
@@ -555,10 +565,15 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
           {!hasItemReview && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
+            : hasItemReview && staged > 0 && undecided > 0 ? <>{(staged === 1 ? copy.stagedItemsOne : copy.stagedItems).replace("{count}", String(staged))}
+              <span className="font-normal text-white">{(undecided === 1 ? copy.stillNeedsOne : copy.stillNeeds).replace("{count}", String(undecided))}</span></>
             : draft.decision || staged > 0 || draft.notes || hasItemNotes ? copy.unsentReview : hasItemReview ? copy.selectEveryItem : copy.selectDecision}
         </p>
+        {hasItemReview && staged > 0 && undecided > 0 && <Button type="button" variant="outline" disabled={reviewing} onClick={approveRest}
+          className="ms-auto border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">{copy.approveRest}</Button>}
         <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
-          className="ms-auto bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
+          className={cn("bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100",
+            !(hasItemReview && staged > 0 && undecided > 0) && "ms-auto")}>
           {hasItemReview ? (staged === 0 ? copy.sendNothing : staged === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(staged)))
             : draft.decision ? copy.submitDecision : copy.sendNothing}
         </Button>

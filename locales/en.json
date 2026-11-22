@@ -1101,7 +1101,12 @@
     "finishedTitle": "Your video is ready",
     "finishedDescription": "Watch it, download the files for each format, schedule it and tell the agent what to keep doing next time.",
     "openFinished": "Open the finished video",
-    "thumbnailPrompt": "Prompt:"
+    "thumbnailPrompt": "Prompt:",
+    "stagedItems": "{count} decisions staged.",
+    "stagedItemsOne": "1 decision staged.",
+    "stillNeeds": "{count} still need one.",
+    "stillNeedsOne": "1 still needs one.",
+    "approveRest": "Approve the rest"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",

@@ -1101,7 +1101,12 @@
     "finishedTitle": "Tu vídeo está listo",
     "finishedDescription": "Míralo, descarga los archivos de cada formato, prográmalo y dile al agente qué mantener la próxima vez.",
     "openFinished": "Abrir el vídeo terminado",
-    "thumbnailPrompt": "Indicación:"
+    "thumbnailPrompt": "Indicación:",
+    "stagedItems": "{count} decisiones preparadas.",
+    "stagedItemsOne": "1 decisión preparada.",
+    "stillNeeds": "Faltan {count}.",
+    "stillNeedsOne": "Falta 1.",
+    "approveRest": "Aprobar el resto"
   },
   "markdownEditor": {
     "loading": "Cargando el editor de texto enriquecido…",
