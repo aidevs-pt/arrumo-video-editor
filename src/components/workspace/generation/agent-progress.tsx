@@ -83,7 +83,7 @@ export function AgentProgress({ workspaceId, runId, agent, stage }: {
               const searches = log.steps.filter((step) => step.kind === "search");
               const others = log.steps.filter((step) => step.kind !== "search");
               return (
-                <div key={log.id} className="flex flex-col gap-3 pb-3">
+                <div key={log.id} className="flex flex-col gap-3 pb-3 last:pb-0">
                   {round > 0 && <ChainOfThoughtStep icon={FolderSearch} label={copy.lookingAtMaterial} status="complete" />}
                   {others.length === 0 && live && <ChainOfThoughtStep icon={SparklesIcon} label={copy.reading} status="active" />}
                   {others.map((step, index) => (

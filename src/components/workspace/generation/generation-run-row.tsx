@@ -138,21 +138,21 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
     <div className="flex flex-wrap items-center gap-2 [&_a[data-variant=outline]]:text-foreground [&_button[data-variant=outline]]:text-foreground">
       <RunStatus run={run} />
       {canPause && (
-        <Button type="button" size="sm" variant="outline" disabled={disabled}
+        <Button type="button" variant="outline" disabled={disabled}
           onClick={() => void onControl(run.id, "pause")}><Pause data-icon="inline-start" />{copy.pause}</Button>
       )}
       {canResume && (
-        <Button type="button" size="sm" variant="outline" disabled={disabled}
+        <Button type="button" variant="outline" disabled={disabled}
           onClick={() => void onControl(run.id, "resume")}><Play data-icon="inline-start" />{copy.resume}</Button>
       )}
       {run.state === "failed" && (
-        <Button type="button" size="sm" variant="outline" disabled={disabled}
+        <Button type="button" variant="outline" disabled={disabled}
           onClick={() => void onControl(run.id, "retry")}><RotateCcw data-icon="inline-start" />{copy.retryRun}</Button>
       )}
       {canStop && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button type="button" size="sm" variant="outline" disabled={disabled}><Square data-icon="inline-start" />{copy.stop}</Button>
+            <Button type="button" variant="outline" disabled={disabled}><Square data-icon="inline-start" />{copy.stop}</Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -169,7 +169,7 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
       {(canPause || run.state === "paused") && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button type="button" size="sm" variant="ghost" disabled={disabled}>{copy.cancel}</Button>
+            <Button type="button" variant="outline" disabled={disabled}>{copy.cancel}</Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -257,8 +257,9 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
             {[...activity].reverse().slice(0, showAll ? undefined : ACTIVITY_SHOWN).map((event, index, newestFirst) => {
               const date = new Date(event.created_at * 1000);
               return (
-                <li className="relative ms-1 border-s pb-4 ps-4 last:border-transparent last:pb-0" key={index}>
-                  <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-sm bg-white/60 ring-4 ring-agent rtl:translate-x-1/2" aria-hidden="true" />
+                <li className="group/event relative ms-1 pb-4 ps-4 last:pb-0" key={index}>
+                  <span className="absolute inset-s-0 top-2.5 -bottom-1.5 w-px -translate-x-1/2 bg-white/30 group-last/event:hidden rtl:translate-x-1/2" aria-hidden="true" />
+                  <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-sm bg-[color-mix(in_oklch,white_65%,var(--agent))] ring-4 ring-agent rtl:translate-x-1/2" aria-hidden="true" />
                   <p className="font-medium">{activityLabel(event,
                     (index === 0 && run.pending_review_id !== null) || newestFirst[index + 1]?.kind === "claimed")}</p>
                   <p className="text-xs text-white/75"><time dateTime={date.toISOString()}>

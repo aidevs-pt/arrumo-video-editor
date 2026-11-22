@@ -506,20 +506,20 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         {motionItems.length > 0 && (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {motionItems.map(({ index, title, usage, kind, thumbnail }) => (
-              <li key={index} className={cn("min-w-0 overflow-hidden rounded-lg border", draft.motion?.[index] && "border-line-strong")}>
+              <li key={index} className={cn("flex min-w-0 flex-col overflow-hidden rounded-lg border", draft.motion?.[index] && "border-line-strong")}>
                 {thumbnail !== null
-                  ? <AssetThumbnail workspaceId={workspaceId} assetId={thumbnail} kind="image" className="w-full rounded-none bg-ink/90" />
+                  ? <AssetThumbnail workspaceId={workspaceId} assetId={thumbnail} kind="image" className="aspect-video w-full rounded-none bg-ink/90" />
                   : <div className="flex aspect-video items-center justify-center bg-secondary">
                     <Clapperboard className="size-6 text-primary" aria-hidden="true" />
                   </div>}
-                <div className="flex flex-col items-start gap-2 px-3 py-3">
+                <div className="flex flex-1 flex-col items-start gap-2 px-3 py-3">
                   <p className="font-semibold wrap-anywhere">{title}</p>
                   <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <span className="rounded-md border px-2 py-0.5 text-foreground">{motionLibrary[kind]}</span>
                     {usage && <span className="wrap-anywhere">{usage}</span>}
                   </span>
                   <MotionPreviewDialog workspaceId={workspaceId} runId={runId} resultId={result.id} index={index} title={title} />
-                  <div className="flex w-full flex-wrap items-center justify-between gap-2 border-t pt-2">
+                  <div className="mt-auto flex w-full flex-wrap items-center justify-between gap-2 border-t pt-2">
                     <label className="flex items-center gap-2 text-sm">
                       <Checkbox checked={selectedMotion.includes(index)} disabled={reviewing} onCheckedChange={(checked) => {
                         updateDraft({ ...draft, motionIndexes: checked
