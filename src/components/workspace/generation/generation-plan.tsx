@@ -487,11 +487,23 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
                   : <div className="flex aspect-video items-center justify-center bg-secondary">
                     <Clapperboard className="size-6 text-primary" aria-hidden="true" />
                   </div>}
-                <div className="flex flex-col items-start gap-2 px-3 py-2">
-                  <span className="rounded-md border px-2 py-0.5 text-sm">{motionLibrary[kind]}</span>
+                <div className="flex flex-col items-start gap-2 px-3 py-3">
                   <p className="font-semibold wrap-anywhere">{title}</p>
-                  {usage && <p className="text-sm wrap-anywhere whitespace-pre-wrap text-muted-foreground">{usage}</p>}
-                  <MotionPreviewDialog workspaceId={workspaceId} runId={runId} resultId={result.id} index={index} title={title} />
+                  <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <span className="rounded-md border px-2 py-0.5 text-foreground">{motionLibrary[kind]}</span>
+                    {usage && <span className="wrap-anywhere">{usage}</span>}
+                  </span>
+                  <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={selectedMotion.includes(index)} disabled={reviewing} onCheckedChange={(checked) => {
+                        updateDraft({ ...draft, motionIndexes: checked
+                          ? [...selectedMotion, index]
+                          : selectedMotion.filter((value) => value !== index) });
+                      }} />
+                      {copy.saveToLibrary}
+                    </label>
+                    <MotionPreviewDialog workspaceId={workspaceId} runId={runId} resultId={result.id} index={index} title={title} />
+                  </div>
                 </div>
               </li>
             ))}
@@ -540,21 +552,6 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
                 <Textarea id={`review-notes-${runId}`} name="notes" value={draft.notes}
                   onChange={(event) => updateDraft({ ...draft, notes: event.target.value })} />
               </Field>
-              {draft.decision === "approved" && motionItems.length > 0 && (
-                <fieldset className="grid gap-2">
-                  <legend className="mb-2 text-sm font-medium">{copy.keepMotionItems}</legend>
-                  {motionItems.map(({ index, title }) => (
-                    <label key={index} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
-                      <Checkbox checked={selectedMotion.includes(index)} onCheckedChange={(checked) => {
-                        updateDraft({ ...draft, motionIndexes: checked
-                          ? [...selectedMotion, index]
-                          : selectedMotion.filter((value) => value !== index) });
-                      }} />
-                      <span className="wrap-anywhere">{title}</span>
-                    </label>
-                  ))}
-                </fieldset>
-              )}
               {reviewError && <Alert variant="destructive"><AlertDescription>{copy.reviewError}</AlertDescription></Alert>}
             </FieldGroup>
           </fieldset>

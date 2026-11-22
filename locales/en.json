@@ -1098,7 +1098,6 @@
     "selectEveryItem": "Choose a decision for every output",
     "submitDecisions": "Send {count} decisions",
     "sharedSupplemental": "Shared across formats",
-    "keepMotionItems": "Save selected items to the Motion library",
     "resultDetails": "Everything the agent returned",
     "decision": "Decision",
     "selectDecision": "Choose a decision",
@@ -1174,7 +1173,8 @@
     "stagedItemsOne": "1 decision staged.",
     "stillNeeds": "{count} still need one.",
     "stillNeedsOne": "1 still needs one.",
-    "approveRest": "Approve the rest"
+    "approveRest": "Approve the rest",
+    "saveToLibrary": "Save to the library when approved"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",

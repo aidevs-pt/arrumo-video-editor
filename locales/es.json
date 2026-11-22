@@ -1098,7 +1098,6 @@
     "selectEveryItem": "Elige una decisión para cada salida",
     "submitDecisions": "Enviar {count} decisiones",
     "sharedSupplemental": "Compartido entre formatos",
-    "keepMotionItems": "Guardar elementos en la biblioteca de movimiento",
     "resultDetails": "Todo lo que devolvió el agente",
     "decision": "Decisión",
     "selectDecision": "Elige una decisión",
@@ -1174,7 +1173,8 @@
     "stagedItemsOne": "1 decisión preparada.",
     "stillNeeds": "Faltan {count}.",
     "stillNeedsOne": "Falta 1.",
-    "approveRest": "Aprobar el resto"
+    "approveRest": "Aprobar el resto",
+    "saveToLibrary": "Guardar en la biblioteca al aprobar"
   },
   "markdownEditor": {
     "loading": "Cargando el editor de texto enriquecido…",
