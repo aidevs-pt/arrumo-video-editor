@@ -330,6 +330,26 @@ impl WorkspaceStore {
         schema: &Value,
         timeout: Duration,
         images: &[PathBuf],
+        tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+    ) -> Result<Value, AgentRunError> {
+        let result = self.explore(
+            database, scope, provider, prompt, schema, timeout, images, tick,
+        );
+        // A run's sessions wait for the run to be over; others are not needed after this.
+        self.release_agent_sessions(scope);
+        result
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn explore(
+        &self,
+        database: &Path,
+        scope: AgentLogScope<'_>,
+        provider: &AgentPlugin,
+        prompt: &str,
+        schema: &Value,
+        timeout: Duration,
+        images: &[PathBuf],
         mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
     ) -> Result<Value, AgentRunError> {
         let catalogue = self
@@ -399,8 +419,15 @@ impl WorkspaceStore {
                 );
                 session = continued;
                 match attempt {
-                    // The session could not be continued: start afresh with everything below.
-                    Err(AgentRunError::Failed(_)) => session = AgentSession::Ephemeral,
+                    // The session could not be continued (gone, unreadable or stuck): start a
+                    // new one below with the whole brief and all material so far.
+                    Err(AgentRunError::Failed(_) | AgentRunError::TimedOut) => {
+                        session = if last {
+                            AgentSession::Ephemeral
+                        } else {
+                            AgentSession::Keep
+                        };
+                    }
                     other => result = Some(other),
                 }
             }

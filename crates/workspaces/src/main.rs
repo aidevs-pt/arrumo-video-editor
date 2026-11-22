@@ -917,6 +917,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&run)?);
         }
+        [database, command] if command == "sweep-agent-sessions" => {
+            let removed = WorkspaceStore::open(Path::new(database))?.sweep_agent_sessions()?;
+            println!("{removed}");
+        }
         [database, command, workspace] if command == "claim-generation" => {
             let claim = WorkspaceStore::open(Path::new(database))?
                 .claim_generation(utf8(workspace)?.parse()?)?;
@@ -1612,7 +1616,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "delete-draft <workspace-id> <draft-id> <confirmed-title> | generation-runs <workspace-id> | ",
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
-                "claim-generation <workspace-id> | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
+                "claim-generation <workspace-id> | sweep-agent-sessions | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> | ",
                 "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
                 "read-completion-notification <workspace-id> <run-id> | ",

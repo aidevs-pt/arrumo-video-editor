@@ -10,6 +10,7 @@ mod agent_images;
 mod agent_logs;
 mod agent_plugins;
 mod agent_run;
+mod agent_sessions;
 mod agent_settings;
 mod agent_stage;
 mod asset_cleanup;
@@ -243,6 +244,7 @@ impl WorkspaceStore {
             include_str!("../migrations/056-footage-assets.sql"),
             include_str!("../migrations/057-privacy-settings.sql"),
             include_str!("../migrations/058-plugin-tour.sql"),
+            include_str!("../migrations/059-agent-sessions.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

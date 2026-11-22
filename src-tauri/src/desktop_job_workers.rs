@@ -113,6 +113,12 @@ impl DesktopJobWorkers {
             },
         )?;
         workers.spawn(
+            "arrumo-agent-sessions",
+            database.clone(),
+            Duration::from_secs(300),
+            |store| store.sweep_agent_sessions().map(|_| false).map_err(|_| ()),
+        )?;
+        workers.spawn(
             "arrumo-plugin-jobs",
             database,
             Duration::from_millis(500),

@@ -277,6 +277,7 @@ impl WorkspaceStore {
             .ok();
         let options = self.run_agent_options(scope, &provider.id);
         let transcript = AgentTranscript::default();
+        let mode = session.clone();
         let started = Instant::now();
         let mut flushed = Instant::now();
         let result = run_structured_session(
@@ -312,6 +313,25 @@ impl WorkspaceStore {
                 tick()
             },
         );
+        // Every session left in the agent's history is recorded, even when the run failed,
+        // so it can be removed once nothing needs it.
+        let resume = provider
+            .cli
+            .structured_run
+            .as_ref()
+            .and_then(|run| run.resume.as_ref());
+        if let Some(resume) = resume.filter(|_| mode != AgentSession::Ephemeral) {
+            let continued = match &mode {
+                AgentSession::Continue { id, .. } => Some(id.clone()),
+                _ => None,
+            };
+            for kept in crate::agent_run::reported_session(resume, &transcript)
+                .into_iter()
+                .chain(continued)
+            {
+                self.record_agent_session(scope, &provider.id, &kept);
+            }
+        }
         if let Some(id) = log {
             let answer = result
                 .as_ref()

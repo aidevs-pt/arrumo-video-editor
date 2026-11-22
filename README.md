@@ -200,7 +200,7 @@ cargo run --locked -- ./workspaces.sqlite enqueue-draft 1 1 request-1 '{"autopil
 cargo run --locked -- ./workspaces.sqlite generation-runs 1
 ```
 
-A worker claims queued work with `claim-generation <workspace-id>`. The claim includes an attempt number and a 60-second lease. Use `checkpoint-generation <workspace-id> <run-id> <attempt> <json>` to save progress and renew the lease. Expired claims can be reclaimed with the last saved checkpoint. Use `control-generation <workspace-id> <run-id> <pause|resume|cancel>` to control runs and `generation-activity <workspace-id> <run-id>` to read their transition history.
+A worker claims queued work with `claim-generation <workspace-id>`. The claim includes an attempt number and a 60-second lease. Use `checkpoint-generation <workspace-id> <run-id> <attempt> <json>` to save progress and renew the lease. Expired claims can be reclaimed with the last saved checkpoint. Use `control-generation <workspace-id> <run-id> <pause|resume|cancel>` to control runs and `generation-activity <workspace-id> <run-id>` to read their transition history. Agent sessions Arrumo kept for follow-ups are deleted from the agent's history once their run has completed, failed or been cancelled; the desktop does this every few minutes, and `sweep-agent-sessions` does it now.
 
 Every agent run is logged with its prompt, command line, standard output, error output, answer and problem. Use `agent-logs <workspace-id> [run-id]` to list them, newest first, and `agent-log <workspace-id> <log-id>` to read one. A running entry is updated every two seconds, and an entry left running by a crash is marked interrupted when the stage is retried. In the desktop, open **Agent logs** next to a run's activity, or from the animation generator.
 

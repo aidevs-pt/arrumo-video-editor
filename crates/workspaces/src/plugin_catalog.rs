@@ -227,6 +227,51 @@ pub(crate) struct StructuredRun {
 pub(crate) struct ResumeRun {
     pub args: Vec<String>,
     pub session: SessionSource,
+    /// Where the agent keeps session files, so Arrumo can remove the ones it kept once they
+    /// are no longer needed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleanup: Option<SessionCleanup>,
+}
+
+/// Session files live under `directory` in the agent's home (`homeEnv` when set to an absolute
+/// path, else `home` in the user's home folder), named `…{session}<suffix>`.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SessionCleanup {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_env: Option<String>,
+    pub home: String,
+    pub directory: String,
+    pub file_suffix: String,
+}
+
+impl SessionCleanup {
+    fn valid(&self) -> bool {
+        let relative = |path: &str| {
+            !path.is_empty()
+                && path.len() <= 64
+                && path.split('/').all(|part| {
+                    !part.is_empty()
+                        && part != ".."
+                        && part != "."
+                        && part
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+                })
+        };
+        self.home_env.as_deref().is_none_or(|name| {
+            (1..=64).contains(&name.len())
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+        }) && relative(&self.home)
+            && relative(&self.directory)
+            && self.file_suffix.starts_with("{session}")
+            && self.file_suffix.len() <= 32
+            && self.file_suffix["{session}".len()..]
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.')
+    }
 }
 
 /// Where the agent prints its session ID: a regular expression whose first group is the ID, or
@@ -343,6 +388,7 @@ impl StructuredRun {
                         (None, Some(value)) => pointer(value, false),
                         _ => false,
                     }
+                    && resume.cleanup.as_ref().is_none_or(SessionCleanup::valid)
             })
     }
 }

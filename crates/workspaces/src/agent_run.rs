@@ -232,7 +232,7 @@ pub(crate) fn run_structured_session(
 }
 
 /// The session ID the agent printed, found with the plugin's declared pattern or pointer.
-fn reported_session(
+pub(crate) fn reported_session(
     resume: &crate::plugin_catalog::ResumeRun,
     transcript: &AgentTranscript,
 ) -> Option<String> {
