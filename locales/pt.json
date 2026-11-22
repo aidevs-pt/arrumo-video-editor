@@ -1797,5 +1797,13 @@
     "body": "Em {workspace}. Abre o Arrumo para o ver.",
     "setting": "Notificações do sistema",
     "settingHint": "Avisa também pelo sistema dos vídeos concluídos, falhados ou à espera de revisão enquanto o Arrumo está em segundo plano."
+  },
+  "starPrompt": {
+    "title": "Estás a gostar do Arrumo?",
+    "body": "Terminaste o teu primeiro vídeo. Se o Arrumo te ajuda, uma estrela no GitHub ajuda outros criadores a encontrá-lo. É grátis e demora um segundo.",
+    "star": "Dar uma estrela no GitHub",
+    "later": "Lembrar-me mais tarde",
+    "never": "Não, obrigado",
+    "bodyMany": "Terminaste {count} vídeos com o Arrumo. Se te ajuda, uma estrela no GitHub ajuda outros criadores a encontrá-lo. É grátis e demora um segundo."
   }
 }

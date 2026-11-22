@@ -16,6 +16,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLocale } from "@/lib/locale-provider";
 import { ReviewInbox, useGenerationInbox } from "./review-inbox";
 import { StudioTrailProvider, useStudioTrailItems } from "./studio-trail";
+import { StarPrompt } from "./star-prompt";
 import { WorkspaceSearch } from "./workspace-search";
 import { UsageBanner } from "@/components/workspace/usage/provider-usage";
 import { WorkspaceMark } from "../workspaces/workspace-mark";
@@ -35,7 +36,7 @@ export function WorkspaceFrame(props: {
   return (
     <TooltipProvider delayDuration={250}>
       <SidebarProvider style={{ "--sidebar-width": "15.5rem" } as CSSProperties}>
-        <StudioTrailProvider><StudioLayout {...props} /><PluginTourHost /></StudioTrailProvider>
+        <StudioTrailProvider><StudioLayout {...props} /><PluginTourHost /><StarPrompt workspaceIds={props.workspaces.map((entry) => entry.id)} /></StudioTrailProvider>
       </SidebarProvider>
     </TooltipProvider>
   );
