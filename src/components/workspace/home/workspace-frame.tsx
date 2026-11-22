@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PluginTourHost } from "@/components/workspace/plugins/plugin-tour";
 import { PluginIcon } from "@/lib/plugin-text";
-import { CalendarDays, Check, ChevronDown, Download, Film, FolderCog, House, Images, Paintbrush, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Download, Film, FolderCog, House, Images, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -17,7 +17,6 @@ import { useLocale } from "@/lib/locale-provider";
 import { ReviewInbox, useGenerationInbox } from "./review-inbox";
 import { StudioTrailProvider, useStudioTrailItems } from "./studio-trail";
 import { WorkspaceSearch } from "./workspace-search";
-import { WorkspaceAppearanceDialog } from "../workspaces/workspace-appearance";
 import { UsageBanner } from "@/components/workspace/usage/provider-usage";
 import { WorkspaceMark } from "../workspaces/workspace-mark";
 import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
@@ -51,7 +50,7 @@ function FaceMark({ className = "size-8" }: { className?: string }) {
   );
 }
 
-function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, children }: Parameters<typeof WorkspaceFrame>[0]) {
+function StudioLayout({ workspaces, workspace, view, onSelect, children }: Parameters<typeof WorkspaceFrame>[0]) {
   const { messages } = useLocale();
   const { setOpenMobile, setOpen } = useSidebar();
   const pathname = usePathname().replace(/\/$/, "");
@@ -81,7 +80,6 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, childre
     : view === "motion-library" ? messages.profileHub.animations
     : messages.profiles.title;
 
-  const [customizing, setCustomizing] = useState(false);
   const [counts, setCounts] = useState<Record<number, { profiles: number; videos: number }>>({});
 
   function loadCounts(open: boolean) {
@@ -135,9 +133,6 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, childre
                     ))}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
-                  {workspace && <DropdownMenuItem onSelect={() => setCustomizing(true)}>
-                    <Paintbrush />{messages.workspaces.customize}
-                  </DropdownMenuItem>}
                   {workspace && <DropdownMenuItem asChild>
                     <Link href={workspaceHref("context", workspace.id)} onClick={() => setOpenMobile(false)}>
                       <FolderCog />{copy.workspaceSettings}
@@ -210,7 +205,6 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, childre
           {workspace && <AgentStatus workspaceId={workspace.id} working={inbox?.working ?? 0} />}
         </SidebarFooter>
       </Sidebar>
-      {workspace && <WorkspaceAppearanceDialog workspace={workspace} open={customizing} onOpenChange={setCustomizing} onSaved={onUpdate} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {workspace && <UsageBanner key={workspace.id} workspaceId={workspace.id} />}

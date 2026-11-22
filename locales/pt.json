@@ -914,7 +914,8 @@
     "customizeError": "Não foi possível guardar o espaço de trabalho. Tente novamente.",
     "cancel": "Cancelar",
     "save": "Guardar",
-    "saving": "A guardar…"
+    "saving": "A guardar…",
+    "appearanceSaved": "Guardado. O seletor já mostra o novo aspeto."
   },
   "brand": {
     "title": "Marca",

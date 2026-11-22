@@ -6,9 +6,9 @@
 
 Crea un espacio de trabajo y selecciona el agente de edición disponible en tu equipo. Si vas a generar subtítulos a partir del audio, configura un proveedor de transcripción que devuelva marcas de tiempo. Cada proveedor necesita sus propias credenciales. Cada campo de clave tiene **Dónde encontrarla**, que abre la página del proveedor para crearla. En el primer inicio, el paso del espacio de trabajo también pregunta dónde puede conocerte el agente: añade los enlaces de tu canal o tu web y, cuando el espacio exista, **Contexto** se abre con ellos y el agente redacta tu contexto y sugiere perfiles para que los marques.
 
-Cada espacio de trabajo empieza con su propio icono y color. Para cambiarlos, o para mostrar una imagen como el avatar de tu canal, elige **Personalizar espacio de trabajo** en el menú del espacio de trabajo.
+Cada espacio de trabajo empieza con su propio icono y color. Para cambiarlos, o para mostrar una imagen como el avatar de tu canal, abre **Ajustes del espacio › Marca** y usa **Personalizar espacio de trabajo** arriba.
 
-En **Ajustes del espacio de trabajo › Marca**, pon nombre a cada color de marca y usa su marca de verificación para elegir si los vídeos lo usan; los colores sin ella siguen en la paleta, pero no se usan al generar.
+En **Ajustes del espacio › Marca**, pon nombre a cada color de marca y usa su marca de verificación para elegir si los vídeos lo usan; los colores sin ella siguen en la paleta, pero no se usan al generar.
 
 Abre **Salidas** y comprueba qué formatos están activados. Para que la entrega se verifique, cada formato activado necesita su propio vídeo MP4 final y su archivo SRT.
 

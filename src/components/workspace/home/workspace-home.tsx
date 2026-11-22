@@ -17,12 +17,10 @@ import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceOnboarding } from "./workspace-onboarding";
 import { useWorkspaceCatalog, workspaceHref } from "./workspace-router";
 import type { Workspace } from "./workspace-links";
-import { WorkspaceAppearanceDialog } from "../workspaces/workspace-appearance";
 import { WorkspaceMark } from "../workspaces/workspace-mark";
 
 export function WorkspaceHome() {
-  const { status, workspaces, load, add, update } = useWorkspaceCatalog();
-  const [customizing, setCustomizing] = useState<Workspace | null>(null);
+  const { status, workspaces, load, add } = useWorkspaceCatalog();
   const router = useRouter();
   const { messages: { workspaces: copy } } = useLocale();
   const [open, setOpen] = useState(false);
@@ -85,7 +83,7 @@ export function WorkspaceHome() {
         <Button variant="outline" onClick={load}>{copy.retry}</Button>
       </Alert>}
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={copy.list}>
-        {workspaces.map((workspace) => <WorkspaceCard key={workspace.id} workspace={workspace} onCustomize={() => setCustomizing(workspace)} />)}
+        {workspaces.map((workspace) => <WorkspaceCard key={workspace.id} workspace={workspace} />)}
         <li>
           <button type="button" disabled={status !== "ready"} onClick={() => setOpen(true)}
             className="flex size-full min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-5 text-center text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 motion-reduce:transition-none">
@@ -95,12 +93,11 @@ export function WorkspaceHome() {
           </button>
         </li>
       </ul>
-      {customizing && <WorkspaceAppearanceDialog workspace={customizing} open onOpenChange={(next) => { if (!next) setCustomizing(null); }} onSaved={update} />}
     </WorkspaceShell>
   );
 }
 
-function WorkspaceCard({ workspace, onCustomize }: { workspace: Workspace; onCustomize: () => void }) {
+function WorkspaceCard({ workspace }: { workspace: Workspace }) {
   const { messages: { workspaces: copy, studio } } = useLocale();
   const [counts, setCounts] = useState<{ profiles: number; videos: number }>();
   useEffect(() => {
@@ -115,8 +112,8 @@ function WorkspaceCard({ workspace, onCustomize }: { workspace: Workspace; onCus
   return <li className="relative flex min-h-40 flex-col rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 motion-reduce:transition-none">
     <div className="flex items-start justify-between gap-3">
       <WorkspaceMark workspace={workspace} className="size-12" />
-      <Button type="button" size="icon-sm" variant="ghost" className="relative z-[1]" aria-label={`${copy.customize} · ${workspace.name}`} onClick={onCustomize}>
-        <Paintbrush />
+      <Button asChild size="icon-sm" variant="ghost" className="relative z-[1]">
+        <Link href={`${workspaceHref("brand", workspace.id)}#appearance`} aria-label={`${copy.customize} · ${workspace.name}`} title={copy.customize}><Paintbrush /></Link>
       </Button>
     </div>
     <h2 className="mt-4 text-[1.375rem] leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_125]">

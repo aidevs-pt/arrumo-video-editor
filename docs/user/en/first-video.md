@@ -6,7 +6,7 @@
 
 Create a workspace and choose the editing agent available on your machine. If you plan to generate subtitles from audio, configure a transcription provider that supplies timestamps. A credential for one provider does not give access to another. Each key field has **Where to find it**, which opens the provider's page for creating that key. On first launch, the workspace step also asks where the agent can learn about you: add your channel or website links, and once the workspace exists, **Context** opens with them and the agent drafts your context and suggests profiles to tick.
 
-Each workspace starts with its own icon and color. To change them, or to show an image such as your channel avatar, choose **Customize workspace** in the workspace menu.
+Each workspace starts with its own icon and color. To change them, or to show an image such as your channel avatar, open **Workspace settings › Brand** and use **Customize workspace** at the top.
 
 In **Workspace settings › Brand**, name each brand color and use its check mark to choose whether videos use it; colors without the check stay in the palette but are left out of generation.
 

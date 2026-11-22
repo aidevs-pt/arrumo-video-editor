@@ -6,9 +6,9 @@
 
 Cria um espaço de trabalho e escolhe o agente de edição disponível no teu computador. Se pretendes gerar legendas a partir do áudio, configura um fornecedor de transcrição que devolva marcas temporais. Cada fornecedor precisa das suas próprias credenciais. Cada campo de chave tem **Onde a encontrar**, que abre a página do fornecedor para a criar. No primeiro arranque, o passo do espaço de trabalho também pergunta onde o agente te pode conhecer: adiciona os links do teu canal ou site e, quando o espaço existir, **Contexto** abre com eles e o agente redige o teu contexto e sugere perfis para escolheres.
 
-Cada espaço de trabalho começa com o seu próprio ícone e cor. Para os mudar, ou para mostrar uma imagem como o avatar do teu canal, escolhe **Personalizar espaço de trabalho** no menu do espaço de trabalho.
+Cada espaço de trabalho começa com o seu próprio ícone e cor. Para os mudar, ou para mostrar uma imagem como o avatar do teu canal, abre **Definições do espaço › Marca** e usa **Personalizar espaço de trabalho** no topo.
 
-Em **Definições do espaço de trabalho › Marca**, dá nome a cada cor da marca e usa o visto para escolher se os vídeos a usam; as cores sem visto ficam na paleta, mas não são usadas ao gerar.
+Em **Definições do espaço › Marca**, dá nome a cada cor da marca e usa o visto para escolher se os vídeos a usam; as cores sem visto ficam na paleta, mas não são usadas ao gerar.
 
 Abre **Saídas** e verifica os formatos ativos. Para a entrega ser verificada, cada formato ativo precisa do seu próprio MP4 final e ficheiro SRT.
 

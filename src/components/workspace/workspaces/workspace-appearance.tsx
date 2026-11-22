@@ -7,7 +7,6 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -15,6 +14,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { ColorPicker, SWATCHES } from "../color-picker";
 import type { Workspace } from "../home/workspace-links";
+import { useWorkspaceCatalog } from "../home/workspace-router";
 import { WORKSPACE_ICONS, WorkspaceMark, useWorkspaceImage } from "./workspace-mark";
 
 type ImageAsset = { id: number; name: string; kind: string };
@@ -32,14 +32,10 @@ function ImageChoice({ workspaceId, asset, selected, onSelect }: {
   </button>;
 }
 
-/** Name, color and icon (or image) of a workspace, so it is recognisable in the switcher. */
-export function WorkspaceAppearanceDialog({ workspace, open, onOpenChange, onSaved }: {
-  workspace: Workspace;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSaved: (workspace: Workspace) => void;
-}) {
+/** Workspace settings › Brand: name, color and icon (or image), so the workspace is recognisable in the switcher. */
+export function WorkspaceAppearance({ workspace }: { workspace: Workspace }) {
   const { messages: { workspaces: copy, profileHub } } = useLocale();
+  const { update } = useWorkspaceCatalog();
   const [name, setName] = useState(workspace.name);
   const [color, setColor] = useState(workspace.color ?? SWATCHES[0]);
   const [icon, setIcon] = useState(workspace.icon ?? "clapperboard");
@@ -47,21 +43,14 @@ export function WorkspaceAppearanceDialog({ workspace, open, onOpenChange, onSav
   const [mode, setMode] = useState<"icon" | "image">(workspace.imageAssetId ? "image" : "icon");
   const [images, setImages] = useState<ImageAsset[]>([]);
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [result, setResult] = useState<"saved" | "failed" | null>(null);
 
   useEffect(() => {
-    if (!open) return;
-    setName(workspace.name);
-    setColor(workspace.color ?? SWATCHES[0]);
-    setIcon(workspace.icon ?? "clapperboard");
-    setImage(workspace.imageAssetId ?? null);
-    setMode(workspace.imageAssetId ? "image" : "icon");
-    setFailed(false);
     invoke<ImageAsset[]>("list_assets", { workspaceId: workspace.id }).then(
       (assets) => setImages(assets.filter((asset) => asset.kind === "image")),
       () => setImages([]),
     );
-  }, [open, workspace]);
+  }, [workspace.id]);
 
   async function importImage() {
     const source = await pickFile({ multiple: false, title: copy.pickImage,
@@ -71,56 +60,61 @@ export function WorkspaceAppearanceDialog({ workspace, open, onOpenChange, onSav
       const asset = await invoke<ImageAsset>("import_asset", { workspaceId: workspace.id, source });
       setImages((current) => [...current, asset]);
       setImage(asset.id);
+      setResult(null);
     } catch {
-      setFailed(true);
+      setResult("failed");
     }
   }
 
+  const imageAssetId = mode === "image" ? image : null;
+  const dirty = name.trim() !== workspace.name || color !== (workspace.color ?? SWATCHES[0])
+    || icon !== (workspace.icon ?? "clapperboard") || imageAssetId !== (workspace.imageAssetId ?? null);
+
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (saving || !name.trim()) return;
+    if (saving || !name.trim() || !dirty) return;
     setSaving(true);
-    setFailed(false);
+    setResult(null);
     try {
       if (name.trim() !== workspace.name) await invoke("rename_workspace", { workspaceId: workspace.id, name: name.trim() });
-      onSaved(await invoke<Workspace>("set_workspace_appearance", {
-        workspaceId: workspace.id, color, icon, imageAssetId: mode === "image" ? image : null,
-      }));
-      onOpenChange(false);
+      update(await invoke<Workspace>("set_workspace_appearance", { workspaceId: workspace.id, color, icon, imageAssetId }));
+      setResult("saved");
     } catch {
-      setFailed(true);
+      setResult("failed");
     } finally {
       setSaving(false);
     }
   }
 
-  const preview = { id: workspace.id, color, icon, imageAssetId: mode === "image" ? image : null };
-  return <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>{copy.customize}</DialogTitle>
-        <DialogDescription>{copy.customizeHint}</DialogDescription>
-      </DialogHeader>
-      <form onSubmit={save}>
+  const preview = { id: workspace.id, color, icon, imageAssetId };
+  return <section id="appearance" aria-labelledby="workspace-appearance" className="scroll-mt-6">
+    <div className="mb-4">
+      <h2 id="workspace-appearance" className="text-[1.75rem]">{copy.customize}</h2>
+      <p className="mt-1 text-muted-foreground">{copy.customizeHint}</p>
+    </div>
+    <form onSubmit={save} className="rounded-xl border bg-card p-5">
+      <div className="grid gap-6 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <FieldGroup>
           <div className="flex items-end gap-3">
-            <WorkspaceMark workspace={preview} className="size-10" />
+            <WorkspaceMark workspace={preview} className="size-12" />
             <Field className="flex-1">
               <FieldLabel htmlFor="workspace-rename">{copy.name}</FieldLabel>
-              <Input id="workspace-rename" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} required />
+              <Input id="workspace-rename" value={name} onChange={(event) => { setName(event.target.value); setResult(null); }} maxLength={120} required />
             </Field>
           </div>
           <ToggleGroup type="single" variant="outline" value={mode} className="w-full"
-            onValueChange={(value) => { if (value) setMode(value as "icon" | "image"); }}>
+            onValueChange={(value) => { if (value) { setMode(value as "icon" | "image"); setResult(null); } }}>
             <ToggleGroupItem value="icon" className="flex-1">{copy.icon}</ToggleGroupItem>
             <ToggleGroupItem value="image" className="flex-1">{copy.image}</ToggleGroupItem>
           </ToggleGroup>
+        </FieldGroup>
+        <FieldGroup>
           {mode === "icon" ? <>
             <FieldSet>
               <FieldLegend variant="label">{copy.icon}</FieldLegend>
-              <div role="radiogroup" aria-label={copy.icon} className="grid grid-cols-8 gap-1.5">
+              <div role="radiogroup" aria-label={copy.icon} className="grid grid-cols-8 gap-1.5 sm:max-w-md">
                 {Object.entries(WORKSPACE_ICONS).map(([key, Icon]) => (
-                  <button key={key} type="button" role="radio" aria-checked={icon === key} aria-label={key} onClick={() => setIcon(key)}
+                  <button key={key} type="button" role="radio" aria-checked={icon === key} aria-label={key} onClick={() => { setIcon(key); setResult(null); }}
                     className={cn("grid aspect-square place-items-center rounded-md border text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-attention motion-reduce:transition-none",
                       icon === key && "border-transparent text-white")}
                     style={icon === key ? { backgroundColor: color } : undefined}>
@@ -131,15 +125,15 @@ export function WorkspaceAppearanceDialog({ workspace, open, onOpenChange, onSav
             </FieldSet>
             <FieldSet>
               <FieldLegend variant="label">{copy.color}</FieldLegend>
-              <ColorPicker value={color} onChange={(value) => { if (value) setColor(value); }}
+              <ColorPicker value={color} onChange={(value) => { if (value) { setColor(value); setResult(null); } }}
                 label={copy.color} customLabel={profileHub.customColor} />
             </FieldSet>
           </> : (
             <FieldSet>
               <FieldLegend variant="label">{copy.image}</FieldLegend>
-              <div role="radiogroup" aria-label={copy.image} className="grid grid-cols-5 gap-2">
+              <div role="radiogroup" aria-label={copy.image} className="grid grid-cols-5 gap-2 sm:max-w-md">
                 {images.map((asset) => <ImageChoice key={asset.id} workspaceId={workspace.id} asset={asset}
-                  selected={image === asset.id} onSelect={() => setImage(asset.id)} />)}
+                  selected={image === asset.id} onSelect={() => { setImage(asset.id); setResult(null); }} />)}
                 <button type="button" onClick={() => void importImage()} aria-label={copy.importImage}
                   className="grid aspect-square place-items-center rounded-[25%] border border-dashed text-muted-foreground hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-attention">
                   <ImagePlus className="size-5" />
@@ -148,13 +142,13 @@ export function WorkspaceAppearanceDialog({ workspace, open, onOpenChange, onSav
               {!images.length && <p className="text-sm text-muted-foreground">{copy.noImages}</p>}
             </FieldSet>
           )}
-          {failed && <Alert variant="destructive" role="alert"><AlertDescription>{copy.customizeError}</AlertDescription></Alert>}
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>{copy.cancel}</Button>
-            <Button type="submit" disabled={saving || !name.trim() || (mode === "image" && !image)}>{saving ? copy.saving : copy.save}</Button>
-          </DialogFooter>
         </FieldGroup>
-      </form>
-    </DialogContent>
-  </Dialog>;
+      </div>
+      {result === "failed" && <Alert variant="destructive" role="alert" className="mt-4"><AlertDescription>{copy.customizeError}</AlertDescription></Alert>}
+      <div className="mt-5 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
+        {result === "saved" && <p role="status" className="text-sm font-semibold text-approval">{copy.appearanceSaved}</p>}
+        <Button type="submit" disabled={saving || !name.trim() || !dirty || (mode === "image" && !image)}>{saving ? copy.saving : copy.save}</Button>
+      </div>
+    </form>
+  </section>;
 }

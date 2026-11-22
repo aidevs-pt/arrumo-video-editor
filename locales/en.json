@@ -914,7 +914,8 @@
     "customizeError": "The workspace couldn’t be saved. Try again.",
     "cancel": "Cancel",
     "save": "Save",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "appearanceSaved": "Saved. The switcher shows the new look."
   },
   "brand": {
     "title": "Brand",

@@ -10,13 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Check, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WorkspaceBrandImages } from "./workspace-brand-images";
+import type { Workspace } from "../home/workspace-links";
+import { WorkspaceAppearance } from "../workspaces/workspace-appearance";
 
 type BrandColor = { hex: string; name: string; forVideos: boolean };
 
-export function WorkspaceBrand({ workspace }: {
-  workspace: { id: number; name: string };
-
-}) {
+export function WorkspaceBrand({ workspace }: { workspace: Workspace }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [palette, setPalette] = useState<BrandColor[]>();
   const colors = palette?.map((color) => color.hex);
@@ -67,6 +66,7 @@ export function WorkspaceBrand({ workspace }: {
   return (
     <WorkspaceShell className="max-w-6xl">
       <WorkspaceSettingsHeading workspace={workspace} current="brand" headingRef={heading} />
+      <div className="mb-10"><WorkspaceAppearance workspace={workspace} /></div>
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
