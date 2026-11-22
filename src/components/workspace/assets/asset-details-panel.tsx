@@ -16,6 +16,7 @@ import { TagInput } from "@/components/ui/tag-input";
 import { cn } from "@/lib/utils";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { AssetThumbnail } from "./asset-thumbnail";
+import { AudioTransformDialog, type AudioTransformProvider } from "./audio-transform-dialog";
 import type { Asset, AssetOrganization } from "./workspace-assets";
 
 type Profile = { id: number; name: string };
@@ -23,7 +24,7 @@ type Format = { id: number; name: string; width: number; height: number };
 type Share = { profile_id: number; format_id: number | null };
 
 /** Describes, organizes and shares one asset or several at once; nothing is written until Save. */
-export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose, onSaved, onReplaced, onRemoved }: {
+export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose, onSaved, onReplaced, onRemoved, onCreated }: {
   workspaceId: number;
   assets: Asset[];
   organizations: Record<number, AssetOrganization>;
@@ -31,6 +32,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   onSaved: (assets: Asset[], organizations: Record<number, AssetOrganization>) => void;
   onReplaced: (previous: number, replacement: Asset) => void;
   onRemoved: (id: number) => void;
+  onCreated: (id: number) => void;
 }) {
   const { messages } = useLocale();
   const copy = messages.assetLibrary;
@@ -46,6 +48,16 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const [shares, setShares] = useState<Share[]>([]);
   const [formatNames, setFormatNames] = useState<Record<number, string>>({});
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [transforms, setTransforms] = useState<AudioTransformProvider[]>([]);
+  const hasSound = single !== null && (single.kind === "audio" || single.kind === "video");
+
+  useEffect(() => {
+    if (!hasSound) return;
+    let active = true;
+    invoke<AudioTransformProvider[]>("list_audio_transforms", { workspaceId })
+      .then((rows) => { if (active) setTransforms(rows); }, () => {});
+    return () => { active = false; };
+  }, [workspaceId, hasSound]);
 
   useEffect(() => {
     let active = true;
@@ -183,6 +195,11 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
       </Button>
       {single && <div className="flex flex-wrap items-center gap-2 border-t pt-4">
         <Button variant="outline" size="sm" disabled={busy} onClick={() => void replace(single)}>{messages.assets.replaceFile}</Button>
+        {hasSound && (["voice-change", "voice-isolation"] as const).map((kind) => {
+          const offer = transforms.find((entry) => entry.transform === kind);
+          return offer && <AudioTransformDialog key={kind} workspaceId={workspaceId} assetId={single.id}
+            assetName={single.name} offer={offer} disabled={busy} onCreated={onCreated} />;
+        })}
         <ConfirmTitleDelete title={single.name} size="sm" disabled={busy} copy={messages.assets.removal}
           onConfirm={(confirmedName) => invoke<boolean>("remove_asset", { workspaceId, assetId: single.id, confirmedName })}
           onDelete={() => onRemoved(single.id)} />

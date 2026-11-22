@@ -317,6 +317,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
               setAssets((rows) => rows?.map((row) => changes.get(row.id) ?? row));
               setOrganizations((current) => ({ ...current, ...organization }));
             }}
+            onCreated={(id) => { setRecent((current) => [...current, id]); setAttempt((value) => value + 1); }}
             onReplaced={(previous, replacement) => {
               setAssets((rows) => rows?.map((row) => row.id === previous ? replacement : row));
               setOrganizations(({ [previous]: organization, ...rest }) => organization ? { ...rest, [replacement.id]: organization } : rest);

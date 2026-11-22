@@ -1413,7 +1413,32 @@
     "emptyHint": "Upload intros, outros, music, logos or references every video can use.",
     "noMatches": "No assets match these filters.",
     "showAll": "Show everything",
-    "removeLabel": "Remove {tag}"
+    "removeLabel": "Remove {tag}",
+    "audioTransform": {
+      "change": {
+        "action": "Change voice",
+        "title": "Change the voice",
+        "description": "Make a copy of the sound in {name} said again in another voice, with the same words and timing.",
+        "confirm": "Change voice"
+      },
+      "isolate": {
+        "action": "Isolate voice",
+        "title": "Isolate the voice",
+        "description": "Make a copy of the sound in {name} that keeps the voice and removes background noise and music.",
+        "confirm": "Isolate voice"
+      },
+      "limitsMax": "The provider takes up to {max} seconds of sound.",
+      "limitsBoth": "The provider takes {min} to {max} seconds of sound.",
+      "cost": "It uses your provider credits. The original asset stays as it is.",
+      "voice": "Voice ID",
+      "voicePlaceholder": "The plugin's voice",
+      "voiceHint": "Leave empty to use the voice from the plugin's settings.",
+      "working": "Working…",
+      "done": "Done. The new sound is in your assets.",
+      "failed": "Couldn't process the sound. Check the provider and its key.",
+      "close": "Close",
+      "cancel": "Cancel"
+    }
   },
   "videoDetails": {
     "step1": "Raw footage",

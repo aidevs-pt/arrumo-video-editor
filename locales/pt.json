@@ -1413,7 +1413,32 @@
     "emptyHint": "Carrega intros, encerramentos, música, logótipos ou referências que qualquer vídeo possa usar.",
     "noMatches": "Nenhum recurso corresponde a estes filtros.",
     "showAll": "Mostrar tudo",
-    "removeLabel": "Remover {tag}"
+    "removeLabel": "Remover {tag}",
+    "audioTransform": {
+      "change": {
+        "action": "Mudar voz",
+        "title": "Mudar a voz",
+        "description": "Cria uma cópia do som de {name} dita de novo com outra voz, com as mesmas palavras e o mesmo ritmo.",
+        "confirm": "Mudar voz"
+      },
+      "isolate": {
+        "action": "Isolar voz",
+        "title": "Isolar a voz",
+        "description": "Cria uma cópia do som de {name} que mantém a voz e remove o ruído e a música de fundo.",
+        "confirm": "Isolar voz"
+      },
+      "limitsMax": "O fornecedor aceita até {max} segundos de som.",
+      "limitsBoth": "O fornecedor aceita de {min} a {max} segundos de som.",
+      "cost": "Usa os teus créditos do fornecedor. O recurso original fica como está.",
+      "voice": "ID da voz",
+      "voicePlaceholder": "A voz do plugin",
+      "voiceHint": "Deixa vazio para usar a voz das definições do plugin.",
+      "working": "A processar…",
+      "done": "Feito. O novo som está nos teus recursos.",
+      "failed": "Não foi possível processar o som. Verifica o fornecedor e a respetiva chave.",
+      "close": "Fechar",
+      "cancel": "Cancelar"
+    }
   },
   "videoDetails": {
     "step1": "Material gravado",
