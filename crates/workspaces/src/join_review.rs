@@ -155,7 +155,9 @@ impl WorkspaceStore {
                 Some(json!({
                     "at_seconds": joins.get(index)?,
                     "ok": entry["ok"].as_bool()?,
-                    "note": entry["note"].as_str().unwrap_or("").trim(),
+                    "note": entry["note"].as_str().map(str::trim)
+                        .filter(|note| !note.trim_end_matches('.').eq_ignore_ascii_case("ok"))
+                        .unwrap_or(""),
                 }))
             })
             .collect();

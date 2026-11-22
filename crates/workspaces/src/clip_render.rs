@@ -67,6 +67,55 @@ pub(crate) struct PreviewCut {
     asset_id: i64,
     start_ms: u32,
     end_ms: u32,
+    #[serde(default)]
+    grade: Option<Grade>,
+}
+
+/// A light colour correction for one cut, applied while its clip is extracted so it costs no
+/// extra encode. Neutral values leave the picture unchanged.
+#[derive(Debug, Clone, Copy, Deserialize, serde::Serialize, PartialEq, Eq)]
+pub(crate) struct Grade {
+    /// Hundredths of the full range, -15 to 15.
+    pub brightness: i16,
+    /// Percent, 80 to 130.
+    pub contrast: i16,
+    /// Percent, 60 to 140.
+    pub saturation: i16,
+    /// -10 (cooler) to 10 (warmer).
+    pub warmth: i16,
+}
+
+impl Grade {
+    pub(crate) const NEUTRAL: Self = Self {
+        brightness: 0,
+        contrast: 100,
+        saturation: 100,
+        warmth: 0,
+    };
+
+    /// The grade within its ranges, or `None` when it would change nothing.
+    pub(crate) fn clamped(self) -> Option<Self> {
+        let grade = Self {
+            brightness: self.brightness.clamp(-15, 15),
+            contrast: self.contrast.clamp(80, 130),
+            saturation: self.saturation.clamp(60, 140),
+            warmth: self.warmth.clamp(-10, 10),
+        };
+        (grade != Self::NEUTRAL).then_some(grade)
+    }
+
+    fn filter(self) -> String {
+        let warmth = f64::from(self.warmth) * 0.006;
+        format!(
+            "eq=brightness={:.2}:contrast={:.2}:saturation={:.2},colorbalance=rm={warmth:.3}:bm={:.3}:rh={:.3}:bh={:.3},",
+            f64::from(self.brightness) / 100.0,
+            f64::from(self.contrast) / 100.0,
+            f64::from(self.saturation) / 100.0,
+            -warmth,
+            warmth / 2.0,
+            -warmth / 2.0,
+        )
+    }
 }
 
 pub(crate) fn preview_cuts(
@@ -1074,7 +1123,13 @@ impl ActiveRender<'_> {
                 command.args(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]);
                 "1:a:0"
             };
-            let mut graph = format!("[0:v]{filter}[base];");
+            let grade = clip
+                .cut
+                .and_then(|cut| cut.grade)
+                .and_then(Grade::clamped)
+                .map(Grade::filter)
+                .unwrap_or_default();
+            let mut graph = format!("[0:v]{grade}{filter}[base];");
             let mut video = "base".to_owned();
             let mut inputs = Vec::new();
             for (number, (spec, at)) in motion.overlays_on(index).enumerate() {
@@ -1270,6 +1325,20 @@ mod tests {
     #[test]
     fn duration_allows_a_frame_per_part() {
         assert!(duration_matches(10.12, &[4.0, 6.0]));
+        assert_eq!(super::Grade::NEUTRAL.clamped(), None);
+        let warm = super::Grade {
+            brightness: 40,
+            contrast: 110,
+            saturation: 100,
+            warmth: 5,
+        }
+        .clamped()
+        .unwrap();
+        assert_eq!(warm.brightness, 15);
+        assert_eq!(
+            warm.filter(),
+            "eq=brightness=0.15:contrast=1.10:saturation=1.00,colorbalance=rm=0.030:bm=-0.030:rh=0.015:bh=-0.015,"
+        );
         assert!(!duration_matches(10.5, &[4.0, 6.0]));
         assert!(!duration_matches(8.0, &[4.0, 6.0]));
     }

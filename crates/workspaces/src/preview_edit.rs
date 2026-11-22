@@ -85,7 +85,17 @@ fn preview_edit(
         if end_ms <= start_ms + 40 {
             continue;
         }
-        kept.push(json!({"asset_id": clip, "start_ms": start_ms, "end_ms": end_ms}));
+        let mut kept_cut = json!({"asset_id": clip, "start_ms": start_ms, "end_ms": end_ms});
+        if let Some(grade) = cut
+            .get("grade")
+            .and_then(|grade| {
+                serde_json::from_value::<crate::clip_render::Grade>(grade.clone()).ok()
+            })
+            .and_then(crate::clip_render::Grade::clamped)
+        {
+            kept_cut["grade"] = json!(grade);
+        }
+        kept.push(kept_cut);
         origins.push(origin);
         let purpose: String = cut
             .get("purpose")
@@ -113,6 +123,65 @@ fn preview_edit(
         "agent": agent,
     }))
 }
+
+/// The middle frame of each clip with a picture, as small JPEGs the agent can look at.
+fn middle_frames(
+    root: &Path,
+    workspace_id: i64,
+    clips: &[(i64, f64, String)],
+    directory: &Path,
+) -> Vec<(i64, std::path::PathBuf)> {
+    clips
+        .iter()
+        .take(crate::agent_run::MAX_IMAGES)
+        .filter_map(|(id, duration, _)| {
+            let frame = directory.join(format!("clip-{id}.jpg"));
+            let made = std::process::Command::new("ffmpeg")
+                .args([
+                    "-nostdin",
+                    "-v",
+                    "error",
+                    "-ss",
+                    &format!("{:.3}", duration / 2.0),
+                    "-i",
+                ])
+                .arg(asset_path(root, workspace_id, *id))
+                .args(["-vf", "scale=640:-2", "-frames:v", "1", "-q:v", "4", "-y"])
+                .arg(&frame)
+                .stdin(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success())
+                && frame.is_file();
+            made.then_some((*id, frame))
+        })
+        .collect()
+}
+
+/// Lets an agent that sees each clip's middle frame set a light colour grade per cut.
+fn with_grade_schema(mut schema: Value) -> Value {
+    let item = &mut schema["properties"]["cuts"]["items"];
+    item["properties"]["grade"] = json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["brightness", "contrast", "saturation", "warmth"],
+        "properties": {
+            "brightness": {"type": "integer", "minimum": -15, "maximum": 15},
+            "contrast": {"type": "integer", "minimum": 80, "maximum": 130},
+            "saturation": {"type": "integer", "minimum": 60, "maximum": 140},
+            "warmth": {"type": "integer", "minimum": -10, "maximum": 10}
+        }
+    });
+    if let Some(required) = item["required"].as_array_mut() {
+        required.push(json!("grade"));
+    }
+    schema
+}
+
+const GRADE_GUIDE: &str = "Each attached image is the middle frame of one clip, in the footage's order. Give every cut a \
+     grade. Keep it neutral (brightness 0, contrast 100, saturation 100, warmth 0) unless the picture clearly needs \
+     correcting: too dark or bright, flat, washed out or with a colour cast. Correct gently, keep skin tones natural, \
+     and give cuts from the same clip and light the same grade so the video looks consistent.";
 
 /// Lets the agent place the run's approved animations: full-frame inserts before a cut (or after
 /// the last one) and overlays drawn over a cut.
@@ -643,7 +712,27 @@ impl WorkspaceStore {
                 serde_json::to_string_pretty(&summaries).unwrap_or_default()
             ));
         }
-        let answer = self.run_logged_agent(
+        let frames_dir = tempfile::tempdir()?;
+        let frames = if crate::agent_run::accepts_images(provider) {
+            middle_frames(&root, workspace_id, &clips, frames_dir.path())
+        } else {
+            Vec::new()
+        };
+        let mut schema = with_music_schema(
+            with_motion_schema(answer_schema(&sources), animations.len()),
+            &track_ids,
+        );
+        if !frames.is_empty() {
+            schema = with_grade_schema(schema);
+            let labels: Vec<String> = frames
+                .iter()
+                .enumerate()
+                .map(|(index, (clip, _))| format!("Image {}: clipId {clip}", index + 1))
+                .collect();
+            prompt.push_str(&format!("\n\n{GRADE_GUIDE}\n{}", labels.join("\n")));
+        }
+        let images: Vec<std::path::PathBuf> = frames.into_iter().map(|(_, path)| path).collect();
+        let answer = self.run_logged_agent_with_images(
             crate::agent_logs::AgentLogScope {
                 workspace_id,
                 run_id: Some(run_id),
@@ -652,11 +741,9 @@ impl WorkspaceStore {
             },
             provider,
             &prompt,
-            &with_music_schema(
-                with_motion_schema(answer_schema(&sources), animations.len()),
-                &track_ids,
-            ),
+            &schema,
             AGENT_TIMEOUT,
+            &images,
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
                     .map(|_| ())
@@ -737,6 +824,36 @@ mod tests {
         );
         assert_eq!(edit["summary"], "The first cut is ready to watch.");
         crate::clip_render::preview_cuts(&edit, &[1, 2]).unwrap();
+    }
+
+    #[test]
+    fn a_cut_keeps_only_a_grade_that_changes_something() {
+        let answer = json!({"summary": "", "cuts": [
+            {"clipId": 1, "startSeconds": 0, "endSeconds": 2, "purpose": "",
+             "grade": {"brightness": 5, "contrast": 140, "saturation": 100, "warmth": 3}},
+            {"clipId": 1, "startSeconds": 3, "endSeconds": 5, "purpose": "",
+             "grade": {"brightness": 0, "contrast": 100, "saturation": 100, "warmth": 0}}
+        ]});
+        let edit = preview_edit(
+            &answer,
+            &[(1, 10.0, "take.mp4".into())],
+            &Default::default(),
+            "codex",
+        )
+        .unwrap();
+        assert_eq!(
+            edit["cuts"][0]["grade"],
+            json!({"brightness": 5, "contrast": 130, "saturation": 100, "warmth": 3})
+        );
+        assert!(edit["cuts"][1].get("grade").is_none());
+        let schema = with_grade_schema(answer_schema(&[1]));
+        assert!(
+            schema["properties"]["cuts"]["items"]["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("grade"))
+        );
+        crate::clip_render::preview_cuts(&edit, &[1]).unwrap();
     }
 
     #[test]
