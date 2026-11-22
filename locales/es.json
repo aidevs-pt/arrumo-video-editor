@@ -1190,6 +1190,7 @@
     "draftTitle": "{stage}, borrador v{version}",
     "reviewHint": "Aprueba, pide cambios o rechaza. No se envía nada hasta que pulses Enviar.",
     "noTranscript": "Escrito sin oír {clips}. Añade una clave de transcripción y pide cambios para redactarlo a partir de lo que dijiste.",
+    "loudJoins": "Posible clic en {times}. Escucha ahí antes de aprobar.",
     "addKey": "Añadir una clave",
     "cutsTitle": "Lo que {agent} conservó",
     "cutsTitleFallback": "Lo que conservó el agente",

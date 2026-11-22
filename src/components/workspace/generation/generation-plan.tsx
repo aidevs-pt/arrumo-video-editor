@@ -377,6 +377,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
     key !== "markdown" && key !== "summary" && key !== "sections" && key !== "agent" && key !== "footage_without_transcript" && key !== "thumbnail_prompts"
       && !(stage === "assets" && key === "asset_plan" && isAssetPlan(result.result.asset_plan))
       && !(previews.length > 0 && isCutList(result.result.cuts) && (key === "cuts" || key === "cut_notes")) && (key !== "preview_videos" || previews.length === 0)
+    && key !== "render_checks"
     && (key !== "motion_items" || motionItems.length === 0)
     && (!hasSupplemental || (key !== "supplemental_text" && key !== "supplemental_media"))));
 
@@ -557,6 +558,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             <GuidedPreview workspaceId={workspaceId} runId={runId}
               resultId={result.id} filename={filename} formatId={formatId} initiallyOpen={index === 0}
               label={formats.find((format) => format.id === formatId)?.name ?? filename} />
+            <LoudJoinsNote checks={result.result.render_checks} formatId={formatId} />
             {hasPreviewReview && reviewControls("media", index, formats.find((format) => format.id === formatId)?.name ?? filename)}
           </div>
         ))}</div>}
@@ -698,6 +700,20 @@ function CutList({ cuts, notes, agent }: { cuts: unknown; notes: unknown; agent?
         })}
       </ol>
     </section>
+  );
+}
+
+function LoudJoinsNote({ checks, formatId }: { checks: unknown; formatId: number }) {
+  const { messages: { productionPlan: copy } } = useLocale();
+  const joins = checks && typeof checks === "object" ? (checks as Record<string, { loud_joins?: unknown }>)[formatId]?.loud_joins : undefined;
+  if (!Array.isArray(joins) || joins.length === 0) return null;
+  const times = joins.filter((at): at is number => typeof at === "number")
+    .map((at) => `${Math.floor(at / 60)}:${(at % 60).toFixed(1).padStart(4, "0")}`).join(", ");
+  return (
+    <div role="note" className="flex items-start gap-3 rounded-lg bg-attention/25 px-3 py-2.5 text-sm">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1">{copy.loudJoins.replace("{times}", times)}</p>
+    </div>
   );
 }
 
