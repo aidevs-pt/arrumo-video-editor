@@ -16,6 +16,8 @@ use crate::{TranscriptWord, WorkspaceStore, asset_path, asset_root};
 /// 15 minutes of 16 kHz mono PCM stays below the transcription upload limit.
 const CHUNK_SECONDS: f64 = 900.0;
 const MAX_SOURCE_SECONDS: f64 = 4.0 * 60.0 * 60.0;
+/// A pause this long or longer ends a transcript line; such pauses are the cleanest cut points.
+const PHRASE_PAUSE_SECONDS: f64 = 0.5;
 
 #[derive(Debug, Serialize)]
 pub struct SourceTranscript {
@@ -26,34 +28,72 @@ pub struct SourceTranscript {
 }
 
 impl SourceTranscript {
-    /// Readable lines with the time each one starts, about one sentence each.
+    /// Phrase lines with their start and end in seconds, as `[012.40-015.85] text`. A line ends at
+    /// a sentence, before a pause of half a second or more, at a change of speaker, or after 24
+    /// words, so pauses (the cleanest cut points) show as gaps between ranges. Speakers are named
+    /// (`S0`, `S1`) only when there is more than one.
     pub fn timed_lines(&self, max_chars: usize) -> String {
         if self.words.is_empty() {
             return self.text.chars().take(max_chars).collect();
         }
+        let speakers: std::collections::BTreeSet<&str> = self
+            .words
+            .iter()
+            .filter_map(|word| word.speaker_id.as_deref())
+            .collect();
+        let named = speakers.len() > 1;
         let mut lines = String::new();
         let mut current = String::new();
-        let mut start = 0.0;
+        let mut range = (0.0, 0.0);
+        let mut speaker: Option<&str> = None;
+        let mut count = 0;
+        let flush =
+            |lines: &mut String, current: &mut String, range: (f64, f64), speaker: Option<&str>| {
+                if current.is_empty() {
+                    return;
+                }
+                let who = match (named, speaker) {
+                    (true, Some(id)) => format!(
+                        " S{}",
+                        speakers.iter().position(|known| *known == id).unwrap_or(0)
+                    ),
+                    _ => String::new(),
+                };
+                lines.push_str(&format!(
+                    "[{:06.2}-{:06.2}]{who} {current}\n",
+                    range.0, range.1
+                ));
+                current.clear();
+            };
         for word in &self.words {
-            if current.is_empty() {
-                start = word.start;
+            let text = word.text.trim();
+            if text.is_empty() {
+                continue;
             }
-            if !current.is_empty() && !word.text.starts_with(|c: char| c.is_ascii_punctuation()) {
+            let paused = !current.is_empty() && word.start - range.1 >= PHRASE_PAUSE_SECONDS;
+            let changed = !current.is_empty() && named && word.speaker_id.as_deref() != speaker;
+            if paused || changed {
+                flush(&mut lines, &mut current, range, speaker);
+                count = 0;
+            }
+            if current.is_empty() {
+                range.0 = word.start;
+                speaker = word.speaker_id.as_deref();
+            } else if !text.starts_with(|c: char| c.is_ascii_punctuation()) {
                 current.push(' ');
             }
-            current.push_str(word.text.trim());
-            let ends = current.ends_with(['.', '?', '!']) || current.split(' ').count() >= 24;
-            if ends {
-                lines.push_str(&format!("[{}] {}\n", clock(start), current));
-                current.clear();
+            current.push_str(text);
+            range.1 = word.end.max(word.start);
+            count += 1;
+            if current.ends_with(['.', '?', '!']) || count >= 24 {
+                flush(&mut lines, &mut current, range, speaker);
+                count = 0;
             }
             if lines.len() > max_chars {
                 break;
             }
         }
-        if !current.is_empty() {
-            lines.push_str(&format!("[{}] {}\n", clock(start), current));
-        }
+        flush(&mut lines, &mut current, range, speaker);
         lines.chars().take(max_chars).collect()
     }
 
@@ -70,25 +110,69 @@ impl SourceTranscript {
                 continue;
             }
             shown = inline;
-            let time = line
+            let (from, to) = line
                 .strip_prefix('[')
                 .and_then(|rest| rest.split_once(']'))
-                .map(|(time, _)| time.to_owned())
+                .and_then(|(range, _)| range.split_once('-'))
+                .map(|(from, to)| (from.to_owned(), to.to_owned()))
                 .unwrap_or_default();
             match parts.last_mut() {
                 Some(current) if current.text.chars().count() + length <= part => {
                     current.text.push_str(line);
                     current.text.push('\n');
-                    current.to = time;
+                    current.to = to;
                 }
                 _ => parts.push(TranscriptPart {
                     text: format!("{line}\n").chars().take(part).collect(),
-                    from: time.clone(),
-                    to: time,
+                    from,
+                    to,
                 }),
             }
         }
         parts
+    }
+}
+
+/// Padding kept before the first spoken word of a cut; transcript timings drift by 50–100 ms.
+const CUT_LEAD_SECONDS: f64 = 0.05;
+/// Padding kept after the last spoken word of a cut.
+const CUT_TAIL_SECONDS: f64 = 0.08;
+
+/// Moves a cut's edges so it never splits a word. An edge inside a word, or closer to it than
+/// the padding, moves out to the word's boundary plus the padding, but not into the neighbouring
+/// word. Edges in a longer silence stay where they are.
+pub(crate) fn snap_cut(words: &[TranscriptWord], start: f64, end: f64) -> (f64, f64) {
+    let mut snapped = (start, end);
+    if let Some((index, first)) = words.iter().enumerate().find(|(_, word)| word.end > start)
+        && first.start - start < CUT_LEAD_SECONDS
+        && first.start < end
+    {
+        let previous = words[..index]
+            .iter()
+            .map(|word| word.end)
+            .fold(0.0_f64, f64::max)
+            .min(first.start);
+        snapped.0 = (first.start - CUT_LEAD_SECONDS).max(previous).max(0.0);
+    }
+    if let Some((index, last)) = words
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, word)| word.start < end)
+        && end - last.end < CUT_TAIL_SECONDS
+        && last.end > snapped.0
+    {
+        let next = words[index + 1..]
+            .iter()
+            .map(|word| word.start)
+            .filter(|next| *next >= last.end)
+            .fold(f64::INFINITY, f64::min);
+        snapped.1 = (last.end + CUT_TAIL_SECONDS).min(next);
+    }
+    if snapped.1 > snapped.0 {
+        snapped
+    } else {
+        (start, end)
     }
 }
 
@@ -98,11 +182,6 @@ pub(crate) struct TranscriptPart {
     pub text: String,
     pub from: String,
     pub to: String,
-}
-
-fn clock(seconds: f64) -> String {
-    let total = seconds.max(0.0) as u64;
-    format!("{}:{:02}", total / 60, total % 60)
 }
 
 impl WorkspaceStore {
@@ -284,6 +363,56 @@ mod tests {
     }
 
     #[test]
+    fn cuts_never_split_a_word_and_keep_a_little_air() {
+        let timed = |text: &str, start: f64, end: f64| TranscriptWord {
+            text: text.into(),
+            start,
+            end,
+            speaker_id: None,
+        };
+        let words = [
+            timed("Ninety", 2.52, 2.9),
+            timed("percent", 2.95, 3.4),
+            timed("wasted.", 3.45, 5.36),
+            timed("We", 6.08, 6.2),
+            timed("fixed", 6.25, 6.74),
+        ];
+        // Inside "Ninety" and inside "wasted.": both edges move out, padded.
+        let (start, end) = snap_cut(&words, 2.7, 5.0);
+        assert!((start - 2.47).abs() < 1e-9 && (end - 5.44).abs() < 1e-9);
+        // In the long pause: left alone.
+        assert_eq!(snap_cut(&words, 5.7, 6.9), (5.7, 6.9));
+        // The tail padding never reaches the next word.
+        let (_, end) = snap_cut(&words, 2.0, 2.92);
+        assert!((end - 2.95).abs() < 1e-9);
+    }
+
+    #[test]
+    fn lines_break_at_pauses_and_speaker_changes() {
+        let spoken = |text: &str, start: f64, end: f64, speaker: &str| TranscriptWord {
+            text: text.into(),
+            start,
+            end,
+            speaker_id: Some(speaker.into()),
+        };
+        let transcript = SourceTranscript {
+            provider: "fixture".into(),
+            language_code: "en".into(),
+            text: String::new(),
+            words: vec![
+                spoken("We", 2.52, 2.7, "a"),
+                spoken("fixed", 2.75, 3.1, "a"),
+                spoken("this", 3.7, 4.0, "a"),
+                spoken("Nice", 4.1, 4.4, "b"),
+            ],
+        };
+        assert_eq!(
+            transcript.timed_lines(10_000),
+            "[002.52-003.10] S0 We fixed\n[003.70-004.00] S0 this\n[004.10-004.40] S1 Nice\n"
+        );
+    }
+
+    #[test]
     fn what_the_prompt_leaves_out_is_split_into_whole_line_parts() {
         let words: Vec<TranscriptWord> = (0..40)
             .map(|index| word(&format!("Sentence{index}."), index as f64 * 60.0))
@@ -306,11 +435,11 @@ mod tests {
         assert_eq!(
             parts[0].from,
             joined.lines().next().unwrap()[1..]
-                .split(']')
+                .split(['-', ']'])
                 .next()
                 .unwrap()
         );
-        assert_eq!(parts.last().unwrap().to, "39:00");
+        assert_eq!(parts.last().unwrap().to, "2340.30");
         assert!(transcript.remaining_parts(usize::MAX, 120).is_empty());
     }
 
@@ -332,7 +461,7 @@ mod tests {
         };
         assert_eq!(
             transcript.timed_lines(10_000),
-            "[0:00] The build is red.\n[1:02] Day three?\n"
+            "[000.00-001.30] The build is red.\n[062.00-063.30] Day three?\n"
         );
         assert!(transcript.timed_lines(12).chars().count() <= 12);
         let plain = SourceTranscript {

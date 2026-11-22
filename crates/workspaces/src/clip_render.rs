@@ -214,6 +214,17 @@ fn narration_tracks(
         .collect()
 }
 
+/// Fades the first and last 30 ms of a cut's audio so joined cuts don't click.
+fn cut_audio_filter(length_ms: u32) -> String {
+    let fade = (length_ms / 4).min(30);
+    if fade == 0 {
+        return "apad".to_owned();
+    }
+    let out = f64::from(length_ms - fade) / 1000.0;
+    let fade = f64::from(fade) / 1000.0;
+    format!("afade=t=in:st=0:d={fade},afade=t=out:st={out}:d={fade},apad")
+}
+
 struct RenderClip {
     path: PathBuf,
     cut: Option<PreviewCut>,
@@ -907,6 +918,10 @@ impl ActiveRender<'_> {
             if let Some(cut) = &clip.cut {
                 command.args(["-t", &format!("{}ms", cut.end_ms - cut.start_ms)]);
             }
+            let audio_filter = clip.cut.as_ref().map_or_else(
+                || "apad".to_owned(),
+                |cut| cut_audio_filter(cut.end_ms - cut.start_ms),
+            );
             command
                 .args([
                     "-map",
@@ -916,7 +931,7 @@ impl ActiveRender<'_> {
                     "-filter_complex",
                     &graph,
                     "-af",
-                    "apad",
+                    &audio_filter,
                     "-shortest",
                     "-c:v",
                     "libx264",
@@ -957,5 +972,23 @@ impl ActiveRender<'_> {
             .args(["-c", "copy", "-movflags", "+faststart", "-y"])
             .arg(scratch.join(format!("{id}.mp4")));
         self.run(&mut command, "joining source clips")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cut_audio_filter;
+
+    #[test]
+    fn cut_audio_fades_in_and_out() {
+        assert_eq!(
+            cut_audio_filter(2000),
+            "afade=t=in:st=0:d=0.03,afade=t=out:st=1.97:d=0.03,apad"
+        );
+        assert_eq!(
+            cut_audio_filter(80),
+            "afade=t=in:st=0:d=0.02,afade=t=out:st=0.06:d=0.02,apad"
+        );
+        assert_eq!(cut_audio_filter(3), "apad");
     }
 }
