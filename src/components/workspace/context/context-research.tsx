@@ -3,7 +3,7 @@
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { Check, ChevronDown, Globe, Image as ImageIcon, Link2, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,15 +29,32 @@ type SavedSource = { source: string; readable: boolean; readAt: number };
 type Outcome = { colors: number; images: number; profiles: number; failedImages: string[] };
 type Failure = "agent_unavailable" | "agent_timed_out" | "agent_failed" | "context_draft_failed";
 
+const handOffKey = (workspaceId: number) => `arrumo:context-sources:${workspaceId}`;
+
+/** Links collected before the workspace existed, read once by its context research. */
+export function handOffContextSources(workspaceId: number, sources: string[]) {
+  try { sessionStorage.setItem(handOffKey(workspaceId), JSON.stringify(sources.slice(0, MAX_SOURCES))); } catch {}
+}
+
+function takeHandedOffSources(workspaceId: number) {
+  try {
+    const raw = sessionStorage.getItem(handOffKey(workspaceId));
+    sessionStorage.removeItem(handOffKey(workspaceId));
+    const list = JSON.parse(raw ?? "null");
+    return Array.isArray(list) ? list.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "").slice(0, MAX_SOURCES) : [];
+  } catch { return []; }
+}
+
 export function ContextResearch({ workspaceId, startOpen, onDraft }: {
   workspaceId: number;
   startOpen: boolean;
   onDraft: (markdown: string) => void;
 }) {
   const { locale, messages: { contextResearch: copy } } = useLocale();
-  const [open, setOpen] = useState(startOpen);
+  const [handedOff] = useState(() => takeHandedOffSources(workspaceId));
+  const [open, setOpen] = useState(startOpen || handedOff.length > 0);
   const [saved, setSaved] = useState<SavedSource[]>([]);
-  const [sources, setSources] = useState([""]);
+  const [sources, setSources] = useState(handedOff.length ? handedOff : [""]);
   const [notes, setNotes] = useState("");
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure>();
@@ -75,6 +92,13 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
 
   const filled = sources.map((source) => source.trim()).filter(Boolean);
   const agentName = agent ?? copy.agentFallback;
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || !handedOff.length) return;
+    started.current = true;
+    void research();
+  });
 
   async function research() {
     if (pending || (!filled.length && !notes.trim())) return;

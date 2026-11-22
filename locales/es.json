@@ -872,7 +872,16 @@
     "skipAll": "Omitir por ahora",
     "saveKeys": "Guardar claves",
     "savingKeys": "Guardando…",
-    "keysError": "Algunas claves no se pudieron guardar. Revísalas e inténtalo de nuevo."
+    "keysError": "Algunas claves no se pudieron guardar. Revísalas e inténtalo de nuevo.",
+    "learnTitle": "¿Dónde puede {agent} conocerte?",
+    "learnHint": "Canales, webs, perfiles sociales. Los lee y redacta tu contexto y tus perfiles. Puedes saltarte esto.",
+    "learnLinks": "Enlaces para leer",
+    "removeLink": "Quitar {link}",
+    "firstLink": "https://youtube.com/@tucanal",
+    "anotherLink": "Pega otro enlace",
+    "addLink": "Añadir",
+    "learnAfter": "Tras crear el espacio, {agent} los lee y sugiere contexto y perfiles para que marques.",
+    "createAndRead": "Crear {name} y leer los enlaces"
   },
   "workspaces": {
     "missing": "No se encontró este espacio de trabajo.",

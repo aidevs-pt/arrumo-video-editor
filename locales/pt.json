@@ -872,7 +872,16 @@
     "skipAll": "Saltar por agora",
     "saveKeys": "Guardar chaves",
     "savingKeys": "A guardar…",
-    "keysError": "Algumas chaves não foram guardadas. Verifique-as e tente novamente."
+    "keysError": "Algumas chaves não foram guardadas. Verifique-as e tente novamente.",
+    "learnTitle": "Onde pode {agent} conhecer-te?",
+    "learnHint": "Canais, sites, perfis sociais. Lê-os e redige o teu contexto e perfis. Podes saltar isto.",
+    "learnLinks": "Links para ler",
+    "removeLink": "Remover {link}",
+    "firstLink": "https://youtube.com/@oteucanal",
+    "anotherLink": "Cola outro link",
+    "addLink": "Adicionar",
+    "learnAfter": "Depois de criar o espaço, {agent} lê-os e sugere contexto e perfis para escolheres.",
+    "createAndRead": "Criar {name} e ler os links"
   },
   "workspaces": {
     "missing": "Este espaço de trabalho não foi encontrado.",

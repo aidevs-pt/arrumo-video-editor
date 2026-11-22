@@ -1,5 +1,6 @@
 "use client";
 
+import { handOffContextSources } from "@/components/workspace/context/context-research";
 import { invoke } from "@tauri-apps/api/core";
 import { Paintbrush, Plus } from "lucide-react";
 import Link from "next/link";
@@ -29,9 +30,10 @@ export function WorkspaceHome() {
   const [pending, setPending] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  async function createWorkspace(workspaceName: string) {
+  async function createWorkspace(workspaceName: string, sources: string[] = []) {
     const workspace = await invoke<Workspace>("create_workspace", { name: workspaceName });
     add(workspace);
+    if (sources.length) handOffContextSources(workspace.id, sources);
     router.push(workspaceHref("context", workspace.id));
   }
 

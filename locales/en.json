@@ -872,7 +872,16 @@
     "skipAll": "Skip for now",
     "saveKeys": "Save keys",
     "savingKeys": "Saving…",
-    "keysError": "Some keys couldn't be saved. Check them and try again."
+    "keysError": "Some keys couldn't be saved. Check them and try again.",
+    "learnTitle": "Where can {agent} learn about you?",
+    "learnHint": "Channels, sites, social profiles. It reads them and drafts your context and profiles. You can skip this.",
+    "learnLinks": "Links to read",
+    "removeLink": "Remove {link}",
+    "firstLink": "https://youtube.com/@yourchannel",
+    "anotherLink": "Paste another link",
+    "addLink": "Add",
+    "learnAfter": "After creating the workspace, {agent} reads these and suggests context and profiles for you to tick.",
+    "createAndRead": "Create {name} and read the links"
   },
   "workspaces": {
     "missing": "This workspace could not be found.",

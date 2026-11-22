@@ -2,7 +2,7 @@
 
 import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ArrowUpRight, Check, Info } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, Globe, Info, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,7 +24,7 @@ type Step = 0 | 1 | 2;
 export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
   desktop: boolean;
   loading: boolean;
-  onCreate: (name: string) => Promise<void>;
+  onCreate: (name: string, sources: string[]) => Promise<void>;
 }) {
   const pluginText = usePluginText();
   const { locale, setLocale, messages: { onboarding: copy, workspaces, agentSettings } } = useLocale();
@@ -32,6 +32,14 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
   const [setup, setSetup] = useState<SetupData>();
   const [selected, setSelected] = useState("");
   const [name, setName] = useState("");
+  const [links, setLinks] = useState<string[]>([]);
+  const [link, setLink] = useState("");
+  function addLink() {
+    const value = link.trim();
+    if (!value || links.length >= 8 || links.includes(value)) return;
+    setLinks([...links, value]);
+    setLink("");
+  }
   const [pending, setPending] = useState(false);
   const [setupError, setSetupError] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -90,7 +98,7 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
     setPending(true);
     setSaveError(false);
     try {
-      await onCreate(name.trim());
+      await onCreate(name.trim(), link.trim() && links.length < 8 ? [...links, link.trim()] : links);
     } catch {
       setSaveError(true);
     } finally {
@@ -168,12 +176,33 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
           <Field className="max-w-sm" data-disabled={pending}>
             <FieldLabel htmlFor="workspace-name">{workspaces.name}</FieldLabel>
             <Input id="workspace-name" autoComplete="organization" value={name} onChange={(event) => setName(event.target.value)} disabled={pending} required />
-            <FieldDescription>{copy.workspaceHint}</FieldDescription>
+          </Field>
+          <Field className="mt-8 max-w-2xl" data-disabled={pending}>
+            <FieldLabel htmlFor="workspace-source">{copy.learnTitle.replace("{agent}", agent?.label ?? copy.agent)}</FieldLabel>
+            <FieldDescription>{copy.learnHint}</FieldDescription>
+            {links.length > 0 && <ul className="flex flex-wrap gap-2" aria-label={copy.learnLinks}>
+              {links.map((entry) => (
+                <li key={entry} className="flex max-w-full items-center gap-1.5 rounded-md border bg-card py-1 ps-2.5 pe-1 text-sm">
+                  <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{entry}</span>
+                  <Button type="button" variant="ghost" size="icon" className="size-6" disabled={pending}
+                    aria-label={copy.removeLink.replace("{link}", entry)} onClick={() => setLinks(links.filter((value) => value !== entry))}><X /></Button>
+                </li>
+              ))}
+            </ul>}
+            {links.length < 8 && <div className="flex gap-2">
+              <Input id="workspace-source" type="text" inputMode="url" autoComplete="url" value={link} maxLength={2048} disabled={pending}
+                placeholder={links.length ? copy.anotherLink : copy.firstLink} onChange={(event) => setLink(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addLink(); } }} />
+              <Button type="button" variant="outline" disabled={pending || !link.trim()} onClick={addLink}>{copy.addLink}</Button>
+            </div>}
+            <FieldDescription>{links.length || link.trim() ? copy.learnAfter.replace("{agent}", agent?.label ?? copy.agent) : copy.workspaceHint}</FieldDescription>
           </Field>
           {saveError && <SetupError>{workspaces.createError}</SetupError>}
           <footer className="mt-auto flex justify-between gap-4 pt-10">
             <Back onClick={back} disabled={pending}>{copy.back}</Back>
-            <Button type="submit" disabled={pending || !name.trim()}>{pending ? workspaces.creating : workspaces.create}</Button>
+            <Button type="submit" disabled={pending || !name.trim()}>{pending ? workspaces.creating
+              : links.length || link.trim() ? copy.createAndRead.replace("{name}", name.trim() || workspaces.name) : workspaces.create}</Button>
           </footer>
         </form>}
       </main>
