@@ -42,7 +42,7 @@ export function DraftSourceClips({ assets, sources, disabled, importing, draggin
         </div>
         {assets.length > 0 && (
           <div>
-            <h2 className="mb-2 text-sm font-semibold">{copy.existingClips}</h2>
+            <h2 className="font-sans mb-2 text-sm font-semibold">{copy.existingClips}</h2>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8rem),1fr))] gap-2.5">
               {assets.map((asset) => (
                 <li key={asset.id} className="min-w-0">

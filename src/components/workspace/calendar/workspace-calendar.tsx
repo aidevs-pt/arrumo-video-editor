@@ -229,7 +229,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
               </div>
               <div className="flex flex-col gap-4 lg:hidden">
                 {[...byDate].map(([date, group]) => <section key={date} className="flex flex-col gap-1">
-                  <h2 className="text-sm font-medium"><time dateTime={date}>{dayLabel.format(new Date(date))}</time></h2>
+                  <h2 className="font-sans text-sm font-medium"><time dateTime={date}>{dayLabel.format(new Date(date))}</time></h2>
                   <OutputList rows={group} workspaceId={workspaceId} />
                 </section>)}
               </div>
@@ -239,7 +239,7 @@ function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
             </div>
             <aside aria-labelledby="calendar-unscheduled" className="flex max-w-xl flex-col gap-2 2xl:sticky 2xl:top-20">
               <div className="flex items-center justify-between">
-                <h2 id="calendar-unscheduled" className="text-[1.125rem] font-bold">{copy.unscheduled}</h2>
+                <h2 id="calendar-unscheduled" className="font-sans text-[1.125rem] font-bold">{copy.unscheduled}</h2>
                 <span className="rounded-[5px] bg-secondary px-2 text-sm font-bold tabular-nums">{unscheduled.length}</span>
               </div>
               <p className="text-sm text-muted-foreground">{unscheduled.length ? copy.unscheduledHint : copy.allScheduled}</p>

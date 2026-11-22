@@ -95,7 +95,7 @@ export function ScriptSectionReview({ storageKey, sections, agent, reviewing, re
         <label className="flex items-center gap-2 text-sm font-semibold">
           <Checkbox checked={selected.length === sections.length ? true : selected.length ? "indeterminate" : false}
             onCheckedChange={(checked) => setSelected(checked === true ? sections.map((_, index) => index) : [])} />
-          {selected.length ? copy.selected.replace("{count}", String(selected.length)) : copy.selectAll}
+          {selected.length === 1 ? copy.selectedOne : selected.length ? copy.selected.replace("{count}", String(selected.length)) : copy.selectAll}
         </label>
         {selected.length > 0 && <>
           <Input value={shared} onChange={(event) => setShared(event.target.value)} placeholder={copy.sharedComment}

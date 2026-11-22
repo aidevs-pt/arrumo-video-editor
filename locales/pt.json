@@ -1136,6 +1136,7 @@
     "groupBy": "Mostrar por grupo",
     "noGrouping": "Não agrupar",
     "selected": "{count} selecionados",
+    "selectedOne": "1 selecionado",
     "selectAll": "Selecionar os visíveis",
     "clear": "Limpar",
     "describeTogether": "Descrever juntos",
@@ -1219,6 +1220,7 @@
   "scriptReview": {
     "selectAll": "Selecionar tudo",
     "selected": "{count} selecionadas",
+    "selectedOne": "1 selecionada",
     "sharedComment": "Um comentário para todas (opcional)",
     "selectSection": "Selecionar {heading}",
     "idea": "Ideia de {agent}:",

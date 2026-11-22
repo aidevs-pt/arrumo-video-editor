@@ -186,7 +186,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
               })}
             </ul>
             {groups.length > 0 && <div>
-              <h2 className="mb-1 px-3 text-sm font-semibold text-muted-foreground">{copy.groups}</h2>
+              <h2 className="font-sans mb-1 px-3 text-sm font-semibold text-muted-foreground">{copy.groups}</h2>
               <ul className="flex flex-wrap gap-1 lg:flex-col">
                 {groups.map((group) => (
                   <li key={group}>
@@ -201,7 +201,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
               </ul>
             </div>}
             {labels.length > 0 && <div>
-              <h2 className="mb-2 px-3 text-sm font-semibold text-muted-foreground">{copy.labels}</h2>
+              <h2 className="font-sans mb-2 px-3 text-sm font-semibold text-muted-foreground">{copy.labels}</h2>
               <ul className="flex flex-wrap gap-1.5 px-1">
                 {labels.map((label) => (
                   <li key={label}>
@@ -235,9 +235,9 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
               </NativeSelect>}
             </div>
             {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-4 py-2.5" role="status">
-              <span className="me-auto font-semibold tabular-nums">{copy.selected.replace("{count}", String(selected.length))}</span>
-              <Button variant="ghost" size="sm" onClick={() => setSelected(visible.map(({ id }) => id))}>{copy.selectAll}</Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelected([])}>{copy.clear}</Button>
+              <span className="me-auto font-semibold tabular-nums">{selected.length === 1 ? copy.selectedOne : copy.selected.replace("{count}", String(selected.length))}</span>
+              <Button variant="outline" size="sm" className="border-border bg-card" onClick={() => setSelected(visible.map(({ id }) => id))}>{copy.selectAll}</Button>
+              <Button variant="outline" size="sm" className="border-border bg-card" onClick={() => setSelected([])}>{copy.clear}</Button>
             </div>}
             {progress && <div role="status" className="flex flex-col gap-2 text-sm">
               {copy.uploading.replace("{done}", String(progress.completed)).replace("{total}", String(progress.total))}
@@ -260,7 +260,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
               </div>
             ) : sections.map(({ group, items }) => (
               <div key={group ?? "ungrouped"} className="flex flex-col gap-2">
-                {sections.length > 1 && <h2 className="flex items-center gap-2 text-base font-bold">
+                {sections.length > 1 && <h2 className="font-sans flex items-center gap-2 text-base font-bold">
                   <Folder className="size-4" aria-hidden="true" />{group ?? messages.assets.ungrouped}
                 </h2>}
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(9.5rem,100%),1fr))] gap-3">
