@@ -24,19 +24,40 @@ type Kind = "image" | "audio" | "video";
 /** What the dialog makes: library kinds, with audio split into voice, music and sound effects. */
 type Tab = Kind | "music" | "sound";
 type LibraryAsset = { id: number; name: string; kind: Kind };
-type VideoModel = { provider: string; id: string; selected: boolean; variants: { images: [number, number]; videos: [number, number] }[] };
+type BestFor = { en: string; es?: string; pt?: string };
+type VideoVariant = { images: [number, number]; videos: [number, number]; minSeconds: number; maxSeconds: number; allowedSeconds: number[]; aspectRatios: string[] };
+type VideoModel = { provider: string; id: string; label: string; bestFor?: BestFor; selected: boolean; variants: VideoVariant[] };
+type ImageModel = { provider: string; id: string; label: string; bestFor: BestFor; selected: boolean; references: number; aspectRatios: string[] };
 
 const MAX_IMAGE_REFERENCES = 9;
 const MAX_VIDEO_REFERENCES = 3;
 
+function fits(variant: VideoVariant, images: number, videos: number) {
+  return images >= variant.images[0] && images <= variant.images[1] && videos >= variant.videos[0] && videos <= variant.videos[1];
+}
+
 function takes(model: VideoModel, images: number, videos: number) {
-  return model.variants.some((variant) => images >= variant.images[0] && images <= variant.images[1] && videos >= variant.videos[0] && videos <= variant.videos[1]);
+  return model.variants.some((variant) => fits(variant, images, videos));
+}
+
+/** The lengths to offer for a variant: the ones it takes, or common lengths within its range. */
+function lengthsFor(variant: VideoVariant | undefined) {
+  if (!variant) return DURATIONS;
+  if (variant.allowedSeconds.length) return variant.allowedSeconds;
+  const within = [...new Set([variant.minSeconds, ...COMMON_DURATIONS, variant.maxSeconds])]
+    .filter((value) => value >= variant.minSeconds && value <= variant.maxSeconds);
+  return within.sort((first, second) => first - second);
+}
+
+function nearest(values: number[], target: number) {
+  return values.reduce((best, value) => Math.abs(value - target) < Math.abs(best - target) ? value : best, values[0] ?? target);
 }
 
 const CAPABILITY: Record<Tab, string> = {
   image: "image-generation", audio: "text-to-speech", music: "music-generation", sound: "sound-effect-generation", video: "video-generation",
 };
 const DURATIONS = [3, 5, 8, 10, 15];
+const COMMON_DURATIONS = [3, 5, 8, 10, 15, 20, 30];
 const MUSIC_DURATIONS = [15, 30, 60, 120, 180];
 const SOUND_DURATIONS = [1, 2, 3, 5, 10];
 
@@ -55,7 +76,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   /** Only images, with the trigger naming the first image provider, as on the brand page. */
   imagesOnly?: boolean;
 }) {
-  const { messages: { assets: { generate: copy } } } = useLocale();
+  const { locale, messages: { assets: { generate: copy } } } = useLocale();
   const pluginText = usePluginText();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Tab>("image");
@@ -73,6 +94,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const [library, setLibrary] = useState<LibraryAsset[]>([]);
   const [references, setReferences] = useState<number[]>([]);
   const [models, setModels] = useState<VideoModel[]>([]);
+  const [imageModels, setImageModels] = useState<ImageModel[]>([]);
   const [model, setModel] = useState("");
 
   useEffect(() => {
@@ -84,6 +106,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
     if (!open) return;
     invoke<LibraryAsset[]>("list_assets", { workspaceId }).then(setLibrary, () => setLibrary([]));
     if (!imagesOnly) invoke<VideoModel[]>("list_video_models", { workspaceId }).then(setModels, () => setModels([]));
+    invoke<ImageModel[]>("list_image_models", { workspaceId }).then(setImageModels, () => setImageModels([]));
   }, [imagesOnly, open, workspaceId]);
 
   const name = (entry: Provider) => pluginText.name(entry.id, entry.name);
@@ -99,7 +122,18 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const fitting = providerModels.filter((entry) => takes(entry, imageCount, videoCount));
   const unfit = kind === "video" && activeModel !== undefined && !takes(activeModel, imageCount, videoCount);
   const unsupported = kind === "video" && chosen.length > 0 && providerModels.length === 0 && models.some((entry) => entry.provider === videoProvider);
-  const modelName = (id: string) => id.replace(/-/g, " ").replace(/\b([a-z])/g, (letter) => letter.toUpperCase()).replace(/ Std$/, " Standard");
+  const variant = activeModel?.variants.find((entry) => fits(entry, imageCount, videoCount)) ?? activeModel?.variants[0];
+  const followsVideo = variant !== undefined && variant.maxSeconds === 0;
+  const lengths = lengthsFor(variant);
+  const length = nearest(lengths, duration);
+  const wrongRatio = kind === "video" && !unfit && !!variant?.aspectRatios.length && !variant.aspectRatios.includes(ratio);
+  const imageProviderModels = imageModels.filter((entry) => entry.provider === videoProvider);
+  const activeImageModel = imageProviderModels.find((entry) => entry.id === model) ?? imageProviderModels.find((entry) => entry.selected);
+  const pickable = kind === "video" ? providerModels : kind === "image" ? imageProviderModels : [];
+  const shown = kind === "video" ? activeModel : kind === "image" ? activeImageModel : undefined;
+  const prettify = (id: string) => id.replace(/-/g, " ").replace(/\b([a-z])/g, (letter) => letter.toUpperCase()).replace(/ Std$/, " Standard");
+  const modelName = (id: string) => pickable.find((entry) => entry.id === id)?.label || prettify(id);
+  const bestFor = (text?: BestFor) => text && (text[locale as keyof BestFor] ?? text.en);
 
   function toggleReference(asset: LibraryAsset) {
     setProblem(undefined);
@@ -119,11 +153,12 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
     try {
       if (kind === "image") {
         onCreated(await invoke<number[]>("generate_library_images", {
-          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, count, notes: notes.trim(), provider: provider || null, references: chosen,
+          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, count, notes: notes.trim(),
+          provider: provider || (model ? videoProvider : null), model: model || null, references: chosen,
         }));
       } else if (kind === "video") {
         onCreated([await invoke<number>("generate_library_video", {
-          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: duration, notes: notes.trim(),
+          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: followsVideo ? null : length, notes: notes.trim(),
           provider: provider || (model ? videoProvider : null), model: model || null, references: chosen,
         })]);
       } else if (made) {
@@ -200,19 +235,21 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
               <NativeSelect id="generate-count" value={count} disabled={pending} onChange={(event) => setCount(Number(event.target.value))}>
                 {[1, 2, 3, 4].map((value) => <NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>)}
               </NativeSelect>
-            </Field> : <Field data-disabled={pending}>
+            </Field> : <Field data-disabled={pending || followsVideo}>
               <FieldLabel htmlFor="generate-length">{copy.length}</FieldLabel>
-              <NativeSelect id="generate-length" value={duration} disabled={pending} onChange={(event) => setDuration(Number(event.target.value))}>
-                {DURATIONS.map((value) => <NativeSelectOption key={value} value={value}>{copy.seconds.replace("{count}", String(value))}</NativeSelectOption>)}
+              <NativeSelect id="generate-length" value={followsVideo ? "" : length} disabled={pending || followsVideo} onChange={(event) => setDuration(Number(event.target.value))}>
+                {followsVideo ? <NativeSelectOption value="">{copy.lengthFollowsVideo}</NativeSelectOption>
+                  : lengths.map((value) => <NativeSelectOption key={value} value={value}>{copy.seconds.replace("{count}", String(value))}</NativeSelectOption>)}
               </NativeSelect>
             </Field>}</>}
           </div>
-          {kind === "video" && providerModels.length > 0 && <Field data-disabled={pending}>
+          {pickable.length > 0 && !imagesOnly && <Field data-disabled={pending}>
             <FieldLabel htmlFor="generate-model">{copy.model}</FieldLabel>
-            <NativeSelect id="generate-model" value={model} disabled={pending} onChange={(event) => setModel(event.target.value)}>
-              <NativeSelectOption value="">{copy.modelDefault.replace("{model}", modelName(providerModels.find((entry) => entry.selected)?.id ?? providerModels[0].id))}</NativeSelectOption>
-              {providerModels.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{modelName(entry.id)}</NativeSelectOption>)}
+            <NativeSelect id="generate-model" value={model} disabled={pending} onChange={(event) => setModel(event.target.value)} aria-describedby="generate-model-best">
+              <NativeSelectOption value="">{copy.modelDefault.replace("{model}", modelName(pickable.find((entry) => entry.selected)?.id ?? pickable[0].id))}</NativeSelectOption>
+              {pickable.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{modelName(entry.id)}</NativeSelectOption>)}
             </NativeSelect>
+            {bestFor(shown?.bestFor) && <FieldDescription id="generate-model-best">{copy.bestFor.replace("{text}", bestFor(shown?.bestFor) ?? "")}</FieldDescription>}
           </Field>}
           {kind !== "audio" && !made && !imagesOnly && <Field data-disabled={pending}>
             <FieldLabel id="generate-references">{copy.references}</FieldLabel>
@@ -231,8 +268,13 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
             </div> : <p className="text-sm text-muted-foreground">{copy.referencesNone}</p>}
           </Field>}
           {unfit && activeModel && <Alert role="status"><AlertDescription>{(fitting.length ? copy.modelCantTake : copy.noModelTakes)
-            .replace("{model}", modelName(activeModel.id)).replace("{models}", fitting.map((entry) => modelName(entry.id)).join(", "))}</AlertDescription></Alert>}
+            .replace("{model}", modelName(activeModel.id)).replace("{models}", new Intl.ListFormat(locale, { type: "disjunction" }).format(fitting.map((entry) => modelName(entry.id))))}</AlertDescription></Alert>}
           {unsupported && <Alert role="status"><AlertDescription>{copy.noReferencesHere}</AlertDescription></Alert>}
+          {wrongRatio && variant && activeModel && <Alert role="status"><AlertDescription>{copy.modelRatios
+            .replace("{model}", modelName(activeModel.id)).replace("{ratios}", new Intl.ListFormat(locale, { type: "conjunction" }).format(variant.aspectRatios))}</AlertDescription></Alert>}
+          {kind === "image" && activeImageModel && imageCount > activeImageModel.references && <Alert role="status"><AlertDescription>
+            {(activeImageModel.references ? copy.imageModelReferences : copy.imageModelNoReferences)
+              .replace("{model}", activeImageModel.label).replace("{count}", String(activeImageModel.references))}</AlertDescription></Alert>}
           <Field data-disabled={pending}>
             <FieldLabel htmlFor="generate-notes">{copy.notes}</FieldLabel>
             <Input id="generate-notes" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={pending}
@@ -244,7 +286,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
           {pending && <p role="status" className="text-sm text-muted-foreground">{kind === "video" ? copy.videoPendingHint : made ? copy.audioPendingHint : copy.pendingHint}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{copy.cancel}</Button>
-            <Button type="submit" disabled={pending || !prompt.trim() || none || unfit || unsupported}>
+            <Button type="submit" disabled={pending || !prompt.trim() || none || unfit || unsupported || wrongRatio}>
               {pending ? copy.generating : kind === "audio" || made ? copy.submitAudio : kind === "video" ? copy.submitVideo : count === 1 ? copy.submitOne : copy.submitMany.replace("{count}", String(count))}
             </Button>
           </DialogFooter>
