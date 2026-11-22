@@ -208,7 +208,8 @@ fn supplemental_prompt(
          thumbnailAspectRatio, following the format's thumbnailGuidance. thumbnailReferences are the creator's example \
          thumbnails with their notes; those with an attachedImage number are attached in that order, so look at them and \
          match their layout, typography, colours and energy without copying their text or subjects. Make each thumbnail a \
-         different idea. Never ask for real people's likenesses or logos you \
+         different idea. Keep text and the main subject inside the central 80% of the frame, since \
+         images may be cropped slightly to the exact ratio. Never ask for real people's likenesses or logos you \
          were not given.\n\
          Respect each format's specifications and the platform's conventions.\n\
          Write in the language the creator's context and brief are written in. The summary is one sentence to the creator.\n\n\

@@ -334,7 +334,7 @@ impl WorkspaceStore {
              For each request, choose exactly the requested number of cuts. Use the timeline to start and end on whole \
              beats so each cut stands on its own, keep them between {MIN_CUT_SECONDS:.0} and {MAX_CUT_SECONDS:.0} seconds, \
              and make each cut a different moment. Give each a short title for the creator and, when thumbnails are \
-             requested, that many detailed 9:16 image-generation prompts following the thumbnail guidance. Never ask for \
+             requested, that many detailed 9:16 image-generation prompts following the thumbnail guidance, with text and the main subject inside the central 80% of the frame. Never ask for \
              real people's likenesses or logos you were not given.\n\
              {replace}\
              The summary is one sentence to the creator, in the first person, in the language of the brief.\n\n\
