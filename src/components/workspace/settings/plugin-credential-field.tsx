@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { CircleCheck } from "lucide-react";
+import { ArrowUpRight, CircleCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,6 +14,7 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
+import { cn } from "@/lib/utils";
 import type { PluginSettingDeclaration } from "./plugin-preferences";
 
 type Status = {
@@ -93,6 +94,7 @@ export function PluginCredentialField({ field, pluginId, workspaceId }: {
         {stored && <CircleCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />}
         {stored ? `${copy.stored} · ${copy[status.source ?? "unset"]}` : copy.unset}
       </p>
+      <SettingHelpLink pluginId={pluginId} settingId={field.id} helpUrl={field.helpUrl} />
     </Field>
     <div className="flex flex-wrap gap-2">
       <Button size="sm" disabled={pending || !hasInput}>{stored ? copy.replace : copy.save}</Button>
@@ -115,4 +117,14 @@ export function PluginCredentialField({ field, pluginId, workspaceId }: {
     {feedback === "saved" && <p role="status" className="text-sm text-muted-foreground">{copy.saved}</p>}
     {feedback === "saveError" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
   </form>;
+}
+
+/** Where to find it: the help page the plugin declares for this setting. */
+export function SettingHelpLink({ pluginId, settingId, helpUrl, className }: { pluginId: string; settingId: string; helpUrl?: string; className?: string }) {
+  const { messages: { pluginPreferences: copy } } = useLocale();
+  if (!helpUrl) return null;
+  return <Button type="button" variant="link" size="sm" title={helpUrl} className={cn("h-auto self-start px-0 font-semibold underline underline-offset-4", className)}
+    onClick={() => void invoke("open_plugin_setting_help", { pluginId, settingId }).catch(() => {})}>
+    {copy.whereToFind}<ArrowUpRight data-icon="inline-end" />
+  </Button>;
 }

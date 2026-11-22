@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -428,6 +428,16 @@ impl PluginManifest {
             })
     }
 
+    /// The help page a setting declares, if the plugin is installed and declares one.
+    pub fn setting_help_url(&self, setting_id: &str) -> Option<&str> {
+        self.settings
+            .iter()
+            .flatten()
+            .find(|setting| setting.id == setting_id)?
+            .help_url
+            .as_deref()
+    }
+
     pub(crate) fn parse(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
         if bytes.len() > MAX_PLUGIN_MANIFEST_BYTES {
             return Err(invalid_manifest("Plugin manifest exceeds 64 KiB").into());
@@ -476,6 +486,10 @@ impl PluginManifest {
                         || !setting_ids.insert(&setting.id)
                         || blank(&setting.label)
                         || blank(&setting.description)
+                        || setting
+                            .help_url
+                            .as_deref()
+                            .is_some_and(|url| manifest.schema_version < 10 || !valid_help_url(url))
                 }))
         {
             return Err(invalid_manifest("Invalid or duplicate plugin setting declaration").into());
@@ -850,4 +864,55 @@ pub(crate) fn identifier(value: &str) -> bool {
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
     })
+}
+
+/// An https address without credentials, spaces or fragments, short enough to show.
+fn valid_help_url(url: &str) -> bool {
+    url.len() <= 512
+        && !url.contains(char::is_whitespace)
+        && url::Url::parse(url).is_ok_and(|parsed| {
+            parsed.scheme() == "https"
+                && parsed.host_str().is_some_and(|host| host.contains('.'))
+                && parsed.username().is_empty()
+                && parsed.password().is_none()
+                && parsed.fragment().is_none()
+        })
+}
+
+#[cfg(test)]
+mod help_url_tests {
+    use super::*;
+
+    fn manifest(schema: u32, help_url: &str) -> Result<PluginManifest, Box<dyn Error>> {
+        PluginManifest::parse(
+            serde_json::json!({
+                "schemaVersion": schema, "id": "keyed", "name": "Keyed", "description": "Uses a key.",
+                "capabilities": {"speech": {"name": "Speech", "description": "Speaks."}},
+                "settings": [{"id": "api-key", "label": "API key", "description": "The key.",
+                    "kind": "secret", "scope": "app", "required": true, "helpUrl": help_url}]
+            })
+            .to_string()
+            .as_bytes(),
+        )
+    }
+
+    #[test]
+    fn help_urls_need_schema_ten_and_a_plain_https_page() {
+        let parsed = manifest(10, "https://example.com/keys").expect("valid help URL");
+        assert_eq!(
+            parsed.setting_help_url("api-key"),
+            Some("https://example.com/keys")
+        );
+        assert_eq!(parsed.setting_help_url("missing"), None);
+        for (schema, url) in [
+            (9, "https://example.com/keys"),
+            (10, "http://example.com/keys"),
+            (10, "https://user:pass@example.com/"),
+            (10, "https://example.com/keys#top"),
+            (10, "https://localhost/keys"),
+            (10, "javascript:alert(1)"),
+        ] {
+            assert!(manifest(schema, url).is_err(), "{schema} {url}");
+        }
+    }
 }

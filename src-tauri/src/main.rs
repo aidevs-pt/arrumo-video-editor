@@ -1284,6 +1284,7 @@ fn main() {
             plugin_settings::browse_plugin_registry,
             plugin_settings::install_registry_plugin,
             plugin_settings::open_plugin_repository,
+            plugin_settings::open_plugin_setting_help,
             agent_settings::set_agent_provider,
             agent_settings::agent_cli_detected,
             agent_settings::agent_login_status,

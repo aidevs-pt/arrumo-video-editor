@@ -162,6 +162,36 @@ pub async fn install_registry_plugin(
     .map_err(|_| "plugin_registry_install_failed")?
 }
 
+/// Opens the help page an installed plugin declares for one of its settings. The address comes
+/// from the manifest, never from the caller.
+#[tauri::command]
+pub fn open_plugin_setting_help(
+    app: AppHandle,
+    store: State<'_, Store>,
+    plugin_id: String,
+    setting_id: String,
+) -> Result<(), &'static str> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let url = store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .plugin_catalog()
+        .map_err(|_| "plugin_catalog_failed")?
+        .into_iter()
+        .find(|plugin| plugin.manifest.id == plugin_id)
+        .and_then(|plugin| {
+            plugin
+                .manifest
+                .setting_help_url(&setting_id)
+                .map(str::to_owned)
+        })
+        .ok_or("plugin_setting_help_missing")?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|_| "plugin_setting_help_failed")
+}
+
 #[tauri::command]
 pub fn open_plugin_repository(app: AppHandle, url: String) -> Result<(), &'static str> {
     use tauri_plugin_opener::OpenerExt;

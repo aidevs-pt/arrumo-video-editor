@@ -171,7 +171,8 @@
     "agentIntro": "Estas definições vêm do plugin do agente. Trabalha sempre só em leitura e não pode executar comandos; ative a pesquisa na web ou os seus próprios plugins apenas se quiser que os use.",
     "saving": "A guardar…",
     "discard": "Descartar alterações",
-    "unsaved": "Por guardar"
+    "unsaved": "Por guardar",
+    "whereToFind": "Onde a encontrar"
   },
   "pluginRegistry": {
     "update": "Atualizar",

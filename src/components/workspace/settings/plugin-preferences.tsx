@@ -27,6 +27,8 @@ export type PluginSettingDeclaration = {
   scope: Scope;
   choices?: string[];
   default?: string | boolean | number;
+  /** A page explaining where to get the value, opened by the host from the installed manifest. */
+  helpUrl?: string;
 };
 export type PluginSettingsManifest = { id: string; name: string; settings?: PluginSettingDeclaration[] };
 type CatalogEntry = { bundled: boolean; manifest: PluginSettingsManifest };

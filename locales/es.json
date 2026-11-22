@@ -171,7 +171,8 @@
     "agentIntro": "Estos ajustes vienen del complemento del agente. Siempre trabaja en solo lectura y no puede ejecutar comandos; activa la búsqueda web o tus propios complementos solo si quieres que los use.",
     "saving": "Guardando…",
     "discard": "Descartar cambios",
-    "unsaved": "Sin guardar"
+    "unsaved": "Sin guardar",
+    "whereToFind": "Dónde encontrarla"
   },
   "pluginRegistry": {
     "update": "Actualizar",

@@ -31,6 +31,9 @@ pub struct PluginSetting {
     /// The value used when neither the app nor the workspace sets one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<serde_json::Value>,
+    /// An https page explaining where to get the value, such as a provider's API key page (schema 10).
+    #[serde(default, rename = "helpUrl", skip_serializing_if = "Option::is_none")]
+    pub help_url: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

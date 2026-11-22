@@ -1,5 +1,6 @@
 "use client";
 
+import { SettingHelpLink } from "@/components/workspace/settings/plugin-credential-field";
 import { usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
@@ -94,10 +95,13 @@ export function OnboardingKeys({ services, onBack, onDone }: {
                   placeholder={saved[key] ? "••••••••••••••" : copy.pasteKey} disabled={saving}
                   aria-describedby={`key-${key}-hint`} value={values[key] ?? ""}
                   onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className="h-11" />
-                <p id={`key-${key}-hint`} className="text-sm text-muted-foreground">
-                  {saved[key] ? <span className="flex items-center gap-2 font-semibold text-approval">
-                    <span aria-hidden="true" className="size-2.5 rounded-[2px] bg-approval" />{copy.keySaved}</span> : null}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p id={`key-${key}-hint`} className="text-sm text-muted-foreground">
+                    {saved[key] ? <span className="flex items-center gap-2 font-semibold text-approval">
+                      <span aria-hidden="true" className="size-2.5 rounded-[2px] bg-approval" />{copy.keySaved}</span> : null}
+                  </p>
+                  <SettingHelpLink pluginId={service.id} settingId={field.id} helpUrl={field.helpUrl} className="ms-auto" />
+                </div>
               </div>
             </section>
           );
