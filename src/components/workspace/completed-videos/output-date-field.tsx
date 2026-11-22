@@ -49,11 +49,11 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
           }} />
         {!savedDate && <p className="text-sm text-muted-foreground">{copy.notScheduled}</p>}
       </Field>
-      <div className="flex flex-wrap gap-1">
-        <Button type="submit" size="sm" variant="outline" disabled={pending || !date || date === savedDate}>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" variant="outline" className="flex-1" disabled={pending || !date || date === savedDate}>
           {copy.saveDate}
         </Button>
-        {savedDate && <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => void save("")}>
+        {savedDate && <Button type="button" size="sm" variant="ghost" className="flex-1" disabled={pending} onClick={() => void save("")}>
           {copy.clearDate}
         </Button>}
       </div>
