@@ -256,6 +256,11 @@ pub(crate) fn execute_speech(
             "The provider refused the key for this (HTTP {status}). Check that the key is allowed to use it and that your plan includes it."
         )));
     }
+    if status == 402 {
+        return Err(io::Error::other(
+            "The provider says your plan doesn't include this or is out of credits (HTTP 402). Upgrade the plan or add credits, then retry.",
+        ));
+    }
     if !response.status().is_success() {
         return Err(io::Error::other(format!(
             "The provider returned HTTP {status}"
