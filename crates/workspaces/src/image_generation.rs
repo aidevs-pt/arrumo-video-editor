@@ -31,11 +31,28 @@ struct ImageAdapter {
     model: ModelChoice,
     aspect_ratios: BTreeMap<String, String>,
     request: Value,
-    response: ImageResponse,
+    /// How to read the image from a synchronous answer; absent when `job` is used.
+    #[serde(default)]
+    response: Option<ImageResponse>,
     max_image_bytes: u64,
     /// How to send reference images, for providers that take them.
     #[serde(default)]
     references: Option<ReferenceInput>,
+    /// Schema 2: the request starts a job to poll; its finished image is downloaded.
+    #[serde(default)]
+    job: Option<ImageJob>,
+    /// Schema 2: how reference images are uploaded for `urls` references.
+    #[serde(default)]
+    upload: Option<crate::provider_media::UploadDescriptor>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImageJob {
+    submission: crate::provider_jobs::Submission,
+    status: crate::provider_jobs::JobStatus,
+    poll_seconds: u64,
+    timeout_seconds: u64,
 }
 
 /// How a provider receives reference images with a request.
@@ -56,6 +73,14 @@ enum ReferenceInput {
     Json {
         pointer: String,
         item: Value,
+        max_images: usize,
+    },
+    /// Schema 2: each image is uploaded through `upload` and the list of public addresses is set
+    /// as `field` of the JSON request, sent to `endpoint` (an edit endpoint on the same host).
+    #[serde(rename_all = "camelCase")]
+    Urls {
+        endpoint: String,
+        field: String,
         max_images: usize,
     },
 }
@@ -99,6 +124,22 @@ fn valid_references(adapter: &ImageAdapter) -> bool {
                     .chars()
                     .all(|c| c.is_ascii_alphanumeric() || "_[]-".contains(c))
                 && (1..=8).contains(max_images)
+        }
+        Some(ReferenceInput::Urls {
+            endpoint,
+            field,
+            max_images,
+        }) => {
+            same_host(endpoint, &adapter.endpoint)
+                && !endpoint.contains(['?', '#', '@'])
+                && !endpoint.contains("/../")
+                && (1..=64).contains(&field.len())
+                && field.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && (1..=8).contains(max_images)
+                && adapter
+                    .upload
+                    .as_ref()
+                    .is_some_and(|upload| upload.valid(&adapter.endpoint))
         }
         Some(ReferenceInput::Json {
             pointer,
@@ -178,13 +219,32 @@ fn image_adapter(plugin_id: &str) -> io::Result<Option<ImageAdapter>> {
             .clone()
             .any(|setting| &setting.id == id && setting.kind == PluginSettingKind::String)
     });
-    if adapter.schema_version != 1
+    let schema_ok = match adapter.schema_version {
+        1 => {
+            adapter.job.is_none()
+                && adapter.upload.is_none()
+                && !matches!(adapter.references, Some(ReferenceInput::Urls { .. }))
+        }
+        2 => true,
+        _ => false,
+    };
+    let mode_ok = match &adapter.job {
+        Some(job) => {
+            adapter.response.is_none()
+                && job.status.valid(&job.submission)
+                && (2..=60).contains(&job.poll_seconds)
+                && (30..=1800).contains(&job.timeout_seconds)
+        }
+        None => adapter.response.is_some(),
+    };
+    if !schema_ok
+        || !mode_ok
         || adapter.plugin_id != manifest.id
         || !manifest.capabilities.contains_key("image-generation")
         || !has_secret
         || !model_setting_ok
         || !valid_model(&adapter.model.default)
-        || !matches!(adapter.credential_prefix.as_str(), "" | "Bearer ")
+        || !matches!(adapter.credential_prefix.as_str(), "" | "Bearer " | "Key ")
         || !(1..=20 * 1024 * 1024).contains(&adapter.max_image_bytes)
         || !["16:9", "9:16", "1:1"]
             .iter()
@@ -349,7 +409,8 @@ impl WorkspaceStore {
             let attached = match &adapter.references {
                 Some(
                     ReferenceInput::Multipart { max_images, .. }
-                    | ReferenceInput::Json { max_images, .. },
+                    | ReferenceInput::Json { max_images, .. }
+                    | ReferenceInput::Urls { max_images, .. },
                 ) => &references[..references.len().min(*max_images)],
                 None => &[][..],
             };
@@ -689,7 +750,42 @@ fn request_image(
                     .map_err(|_| encode())?;
                 form = form.part(file_field.clone(), part);
             }
-            client.post(&endpoint).header(header, value).multipart(form)
+            client
+                .post(&endpoint)
+                .header(header.clone(), value.clone())
+                .multipart(form)
+        }
+        (
+            Some(ReferenceInput::Urls {
+                endpoint: edits,
+                field,
+                ..
+            }),
+            false,
+        ) => {
+            endpoint = edits.replace("{model}", model);
+            let upload = adapter.upload.as_ref().ok_or_else(encode)?;
+            let mut urls = Vec::new();
+            for picture in references {
+                let (kind, mime) = crate::provider_media::media_mime(&picture.bytes)
+                    .filter(|(kind, _)| *kind == crate::provider_media::MediaKind::Image)
+                    .ok_or_else(encode)?;
+                let media = crate::provider_media::ReferenceMedia {
+                    kind,
+                    mime,
+                    bytes: picture.bytes.clone(),
+                };
+                urls.push(upload.upload((&header, &value), &media)?);
+            }
+            let mut body = body;
+            body.as_object_mut()
+                .ok_or_else(encode)?
+                .insert(field.clone(), Value::from(urls));
+            client
+                .post(&endpoint)
+                .header(header.clone(), value.clone())
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(serde_json::to_vec(&body).map_err(|_| encode())?)
         }
         (Some(ReferenceInput::Json { pointer, item, .. }), false) => {
             let mut body = body;
@@ -706,19 +802,37 @@ fn request_image(
             }
             client
                 .post(&endpoint)
-                .header(header, value)
+                .header(header.clone(), value.clone())
                 .header(reqwest::header::CONTENT_TYPE, "application/json")
                 .body(serde_json::to_vec(&body).map_err(|_| encode())?)
         }
         _ => client
             .post(&endpoint)
-            .header(header, value)
+            .header(header.clone(), value.clone())
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(serde_json::to_vec(&body).map_err(|_| encode())?),
     };
     let response = request
         .send()
         .map_err(|_| io::Error::other("The image request failed"))?;
+    if let Some(job) = &adapter.job {
+        let submitted = crate::provider_jobs::read_json(response, "image request")?;
+        let bytes = crate::provider_jobs::await_output(
+            client,
+            &submitted,
+            &endpoint,
+            (&header, &value),
+            &job.submission,
+            &job.status,
+            (job.poll_seconds, job.timeout_seconds),
+            adapter.max_image_bytes,
+            "image",
+        )?;
+        let extension = image_extension(&bytes).ok_or_else(|| {
+            io::Error::other("The provider did not return a PNG, JPEG or WebP image")
+        })?;
+        return Ok((bytes, extension));
+    }
     if !response.status().is_success() {
         return Err(io::Error::other(format!(
             "The image provider returned HTTP {}",
@@ -736,7 +850,8 @@ fn request_image(
     }
     let json: Value = serde_json::from_slice(&text)
         .map_err(|_| io::Error::other("The image response is not JSON"))?;
-    let data = image_data(&json, &adapter.response)
+    let mapping = adapter.response.as_ref().ok_or_else(invalid_adapter)?;
+    let data = image_data(&json, mapping)
         .ok_or_else(|| io::Error::other("The image response has no image"))?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data.trim())
@@ -819,6 +934,34 @@ mod tests {
             assert_eq!(adapter.plugin_id, id);
             assert!(adapter.model.setting.is_some());
         }
+    }
+
+    #[test]
+    fn the_bundled_higgsfield_image_adapter_polls_and_uploads_references() {
+        let adapter = image_adapter("higgsfield")
+            .unwrap()
+            .expect("Higgsfield ships an image adapter");
+        assert!(adapter.job.is_some() && adapter.response.is_none());
+        assert!(matches!(
+            adapter.references,
+            Some(ReferenceInput::Urls { max_images: 3, .. })
+        ));
+    }
+
+    #[test]
+    fn url_references_need_an_upload_flow() {
+        let mut adapter: ImageAdapter = serde_json::from_slice(
+            crate::plugin_catalog::BUNDLED
+                .iter()
+                .zip(bundled_manifests())
+                .find(|(_, manifest)| manifest.id == "higgsfield")
+                .and_then(|(source, _)| source.image_generation)
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(valid_references(&adapter));
+        adapter.upload = None;
+        assert!(!valid_references(&adapter));
     }
 
     #[test]

@@ -2,13 +2,7 @@
 //! status on the same host, then download the finished clip without credentials. Provider
 //! specifics live in each plugin's `video-generation.json`.
 
-use std::{
-    collections::BTreeMap,
-    error::Error,
-    io::{self, Read},
-    path::Path,
-    time::{Duration, Instant},
-};
+use std::{collections::BTreeMap, error::Error, io, path::Path, time::Duration};
 
 use reqwest::{
     blocking::Client,
@@ -20,12 +14,12 @@ use serde_json::Value;
 use crate::{
     PluginSettingKind, PluginSettingScope, WorkspaceStore,
     plugin_catalog::{BUNDLED, bundled_manifests},
+    provider_jobs::{JobStatus, Submission, await_output, host, read_json, safe_https},
     provider_media::{MediaKind, UploadDescriptor},
 };
 
 const MAX_PROMPT_CHARACTERS: usize = 2500;
 const MAX_TEMPLATE_BYTES: usize = 16 * 1024;
-const MAX_STATUS_BYTES: u64 = 256 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -43,7 +37,7 @@ struct VideoAdapter {
     /// number) are filled in.
     request: Value,
     submission: Submission,
-    status: StatusMapping,
+    status: JobStatus,
     poll_seconds: u64,
     timeout_seconds: u64,
     max_video_bytes: u64,
@@ -116,42 +110,8 @@ struct Durations {
     default: u32,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Submission {
-    /// JSON pointer to the job's status address, which must be on the endpoint's host.
-    status_url: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct StatusMapping {
-    state: String,
-    completed: Vec<String>,
-    failed: Vec<String>,
-    /// JSON pointer to the finished clip's HTTPS address.
-    video: String,
-    #[serde(default)]
-    error: Option<String>,
-}
-
 fn invalid_adapter() -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, "Invalid video adapter")
-}
-
-fn host(url: &str) -> Option<&str> {
-    url.strip_prefix("https://")?
-        .split('/')
-        .next()
-        .filter(|host| !host.is_empty())
-}
-
-fn safe_https(url: &str) -> bool {
-    host(url).is_some() && !url.contains(['#', '@', ' ']) && !url.contains("/../")
-}
-
-fn pointer(value: &str) -> bool {
-    value.starts_with('/') && value.len() <= 128
 }
 
 fn valid_model_id(id: &str) -> bool {
@@ -284,11 +244,7 @@ fn valid(adapter: &VideoAdapter, manifest: &crate::PluginManifest) -> bool {
         && (2..=60).contains(&adapter.poll_seconds)
         && (60..=3600).contains(&adapter.timeout_seconds)
         && (1..=500 * 1024 * 1024).contains(&adapter.max_video_bytes)
-        && pointer(&adapter.submission.status_url)
-        && pointer(&adapter.status.state)
-        && pointer(&adapter.status.video)
-        && adapter.status.error.as_deref().is_none_or(pointer)
-        && !adapter.status.completed.is_empty()
+        && adapter.status.valid(&adapter.submission)
         && serde_json::to_vec(&adapter.request).is_ok_and(|body| body.len() <= MAX_TEMPLATE_BYTES)
 }
 
@@ -364,40 +320,6 @@ fn credential(adapter: &VideoAdapter, secret: &[u8]) -> io::Result<(HeaderName, 
     Ok((header, value))
 }
 
-fn read_json(response: reqwest::blocking::Response, what: &str) -> io::Result<Value> {
-    if !response.status().is_success() {
-        let code = response.status().as_u16();
-        let mut text = Vec::new();
-        let _ = response.take(4096).read_to_end(&mut text);
-        let reason = serde_json::from_slice::<Value>(&text)
-            .ok()
-            .and_then(|body| {
-                ["/detail", "/error", "/message"]
-                    .iter()
-                    .find_map(|at| body.pointer(at)?.as_str().map(provider_reason))
-            })
-            .map(|reason| format!(": {reason}"))
-            .unwrap_or_default();
-        return Err(io::Error::other(format!(
-            "The video provider returned HTTP {code} for the {what}{reason}"
-        )));
-    }
-    let mut text = Vec::new();
-    response
-        .take(MAX_STATUS_BYTES + 1)
-        .read_to_end(&mut text)
-        .map_err(|_| io::Error::other(format!("Could not read the {what}")))?;
-    if text.len() as u64 > MAX_STATUS_BYTES {
-        return Err(io::Error::other(format!("The {what} is too large")));
-    }
-    serde_json::from_slice(&text).map_err(|_| io::Error::other(format!("The {what} is not JSON")))
-}
-
-/// A provider's short reason, such as `not_enough_credits`, safe to show.
-fn provider_reason(text: &str) -> String {
-    text.chars().filter(|c| !c.is_control()).take(120).collect()
-}
-
 /// MP4 and QuickTime files carry an `ftyp` box near the start; WebM starts with the EBML magic.
 fn video_extension(bytes: &[u8]) -> Option<&'static str> {
     if bytes.len() > 12 && &bytes[4..8] == b"ftyp" {
@@ -437,79 +359,17 @@ fn request_video(
             .map_err(|_| io::Error::other("The video request failed"))?,
         "video request",
     )?;
-    let status_url = submitted
-        .pointer(&adapter.submission.status_url)
-        .and_then(Value::as_str)
-        .filter(|url| safe_https(url) && host(url) == host(call.endpoint))
-        .ok_or_else(|| {
-            io::Error::other("The video provider gave no status address on its own host")
-        })?
-        .to_owned();
-    let started = Instant::now();
-    let video_url = loop {
-        std::thread::sleep(Duration::from_secs(adapter.poll_seconds));
-        if started.elapsed() > Duration::from_secs(adapter.timeout_seconds) {
-            return Err(io::Error::other(
-                "The video provider did not finish in time",
-            ));
-        }
-        let status = read_json(
-            client
-                .get(&status_url)
-                .header(header.clone(), value.clone())
-                .send()
-                .map_err(|_| io::Error::other("The video status request failed"))?,
-            "video status",
-        )?;
-        let state = status
-            .pointer(&adapter.status.state)
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        if adapter.status.completed.iter().any(|done| done == state) {
-            break status
-                .pointer(&adapter.status.video)
-                .and_then(Value::as_str)
-                .filter(|url| safe_https(url))
-                .ok_or_else(|| io::Error::other("The finished video has no HTTPS address"))?
-                .to_owned();
-        }
-        if adapter.status.failed.iter().any(|failed| failed == state) {
-            let reason = adapter
-                .status
-                .error
-                .as_deref()
-                .and_then(|pointer| status.pointer(pointer)?.as_str())
-                .map_or_else(|| provider_reason(state), provider_reason);
-            return Err(io::Error::other(format!(
-                "The video provider stopped: {reason}"
-            )));
-        }
-    };
-    // The clip is fetched from wherever the provider stores it, without the credential.
-    let download = Client::builder()
-        .https_only(true)
-        .redirect(reqwest::redirect::Policy::limited(3))
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(300))
-        .build()
-        .map_err(|_| io::Error::other("Could not initialize video transport"))?
-        .get(&video_url)
-        .send()
-        .map_err(|_| io::Error::other("The finished video could not be downloaded"))?;
-    if !download.status().is_success() {
-        return Err(io::Error::other(format!(
-            "The video download returned HTTP {}",
-            download.status().as_u16()
-        )));
-    }
-    let mut bytes = Vec::new();
-    download
-        .take(adapter.max_video_bytes + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| io::Error::other("The finished video could not be downloaded"))?;
-    if bytes.is_empty() || bytes.len() as u64 > adapter.max_video_bytes {
-        return Err(io::Error::other("The video size is invalid"));
-    }
+    let bytes = await_output(
+        &client,
+        &submitted,
+        call.endpoint,
+        (&header, &value),
+        &adapter.submission,
+        &adapter.status,
+        (adapter.poll_seconds, adapter.timeout_seconds),
+        adapter.max_video_bytes,
+        "video",
+    )?;
     let extension = video_extension(&bytes)
         .ok_or_else(|| io::Error::other("The provider did not return an MP4, MOV or WebM video"))?;
     Ok((bytes, extension))

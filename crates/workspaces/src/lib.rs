@@ -72,6 +72,7 @@ mod profile_deliveries;
 mod profile_drafting;
 mod profile_formats;
 mod profile_organization;
+mod provider_jobs;
 mod provider_media;
 mod provider_preferences;
 mod provider_usage;
