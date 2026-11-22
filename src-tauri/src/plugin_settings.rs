@@ -209,6 +209,25 @@ pub fn open_plugin_setting_help(
         .map_err(|_| "plugin_setting_help_failed")
 }
 
+/// Opens a web link from app content, such as Markdown, in the system browser.
+#[tauri::command]
+pub fn open_external_link(app: AppHandle, url: String) -> Result<(), &'static str> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let parsed = tauri::Url::parse(&url).map_err(|_| "external_link_invalid")?;
+    if !matches!(parsed.scheme(), "https" | "http")
+        || parsed.host_str().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || url.len() > 4096
+    {
+        return Err("external_link_invalid");
+    }
+    app.opener()
+        .open_url(parsed.as_str(), None::<&str>)
+        .map_err(|_| "external_link_failed")
+}
+
 #[tauri::command]
 pub fn open_plugin_repository(app: AppHandle, url: String) -> Result<(), &'static str> {
     use tauri_plugin_opener::OpenerExt;

@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useLocale } from "@/lib/locale-provider";
-import { PluginCredentialField } from "./plugin-credential-field";
+import { PluginCredentialField, SettingHelpLink } from "./plugin-credential-field";
 import { ProviderOrder } from "./provider-order";
 
 type Scope = "app" | "workspace";
@@ -207,7 +207,7 @@ export function PluginFields({ pluginId, fields, workspaceId }: {
   return <form className="flex flex-col gap-4" onSubmit={save}>
     <div className="flex flex-col divide-y">
       {fields.map((field) => values[field.id] && (
-        <PreferenceField key={field.id} field={pluginText.field(pluginId, field)} values={values[field.id]} workspace={workspace}
+        <PreferenceField key={field.id} field={pluginText.field(pluginId, field)} values={values[field.id]} workspace={workspace} pluginId={pluginId}
           draft={field.id in drafts ? drafts[field.id] : undefined} disabled={saving}
           onChange={(value) => change(field.id, value)} />
       ))}
@@ -221,7 +221,8 @@ export function PluginFields({ pluginId, fields, workspaceId }: {
   </form>;
 }
 
-function PreferenceField({ field, values, workspace, draft, disabled, onChange }: {
+function PreferenceField({ field, values, workspace, pluginId, draft, disabled, onChange }: {
+  pluginId: string;
   field: PluginSettingDeclaration & { choiceLabels: Record<string, string> };
   values: Values;
   workspace: boolean;
@@ -256,20 +257,30 @@ function PreferenceField({ field, values, workspace, draft, disabled, onChange }
       </SelectGroup></SelectContent>
     </Select>
   ) : (
-    <Input id={id} aria-describedby={id + "-description"} className="w-44" placeholder={fallback}
+    <Input id={id} aria-describedby={id + "-description"} className="w-full" placeholder={fallback}
       inputMode={field.kind === "integer" ? "numeric" : undefined}
       value={shown} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
   );
 
+  const status = <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <span>{source}</span>
+    {canReset && <button type="button" className="underline underline-offset-2 hover:text-foreground" disabled={disabled}
+      onClick={() => onChange(null)}>{workspace ? copy.inherit : copy.clear}</button>}
+  </p>;
+  // Text values stack like the key fields; switches and choices sit beside their label.
+  if (field.kind !== "boolean" && !field.choices) return <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+    <Label htmlFor={id} className="font-semibold">{field.label}</Label>
+    <p id={id + "-description"} className="text-sm text-muted-foreground">{field.description}</p>
+    {control}
+    {status}
+    <SettingHelpLink pluginId={pluginId} settingId={field.id} helpUrl={field.helpUrl} />
+  </div>;
   return <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0">
     <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
       <Label htmlFor={id} className="font-semibold">{field.label}</Label>
       <p id={id + "-description"} className="text-sm text-muted-foreground">{field.description}</p>
-      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{source}</span>
-        {canReset && <button type="button" className="underline underline-offset-2 hover:text-foreground" disabled={disabled}
-          onClick={() => onChange(null)}>{workspace ? copy.inherit : copy.clear}</button>}
-      </p>
+      {status}
+      <SettingHelpLink pluginId={pluginId} settingId={field.id} helpUrl={field.helpUrl} />
     </div>
     <div className="shrink-0 pt-0.5">{control}</div>
   </div>;

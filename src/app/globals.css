@@ -7,7 +7,7 @@
 /* Disabled controls keep the not-allowed cursor, so they must not take hover styles. */
 @custom-variant hover {
   @media (hover: hover) {
-    &:hover:not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    &:hover:not(:disabled, [aria-disabled="true"], [data-disabled]:not([data-disabled="false"])) {
       @slot;
     }
   }
@@ -156,7 +156,8 @@
   }
   button:disabled,
   [aria-disabled="true"],
-  [data-disabled],
+  /* Fields mirror a pending flag as data-disabled="false" while enabled. */
+  [data-disabled]:not([data-disabled="false"]),
   input:disabled,
   select:disabled,
   textarea:disabled {

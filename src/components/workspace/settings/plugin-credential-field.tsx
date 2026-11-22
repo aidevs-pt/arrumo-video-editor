@@ -123,7 +123,7 @@ export function PluginCredentialField({ field, pluginId, workspaceId }: {
 export function SettingHelpLink({ pluginId, settingId, helpUrl, className }: { pluginId: string; settingId: string; helpUrl?: string; className?: string }) {
   const { messages: { pluginPreferences: copy } } = useLocale();
   if (!helpUrl) return null;
-  return <Button type="button" variant="link" size="sm" title={helpUrl} className={cn("h-auto self-start px-0 font-semibold underline underline-offset-4", className)}
+  return <Button type="button" variant="link" size="sm" title={helpUrl} className={cn("h-auto w-fit! justify-start self-start px-0 font-semibold underline underline-offset-4", className)}
     onClick={() => void invoke("open_plugin_setting_help", { pluginId, settingId }).catch(() => {})}>
     {copy.whereToFind}<ArrowUpRight data-icon="inline-end" />
   </Button>;
