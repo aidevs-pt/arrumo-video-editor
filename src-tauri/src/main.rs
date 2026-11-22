@@ -796,6 +796,33 @@ async fn set_brand_colors(
 }
 
 #[tauri::command]
+async fn get_brand_palette(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::BrandColor>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .brand_palette(workspace_id)
+        .map_err(|_| "brand_colors_load_failed")
+}
+
+#[tauri::command]
+async fn set_brand_color_details(
+    workspace_id: i64,
+    color: String,
+    name: String,
+    for_videos: bool,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::BrandColor>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_brand_color_details(workspace_id, &color, &name, for_videos)
+        .map_err(|_| "brand_colors_save_failed")
+}
+
+#[tauri::command]
 async fn list_brand_assets(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -1304,6 +1331,8 @@ fn main() {
             remove_workspace_feedback,
             get_brand_colors,
             set_brand_colors,
+            get_brand_palette,
+            set_brand_color_details,
             list_brand_assets,
             attach_brand_asset,
             detach_brand_asset,

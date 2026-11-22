@@ -216,6 +216,15 @@ pub struct Profile {
     pub description: String,
 }
 
+/// One brand colour: `#RRGGBB`, an optional name, and whether videos use it.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BrandColor {
+    pub hex: String,
+    pub name: String,
+    pub for_videos: bool,
+}
+
 pub struct WorkspaceStore(Connection);
 
 impl WorkspaceStore {
@@ -287,6 +296,7 @@ impl WorkspaceStore {
             include_str!("../migrations/059-agent-sessions.sql"),
             include_str!("../migrations/060-workspace-appearance.sql"),
             include_str!("../migrations/061-context-sources.sql"),
+            include_str!("../migrations/062-brand-color-details.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -399,6 +409,68 @@ impl WorkspaceStore {
         format_deliveries::read_settings(Some(json), 0)
     }
 
+    /// The brand colours videos use: every colour except those the creator turned off.
+    pub fn video_brand_colors(&self, workspace_id: i64) -> rusqlite::Result<Vec<String>> {
+        Ok(self
+            .brand_palette(workspace_id)?
+            .into_iter()
+            .filter(|color| color.for_videos)
+            .map(|color| color.hex)
+            .collect())
+    }
+
+    /// Every brand colour with its name and whether videos use it, in palette order.
+    pub fn brand_palette(&self, workspace_id: i64) -> rusqlite::Result<Vec<BrandColor>> {
+        let details: serde_json::Map<String, serde_json::Value> = self
+            .0
+            .query_row(
+                "SELECT brand_color_details_json FROM workspaces WHERE id = ?1",
+                [workspace_id],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|json| serde_json::from_str(&json).unwrap_or_default())?;
+        Ok(self
+            .brand_colors(workspace_id)?
+            .into_iter()
+            .map(|hex| {
+                let detail = details.get(&hex);
+                BrandColor {
+                    name: detail
+                        .and_then(|value| value["name"].as_str())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    for_videos: detail
+                        .and_then(|value| value["forVideos"].as_bool())
+                        .unwrap_or(true),
+                    hex,
+                }
+            })
+            .collect())
+    }
+
+    /// Names a brand colour and says whether videos use it. The colour must be in the palette.
+    pub fn set_brand_color_details(
+        &self,
+        workspace_id: i64,
+        hex: &str,
+        name: &str,
+        for_videos: bool,
+    ) -> rusqlite::Result<Vec<BrandColor>> {
+        let hex = hex.to_ascii_uppercase();
+        let name = name.trim();
+        if name.chars().count() > 40 || !self.brand_colors(workspace_id)?.contains(&hex) {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        self.0.query_row(
+            "UPDATE workspaces SET brand_color_details_json =
+                 json_set(brand_color_details_json, '$.' || json_quote(?2), json_object('name', ?3, 'forVideos', json(?4)))
+             WHERE id = ?1 RETURNING id",
+            rusqlite::params![workspace_id, hex, name, if for_videos { "true" } else { "false" }],
+            |_| Ok(()),
+        )?;
+        self.brand_palette(workspace_id)
+    }
+
     pub fn set_brand_colors(
         &self,
         workspace_id: i64,
@@ -421,7 +493,12 @@ impl WorkspaceStore {
         let json = serde_json::to_string(&normalized)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         self.0.query_row(
-            "UPDATE workspaces SET brand_colors_json = ?2 WHERE id = ?1 RETURNING id",
+            "UPDATE workspaces SET brand_colors_json = ?2,
+                 brand_color_details_json = COALESCE((
+                     SELECT json_group_object(detail.key, json(detail.value))
+                     FROM json_each(brand_color_details_json) AS detail
+                     WHERE detail.key IN (SELECT value FROM json_each(?2))), '{}')
+             WHERE id = ?1 RETURNING id",
             rusqlite::params![workspace_id, json],
             |_| Ok(()),
         )?;
@@ -649,6 +726,42 @@ mod tests {
             ["#A1B2C3", "#020304"]
         );
         assert!(store.set_brand_colors(main, &["#ZZ0000".into()]).is_err());
+        let palette = store
+            .set_brand_color_details(main, &colors[0].to_ascii_lowercase(), " Coral ", false)
+            .unwrap();
+        assert_eq!(
+            (palette[0].name.as_str(), palette[0].for_videos),
+            ("Coral", false)
+        );
+        assert!(
+            palette[1..]
+                .iter()
+                .all(|color| color.for_videos && color.name.is_empty())
+        );
+        assert!(
+            !store
+                .video_brand_colors(main)
+                .unwrap()
+                .contains(&palette[0].hex)
+        );
+        assert!(
+            store
+                .set_brand_color_details(main, "#ABCDEF", "Missing", true)
+                .is_err()
+        );
+        let kept = palette[1..]
+            .iter()
+            .map(|color| color.hex.clone())
+            .collect::<Vec<_>>();
+        store.set_brand_colors(main, &kept).unwrap();
+        store
+            .set_brand_colors(main, &[palette[0].hex.clone()])
+            .unwrap();
+        assert!(
+            store.brand_palette(main).unwrap()[0].for_videos,
+            "removing a color forgets its details"
+        );
+        store.set_brand_colors(main, &colors).unwrap();
         assert_eq!(store.brand_colors(main).unwrap(), ["#A1B2C3", "#020304"]);
         assert!(store.brand_colors(other).unwrap().is_empty());
         assert!(store.set_brand_colors(main, &[]).unwrap().is_empty());

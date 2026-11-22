@@ -167,12 +167,21 @@ struct FeedbackIdInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrandColorInput {
+    workspace_id: i64,
+    color: String,
+    name: String,
+    for_videos: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BrandColorsInput {
     workspace_id: i64,
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 28] {
+pub(super) fn definitions() -> [Value; 29] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -293,12 +302,18 @@ pub(super) fn definitions() -> [Value; 28] {
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "feedbackId": id},
                 "required": ["workspaceId", "feedbackId"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
-        json!({"name": "get_brand_colors", "description": "Read the workspace's saved brand palette.",
+        json!({"name": "get_brand_colors", "description": "Read the workspace's saved brand palette: every color, plus each color's name and whether videos use it.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "set_brand_colors", "description": "Replace the workspace brand palette with an ordered list of hex colors.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "colors": {"type": "array", "items": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}}
             }, "required": ["workspaceId", "colors"], "additionalProperties": false}}),
+        json!({"name": "set_brand_color_details", "description": "Name a color in the workspace brand palette and choose whether videos use it.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+                "name": {"type": "string", "maxLength": 40}, "forVideos": {"type": "boolean"}
+            }, "required": ["workspaceId", "color", "name", "forVideos"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
     ]
 }
 
@@ -498,8 +513,11 @@ pub(super) fn call(
         }),
         "get_brand_colors" => parse(arguments).and_then(|args: WorkspaceInput| {
             store
-                .brand_colors(args.workspace_id)
-                .map(|colors| json!({"colors": colors}))
+                .brand_palette(args.workspace_id)
+                .map(|palette| {
+                    let colors: Vec<&str> = palette.iter().map(|color| color.hex.as_str()).collect();
+                    json!({"colors": colors, "palette": palette})
+                })
                 .map_err(|_| "Could not read brand colors")
         }),
         "set_brand_colors" => parse(arguments).and_then(|args: BrandColorsInput| {
@@ -507,6 +525,12 @@ pub(super) fn call(
                 .set_brand_colors(args.workspace_id, &args.colors)
                 .map(|colors| json!({"colors": colors}))
                 .map_err(|_| "Could not save brand colors")
+        }),
+        "set_brand_color_details" => parse(arguments).and_then(|args: BrandColorInput| {
+            store
+                .set_brand_color_details(args.workspace_id, &args.color, &args.name, args.for_videos)
+                .map(|palette| json!({"palette": palette}))
+                .map_err(|_| "Could not save the brand color")
         }),
         _ => return None,
     })

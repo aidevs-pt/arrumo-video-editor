@@ -157,7 +157,7 @@ impl WorkspaceStore {
         let brief = json!({
             "request": request,
             "workspaceContext": self.workspace_context(workspace_id)?,
-            "brandColors": self.brand_colors(workspace_id)?,
+            "brandColors": self.video_brand_colors(workspace_id)?,
             "profile": profile,
             "images": images.iter().map(|image| json!({"assetId": image.id, "name": image.name, "notes": image.notes})).collect::<Vec<_>>(),
             "animationToChange": base,
