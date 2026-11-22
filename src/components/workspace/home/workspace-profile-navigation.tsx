@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Plus } from "lucide-react";
+import { CalendarDays, FileText, Film, ImageIcon, MonitorPlay, Palette, Plus, Upload, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useLocale } from "@/lib/locale-provider";
+import { ItemContextMenu } from "../item-context-menu";
 import { profileHref, workspaceHref } from "./workspace-links";
 
 type Profile = { id: number; name: string; color: string | null };
@@ -36,6 +37,17 @@ export function WorkspaceProfileNavigation({ workspaceId, selected }: { workspac
     <SidebarMenu>
       {profiles.map((profile) => (
         <SidebarMenuItem key={profile.id}>
+          <ItemContextMenu label={profile.name} items={[
+            { label: messages.profileHub.videos, icon: Film, href: profileHref(workspaceId, profile.id) },
+            { label: messages.profiles.context, icon: FileText, href: `${profileHref(workspaceId, profile.id)}&tab=context` },
+            { label: messages.profiles.brand, icon: Palette, href: `${profileHref(workspaceId, profile.id)}&tab=brand` },
+            { label: messages.profiles.assets, icon: ImageIcon, href: `${profileHref(workspaceId, profile.id)}&tab=assets` },
+            { label: messages.profiles.outputs, icon: MonitorPlay, href: `${profileHref(workspaceId, profile.id)}&tab=outputs` },
+            { label: messages.profileHub.animations, icon: WandSparkles, href: `${profileHref(workspaceId, profile.id)}&tab=animations` },
+            { label: messages.profileHub.calendar, icon: CalendarDays, href: `${profileHref(workspaceId, profile.id)}&tab=calendar` },
+            { label: messages.profileHub.generate.replace("{profile}", profile.name), icon: Upload, group: true, href: `${workspaceHref("drafts", workspaceId, profile.id)}&compose=1` },
+          ]}>
+          <div>
           <SidebarMenuButton asChild isActive={profile.id === selected} tooltip={profile.name} className={itemClass}>
             <Link href={profileHref(workspaceId, profile.id)} aria-current={profile.id === selected ? "page" : undefined}
               onClick={() => setOpenMobile(false)}>
@@ -44,6 +56,8 @@ export function WorkspaceProfileNavigation({ workspaceId, selected }: { workspac
               <span className="truncate">{profile.name}</span>
             </Link>
           </SidebarMenuButton>
+          </div>
+          </ItemContextMenu>
         </SidebarMenuItem>
       ))}
       <SidebarMenuItem>

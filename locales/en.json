@@ -431,7 +431,8 @@
       "agent_failed": "The agent could not design the animation. Open the agent logs to see why.",
       "motion_generation_failed": "The animation could not be rendered. Open the agent logs and check that FFmpeg is installed."
     },
-    "emptyGenerate": "Use Generate with agent to describe one, or add a video you already have."
+    "emptyGenerate": "Use Generate with agent to describe one, or add a video you already have.",
+    "showDetails": "Show details"
   },
   "assets": {
     "replaceFile": "Replace file",
@@ -485,7 +486,9 @@
     "cancel": "Cancel",
     "noNotes": "No usage notes",
     "notesError": "Notes couldn’t be saved. Try again.",
-    "pickTitle": "Select media files"
+    "pickTitle": "Select media files",
+    "unselectAsset": "Remove from selection",
+    "copyName": "Copy name"
   },
   "delivery": {
     "inherited": "Inherited",

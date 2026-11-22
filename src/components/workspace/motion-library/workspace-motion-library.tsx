@@ -1,10 +1,11 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Pencil, Plus, Sparkles, Volume2, X } from "lucide-react";
+import { Copy, PanelRight, Pencil, Plus, Sparkles, Trash2, Volume2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -54,6 +55,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [chosenId, setChosenId] = useState<number | null>(null);
+  const [deletingItem, setDeletingItem] = useState<number | null>(null);
   const workspaceId = workspace.id;
 
   useEffect(() => {
@@ -203,7 +205,12 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
         </Empty>
         : <div className={cn("grid items-start gap-6", chosen && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
-            {items.map(({ id, settings }) => <li key={id} className="min-w-0">
+            {items.map((item) => { const { id, settings } = item; return <ItemContextMenu key={id} label={settings.title} items={[
+              { label: copy.showDetails, icon: PanelRight, onSelect: () => setChosenId(id) },
+              { label: copy.edit, icon: Pencil, group: true, disabled: open, onSelect: () => { setChosenId(id); setOperation({ mode: "edit", item }); setSaveError(false); setOpen(true); } },
+              { label: copy.duplicate, icon: Copy, disabled: open, onSelect: () => { setChosenId(id); setOperation({ mode: "duplicate", item }); setSaveError(false); setOpen(true); } },
+              { label: copy.deletion.deleteTitle, icon: Trash2, destructive: true, group: true, disabled: open, onSelect: () => { setChosenId(id); setDeletingItem(id); } },
+            ]}><li className="min-w-0">
               <button type="button" aria-pressed={chosen?.id === id} onClick={() => setChosenId(chosenId === id ? null : id)}
                 className={cn("flex h-full w-full flex-col gap-3 rounded-xl border-2 border-border bg-card p-2 text-start transition-colors duration-150 hover:border-line-strong",
                   chosen?.id === id && "border-primary hover:border-primary")}>
@@ -221,7 +228,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
                   {settings.usage_markdown && <span className="line-clamp-2 text-sm text-muted-foreground wrap-anywhere">{settings.usage_markdown}</span>}
                 </span>
               </button>
-            </li>)}
+            </li></ItemContextMenu>; })}
           </ul>
           {chosen && <aside className="flex flex-col gap-4 rounded-xl border bg-card p-5 xl:sticky xl:top-20" aria-labelledby="motion-panel-title">
             <div className="flex items-start justify-between gap-2">
@@ -255,6 +262,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
                 ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}
                 onSave={() => setAttempt((value) => value + 1)} />}
               <ConfirmTitleDelete title={chosen.settings.title} disabled={open} copy={copy.deletion}
+                open={deletingItem === chosen.id} onOpenChange={(value) => setDeletingItem(value ? chosen.id : null)}
                 onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
                   workspaceId, itemId: chosen.id, confirmedTitle,
                 })}

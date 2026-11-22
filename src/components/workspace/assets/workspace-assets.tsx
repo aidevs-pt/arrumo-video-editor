@@ -3,7 +3,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AudioLines, Film, Folder, ImageIcon, Layers, Search, Tag, TriangleAlert, Upload } from "lucide-react";
+import { AudioLines, Copy, Film, Folder, ImageIcon, Layers, PanelRight, Search, SquareCheck, SquareMinus, Tag, TriangleAlert, Upload } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
+import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { AssetDetailsPanel } from "./asset-details-panel";
 import { AssetThumbnail } from "./asset-thumbnail";
 
@@ -270,7 +271,12 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                     const organization = organizations[asset.id];
                     const Icon = kindIcons[asset.kind];
                     return (
-                      <li key={asset.id} className="min-w-0">
+                      <ItemContextMenu key={asset.id} label={asset.name} items={[
+                        { label: messages.assets.edit, icon: PanelRight, onSelect: () => setSelected([asset.id]) },
+                        { label: checked ? messages.assets.unselectAsset : messages.assets.selectAsset, icon: checked ? SquareMinus : SquareCheck, onSelect: () => toggle(asset.id, !checked) },
+                        { label: messages.assets.copyName, icon: Copy, group: true, onSelect: () => void navigator.clipboard.writeText(asset.name).catch(() => undefined) },
+                      ]}>
+                      <li className="min-w-0">
                         <div className={cn("relative flex flex-col gap-1.5 rounded-lg border-2 border-transparent p-1 transition-colors duration-150 hover:border-border",
                           isNew && "border-attention hover:border-attention", checked && "border-primary hover:border-primary")}>
                           <button type="button" className="block text-start" onClick={() => setSelected([asset.id])}
@@ -291,6 +297,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                           </span>}
                         </div>
                       </li>
+                      </ItemContextMenu>
                     );
                   })}
                 </ul>

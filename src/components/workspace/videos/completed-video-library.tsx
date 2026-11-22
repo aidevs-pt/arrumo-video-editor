@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Film, Search } from "lucide-react";
+import { ArrowUpRight, Captions, Film, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,6 +13,7 @@ import { useWorkspaceCatalog } from "@/components/workspace/home/workspace-route
 import { completedVideoHref, workspaceHref } from "@/components/workspace/home/workspace-links";
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
+import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { VideoCatalogHeader } from "./video-catalog-header";
 
 type Run = {
@@ -84,7 +85,11 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
           </div>
           <ul className="divide-y border-y" aria-label={copy.completedVideos}>
             {filtered.map((run) => (
-              <li key={run.id}>
+              <ItemContextMenu key={run.id} label={title(run)} items={[
+                { label: messages.completedVideo.details, icon: ArrowUpRight, href: completedVideoHref(workspaceId, run.id) },
+                { label: messages.completedVideo.subtitleText, icon: Captions, href: completedVideoHref(workspaceId, run.id, undefined, "subtitles") },
+              ]}>
+              <li>
                 <Link className="group flex items-center gap-3 px-1 py-3 hover:bg-muted/60 sm:gap-4"
                   href={completedVideoHref(workspaceId, run.id)}>
                   <VideoPoster workspaceId={workspaceId} runId={run.id} />
@@ -95,6 +100,7 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
                   <ArrowUpRight className="me-2 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
                 </Link>
               </li>
+              </ItemContextMenu>
             ))}
             {filtered.length === 0 && <li className="p-4 text-muted-foreground">{copy.noSearchMatches}</li>}
           </ul>

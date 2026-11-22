@@ -3,7 +3,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, ArrowRight, Clapperboard } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clapperboard, Pencil, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,6 +16,7 @@ import { GenerationQueue } from "@/components/workspace/generation/generation-qu
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { useWorkspaceCatalog } from "../home/workspace-router";
+import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { DraftSourceClips } from "./draft-source-clips";
 import { RawFootageBatch } from "./raw-footage-batch";
@@ -50,6 +51,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
   const [assets, setAssets] = useState<Asset[]>([]);
   const [profiles, setProfiles] = useState<CatalogEntry[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
+  const [deletingDraft, setDeletingDraft] = useState<number>();
   const [title, setTitle] = useState("");
   const titleInput = useRef<HTMLInputElement>(null);
   const newDraft = useRef<Omit<Draft, "id"> | null>(null);
@@ -326,8 +328,13 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
               <ul aria-label={copy.savedDrafts} className="divide-y border-y">
                 {drafts.map((draft) => {
                   const draftProfile = profiles.find((entry) => entry.id === draft.profile_id);
+                  const busy = pending !== null || editing !== null;
                   return (
-                    <li key={draft.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-1 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+                    <ItemContextMenu key={draft.id} label={draft.title} items={[
+                      { label: catalog.continue, icon: Pencil, disabled: busy, onSelect: () => edit(draft) },
+                      { label: copy.deleteDraft, icon: Trash2, destructive: true, group: true, disabled: busy, onSelect: () => setDeletingDraft(draft.id) },
+                    ]}>
+                    <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-1 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
                       <VideoThumbnail title={draft.title} color={draftProfile?.color} small className="w-24 opacity-70 sm:w-36" />
                       <div className="min-w-0">
                         <h2 className="font-heading text-xl leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_112]">{draft.title}</h2>
@@ -342,6 +349,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                         <Button type="button" size="sm" variant="outline" disabled={pending !== null || editing !== null}
                           aria-label={`${catalog.continue} ${draft.title}`} onClick={() => edit(draft)}>{catalog.continue}</Button>
                         <ConfirmTitleDelete title={draft.title} compact
+                          open={deletingDraft === draft.id} onOpenChange={(open) => setDeletingDraft(open ? draft.id : undefined)}
                           copy={{ ...copy, deleteTitle: copy.deleteDraft, deleting: copy.deletingDraft }}
                           onConfirm={(confirmedTitle) => invoke<boolean>("delete_video_draft", {
                             workspaceId, draftId: draft.id, confirmedTitle,
@@ -354,6 +362,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                           }} />
                       </div>
                     </li>
+                    </ItemContextMenu>
                   );
                 })}
               </ul>

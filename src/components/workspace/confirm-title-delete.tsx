@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false }: {
+export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false, open: controlled, onOpenChange }: {
   title: string;
   disabled: boolean;
   compact?: boolean;
@@ -23,9 +23,14 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
   };
   onConfirm: (title: string) => Promise<boolean>;
   onDelete: () => void;
+  /** Lets another control, such as a context menu, open the dialog. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const inputId = useId();
-  const [open, setOpen] = useState(false);
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  const setOpen = (next: boolean) => { setOwn(next); onOpenChange?.(next); };
   const [confirmation, setConfirmation] = useState("");
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);

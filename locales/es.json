@@ -431,7 +431,8 @@
       "agent_failed": "El agente no pudo diseñar la animación. Abre los registros del agente para ver por qué.",
       "motion_generation_failed": "No se pudo renderizar la animación. Abre los registros del agente y comprueba que FFmpeg está instalado."
     },
-    "emptyGenerate": "Usa Generar con el agente para describir una o añade un vídeo que ya tengas."
+    "emptyGenerate": "Usa Generar con el agente para describir una o añade un vídeo que ya tengas.",
+    "showDetails": "Ver detalles"
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",
@@ -485,7 +486,9 @@
     "cancel": "Cancelar",
     "noNotes": "Sin notas de uso",
     "notesError": "No se pudieron guardar las notas. Inténtalo de nuevo.",
-    "pickTitle": "Seleccionar archivos multimedia"
+    "pickTitle": "Seleccionar archivos multimedia",
+    "unselectAsset": "Quitar de la selección",
+    "copyName": "Copiar nombre"
   },
   "delivery": {
     "inherited": "Heredado",

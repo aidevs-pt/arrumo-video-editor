@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ItemContextMenu, type ItemMenuEntry } from "../item-context-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 import { StepTrack } from "@/components/workspace/step-track";
@@ -80,7 +81,7 @@ export function RunStatus({ run }: { run: Run }) {
   );
 }
 
-export function GenerationRunRow({ run, workspaceId, actions }: { run: Run; workspaceId: number; actions?: ReactNode }) {
+export function GenerationRunRow({ run, workspaceId, actions, menu = [] }: { run: Run; workspaceId: number; actions?: ReactNode; menu?: ItemMenuEntry[] }) {
   const { messages } = useLocale();
   const completed = run.state === "completed";
   const title = runTitle(run);
@@ -88,6 +89,10 @@ export function GenerationRunRow({ run, workspaceId, actions }: { run: Run; work
     : `/generation-run?workspace=${workspaceId}&run=${run.id}`;
 
   return (
+    <ItemContextMenu label={title} items={[
+      { label: completed ? messages.completedVideo.details : runNeedsReview(run) ? messages.queue.reviewRun : messages.queue.openRun, icon: ArrowUpRight, href },
+      ...menu,
+    ]}>
     <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
       <VideoThumbnail title={title} color={run.snapshot.profile?.color} small className="row-span-2 w-24 sm:row-span-1 sm:w-36" />
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -113,6 +118,7 @@ export function GenerationRunRow({ run, workspaceId, actions }: { run: Run; work
         {actions}
       </div>
     </li>
+    </ItemContextMenu>
   );
 }
 

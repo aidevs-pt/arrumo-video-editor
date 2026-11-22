@@ -3,7 +3,7 @@
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ListVideo, Plus } from "lucide-react";
+import { ArrowLeft, ListVideo, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState(false);
   const [pending, setPending] = useState(false);
+  const [deleting, setDeleting] = useState<number>();
   const [submitError, setSubmitError] = useState(false);
   const { messages } = useLocale();
   const copy = messages.queue;
@@ -180,8 +181,11 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
                 {group.length ? (
                   <WorkspaceRows compact className="rounded-none border-x-0 bg-transparent [&>li]:px-1">
                     {group.map((run) => (
-                      <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId} actions={(
+                      <GenerationRunRow key={run.id} run={run} workspaceId={workspaceId}
+                        menu={[{ label: copy.deleteTitle, icon: Trash2, destructive: true, group: true, disabled: pending, onSelect: () => setDeleting(run.id) }]}
+                        actions={(
                         <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy} compact
+                          open={deleting === run.id} onOpenChange={(open) => setDeleting(open ? run.id : undefined)}
                           onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", { workspaceId, runId: run.id, confirmedTitle })}
                           onDelete={() => {
                             setRuns((current) => current?.filter((entry) => entry.id !== run.id));
