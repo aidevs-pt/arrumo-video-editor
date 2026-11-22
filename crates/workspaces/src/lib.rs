@@ -105,7 +105,9 @@ pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
 pub use completed_video_feedback::CompletedVideoFeedback;
 pub use context_import::{ContextImport, ContextImportOutcome};
-pub use context_research::{ContextDraft, SuggestedImage, SuggestedProfile, UnreadSource};
+pub use context_research::{
+    ContextDraft, ContextSource, SuggestedImage, SuggestedProfile, UnreadSource,
+};
 pub use database_snapshot::DatabaseSnapshot;
 pub use delivery_cleanup::DeliveryCleanupReport;
 pub use delivery_verification::{VerifiedDelivery, VerifiedOutput, delivery_directory};
@@ -284,6 +286,7 @@ impl WorkspaceStore {
             include_str!("../migrations/058-plugin-tour.sql"),
             include_str!("../migrations/059-agent-sessions.sql"),
             include_str!("../migrations/060-workspace-appearance.sql"),
+            include_str!("../migrations/061-context-sources.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

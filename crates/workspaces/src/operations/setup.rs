@@ -45,6 +45,13 @@ struct WorkspaceInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourceInput {
+    workspace_id: i64,
+    source: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ContextInput {
     workspace_id: i64,
     markdown: String,
@@ -165,7 +172,7 @@ struct BrandColorsInput {
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 26] {
+pub(super) fn definitions() -> [Value; 28] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -217,6 +224,12 @@ pub(super) fn definitions() -> [Value; 26] {
         json!({"name": "set_workspace_context", "description": "Replace the workspace's saved Markdown context.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "markdown": {"type": "string"}},
                 "required": ["workspaceId", "markdown"], "additionalProperties": false}}),
+        json!({"name": "list_context_sources", "description": "List the links read for the workspace context, most recent first, with whether each could be read and when (Unix seconds). draft_workspace_context records them.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": {"type": "integer", "minimum": 1}}, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "forget_context_source", "description": "Forget one remembered context link. Returns whether it was there.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": {"type": "integer", "minimum": 1}, "source": {"type": "string", "minLength": 1, "maxLength": 2048}}, "required": ["workspaceId", "source"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true, "destructiveHint": false}}),
         json!({"name": "draft_workspace_context", "description": "Read up to eight public web pages, such as the creator's website or channel, and let the workspace's agent draft its context and suggest profiles. Returns the draft without saving it.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id,
                 "sources": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 2048}},
@@ -330,6 +343,18 @@ pub(super) fn call(
                 .set_workspace_context(args.workspace_id, &args.markdown)
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not save workspace context")
+        }),
+        "list_context_sources" => parse(arguments).and_then(|args: WorkspaceInput| {
+            store
+                .context_sources(args.workspace_id)
+                .map(|sources| json!({"sources": sources}))
+                .map_err(|_| "Could not read the context links")
+        }),
+        "forget_context_source" => parse(arguments).and_then(|args: SourceInput| {
+            store
+                .forget_context_source(args.workspace_id, &args.source)
+                .map(|forgotten| json!({"forgotten": forgotten}))
+                .map_err(|_| "Could not forget the context link")
         }),
         "draft_workspace_context" => parse(arguments).and_then(|args: ResearchInput| {
             store

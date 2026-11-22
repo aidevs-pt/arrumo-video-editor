@@ -1410,7 +1410,12 @@
     "importing": "Adding…",
     "imported": "Added {images} images, {colors} colors and {profiles} profiles.",
     "importFailedImages": "{count} images could not be downloaded.",
-    "importError": "Could not add these items. Try again."
+    "importError": "Could not add these items. Try again.",
+    "readLinks": "Links read",
+    "linkRead": "Read",
+    "linkUnread": "Could not be read",
+    "forgetLink": "Forget {link}",
+    "lastRead": "Last read on {date}. Open this to read them again or add more."
   },
   "agentLogs": {
     "open": "Agent logs",

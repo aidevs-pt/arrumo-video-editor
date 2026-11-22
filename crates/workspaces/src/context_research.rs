@@ -50,6 +50,16 @@ pub struct ContextDraft {
     pub unread: Vec<UnreadSource>,
 }
 
+/// A link the agent was asked to learn from, and whether it could be read last time.
+#[derive(Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextSource {
+    pub source: String,
+    pub readable: bool,
+    /// Unix seconds.
+    pub read_at: i64,
+}
+
 #[derive(Debug, Serialize, PartialEq)]
 pub struct UnreadSource {
     pub source: String,
@@ -280,6 +290,33 @@ fn context_draft(answer: &Value, unread: Vec<UnreadSource>) -> Result<ContextDra
 
 impl WorkspaceStore {
     /// Reads the given public pages and lets the workspace's agent draft its context.
+    /// The links read for this workspace's context, most recent first.
+    pub fn context_sources(&self, workspace_id: i64) -> rusqlite::Result<Vec<ContextSource>> {
+        self.0
+            .prepare(
+                "SELECT source, readable, read_at FROM workspace_context_sources
+                 WHERE workspace_id = ?1 ORDER BY read_at DESC, source",
+            )?
+            .query_map([workspace_id], |row| {
+                Ok(ContextSource {
+                    source: row.get(0)?,
+                    readable: row.get(1)?,
+                    read_at: row.get(2)?,
+                })
+            })?
+            .collect()
+    }
+
+    /// Forgets one remembered link. Returns whether it was there.
+    pub fn forget_context_source(&self, workspace_id: i64, source: &str) -> rusqlite::Result<bool> {
+        self.0
+            .execute(
+                "DELETE FROM workspace_context_sources WHERE workspace_id = ?1 AND source = ?2",
+                rusqlite::params![workspace_id, source],
+            )
+            .map(|changed| changed > 0)
+    }
+
     pub fn draft_workspace_context(
         &self,
         workspace_id: i64,
@@ -321,6 +358,14 @@ impl WorkspaceStore {
                     reason,
                 }),
             }
+        }
+        for source in sources {
+            let readable = !unread.iter().any(|entry| &entry.source == source);
+            self.0.execute(
+                "INSERT INTO workspace_context_sources (workspace_id, source, readable) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (workspace_id, source) DO UPDATE SET readable = excluded.readable, read_at = unixepoch()",
+                rusqlite::params![workspace_id, source.trim(), readable],
+            )?;
         }
         if pages.is_empty() && notes.trim().is_empty() {
             return Ok(ContextDraft {
@@ -397,6 +442,38 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remembers_and_forgets_context_links_per_workspace() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let other = store.create("Other").unwrap().id;
+        for (source, readable) in [("youtube.com/@cubes", true), ("example.invalid", false)] {
+            store.0.execute(
+                "INSERT INTO workspace_context_sources (workspace_id, source, readable) VALUES (?1, ?2, ?3)",
+                rusqlite::params![workspace, source, readable],
+            ).unwrap();
+        }
+        let sources = store.context_sources(workspace).unwrap();
+        assert_eq!(sources.len(), 2);
+        assert!(
+            sources
+                .iter()
+                .any(|entry| entry.source == "example.invalid" && !entry.readable)
+        );
+        assert!(store.context_sources(other).unwrap().is_empty());
+        assert!(
+            !store
+                .forget_context_source(other, "youtube.com/@cubes")
+                .unwrap()
+        );
+        assert!(
+            store
+                .forget_context_source(workspace, "youtube.com/@cubes")
+                .unwrap()
+        );
+        assert_eq!(store.context_sources(workspace).unwrap().len(), 1);
+    }
 
     #[test]
     fn drafts_keep_named_profiles_and_require_markdown() {

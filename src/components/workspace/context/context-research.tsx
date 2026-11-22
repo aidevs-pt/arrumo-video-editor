@@ -2,7 +2,7 @@
 
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Image as ImageIcon, Link2, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, Globe, Image as ImageIcon, Link2, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ type Draft = {
   images: FoundImage[];
   unread: { source: string; reason: Problem }[];
 };
+type SavedSource = { source: string; readable: boolean; readAt: number };
 type Outcome = { colors: number; images: number; profiles: number; failedImages: string[] };
 type Failure = "agent_unavailable" | "agent_timed_out" | "agent_failed" | "context_draft_failed";
 
@@ -33,8 +34,9 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
   startOpen: boolean;
   onDraft: (markdown: string) => void;
 }) {
-  const { messages: { contextResearch: copy } } = useLocale();
+  const { locale, messages: { contextResearch: copy } } = useLocale();
   const [open, setOpen] = useState(startOpen);
+  const [saved, setSaved] = useState<SavedSource[]>([]);
   const [sources, setSources] = useState([""]);
   const [notes, setNotes] = useState("");
   const [pending, setPending] = useState(false);
@@ -55,6 +57,22 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
     return () => { active = false; };
   }, [workspaceId]);
 
+  useEffect(() => {
+    let active = true;
+    invoke<SavedSource[]>("list_context_sources", { workspaceId }).then((list) => {
+      if (!active) return;
+      setSaved(list);
+      const readable = list.filter((entry) => entry.readable).map((entry) => entry.source).slice(0, MAX_SOURCES);
+      if (readable.length) setSources((current) => current.some((value) => value.trim()) ? current : readable);
+    }, () => {});
+    return () => { active = false; };
+  }, [workspaceId]);
+
+  async function forget(source: string) {
+    setSaved((current) => current.filter((entry) => entry.source !== source));
+    await invoke("forget_context_source", { workspaceId, source }).catch(() => {});
+  }
+
   const filled = sources.map((source) => source.trim()).filter(Boolean);
   const agentName = agent ?? copy.agentFallback;
 
@@ -66,6 +84,7 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
     try {
       const result = await invoke<Draft>("draft_workspace_context", { workspaceId, sources: filled, notes });
       setDraft(result);
+      invoke<SavedSource[]>("list_context_sources", { workspaceId }).then(setSaved, () => {});
       if (result.markdown) onDraft(result.markdown);
     } catch (error) {
       setFailure(typeof error === "string" && error in copy.failures ? error as Failure : "context_draft_failed");
@@ -86,6 +105,23 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
           <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
         </button>
       </CollapsibleTrigger>
+      {saved.length > 0 && <div className="-mt-1 flex flex-col gap-2 px-4 pb-4 sm:px-5">
+        <ul className="flex flex-wrap gap-2" aria-label={copy.readLinks}>
+          {saved.map((entry) => (
+            <li key={entry.source} className="flex max-w-full items-center gap-1.5 rounded-md border bg-background py-1 ps-2.5 pe-1 text-sm">
+              <Globe aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{entry.source.replace(/^https?:\/\//, "")}</span>
+              {entry.readable
+                ? <Check className="size-3.5 shrink-0 text-approval" aria-label={copy.linkRead} />
+                : <TriangleAlert className="size-3.5 shrink-0 text-destructive" aria-label={copy.linkUnread} />}
+              <Button type="button" variant="ghost" size="icon" className="size-6" aria-label={copy.forgetLink.replace("{link}", entry.source)}
+                onClick={() => void forget(entry.source)}><X className="size-3.5" /></Button>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground">{copy.lastRead.replace("{date}",
+          new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(Math.max(...saved.map((entry) => entry.readAt)) * 1000)))}</p>
+      </div>}
       <CollapsibleContent className="flex flex-col gap-4 border-t px-4 py-4 sm:px-5">
         <fieldset className="flex flex-col gap-2" disabled={pending}>
           <legend className="mb-1 text-sm font-semibold">{copy.links}</legend>

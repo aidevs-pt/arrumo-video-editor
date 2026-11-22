@@ -255,7 +255,11 @@ pub async fn export_completed_subtitles(
             .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.'))
             .take(80)
             .collect();
-        let name = if name.ends_with(".srt") { name } else { "subtitles.srt".to_owned() };
+        let name = if name.ends_with(".srt") {
+            name
+        } else {
+            "subtitles.srt".to_owned()
+        };
         let Some(destination) = app
             .dialog()
             .file()

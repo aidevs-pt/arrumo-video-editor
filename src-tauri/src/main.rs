@@ -611,6 +611,31 @@ async fn draft_profile(
 }
 
 #[tauri::command]
+async fn list_context_sources(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::ContextSource>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .context_sources(workspace_id)
+        .map_err(|_| "context_sources_failed")
+}
+
+#[tauri::command]
+async fn forget_context_source(
+    workspace_id: i64,
+    source: String,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .forget_context_source(workspace_id, &source)
+        .map_err(|_| "context_sources_failed")
+}
+
+#[tauri::command]
 async fn draft_workspace_context(
     workspace_id: i64,
     sources: Vec<String>,
@@ -1264,6 +1289,8 @@ fn main() {
             replace_asset,
             get_workspace_context,
             draft_workspace_context,
+            list_context_sources,
+            forget_context_source,
             draft_profile,
             generate_library_images,
             generate_library_speech,

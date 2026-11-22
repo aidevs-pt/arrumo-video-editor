@@ -1410,7 +1410,12 @@
     "importing": "Añadiendo…",
     "imported": "Se han añadido {images} imágenes, {colors} colores y {profiles} perfiles.",
     "importFailedImages": "No se pudieron descargar {count} imágenes.",
-    "importError": "No se pudieron añadir estos elementos. Inténtalo de nuevo."
+    "importError": "No se pudieron añadir estos elementos. Inténtalo de nuevo.",
+    "readLinks": "Enlaces leídos",
+    "linkRead": "Leído",
+    "linkUnread": "No se pudo leer",
+    "forgetLink": "Olvidar {link}",
+    "lastRead": "Última lectura el {date}. Ábrelo para volver a leerlos o añadir más."
   },
   "agentLogs": {
     "open": "Registros del agente",
