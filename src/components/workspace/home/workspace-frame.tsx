@@ -18,6 +18,7 @@ import { ReviewInbox, useGenerationInbox } from "./review-inbox";
 import { StudioTrailProvider, useStudioTrailItems } from "./studio-trail";
 import { WorkspaceSearch } from "./workspace-search";
 import { WorkspaceAppearanceDialog } from "../workspaces/workspace-appearance";
+import { UsageBanner } from "@/components/workspace/usage/provider-usage";
 import { WorkspaceMark } from "../workspaces/workspace-mark";
 import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
@@ -212,6 +213,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, childre
       {workspace && <WorkspaceAppearanceDialog workspace={workspace} open={customizing} onOpenChange={setCustomizing} onSaved={onUpdate} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {workspace && <UsageBanner key={workspace.id} workspaceId={workspace.id} />}
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background px-3 sm:px-5">
           <SidebarTrigger aria-label={copy.navigation} />
           <Breadcrumb aria-label={copy.location} className="min-w-0 flex-1">

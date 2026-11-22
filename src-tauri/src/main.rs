@@ -502,6 +502,26 @@ async fn generate_library_images(
 }
 
 #[tauri::command]
+async fn provider_usage(
+    workspace_id: i64,
+    app: AppHandle,
+) -> Result<Vec<arrumo_workspaces::ProviderUsage>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .provider_usage(workspace_id)
+            .map_err(|_| "usage_unavailable".to_owned())
+    })
+    .await
+    .map_err(|_| "usage_unavailable".to_owned())?
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn generate_library_video(
     workspace_id: i64,
@@ -1248,6 +1268,7 @@ fn main() {
             generate_library_images,
             generate_library_speech,
             generate_library_video,
+            provider_usage,
             generate_motion_library_item,
             apply_context_import,
             set_workspace_context,

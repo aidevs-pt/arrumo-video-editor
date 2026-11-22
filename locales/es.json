@@ -1535,5 +1535,24 @@
   "runHooks": {
     "title": "Complementos que se ejecutan solos",
     "description": "Las acciones de complementos activadas en este espacio de trabajo se ejecutan al terminar este vídeo, en sus fechas de publicación previstas o si falla su generación. Desactiva una para omitirla solo en este vídeo."
+  },
+  "usage": {
+    "bannerTitle": "A {provider} le queda un {percent} de sus {unit}.",
+    "bannerBody": "Las generaciones que lo usan se detienen en ese paso cuando se agote.",
+    "seeUsage": "Ver uso",
+    "close": "Cerrar aviso",
+    "panelTitle": "Uso",
+    "panelDescription": "Lo que les queda a tus claves en este periodo. Arrumo avisa al 20% y de nuevo al 10%.",
+    "left": "Queda un {percent}",
+    "usedOf": "{used} de {limit} {unit} usados",
+    "resets": "se renueva el {date}",
+    "unknown": "No se pudo leer el uso ({reason}). Comprueba que la clave puede leer su cuenta.",
+    "units": {
+      "characters": "caracteres",
+      "credits": "créditos",
+      "requests": "peticiones",
+      "seconds": "segundos"
+    },
+    "beforeGenerating": "Este vídeo podría detenerse a medias si se agota un proveedor que usa. Recárgalo o bájalo en Ajustes › Servicios y claves."
   }
 }

@@ -25,6 +25,7 @@ import { PluginCatalog } from "./plugin-catalog";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
 import { AgentCapabilities, ScopedPluginPreferences } from "./plugin-preferences";
+import { UsagePanel } from "@/components/workspace/usage/provider-usage";
 import { BackupSettings } from "./backup-settings";
 
 type AgentPlugin = { id: string; label: string };
@@ -121,6 +122,7 @@ export function AgentSettingsPage() {
                 <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
               </Button>}
               {tab === "plugins" && !requested && <PluginCatalog />}
+              {tab === "services" && workspace && <UsagePanel key={`usage-${workspace.id}`} workspaceId={workspace.id} />}
               {tab === "services" && (requested === null || workspace) && <ScopedPluginPreferences key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
               {workspace && tab === "plugins" && <PluginGrants key={`grants:${workspace.id}`} workspace={workspace} />}
               {workspace && tab === "plugins" && <PluginActions key={`actions:${workspace.id}`} workspaceId={workspace.id} />}

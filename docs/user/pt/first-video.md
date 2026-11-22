@@ -48,6 +48,10 @@ Para restaurar, escolhe uma cópia no mesmo sítio. O Arrumo verifica primeiro c
 
 O Arrumo conta que funcionalidades são usadas e reporta erros, para saber o que melhorar. Ambas as opções estão ativas por omissão e podem ser desligadas em **Definições › Geral › Dados e privacidade**. Estão ligadas a um identificador aleatório desta instalação, nunca a ti, e nunca incluem os teus vídeos, ficheiros, textos ou chaves. As compilações que fazes tu não enviam nada.
 
+## Créditos dos fornecedores
+
+Definições › Serviços e chaves mostra o que resta a cada chave quando o plugin consegue saber. Com 20% restantes aparece um aviso amarelo no topo, e com 10% um vermelho; se o fechar, só volta no nível seguinte. A página do rascunho repete o aviso acima de **Gerar este vídeo**, porque um fornecedor esgotado para o vídeo nesse passo.
+
 ## Plugins novos
 
 Quando chegam plugins, de um ZIP, do registo ou de uma atualização do Arrumo, o Arrumo apresenta-os numa visita curta, uma página por plugin. Podes saltá-la quando quiseres; **Definições › Plugins › Ver a visita aos plugins** volta a mostrar a apresentação de cada um.

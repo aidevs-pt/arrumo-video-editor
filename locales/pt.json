@@ -1535,5 +1535,24 @@
   "runHooks": {
     "title": "Plugins que são executados automaticamente",
     "description": "As ações de plugins ativadas neste espaço de trabalho são executadas quando este vídeo terminar, nas datas de publicação previstas ou se a geração falhar. Desative uma para a ignorar apenas neste vídeo."
+  },
+  "usage": {
+    "bannerTitle": "{provider} tem {percent} dos seus {unit} disponíveis.",
+    "bannerBody": "As gerações que o usam param nesse passo quando acabar.",
+    "seeUsage": "Ver utilização",
+    "close": "Fechar aviso",
+    "panelTitle": "Utilização",
+    "panelDescription": "O que resta às suas chaves neste período. O Arrumo avisa aos 20% e de novo aos 10%.",
+    "left": "Restam {percent}",
+    "usedOf": "{used} de {limit} {unit} usados",
+    "resets": "renova a {date}",
+    "unknown": "Não foi possível ler a utilização ({reason}). Verifique se a chave pode ler a conta.",
+    "units": {
+      "characters": "caracteres",
+      "credits": "créditos",
+      "requests": "pedidos",
+      "seconds": "segundos"
+    },
+    "beforeGenerating": "Este vídeo pode parar a meio se acabar um fornecedor que usa. Carregue-o ou desça-o em Definições › Serviços e chaves."
   }
 }

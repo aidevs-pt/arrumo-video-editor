@@ -1535,5 +1535,24 @@
   "runHooks": {
     "title": "Plugins that run on their own",
     "description": "Plugin actions switched on for this workspace run when this video finishes, on its planned publish dates, or if its generation fails. Turn one off to skip it for this video only."
+  },
+  "usage": {
+    "bannerTitle": "{provider} has {percent} of its {unit} left.",
+    "bannerBody": "Generations that use it stop at that step when it runs out.",
+    "seeUsage": "See usage",
+    "close": "Close warning",
+    "panelTitle": "Usage",
+    "panelDescription": "What your keys have left this period. Arrumo warns at 20% and again at 10%.",
+    "left": "{percent} left",
+    "usedOf": "{used} of {limit} {unit} used",
+    "resets": "resets {date}",
+    "unknown": "Could not read usage ({reason}). Check that the key is allowed to read its account.",
+    "units": {
+      "characters": "characters",
+      "credits": "credits",
+      "requests": "requests",
+      "seconds": "seconds"
+    },
+    "beforeGenerating": "This video might stop partway if a provider it uses runs out. Top it up or move it down in Settings › Services and keys."
   }
 }

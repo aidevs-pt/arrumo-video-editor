@@ -16,6 +16,7 @@ import { outputOptions, VideoOutputs, type OutputChoice, type OutputPlan } from 
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { RunHooks } from "@/components/workspace/generation/run-hooks";
 import { RunProviders } from "@/components/workspace/generation/run-providers";
+import { UsageNotice } from "@/components/workspace/usage/provider-usage";
 import { profileHref, workspaceHref } from "@/components/workspace/home/workspace-links";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { useLocale } from "@/lib/locale-provider";
@@ -243,6 +244,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               <p id="run-autopilot-description" className="mt-2 text-sm text-muted-foreground">{copy.autopilotHint.replace("{agent}", agentName)}</p>
             </section>
             <PlacedPluginActions workspaceId={workspaceId} placement="draft" />
+            <UsageNotice workspaceId={workspaceId} />
             {message && <Alert variant={message === "saved" ? "default" : "destructive"}><AlertDescription role="status">{copy[message]}</AlertDescription></Alert>}
             <Button type="submit" size="lg" className="h-12 text-base">{pending === "generating" ? copy.generating : copy.generate}</Button>
             {next && <p className="text-center text-sm text-muted-foreground">{copy.thenNext.replace("{title}", next.title)}</p>}

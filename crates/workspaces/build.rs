@@ -107,12 +107,13 @@ fn main() {
             let speech_synthesis = adapter("speech-synthesis.json");
             let image_generation = adapter("image-generation.json");
             let video_generation = adapter("video-generation.json");
+            let usage = adapter("usage.json");
             let icon = match (checkout["icon"].as_str(), &mut verified_zip) {
                 (None, _) => "None".into(),
                 (Some(name), Some(archive)) => release_adapter(&output, id, archive, name),
                 (Some(name), None) => optional_adapter(&directory, name),
             };
-            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, image_generation: {image_generation}, video_generation: {video_generation}, icon: {icon}, package: {package}, release: {source} }},\n"));
+            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, image_generation: {image_generation}, video_generation: {video_generation}, usage: {usage}, icon: {icon}, package: {package}, release: {source} }},\n"));
         }
     }
     index.push_str("];\n");

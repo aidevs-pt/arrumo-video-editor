@@ -48,6 +48,10 @@ To restore, choose a backup in the same place. Arrumo checks every file against 
 
 Arrumo counts which features are used and reports crashes, to learn what to improve. Both are on by default and can be turned off in **Settings › General › Data and privacy**. They are tied to a random ID for this install, never to you, and never include your videos, files, text or keys. Builds you compile yourself send nothing.
 
+## Provider credits
+
+Settings › Services and keys shows how much each provider key has left when its plugin can tell. At 20% left a yellow warning appears across the top of the app, and at 10% a red one; close it and it stays closed until the next level. The draft page repeats the warning above **Generate this video**, because a provider that runs out stops the video at that step.
+
 ## New plugins
 
 When plugins arrive, from a ZIP, the registry or an Arrumo update, Arrumo introduces them in a short tour, one page each. Skip it whenever you like; **Settings › Plugins › Take the plugin tour** shows every plugin's introduction again.

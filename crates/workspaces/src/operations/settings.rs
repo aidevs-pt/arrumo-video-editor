@@ -97,7 +97,7 @@ struct RemovePackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 18] {
+pub(super) fn definitions() -> [Value; 19] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -140,6 +140,9 @@ pub(super) fn definitions() -> [Value; 18] {
         json!({"name": "list_plugin_catalog", "description": "List bundled and installed plugins with declared capabilities, settings metadata, and package information.",
             "inputSchema": {"type": "object", "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_provider_usage", "description": "Read how much of each keyed provider's allowance is used and left, with a level of ok, warning (20% or less left), danger (10% or less) or unknown.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": {"type": "integer", "minimum": 1}}, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true, "openWorldHint": true}}),
         json!({"name": "get_plugin_credential_status", "description": "Check whether a plugin credential is configured and where it comes from. Returns status only.",
             "inputSchema": {"type": "object", "properties": {"pluginId": id, "workspaceId": workspace, "settingId": id},
                 "required": ["pluginId", "settingId"], "additionalProperties": false},
@@ -230,6 +233,14 @@ pub(super) fn call(
             .map(|plugins| json!({"plugins": plugins}))
             .map_err(|_| "Could not list plugin catalog"),
         "list_plugin_catalog" => Err("Unexpected plugin catalog arguments"),
+        "get_provider_usage" => serde_json::from_value::<UsageInput>(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid usage arguments")
+            .and_then(|args| {
+                store
+                    .provider_usage(args.workspace_id)
+                    .map(|usage| json!({"providers": usage}))
+                    .map_err(|_| "Could not read provider usage")
+            }),
         "get_plugin_credential_status" => parse(arguments).and_then(|args: SettingInput| {
             store
                 .plugin_credential_status(&args.plugin_id, &args.setting_id, args.workspace_id)
@@ -321,4 +332,10 @@ fn open_local_file(source: &str) -> Result<File, &'static str> {
         return Err("Source must be a regular file");
     }
     File::open(path).map_err(|_| "Could not open local source")
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct UsageInput {
+    workspace_id: i64,
 }
