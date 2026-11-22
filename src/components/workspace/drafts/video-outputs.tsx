@@ -104,9 +104,9 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
         ].filter(Boolean).join(", ") });
         return (
           <li key={format.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-            <div className="flex items-start justify-between gap-3">
-              <span className={cn("flex items-start gap-2.5 font-semibold", skipped && "text-muted-foreground line-through")}>
-                <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-3">
+              <span className={cn("flex min-w-0 items-center gap-2.5 text-sm font-semibold", skipped && "text-muted-foreground line-through")}>
+                <Icon className="size-4 shrink-0" aria-hidden="true" />
                 {copy.makeVideo.replace("{format}", format.name.toLowerCase())}
               </span>
               <Switch checked={!skipped} disabled={disabled || (!skipped && produced === 1)}
