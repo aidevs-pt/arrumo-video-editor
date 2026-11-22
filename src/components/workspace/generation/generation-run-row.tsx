@@ -2,13 +2,14 @@
 
 import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Check, Circle, Clock3, Pause, Play, RotateCcw, Square } from "lucide-react";
+import { ArrowUpRight, Ban, Check, Circle, Clock3, Ellipsis, Pause, Play, RotateCcw, Square, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -122,21 +123,24 @@ export function GenerationRunRow({ run, workspaceId, actions, menu = [] }: { run
   );
 }
 
-export function GenerationRunControls({ run, workspaceId, disabled, onControl }: {
+export function GenerationRunControls({ run, disabled, onControl, deleteMenu }: {
   run: Run;
-  workspaceId: number;
   disabled: boolean;
   onControl: (runId: number, action: RunAction) => Promise<void>;
+  /** Renders the delete confirmation, opened from the menu. */
+  deleteMenu?: (open: boolean, setOpen: (open: boolean) => void) => ReactNode;
 }) {
   const { messages } = useLocale();
   const copy = messages.queue;
+  const [dialog, setDialog] = useState<"stop" | "cancel" | "delete">();
   const canPause = run.state === "queued" || run.state === "running";
   const canResume = run.state === "paused" && run.pending_review_id === null;
   const canStop = ["queued", "running", "paused", "failed"].includes(run.state) && (run.progress?.stage_index ?? 0) > 0;
+  const canCancel = canPause || run.state === "paused";
+  const canDelete = run.state !== "completed" && deleteMenu !== undefined;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 [&_a[data-variant=outline]]:text-foreground [&_button[data-variant=outline]]:text-foreground">
-      <RunStatus run={run} />
+    <div className="flex flex-wrap items-center gap-2 [&_button[data-variant=outline]]:text-foreground">
       {canPause && (
         <Button type="button" variant="outline" disabled={disabled}
           onClick={() => void onControl(run.id, "pause")}><Pause data-icon="inline-start" />{copy.pause}</Button>
@@ -149,40 +153,44 @@ export function GenerationRunControls({ run, workspaceId, disabled, onControl }:
         <Button type="button" variant="outline" disabled={disabled}
           onClick={() => void onControl(run.id, "retry")}><RotateCcw data-icon="inline-start" />{copy.retryRun}</Button>
       )}
-      {canStop && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button type="button" variant="outline" disabled={disabled}><Square data-icon="inline-start" />{copy.stop}</Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{copy.stopTitle}</AlertDialogTitle>
-              <AlertDialogDescription>{copy.stopDescription}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{copy.keepGoing}</AlertDialogCancel>
-              <AlertDialogAction onClick={() => void onControl(run.id, "stop")}>{copy.stop}</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-      {(canPause || run.state === "paused") && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button type="button" variant="outline" disabled={disabled}>{copy.cancel}</Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{copy.confirmCancel}</AlertDialogTitle>
-              <AlertDialogDescription>{runTitle(run)}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{copy.keepRun}</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={() => void onControl(run.id, "cancel")}>{copy.cancel}</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {(canStop || canCancel || canDelete) && <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" disabled={disabled}><Ellipsis data-icon="inline-start" />{copy.moreActions}</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canStop && <DropdownMenuItem onSelect={() => setDialog("stop")}><Square />{copy.stop}</DropdownMenuItem>}
+          {canCancel && <DropdownMenuItem onSelect={() => setDialog("cancel")}><Ban />{copy.cancel}</DropdownMenuItem>}
+          {canDelete && <>
+            {(canStop || canCancel) && <DropdownMenuSeparator />}
+            <DropdownMenuItem variant="destructive" onSelect={() => setDialog("delete")}><Trash2 />{copy.deleteTitle}</DropdownMenuItem>
+          </>}
+        </DropdownMenuContent>
+      </DropdownMenu>}
+      <AlertDialog open={dialog === "stop"} onOpenChange={(open) => setDialog(open ? "stop" : undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.stopTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.stopDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{copy.keepGoing}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void onControl(run.id, "stop")}>{copy.stop}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={dialog === "cancel"} onOpenChange={(open) => setDialog(open ? "cancel" : undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.confirmCancel}</AlertDialogTitle>
+            <AlertDialogDescription>{runTitle(run)}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{copy.keepRun}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => void onControl(run.id, "cancel")}>{copy.cancel}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {canDelete && deleteMenu(dialog === "delete", (open) => setDialog(open ? "delete" : undefined))}
     </div>
   );
 }

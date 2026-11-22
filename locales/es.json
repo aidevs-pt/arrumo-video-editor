@@ -796,6 +796,7 @@
     "size": "Tamaño"
   },
   "queue": {
+    "moreActions": "Más",
     "deleteTitle": "Eliminar generación",
     "deleting": "Eliminando generación…",
     "deleteDescription": "Escribe el título exacto para detener esta generación y eliminar sus archivos. El borrador y los archivos compartidos se conservan.",

@@ -14,7 +14,7 @@ import { WorkspaceShell } from "@/components/workspace/layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
-import { GenerationRunControls, GenerationRunPanels, runTitle, type Run, type RunAction } from "./generation-run-row";
+import { GenerationRunControls, GenerationRunPanels, RunStatus, runTitle, type Run, type RunAction } from "./generation-run-row";
 
 export function GenerationRunRoute() {
   const { workspace } = useWorkspaceCatalog();
@@ -86,18 +86,20 @@ function GenerationRunDetail({ workspaceId, runId }: { workspaceId: number; runI
               <span aria-hidden="true" className="size-3 rounded-[3px] ring-1 ring-white/60" style={{ backgroundColor: profile.color ?? "transparent" }} />
               {profile.name}
             </span>}
+            {run && <span className="[&_[data-slot=badge][data-variant=outline]]:border-white/50 [&_[data-slot=badge][data-variant=outline]]:text-white [&_[data-slot=badge][data-variant=secondary]]:bg-white/15 [&_[data-slot=badge][data-variant=secondary]]:text-white"><RunStatus run={run} /></span>}
             <h1 className="max-w-[24ch] text-[clamp(2rem,4.5vw,3rem)] leading-[1] font-[850] tracking-[-.01em] text-balance wrap-anywhere [font-variation-settings:'wdth'_130]">
               {run ? runTitle(run) : copy.runDetail}
             </h1>
           </div>
           {run && (
             <div className="flex flex-wrap items-center gap-2 self-end [&_[data-slot=badge][data-variant=outline]]:border-white/50 [&_[data-slot=badge][data-variant=outline]]:text-white [&_[data-slot=badge][data-variant=secondary]]:bg-white/15 [&_[data-slot=badge][data-variant=secondary]]:text-white">
-              <GenerationRunControls run={run} workspaceId={workspaceId} disabled={pending} onControl={control} />
-              {run.state !== "completed" && <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy}
-                onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", {
-                  workspaceId, runId: run.id, confirmedTitle,
-                })}
-                onDelete={() => router.replace(workspaceHref("generations", workspaceId))} />}
+              <GenerationRunControls run={run} disabled={pending} onControl={control}
+                deleteMenu={(open, setOpen) => <ConfirmTitleDelete title={runTitle(run)} disabled={pending} copy={copy} hideTrigger
+                  open={open} onOpenChange={setOpen}
+                  onConfirm={(confirmedTitle) => invoke<boolean>("delete_generation", {
+                    workspaceId, runId: run.id, confirmedTitle,
+                  })}
+                  onDelete={() => router.replace(workspaceHref("generations", workspaceId))} />} />
             </div>
           )}
         </header>

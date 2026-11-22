@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false, size = "default", open: controlled, onOpenChange }: {
+export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false, size = "default", open: controlled, onOpenChange, hideTrigger = false }: {
+  /** Opened only by another control, such as a menu item. */
+  hideTrigger?: boolean;
   title: string;
   disabled: boolean;
   compact?: boolean;
@@ -65,12 +67,12 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
         setFailed(false);
       }
     }}>
-      <AlertDialogTrigger asChild>
+      {!hideTrigger && <AlertDialogTrigger asChild>
         <Button type="button" size={compact ? "icon-sm" : size} variant="ghost" disabled={disabled} title={compact ? copy.deleteTitle : undefined}
           aria-label={`${copy.deleteTitle} · ${title}`}>
           <Trash2 data-icon="inline-start" />{!compact && copy.deleteTitle}
         </Button>
-      </AlertDialogTrigger>
+      </AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.deleteTitle}</AlertDialogTitle>

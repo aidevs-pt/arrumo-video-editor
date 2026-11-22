@@ -796,6 +796,7 @@
     "size": "Size"
   },
   "queue": {
+    "moreActions": "More",
     "deleteTitle": "Delete run",
     "deleting": "Deleting run…",
     "deleteDescription": "Type the exact title to stop this run and delete its managed files. The draft and shared sources stay in the workspace.",

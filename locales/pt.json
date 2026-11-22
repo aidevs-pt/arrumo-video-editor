@@ -796,6 +796,7 @@
     "size": "Tamanho"
   },
   "queue": {
+    "moreActions": "Mais",
     "deleteTitle": "Eliminar geração",
     "deleting": "A eliminar geração…",
     "deleteDescription": "Escreve o título exato para parar esta geração e eliminar os seus ficheiros. O rascunho e os ficheiros partilhados ficam no espaço de trabalho.",
