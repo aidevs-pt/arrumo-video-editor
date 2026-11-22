@@ -62,6 +62,13 @@ struct ContextGrantInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RepositoryInput {
+    repository: String,
+    package_sha256: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PackageInput {
     source: String,
     package_sha256: String,
@@ -104,7 +111,7 @@ struct RemovePackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 20] {
+pub(super) fn definitions() -> [Value; 21] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -179,6 +186,11 @@ pub(super) fn definitions() -> [Value; 20] {
                 "source": {"type": "string", "minLength": 1},
                 "packageSha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
             }, "required": ["source", "packageSha256"], "additionalProperties": false}}),
+        json!({"name": "install_plugin_from_repository", "description": format!("Install the plugin package (plugin.zip, or the only ZIP) from the latest release of a public GitHub repository, after reviewing it, with its expected SHA-256 digest. {THIRD_PARTY_PLUGIN_NOTICE}"),
+            "inputSchema": {"type": "object", "properties": {
+                "repository": {"type": "string", "minLength": 1, "maxLength": 300, "description": "Like https://github.com/owner/plugin"},
+                "packageSha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+            }, "required": ["repository", "packageSha256"], "additionalProperties": false}}),
         json!({"name": "install_plugin_release_from_snapshot", "description": format!("Install an exact plugin release using absolute paths to a reviewed local registry catalog and its ZIP. {THIRD_PARTY_PLUGIN_NOTICE}"),
             "inputSchema": registry_package}),
         json!({"name": "update_plugin_release_from_snapshot", "description": format!("Update an offline-installed plugin to a newer exact release using absolute paths to a reviewed local registry catalog and its ZIP. {THIRD_PARTY_PLUGIN_NOTICE}"),
@@ -292,6 +304,12 @@ pub(super) fn call(
                 .install_verified_plugin_zip(archive, &args.package_sha256)
                 .map(|plugin| json!({"plugin": plugin, "notice": THIRD_PARTY_PLUGIN_NOTICE}))
                 .map_err(|_| "Could not install plugin ZIP. Check the package and expected digest")
+        }),
+        "install_plugin_from_repository" => parse(arguments).and_then(|args: RepositoryInput| {
+            store
+                .install_plugin_from_repository(&args.repository, Some(&args.package_sha256))
+                .map(|plugin| json!({"plugin": plugin, "notice": THIRD_PARTY_PLUGIN_NOTICE}))
+                .map_err(|_| "Could not install the plugin. Check the repository address, its latest release and the expected digest")
         }),
         "install_plugin_release_from_snapshot" | "update_plugin_release_from_snapshot" => {
             parse(arguments).and_then(|args: RegistryPackageInput| {

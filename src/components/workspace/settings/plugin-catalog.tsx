@@ -2,7 +2,7 @@
 
 import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { PackagePlus, Sparkles } from "lucide-react";
+import { GitBranch, PackagePlus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,6 +12,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,6 +49,9 @@ export function PluginCatalog() {
   const [plugins, setPlugins] = useState<Plugin[]>();
   const [error, setError] = useState<"loadError" | "importError" | "removeError">();
   const [notice, setNotice] = useState<"imported" | "removed">();
+  const [repository, setRepository] = useState("");
+  const [repositoryOpen, setRepositoryOpen] = useState(false);
+  const [repositoryError, setRepositoryError] = useState<string>();
   const [pending, setPending] = useState(false);
 
   const load = useCallback(async () => {
@@ -70,6 +78,24 @@ export function PluginCatalog() {
       }
     } catch {
       setError("importError");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function installRepository() {
+    setPending(true);
+    setRepositoryError(undefined);
+    setNotice(undefined);
+    try {
+      await invoke<Plugin>("install_plugin_repository", { repository: repository.trim() });
+      await load();
+      setNotice("imported");
+      setRepositoryOpen(false);
+      setRepository("");
+      announcePluginChanges();
+    } catch (reason) {
+      setRepositoryError(typeof reason === "string" && reason ? reason : copy.importError);
     } finally {
       setPending(false);
     }
@@ -117,6 +143,35 @@ export function PluginCatalog() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          <Dialog open={repositoryOpen} onOpenChange={(next) => { if (!pending) { setRepositoryOpen(next); setRepositoryError(undefined); } }}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={pending || !plugins}>
+                <GitBranch data-icon="inline-start" />
+                {copy.fromRepository}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{copy.fromRepository}</DialogTitle>
+                <DialogDescription>{copy.warning}</DialogDescription>
+              </DialogHeader>
+              <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void installRepository(); }}>
+                <Field>
+                  <FieldLabel htmlFor="plugin-repository">{copy.repositoryLabel}</FieldLabel>
+                  <Input id="plugin-repository" value={repository} disabled={pending} maxLength={300} inputMode="url"
+                    placeholder="https://github.com/owner/plugin" onChange={(event) => setRepository(event.target.value)} />
+                  <FieldDescription>{copy.repositoryHint}</FieldDescription>
+                </Field>
+                {repositoryError && <Alert variant="destructive"><AlertDescription>{repositoryError}</AlertDescription></Alert>}
+                <DialogFooter>
+                  <DialogClose asChild><Button type="button" variant="outline" disabled={pending}>{copy.cancel}</Button></DialogClose>
+                  <Button type="submit" disabled={pending || !repository.trim().startsWith("https://github.com/")}>
+                    {pending ? copy.working : copy.installRepository}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
           <Button variant="ghost" onClick={() => replayPluginTour()} disabled={!plugins}>
             <Sparkles data-icon="inline-start" />
             {tourCopy.replay}

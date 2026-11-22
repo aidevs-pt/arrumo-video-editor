@@ -214,7 +214,11 @@
     "bundled": "Bundled",
     "remove": "Remove",
     "removeNamed": "Remove {name}",
-    "removeDescription": "This removes the local plugin entry and its stored ZIP, if present."
+    "removeDescription": "This removes the local plugin entry and its stored ZIP, if present.",
+    "fromRepository": "From repository",
+    "repositoryLabel": "GitHub repository",
+    "repositoryHint": "Arrumo installs plugin.zip (or the only ZIP) from the repository’s latest release and checks GitHub’s SHA-256 digest when it publishes one.",
+    "installRepository": "Install"
   },
   "agentSettings": {
     "checkLogin": "Check sign-in",

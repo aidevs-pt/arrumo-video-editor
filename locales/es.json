@@ -214,7 +214,11 @@
     "bundled": "Incluido",
     "remove": "Eliminar",
     "removeNamed": "Eliminar {name}",
-    "removeDescription": "Se eliminará el complemento local y su archivo ZIP si está guardado."
+    "removeDescription": "Se eliminará el complemento local y su archivo ZIP si está guardado.",
+    "fromRepository": "Desde un repositorio",
+    "repositoryLabel": "Repositorio de GitHub",
+    "repositoryHint": "Arrumo instala plugin.zip (o el único ZIP) de la última versión publicada del repositorio y comprueba el resumen SHA-256 de GitHub cuando lo publica.",
+    "installRepository": "Instalar"
   },
   "agentSettings": {
     "checkLogin": "Comprobar inicio de sesión",

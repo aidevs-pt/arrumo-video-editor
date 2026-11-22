@@ -1605,6 +1605,7 @@ fn main() {
             plugin_settings::read_plugin_credential_status,
             plugin_settings::write_plugin_credential,
             plugin_settings::import_plugin_package,
+            plugin_settings::install_plugin_repository,
             plugin_settings::remove_plugin_package,
             plugin_settings::browse_plugin_registry,
             plugin_settings::install_registry_plugin,

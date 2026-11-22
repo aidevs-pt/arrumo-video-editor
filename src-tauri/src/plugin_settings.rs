@@ -97,6 +97,29 @@ pub async fn import_plugin_package(
 }
 
 #[tauri::command]
+pub async fn install_plugin_repository(
+    app: AppHandle,
+    repository: String,
+) -> Result<CatalogPlugin, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .install_plugin_from_repository(&repository, None)
+            .map_err(|error| match error.downcast_ref::<std::io::Error>() {
+                Some(error) if error.kind() == std::io::ErrorKind::InvalidData => error.to_string(),
+                _ => "The plugin couldn't be installed. Check the address and that the package is a valid Arrumo plugin.".to_owned(),
+            })
+    })
+    .await
+    .map_err(|_| "plugin_import_failed".to_owned())?
+}
+
+#[tauri::command]
 pub fn remove_plugin_package(id: String, store: State<'_, Store>) -> Result<bool, &'static str> {
     store
         .lock()

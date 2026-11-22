@@ -387,3 +387,209 @@ pub fn validate_registry_url(value: &str) -> Result<(), Box<dyn Error>> {
 fn invalid_registry(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
 }
+
+/// The `owner/name` of a GitHub repository address such as
+/// `https://github.com/owner/name`, `…/name.git` or `…/name/`.
+fn github_repository(url: &str) -> io::Result<(String, String)> {
+    let bad = || {
+        invalid_registry("Enter a GitHub repository address, like https://github.com/owner/plugin")
+    };
+    let rest = url
+        .trim()
+        .strip_prefix("https://github.com/")
+        .ok_or_else(bad)?;
+    let rest = rest.trim_end_matches('/');
+    let rest = rest.strip_suffix(".git").unwrap_or(rest);
+    let (owner, name) = rest.split_once('/').ok_or_else(bad)?;
+    let part = |text: &str| {
+        (1..=100).contains(&text.len())
+            && !matches!(text, "." | "..")
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    };
+    if !part(owner) || !part(name) {
+        return Err(bad());
+    }
+    Ok((owner.to_owned(), name.to_owned()))
+}
+
+#[derive(Deserialize)]
+struct GithubRelease {
+    assets: Vec<GithubAsset>,
+}
+
+#[derive(Deserialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
+    size: u64,
+    #[serde(default)]
+    digest: Option<String>,
+}
+
+/// The plugin package among a release's assets: `plugin.zip`, or its only ZIP.
+fn plugin_asset(assets: &[GithubAsset]) -> io::Result<&GithubAsset> {
+    let zips: Vec<_> = assets
+        .iter()
+        .filter(|asset| asset.name.to_ascii_lowercase().ends_with(".zip"))
+        .collect();
+    zips.iter()
+        .find(|asset| asset.name.eq_ignore_ascii_case("plugin.zip"))
+        .or(match zips.as_slice() {
+            [only] => Some(only),
+            _ => None,
+        })
+        .copied()
+        .ok_or_else(|| {
+            invalid_registry(if zips.is_empty() {
+                "The latest release has no plugin ZIP"
+            } else {
+                "The latest release has several ZIP files; name the plugin package plugin.zip"
+            })
+        })
+}
+
+impl WorkspaceStore {
+    /// Installs the plugin package from the latest release of a public GitHub repository,
+    /// checking `expected_sha256` and GitHub's SHA-256 digest of the file when either is known. The package goes
+    /// through the same checks as a local ZIP and is a third-party plugin.
+    pub fn install_plugin_from_repository(
+        &self,
+        repository: &str,
+        expected_sha256: Option<&str>,
+    ) -> Result<CatalogPlugin, Box<dyn Error>> {
+        let (owner, name) = github_repository(repository)?;
+        let client = reqwest::blocking::Client::builder()
+            .https_only(true)
+            .referer(false)
+            .user_agent("Arrumo")
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                let url = attempt.url();
+                let host = url.host_str().unwrap_or_default();
+                if attempt.previous().len() > 5
+                    || url.scheme() != "https"
+                    || !url.username().is_empty()
+                    || url.password().is_some()
+                    || !(host == "github.com"
+                        || host.ends_with(".github.com")
+                        || host.ends_with(".githubusercontent.com"))
+                {
+                    return attempt.error("Invalid plugin download redirect");
+                }
+                attempt.follow()
+            }))
+            .build()?;
+        let response = client
+            .get(format!(
+                "https://api.github.com/repos/{owner}/{name}/releases/latest"
+            ))
+            .header("accept", "application/vnd.github+json")
+            .send()
+            .map_err(reqwest::Error::without_url)?;
+        match response.status().as_u16() {
+            200 => {}
+            404 => {
+                return Err(invalid_registry(
+                    "No public release found. Check the address, and that the repository is public and has a release",
+                )
+                .into());
+            }
+            403 | 429 => {
+                return Err(invalid_registry(
+                    "GitHub is limiting requests right now. Try again later",
+                )
+                .into());
+            }
+            status => {
+                return Err(invalid_registry(&format!("GitHub returned HTTP {status}")).into());
+            }
+        }
+        let mut body = Vec::new();
+        response.take(1024 * 1024).read_to_end(&mut body)?;
+        let release: GithubRelease = serde_json::from_slice(&body)
+            .map_err(|_| invalid_registry("Could not read the release from GitHub"))?;
+        let asset = plugin_asset(&release.assets)?;
+        if asset.size > 16 * 1024 * 1024 {
+            return Err(invalid_registry("The plugin package is over 16 MiB").into());
+        }
+        let digest = asset
+            .digest
+            .as_deref()
+            .and_then(|digest| digest.strip_prefix("sha256:"))
+            .filter(|digest| valid_sha256(digest));
+        let url = reqwest::Url::parse(&asset.browser_download_url)
+            .map_err(|_| invalid_registry("Invalid plugin download address"))?;
+        if url.host_str() != Some("github.com")
+            || !url
+                .path()
+                .starts_with(&format!("/{owner}/{name}/releases/download/"))
+        {
+            return Err(invalid_registry("The plugin download is not in that repository").into());
+        }
+        if let (Some(expected), Some(published)) = (expected_sha256, digest)
+            && !expected.eq_ignore_ascii_case(published)
+        {
+            return Err(invalid_registry(
+                "The release's package differs from the expected SHA-256",
+            )
+            .into());
+        }
+        let archive = get_release_response(&client, url.as_str())?;
+        self.register_plugin_zip(archive, expected_sha256.or(digest), None, None)
+    }
+}
+
+#[cfg(test)]
+mod repository_tests {
+    use super::*;
+
+    #[test]
+    fn reads_github_repository_addresses() {
+        for url in [
+            "https://github.com/aidevs-pt/arrumo-plugin",
+            "https://github.com/aidevs-pt/arrumo-plugin/",
+            "https://github.com/aidevs-pt/arrumo-plugin.git",
+        ] {
+            assert_eq!(
+                github_repository(url).unwrap(),
+                ("aidevs-pt".to_owned(), "arrumo-plugin".to_owned())
+            );
+        }
+        for url in [
+            "http://github.com/a/b",
+            "https://gitlab.com/a/b",
+            "https://github.com/a",
+            "https://github.com/a/b/c",
+            "https://github.com/../b",
+        ] {
+            assert!(github_repository(url).is_err(), "{url}");
+        }
+    }
+
+    #[test]
+    fn picks_the_plugin_package() {
+        let asset = |name: &str| GithubAsset {
+            name: name.into(),
+            browser_download_url: String::new(),
+            size: 1,
+            digest: None,
+        };
+        assert_eq!(
+            plugin_asset(&[asset("SHA256SUMS"), asset("x.zip")])
+                .unwrap()
+                .name,
+            "x.zip"
+        );
+        assert_eq!(
+            plugin_asset(&[asset("source.zip"), asset("plugin.zip")])
+                .unwrap()
+                .name,
+            "plugin.zip"
+        );
+        assert!(plugin_asset(&[asset("a.zip"), asset("b.zip")]).is_err());
+        assert!(plugin_asset(&[asset("notes.txt")]).is_err());
+    }
+}

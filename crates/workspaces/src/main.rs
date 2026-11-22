@@ -282,6 +282,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 WorkspaceStore::open(Path::new(database))?.install_plugin_manifest(&bytes)?;
             println!("{}", serde_json::to_string(&installed)?);
         }
+        [database, command, repository] if command == "install-plugin-repository" => {
+            eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
+            let installed = WorkspaceStore::open(Path::new(database))?
+                .install_plugin_from_repository(utf8(repository)?, None)?;
+            println!("{}", serde_json::to_string(&installed)?);
+        }
         [database, command, archive] if command == "install-plugin-zip" => {
             eprintln!("{THIRD_PARTY_PLUGIN_NOTICE}");
             let installed = WorkspaceStore::open(Path::new(database))?
