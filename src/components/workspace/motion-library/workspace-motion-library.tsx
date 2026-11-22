@@ -20,7 +20,7 @@ import { workspaceHref, type Workspace } from "@/components/workspace/home/works
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
-import { GenerateMotionDialog } from "./generate-motion-dialog";
+import { GenerateMotionDialog, MotionPromptBar } from "./generate-motion-dialog";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
 
@@ -136,8 +136,6 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
           </NativeSelect>
         </Field>
         <div className="order-2 flex flex-wrap gap-2">
-        <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
-          disabled={!items || open} onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
         <Dialog open={open} onOpenChange={(next) => {
           if (saving) return;
           setSaveError(false);
@@ -192,6 +190,10 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
           </DialogContent>
         </Dialog>
         </div>
+      </div>
+      <div className="mb-6">
+        <MotionPromptBar<Item> workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
+          disabled={!items || open} onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
       </div>
       {loadError ? <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription>
         <Button variant="outline" onClick={() => { setLoadError(false); setAttempt((value) => value + 1); }}>{copy.retry}</Button>

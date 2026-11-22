@@ -454,8 +454,10 @@
       "agent_failed": "The agent could not design the animation. Open the agent logs to see why.",
       "motion_generation_failed": "The animation could not be rendered. Open the agent logs and check that FFmpeg is installed."
     },
-    "emptyGenerate": "Use Generate with agent to describe one, or add a video you already have.",
-    "showDetails": "Show details"
+    "emptyGenerate": "Describe one above, or add a video you already have.",
+    "showDetails": "Show details",
+    "barPlaceholder": "Describe an animation, like a “like” thumb that bounces in from the bottom right",
+    "makeWith": "Make it with {agent}"
   },
   "assets": {
     "replaceFile": "Replace file",

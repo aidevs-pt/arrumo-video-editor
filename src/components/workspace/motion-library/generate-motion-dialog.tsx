@@ -2,7 +2,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { Sparkles, WandSparkles } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -79,5 +80,62 @@ export function GenerateMotionDialog<Item>({ workspaceId, profileId, basedOn, di
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The library's describe-and-make bar: one line to the workspace's agent, which adds a new animation. */
+export function MotionPromptBar<Item>({ workspaceId, profileId, disabled, onCreate }: {
+  workspaceId: number;
+  profileId: number | null;
+  disabled?: boolean;
+  onCreate: (item: Item) => void;
+}) {
+  const { messages: { motionLibrary: copy } } = useLocale();
+  const [request, setRequest] = useState("");
+  const [working, setWorking] = useState(false);
+  const [failure, setFailure] = useState<Failure>();
+  const [agent, setAgent] = useState<string>();
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      invoke<{ effective_provider: string | null }>("get_agent_settings", { workspaceId }),
+      invoke<{ id: string; label: string }[]>("list_agent_plugins"),
+    ]).then(([settings, plugins]) => {
+      if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label);
+    }, () => {});
+    return () => { active = false; };
+  }, [workspaceId]);
+
+  async function generate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!request.trim() || working) return;
+    setWorking(true);
+    setFailure(undefined);
+    try {
+      onCreate(await invoke<Item>("generate_motion_library_item", { workspaceId, profileId, request: request.trim(), basedOn: null }));
+      setRequest("");
+    } catch (error) {
+      setFailure(typeof error === "string" && error in copy.generateErrors ? error as Failure : "motion_generation_failed");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <form onSubmit={generate} aria-busy={working}
+        className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-primary/25 bg-card p-2 ps-4 focus-within:border-primary/60">
+        <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
+        <Input value={request} onChange={(event) => setRequest(event.target.value)} maxLength={4000} disabled={disabled || working}
+          aria-label={copy.request} placeholder={copy.barPlaceholder}
+          className="h-10 min-w-48 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent" />
+        <Button type="submit" disabled={disabled || working || !request.trim()} className="max-sm:w-full">
+          {working ? copy.generatingShort : agent ? copy.makeWith.replace("{agent}", agent) : copy.generateSubmit}
+        </Button>
+      </form>
+      {working && <p role="status" className="text-sm text-muted-foreground">{copy.generating}</p>}
+      {failure && <Alert variant="destructive"><AlertDescription>{copy.generateErrors[failure]}</AlertDescription></Alert>}
+    </div>
   );
 }
