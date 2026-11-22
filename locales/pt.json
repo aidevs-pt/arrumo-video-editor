@@ -1608,7 +1608,7 @@
     "seeUsage": "Ver utilização",
     "close": "Fechar aviso",
     "panelTitle": "Utilização",
-    "panelDescription": "O que resta às suas chaves neste período. O Arrumo avisa aos 20% e de novo aos 10%.",
+    "panelDescription": "Com 20% restante aparece um aviso; com 10% fica vermelho e o Arrumo avisa-te antes de cada geração.",
     "left": "Restam {percent}",
     "usedOf": "{used} de {limit} {unit} usados",
     "resets": "renova a {date}",
@@ -1619,6 +1619,9 @@
       "requests": "pedidos",
       "seconds": "segundos"
     },
-    "beforeGenerating": "Este vídeo pode parar a meio se acabar um fornecedor que usa. Carregue-o ou desça-o em Definições › Serviços e chaves."
+    "beforeGenerating": "Este vídeo pode parar a meio se acabar um fornecedor que usa. Carregue-o ou desça-o em Definições › Serviços e chaves.",
+    "unreadable": "Não é possível ler",
+    "manageKey": "Gerir chave",
+    "vault": "As chaves ficam guardadas cifradas: os agentes usam-nas através do Arrumo e nunca as podem ler."
   }
 }

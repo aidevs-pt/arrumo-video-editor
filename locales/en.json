@@ -1608,7 +1608,7 @@
     "seeUsage": "See usage",
     "close": "Close warning",
     "panelTitle": "Usage",
-    "panelDescription": "What your keys have left this period. Arrumo warns at 20% and again at 10%.",
+    "panelDescription": "At 20% left a banner appears; at 10% it turns red and Arrumo warns you before each generation.",
     "left": "{percent} left",
     "usedOf": "{used} of {limit} {unit} used",
     "resets": "resets {date}",
@@ -1619,6 +1619,9 @@
       "requests": "requests",
       "seconds": "seconds"
     },
-    "beforeGenerating": "This video might stop partway if a provider it uses runs out. Top it up or move it down in Settings › Services and keys."
+    "beforeGenerating": "This video might stop partway if a provider it uses runs out. Top it up or move it down in Settings › Services and keys.",
+    "unreadable": "Not readable",
+    "manageKey": "Manage key",
+    "vault": "Keys sit in an encrypted vault: agents use them through Arrumo and can never read them."
   }
 }

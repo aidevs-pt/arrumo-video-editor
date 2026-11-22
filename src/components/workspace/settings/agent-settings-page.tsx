@@ -123,7 +123,7 @@ export function AgentSettingsPage() {
                 <Link href={workspaceHref("context", setupWorkspace.id)}>{copy.continueSetup}</Link>
               </Button>}
               {tab === "plugins" && !requested && <PluginCatalog />}
-              {tab === "services" && workspace && <UsagePanel key={`usage-${workspace.id}`} workspaceId={workspace.id} />}
+              {tab === "services" && studioWorkspace && <UsagePanel key={`usage-${workspace?.id ?? "app"}`} workspaceId={workspace?.id ?? Number(studioWorkspace)} keysHref={settingsHref("plugins")} />}
               {tab === "services" && (requested === null || workspace) && <ScopedPluginPreferences key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
               {workspace && tab === "plugins" && <PluginGrants key={`grants:${workspace.id}`} workspace={workspace} />}
               {workspace && tab === "plugins" && <PluginActions key={`actions:${workspace.id}`} workspaceId={workspace.id} />}

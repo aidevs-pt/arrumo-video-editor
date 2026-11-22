@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useLocale } from "@/lib/locale-provider";
 import { PLUGINS_CHANGED, PluginIcon, usePluginText } from "@/lib/plugin-text";
@@ -106,50 +105,49 @@ export function UsageBanner({ workspaceId }: { workspaceId: number }) {
   );
 }
 
-/** Settings › Services and keys: how much each keyed provider has left. */
-export function UsagePanel({ workspaceId }: { workspaceId: number }) {
+/** Settings › Services and keys: how much each keyed provider has left, one row per provider. */
+export function UsagePanel({ workspaceId, keysHref }: { workspaceId: number; keysHref: string }) {
   const { locale, messages: { usage: copy } } = useLocale();
   const pluginText = usePluginText();
   const usage = useProviderUsage(workspaceId);
   if (!usage?.providers.length) return null;
   const count = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
-  const day = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+  const day = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{copy.panelTitle}</CardTitle>
-        <CardDescription>{copy.panelDescription}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <section aria-labelledby="usage-title">
+      <h2 id="usage-title" className="mb-3 text-[1.5rem]">{copy.panelTitle}</h2>
+      <ul className="divide-y rounded-xl border bg-card">
         {usage.providers.map((entry) => {
           const name = pluginText.name(entry.pluginId, usage.names[entry.pluginId] ?? entry.pluginId);
           const left = entry.remainingPercent;
+          const tone = entry.level === "danger" ? "text-destructive" : entry.level === "warning" ? "text-[oklch(52%_.13_65)]" : "text-[oklch(50%_.13_150)]";
           return (
-            <div key={entry.pluginId} className="flex items-start gap-3">
-              <PluginIcon pluginId={entry.pluginId} className="size-8" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-semibold">{name}</span>
-                  {left !== null && <span className={cn("text-sm font-semibold tabular-nums",
-                    entry.level === "danger" ? "text-destructive" : entry.level === "warning" ? "text-foreground" : "text-muted-foreground")}>
-                    {copy.left.replace("{percent}", percent(left, locale))}
-                  </span>}
-                </div>
-                {left !== null ? <>
-                  <Progress value={left} aria-label={copy.left.replace("{percent}", percent(left, locale))}
-                    className={cn(entry.level === "danger" && "*:data-[slot=progress-indicator]:bg-destructive", entry.level === "warning" && "*:data-[slot=progress-indicator]:bg-attention")} />
-                  <span className="text-xs text-muted-foreground">
-                    {copy.usedOf.replace("{used}", count.format(entry.used ?? 0)).replace("{limit}", count.format(entry.limit ?? 0)).replace("{unit}", copy.units[entry.unit])}
-                    {entry.resetsAt ? ` · ${copy.resets.replace("{date}", day.format(new Date(entry.resetsAt * 1000)))}` : ""}
-                  </span>
-                </> : <span className="text-sm text-muted-foreground">{copy.unknown.replace("{reason}", entry.problem ?? "")}</span>}
-              </div>
-            </div>
+            <li key={entry.pluginId} className="grid items-center gap-x-5 gap-y-2 p-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,11rem)_minmax(0,1fr)_auto]">
+              <span className="flex min-w-0 items-center gap-2.5">
+                <PluginIcon pluginId={entry.pluginId} className="size-7 shrink-0" />
+                <span className="truncate font-semibold">{name}</span>
+              </span>
+              {left !== null ? <span className="flex flex-col gap-1.5">
+                <span className={cn("text-sm font-semibold tabular-nums", tone)}>{copy.left.replace("{percent}", percent(left, locale))}</span>
+                <Progress value={left} aria-label={copy.left.replace("{percent}", percent(left, locale))} className={cn(
+                  "h-1.5",
+                  entry.level === "danger" ? "*:data-[slot=progress-indicator]:bg-destructive"
+                    : entry.level === "warning" ? "*:data-[slot=progress-indicator]:bg-[oklch(60%_.14_65)]" : "*:data-[slot=progress-indicator]:bg-[oklch(55%_.14_150)]")} />
+              </span> : <span className="text-sm text-muted-foreground">{copy.unreadable}</span>}
+              <span className={cn("text-sm", left !== null && entry.level !== "ok" ? tone : "text-muted-foreground")}>
+                {left !== null
+                  ? <>{copy.usedOf.replace("{used}", count.format(entry.used ?? 0)).replace("{limit}", count.format(entry.limit ?? 0)).replace("{unit}", copy.units[entry.unit])}
+                    {entry.resetsAt ? `, ${copy.resets.replace("{date}", day.format(new Date(entry.resetsAt * 1000)))}` : ""}</>
+                  : copy.unknown.replace("{reason}", entry.problem ?? "")}
+              </span>
+              <Button asChild size="sm" variant="outline" className="justify-self-start sm:justify-self-end"><Link href={keysHref}>{copy.manageKey}</Link></Button>
+            </li>
           );
         })}
-      </CardContent>
-    </Card>
+      </ul>
+      <p className="mt-3 text-sm text-muted-foreground">{copy.panelDescription} {copy.vault}</p>
+    </section>
   );
 }
 

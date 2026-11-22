@@ -1608,7 +1608,7 @@
     "seeUsage": "Ver uso",
     "close": "Cerrar aviso",
     "panelTitle": "Uso",
-    "panelDescription": "Lo que les queda a tus claves en este periodo. Arrumo avisa al 20% y de nuevo al 10%.",
+    "panelDescription": "Con un 20 % restante aparece un aviso; con un 10 % se pone rojo y Arrumo te avisa antes de cada generación.",
     "left": "Queda un {percent}",
     "usedOf": "{used} de {limit} {unit} usados",
     "resets": "se renueva el {date}",
@@ -1619,6 +1619,9 @@
       "requests": "peticiones",
       "seconds": "segundos"
     },
-    "beforeGenerating": "Este vídeo podría detenerse a medias si se agota un proveedor que usa. Recárgalo o bájalo en Ajustes › Servicios y claves."
+    "beforeGenerating": "Este vídeo podría detenerse a medias si se agota un proveedor que usa. Recárgalo o bájalo en Ajustes › Servicios y claves.",
+    "unreadable": "No se puede leer",
+    "manageKey": "Gestionar clave",
+    "vault": "Las claves se guardan cifradas: los agentes las usan a través de Arrumo y nunca pueden leerlas."
   }
 }
