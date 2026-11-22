@@ -405,6 +405,7 @@ impl WorkspaceStore {
                 .import_asset(&root, workspace_id, &scratch.path().join(&name))
                 .map_err(|error| io::Error::other(error.to_string()))?;
             let _ = fs::remove_file(scratch.path().join(&name));
+            crate::assets::mark_generated(&self.0, workspace_id, &[asset.id])?;
             media.push(json!({"asset_id": asset.id, "format_id": cut.format_id}));
             records.push(json!({
                 "asset_id": asset.id, "format_id": cut.format_id, "kind": CUT_KIND,
@@ -438,6 +439,7 @@ impl WorkspaceStore {
                             "The portrait cut thumbnails could not be generated: {error}"
                         ))
                     })?;
+                crate::assets::mark_generated(&self.0, workspace_id, &[asset_id])?;
                 media.push(json!({"asset_id": asset_id, "format_id": cut.format_id}));
                 records.push(json!({
                     "asset_id": asset_id, "format_id": cut.format_id, "prompt": prompt,

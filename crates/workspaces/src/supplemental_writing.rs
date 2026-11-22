@@ -605,6 +605,7 @@ impl WorkspaceStore {
                 .map_err(|error| {
                     StageFailure(format!("The thumbnails could not be generated: {error}"))
                 })?;
+            crate::assets::mark_generated(&self.0, workspace_id, &[asset_id])?;
             media.push(json!({"asset_id": asset_id, "format_id": format}));
             let mut record = json!({"asset_id": asset_id, "format_id": format, "prompt": prompt, "provider": image_provider});
             if let Some(aspect) = aspect {

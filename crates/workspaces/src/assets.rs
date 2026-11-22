@@ -32,7 +32,7 @@ impl WorkspaceStore {
         self.0
             .prepare(
                 "SELECT id, workspace_id, name, kind, byte_size, notes FROM workspace_assets
-                 WHERE workspace_id = ?1 AND superseded = 0 ORDER BY id",
+                 WHERE workspace_id = ?1 AND superseded = 0 AND generated = 0 ORDER BY id",
             )?
             .query_map([workspace_id], read_asset)?
             .collect()
@@ -173,6 +173,21 @@ impl WorkspaceStore {
         transaction.commit()?;
         Ok(asset)
     }
+}
+
+/// Marks assets as produced by Arrumo, which keeps them out of the asset library.
+pub(crate) fn mark_generated(
+    connection: &rusqlite::Connection,
+    workspace_id: i64,
+    asset_ids: &[i64],
+) -> rusqlite::Result<()> {
+    for id in asset_ids {
+        connection.execute(
+            "UPDATE workspace_assets SET generated = 1 WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, id],
+        )?;
+    }
+    Ok(())
 }
 
 pub(crate) fn copy_asset_in(
@@ -466,5 +481,35 @@ mod replacement_tests {
         assert!(!asset_path(&root, workspace, old.id).exists());
         assert!(asset_path(&root, workspace, new.id).is_file());
         assert_eq!(fs::read(original).unwrap(), b"original");
+    }
+
+    #[test]
+    fn generated_media_stays_out_of_the_asset_library() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("studio.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let root = crate::asset_root(&database);
+        let file = temp.path().join("logo.png");
+        std::fs::write(&file, b"png bytes").unwrap();
+        let logo = store.import_asset(&root, workspace, &file).unwrap();
+        let other = temp.path().join("thumbnail.png");
+        std::fs::write(&other, b"other png bytes").unwrap();
+        let thumbnail = store.import_asset(&root, workspace, &other).unwrap();
+        mark_generated(&store.0, workspace, &[thumbnail.id]).unwrap();
+        let listed: Vec<i64> = store
+            .list_assets(workspace)
+            .unwrap()
+            .into_iter()
+            .map(|asset| asset.id)
+            .collect();
+        assert_eq!(listed, [logo.id]);
+        let images: Vec<i64> = store
+            .workspace_images(workspace)
+            .unwrap()
+            .into_iter()
+            .map(|image| image.id)
+            .collect();
+        assert_eq!(images, [logo.id]);
     }
 }

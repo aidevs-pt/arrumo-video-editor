@@ -58,9 +58,7 @@ impl WorkspaceStore {
         self.0
             .prepare(
                 "SELECT id, name, notes FROM workspace_assets
-                 WHERE workspace_id = ?1 AND kind = 'image' AND superseded = 0
-                   AND id NOT IN (SELECT thumbnail_asset_id FROM motion_library
-                                  WHERE workspace_id = ?1 AND thumbnail_asset_id IS NOT NULL)
+                 WHERE workspace_id = ?1 AND kind = 'image' AND superseded = 0 AND generated = 0
                  ORDER BY id DESC LIMIT ?2",
             )?
             .query_map(params![workspace_id, MAX_IMAGES], |row| {

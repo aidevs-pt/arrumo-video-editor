@@ -206,8 +206,7 @@ impl WorkspaceStore {
             .0
             .prepare(
                 "SELECT id, name, kind, notes FROM workspace_assets
-                 WHERE workspace_id = ?1 AND superseded = 0
-                   AND id NOT IN (SELECT preview_asset_id FROM motion_library WHERE workspace_id = ?1)
+                 WHERE workspace_id = ?1 AND superseded = 0 AND generated = 0
                  ORDER BY id DESC LIMIT ?2",
             )?
             .query_map(params![workspace_id, MAX_LIBRARY], |row| {
@@ -215,7 +214,12 @@ impl WorkspaceStore {
             })?
             .filter_map(|row| match row {
                 Ok((id, _, _, _)) if sources.contains(&id) => None,
-                Ok((id, name, kind, notes)) => Some(Ok(LibraryEntry { reference: format!("asset-{id}"), name, kind, notes })),
+                Ok((id, name, kind, notes)) => Some(Ok(LibraryEntry {
+                    reference: format!("asset-{id}"),
+                    name,
+                    kind,
+                    notes,
+                })),
                 Err(error) => Some(Err(error)),
             })
             .collect::<rusqlite::Result<_>>()?;

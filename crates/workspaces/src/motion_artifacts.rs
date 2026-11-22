@@ -138,6 +138,7 @@ impl WorkspaceStore {
                         .into());
                     }
                     let asset = copy_asset_in(&tx, &root, workspace_id, source, false, None)?;
+                    crate::assets::mark_generated(&tx, workspace_id, &[asset.id])?;
                     let path = asset_path(&root, workspace_id, asset.id);
                     copied.push(path.clone());
                     if asset.kind != kind {
@@ -213,6 +214,7 @@ impl WorkspaceStore {
             let mut import =
                 |source: &Path, kind: &str| -> Result<i64, Box<dyn Error + Send + Sync>> {
                     let asset = copy_asset_in(&tx, &root, workspace_id, source, false, None)?;
+                    crate::assets::mark_generated(&tx, workspace_id, &[asset.id])?;
                     let path = asset_path(&root, workspace_id, asset.id);
                     copied.push(path.clone());
                     validate_motion_file(&path, &asset.name, kind)?;

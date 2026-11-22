@@ -801,21 +801,53 @@ pub(crate) fn render_spec_with_audio(
     run_ffmpeg(directory, &args, check)
 }
 
-/// Saves a still from the middle of a rendered animation.
+/// Frames in an animation's thumbnail, sampled evenly across it.
+const SUMMARY_FRAMES: u32 = 6;
+
+/// Saves a thumbnail that summarises a rendered animation: six moments across its length in a
+/// three-by-two grid, so the motion reads at a glance.
 pub(crate) fn render_thumbnail(
     directory: &Path,
     video: &str,
     seconds: f64,
     output: &str,
 ) -> Result<(), Box<dyn Error>> {
+    // Sample the middle of each sixth so the first and last frames (often empty) are skipped.
+    let step = seconds.max(0.1) / f64::from(SUMMARY_FRAMES);
+    for frame in 0..SUMMARY_FRAMES {
+        let at = (step * (f64::from(frame) + 0.5)).min((seconds - 0.05).max(0.0));
+        let name = format!("summary-{frame}.png");
+        let args: Vec<String> = [
+            "-nostdin",
+            "-v",
+            "error",
+            "-ss",
+            &format!("{at:.3}"),
+            "-i",
+            video,
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=480:-2",
+            "-y",
+            &name,
+        ]
+        .map(String::from)
+        .to_vec();
+        run_ffmpeg(directory, &args, &mut || Ok(()))?;
+    }
     let args: Vec<String> = [
         "-nostdin",
         "-v",
         "error",
-        "-ss",
-        &format!("{:.3}", seconds * 0.6),
+        "-framerate",
+        "1",
+        "-start_number",
+        "0",
         "-i",
-        video,
+        "summary-%d.png",
+        "-vf",
+        "tile=3x2:padding=6:margin=6:color=0x101418",
         "-frames:v",
         "1",
         "-y",
@@ -823,7 +855,11 @@ pub(crate) fn render_thumbnail(
     ]
     .map(String::from)
     .to_vec();
-    run_ffmpeg(directory, &args, &mut || Ok(()))
+    let made = run_ffmpeg(directory, &args, &mut || Ok(()));
+    for frame in 0..SUMMARY_FRAMES {
+        let _ = fs::remove_file(directory.join(format!("summary-{frame}.png")));
+    }
+    made
 }
 
 /// SubRip captions timed to when each scene plays: its spoken words when it is narrated,

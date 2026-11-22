@@ -223,6 +223,7 @@ impl WorkspaceStore {
             include_str!("../migrations/052-source-transcripts.sql"),
             include_str!("../migrations/053-agent-logs.sql"),
             include_str!("../migrations/054-motion-specs.sql"),
+            include_str!("../migrations/055-generated-assets.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

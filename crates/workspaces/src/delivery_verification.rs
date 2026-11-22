@@ -357,6 +357,7 @@ impl WorkspaceStore {
         }
         let asset =
             crate::assets::copy_asset_in(&tx, &media_root, workspace_id, source, false, None)?;
+        crate::assets::mark_generated(&tx, workspace_id, &[asset.id])?;
         let managed = crate::asset_path(&media_root, workspace_id, asset.id);
         let attached = (|| -> Result<(), Box<dyn Error + Send + Sync>> {
             if variant_digest(&managed)? != digest {
