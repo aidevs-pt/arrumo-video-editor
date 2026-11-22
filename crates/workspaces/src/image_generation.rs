@@ -492,6 +492,7 @@ impl WorkspaceStore {
         count: usize,
         notes: &str,
         provider: Option<&str>,
+        references: &[i64],
     ) -> Result<Vec<GeneratedAsset>, Box<dyn Error>> {
         let prompt = prompt.trim();
         if prompt.is_empty() || prompt.chars().count() > MAX_PROMPT_CHARACTERS {
@@ -527,6 +528,13 @@ impl WorkspaceStore {
             )
             .into());
         }
+        if self
+            .reference_media(database, workspace_id, references)?
+            .iter()
+            .any(|media| media.kind != crate::provider_media::MediaKind::Image)
+        {
+            return Err(io::Error::other("Image references must be images").into());
+        }
         let stem = library_image_stem(prompt);
         let mut made = Vec::new();
         for index in 0..count {
@@ -541,7 +549,7 @@ impl WorkspaceStore {
                 } else {
                     format!("{stem}-{}", index + 1)
                 },
-                &[],
+                references,
             )?;
             if !notes.trim().is_empty() {
                 self.set_asset_notes(workspace_id, image.id, notes.trim())?;
@@ -774,7 +782,16 @@ mod tests {
         ] {
             assert!(
                 store
-                    .generate_library_images(database, workspace, prompt, ratio, count, "", None)
+                    .generate_library_images(
+                        database,
+                        workspace,
+                        prompt,
+                        ratio,
+                        count,
+                        "",
+                        None,
+                        &[]
+                    )
                     .is_err()
             );
         }
@@ -787,7 +804,8 @@ mod tests {
                     "16:9",
                     1,
                     "",
-                    Some("codex-not-a-provider")
+                    Some("codex-not-a-provider"),
+                    &[]
                 )
                 .is_err()
         );

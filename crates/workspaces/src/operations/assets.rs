@@ -29,6 +29,10 @@ struct GenerateVideoInput {
     notes: String,
     #[serde(default)]
     provider: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    references: Vec<i64>,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +57,8 @@ struct GenerateImagesInput {
     notes: String,
     #[serde(default)]
     provider: Option<String>,
+    #[serde(default)]
+    references: Vec<i64>,
 }
 
 #[derive(Deserialize)]
@@ -149,21 +155,22 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 19] {
+pub(super) fn definitions() -> [Value; 20] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
     }, "required": ["workspaceId", "assetId", "role"], "additionalProperties": false});
     [
         json!({"name": "generate_library_images",
-            "description": "Generate one to four images from a description with the workspace's image providers (in their order, or one named provider) and add them to the workspace assets with the given notes.",
+            "description": "Generate one to four images from a description with the workspace's image providers (in their order, or one named provider) and add them to the workspace assets with the given notes. references are workspace image asset IDs to follow; each result's references count says how many the provider accepted (0 when it fell back to the description alone).",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id,
                 "prompt": {"type": "string", "minLength": 1, "maxLength": 4000},
                 "aspectRatio": {"enum": crate::ASSET_ASPECT_RATIOS},
                 "count": {"type": "integer", "minimum": 1, "maximum": 4},
                 "notes": {"type": "string", "maxLength": 8000},
-                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+                "references": {"type": "array", "items": id, "maxItems": 9, "uniqueItems": true}
             }, "required": ["workspaceId", "prompt", "aspectRatio", "count"], "additionalProperties": false}}),
         json!({"name": "generate_library_speech",
             "description": "Voice text with the workspace's first speech provider (or one named provider) and its configured voice, and add the audio to the workspace assets with the given notes.",
@@ -174,15 +181,22 @@ pub(super) fn definitions() -> [Value; 19] {
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
         json!({"name": "generate_library_video",
-            "description": "Generate a short clip with the workspace's first video provider (or one named provider) and add it to the workspace assets with the given notes. Takes minutes; the provider's duration limits apply.",
+            "description": "Generate a short clip with the workspace's first video provider (or one named provider) and add it to the workspace assets with the given notes. A provider may offer several models (see its plugin settings); name one with provider and model. references are workspace image or MP4 video asset IDs to animate or follow (up to 9 images and 3 videos, as the model allows); the provider picks the matching endpoint and fails with the models that fit when the chosen one can't take them. Takes minutes; the model's duration limits apply.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id,
                 "prompt": {"type": "string", "minLength": 1, "maxLength": 2500},
                 "aspectRatio": {"type": "string", "enum": ["16:9", "9:16", "1:1"]},
                 "durationSeconds": {"type": "integer", "minimum": 1, "maximum": 60},
                 "notes": {"type": "string", "maxLength": 8000},
-                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+                "model": {"type": "string", "minLength": 1, "maxLength": 64},
+                "references": {"type": "array", "items": id, "maxItems": 12, "uniqueItems": true}
             }, "required": ["workspaceId", "prompt", "aspectRatio"], "additionalProperties": false}}),
+        json!({"name": "list_video_models",
+            "description": "List the models of each video provider on for this workspace, in provider order: which one is selected by default, and for each way of calling it the reference images and videos it takes (inclusive [min, max]), its length limits and aspect ratios. Use it to choose provider, model and references for generate_library_video.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "detach_completed_media",
             "description": "Remove a post-completion attachment from a verified output while retaining the managed asset.",
             "inputSchema": {"type": "object", "properties": {
@@ -290,8 +304,9 @@ pub(super) fn call(
                         args.count,
                         &args.notes,
                         args.provider.as_deref(),
+                        &args.references,
                     )
-                    .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider})).collect::<Vec<_>>()}))
+                    .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider, "references": image.references})).collect::<Vec<_>>()}))
                     .map_err(|_| "Could not generate the images. Check the image providers and their keys")
             }),
         "generate_library_speech" => serde_json::from_value(Value::Object(arguments.clone()))
@@ -306,9 +321,17 @@ pub(super) fn call(
             .map_err(|_| "Invalid video arguments")
             .and_then(|args: GenerateVideoInput| {
                 store
-                    .generate_library_video(database, args.workspace_id, &args.prompt, &args.aspect_ratio, args.duration_seconds, &args.notes, args.provider.as_deref())
+                    .generate_library_video(database, args.workspace_id, &args.prompt, &args.aspect_ratio, args.duration_seconds, &args.notes, args.provider.as_deref(), args.model.as_deref(), &args.references)
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not generate the clip. Check the video provider and its key")
+            }),
+        "list_video_models" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid video model arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .video_models(args.workspace_id)
+                    .map(|models| json!({"models": models}))
+                    .map_err(|_| "Could not list the video models")
             }),
         "detach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid completed media arguments")

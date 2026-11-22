@@ -468,6 +468,7 @@ async fn get_workspace_context(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn generate_library_images(
     workspace_id: i64,
     prompt: String,
@@ -475,6 +476,7 @@ async fn generate_library_images(
     count: usize,
     notes: String,
     provider: Option<String>,
+    references: Option<Vec<i64>>,
     app: AppHandle,
 ) -> Result<Vec<i64>, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -493,6 +495,7 @@ async fn generate_library_images(
                 count,
                 &notes,
                 provider.as_deref(),
+                &references.unwrap_or_default(),
             )
             .map(|images| images.into_iter().map(|image| image.id).collect())
             .map_err(|error| error.to_string())
@@ -522,6 +525,26 @@ async fn provider_usage(
 }
 
 #[tauri::command]
+async fn list_video_models(
+    workspace_id: i64,
+    app: AppHandle,
+) -> Result<Vec<arrumo_workspaces::VideoModel>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .video_models(workspace_id)
+            .map_err(|_| "video_models_unavailable".to_owned())
+    })
+    .await
+    .map_err(|_| "video_models_unavailable".to_owned())?
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn generate_library_video(
     workspace_id: i64,
@@ -530,6 +553,8 @@ async fn generate_library_video(
     duration_seconds: Option<u32>,
     notes: String,
     provider: Option<String>,
+    model: Option<String>,
+    references: Option<Vec<i64>>,
     app: AppHandle,
 ) -> Result<i64, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -548,6 +573,8 @@ async fn generate_library_video(
                 duration_seconds,
                 &notes,
                 provider.as_deref(),
+                model.as_deref(),
+                &references.unwrap_or_default(),
             )
             .map(|(id, _)| id)
             .map_err(|error| error.to_string())
@@ -1371,6 +1398,7 @@ fn main() {
             generate_library_images,
             generate_library_speech,
             generate_library_video,
+            list_video_models,
             provider_usage,
             generate_motion_library_item,
             apply_context_import,

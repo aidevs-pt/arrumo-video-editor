@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { AudioLines, Clapperboard, ImageIcon, Sparkles } from "lucide-react";
+import { AudioLines, Check, Clapperboard, ImageIcon, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,10 +14,22 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
 import { usePluginText } from "@/lib/plugin-text";
+import { cn } from "@/lib/utils";
+
+import { AssetThumbnail } from "./asset-thumbnail";
 
 type Provider = { id: string; name: string };
 type Preferences = { available: Provider[]; effective: string[] };
 type Kind = "image" | "audio" | "video";
+type LibraryAsset = { id: number; name: string; kind: Kind };
+type VideoModel = { provider: string; id: string; selected: boolean; variants: { images: [number, number]; videos: [number, number] }[] };
+
+const MAX_IMAGE_REFERENCES = 9;
+const MAX_VIDEO_REFERENCES = 3;
+
+function takes(model: VideoModel, images: number, videos: number) {
+  return model.variants.some((variant) => images >= variant.images[0] && images <= variant.images[1] && videos >= variant.videos[0] && videos <= variant.videos[1]);
+}
 
 const CAPABILITY: Record<Kind, string> = { image: "image-generation", audio: "text-to-speech", video: "video-generation" };
 const DURATIONS = [3, 5, 8, 10, 15];
@@ -51,15 +63,46 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const [notes, setNotes] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<string>();
+  const [library, setLibrary] = useState<LibraryAsset[]>([]);
+  const [references, setReferences] = useState<number[]>([]);
+  const [models, setModels] = useState<VideoModel[]>([]);
+  const [model, setModel] = useState("");
 
   useEffect(() => {
     if (!open && !imagesOnly) return;
     invoke<Record<string, Preferences>>("list_provider_preferences", { workspaceId }).then(setAll, () => setAll({}));
   }, [imagesOnly, open, workspaceId]);
 
+  useEffect(() => {
+    if (!open) return;
+    invoke<LibraryAsset[]>("list_assets", { workspaceId }).then(setLibrary, () => setLibrary([]));
+    if (!imagesOnly) invoke<VideoModel[]>("list_video_models", { workspaceId }).then(setModels, () => setModels([]));
+  }, [imagesOnly, open, workspaceId]);
+
   const name = (entry: Provider) => pluginText.name(entry.id, entry.name);
   const inOrder = providers?.effective.map((id) => providers.available.find((entry) => entry.id === id)).filter((entry): entry is Provider => !!entry) ?? [];
   const none = providers !== undefined && inOrder.length === 0 && !provider;
+  const choices = library.filter((asset) => asset.kind === "image" || (kind === "video" && asset.kind === "video"));
+  const chosen = references.filter((id) => choices.some((asset) => asset.id === id));
+  const imageCount = chosen.filter((id) => choices.find((asset) => asset.id === id)?.kind === "image").length;
+  const videoCount = chosen.length - imageCount;
+  const videoProvider = provider || inOrder[0]?.id || "";
+  const providerModels = models.filter((entry) => entry.provider === videoProvider && entry.id);
+  const activeModel = providerModels.find((entry) => entry.id === model) ?? providerModels.find((entry) => entry.selected);
+  const fitting = providerModels.filter((entry) => takes(entry, imageCount, videoCount));
+  const unfit = kind === "video" && activeModel !== undefined && !takes(activeModel, imageCount, videoCount);
+  const unsupported = kind === "video" && chosen.length > 0 && providerModels.length === 0 && models.some((entry) => entry.provider === videoProvider);
+  const modelName = (id: string) => id.replace(/-/g, " ").replace(/\b([a-z])/g, (letter) => letter.toUpperCase()).replace(/ Std$/, " Standard");
+
+  function toggleReference(asset: LibraryAsset) {
+    setProblem(undefined);
+    setReferences((current) => {
+      if (current.includes(asset.id)) return current.filter((id) => id !== asset.id);
+      const same = current.filter((id) => library.find((entry) => entry.id === id)?.kind === asset.kind).length;
+      if (same >= (asset.kind === "video" ? MAX_VIDEO_REFERENCES : MAX_IMAGE_REFERENCES)) return current;
+      return [...current, asset.id];
+    });
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -69,11 +112,12 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
     try {
       if (kind === "image") {
         onCreated(await invoke<number[]>("generate_library_images", {
-          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, count, notes: notes.trim(), provider: provider || null,
+          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, count, notes: notes.trim(), provider: provider || null, references: chosen,
         }));
       } else if (kind === "video") {
         onCreated([await invoke<number>("generate_library_video", {
-          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: duration, notes: notes.trim(), provider: provider || null,
+          workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: duration, notes: notes.trim(),
+          provider: provider || (model ? videoProvider : null), model: model || null, references: chosen,
         })]);
       } else {
         onCreated([await invoke<number>("generate_library_speech", {
@@ -83,6 +127,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       setOpen(false);
       setPrompt("");
       setNotes("");
+      setReferences([]);
     } catch (error) {
       setProblem(typeof error === "string" ? error : copy.error);
     } finally {
@@ -102,7 +147,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       </DialogHeader>
       <form onSubmit={submit}>
         <FieldGroup>
-          {!imagesOnly && <Tabs value={kind} onValueChange={(value) => { const next = value as Kind; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setProvider(""); setProblem(undefined); }}>
+          {!imagesOnly && <Tabs value={kind} onValueChange={(value) => { const next = value as Kind; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setProvider(""); setModel(""); setProblem(undefined); }}>
             <TabsList className="w-full justify-start">
               <TabsTrigger value="image" disabled={pending} className="flex-none"><ImageIcon data-icon="inline-start" />{copy.image}</TabsTrigger>
               <TabsTrigger value="audio" disabled={pending} className="flex-none"><AudioLines data-icon="inline-start" />{copy.audio}</TabsTrigger>
@@ -117,7 +162,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
           <div className={kind === "audio" ? "grid gap-4" : "grid gap-4 sm:grid-cols-[1fr_1fr_6rem]"}>
             <Field data-disabled={pending}>
               <FieldLabel htmlFor="generate-provider">{copy.provider}</FieldLabel>
-              <NativeSelect id="generate-provider" value={provider} disabled={pending} onChange={(event) => setProvider(event.target.value)}>
+              <NativeSelect id="generate-provider" value={provider} disabled={pending} onChange={(event) => { setProvider(event.target.value); setModel(""); }}>
                 <NativeSelectOption value="">{inOrder[0] ? copy.firstAvailable.replace("{provider}", name(inOrder[0])) : copy.defaultOrder}</NativeSelectOption>
                 {providers?.available.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{name(entry)}</NativeSelectOption>)}
               </NativeSelect>
@@ -140,6 +185,31 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
               </NativeSelect>
             </Field>}</>}
           </div>
+          {kind === "video" && providerModels.length > 0 && <Field data-disabled={pending}>
+            <FieldLabel htmlFor="generate-model">{copy.model}</FieldLabel>
+            <NativeSelect id="generate-model" value={model} disabled={pending} onChange={(event) => setModel(event.target.value)}>
+              <NativeSelectOption value="">{copy.modelDefault.replace("{model}", modelName(providerModels.find((entry) => entry.selected)?.id ?? providerModels[0].id))}</NativeSelectOption>
+              {providerModels.map((entry) => <NativeSelectOption key={entry.id} value={entry.id}>{modelName(entry.id)}</NativeSelectOption>)}
+            </NativeSelect>
+          </Field>}
+          {kind !== "audio" && !imagesOnly && <Field data-disabled={pending}>
+            <FieldLabel id="generate-references">{copy.references}</FieldLabel>
+            <FieldDescription>{kind === "video" ? copy.referencesVideoHint : copy.referencesImageHint}</FieldDescription>
+            {choices.length ? <div role="group" aria-labelledby="generate-references" className="scroll-fade grid max-h-44 grid-cols-4 gap-2 overflow-y-auto p-0.5 sm:grid-cols-5">
+              {choices.map((asset) => {
+                const selected = chosen.includes(asset.id);
+                return <button key={asset.id} type="button" aria-pressed={selected} disabled={pending} title={asset.name} onClick={() => toggleReference(asset)}
+                  className={cn("relative rounded-thumb text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50", selected && "ring-2 ring-primary")}>
+                  <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind} />
+                  <span className="mt-1 block truncate text-xs text-muted-foreground">{asset.name}</span>
+                  {selected && <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3.5" aria-hidden="true" /></span>}
+                </button>;
+              })}
+            </div> : <p className="text-sm text-muted-foreground">{copy.referencesNone}</p>}
+          </Field>}
+          {unfit && activeModel && <Alert role="status"><AlertDescription>{(fitting.length ? copy.modelCantTake : copy.noModelTakes)
+            .replace("{model}", modelName(activeModel.id)).replace("{models}", fitting.map((entry) => modelName(entry.id)).join(", "))}</AlertDescription></Alert>}
+          {unsupported && <Alert role="status"><AlertDescription>{copy.noReferencesHere}</AlertDescription></Alert>}
           <Field data-disabled={pending}>
             <FieldLabel htmlFor="generate-notes">{copy.notes}</FieldLabel>
             <Input id="generate-notes" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={pending}
@@ -151,7 +221,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
           {pending && <p role="status" className="text-sm text-muted-foreground">{kind === "video" ? copy.videoPendingHint : copy.pendingHint}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{copy.cancel}</Button>
-            <Button type="submit" disabled={pending || !prompt.trim() || none}>
+            <Button type="submit" disabled={pending || !prompt.trim() || none || unfit || unsupported}>
               {pending ? copy.generating : kind === "audio" ? copy.submitAudio : kind === "video" ? copy.submitVideo : count === 1 ? copy.submitOne : copy.submitMany.replace("{count}", String(count))}
             </Button>
           </DialogFooter>

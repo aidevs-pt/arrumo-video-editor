@@ -570,7 +570,16 @@
       "videoPendingHint": "Os clipes demoram alguns minutos. Mantenha esta janela aberta até o clipe estar pronto.",
       "openWith": "Gerar com {provider}",
       "styleTitle": "Gerar uma referência de estilo",
-      "styleDescription": "Descreve o estilo que queres. A imagem junta-se aos recursos deste espaço de trabalho e às suas referências de estilo."
+      "styleDescription": "Descreve o estilo que queres. A imagem junta-se aos recursos deste espaço de trabalho e às suas referências de estilo.",
+      "model": "Modelo",
+      "modelDefault": "{model} (predefinido)",
+      "references": "Referências",
+      "referencesImageHint": "Opcional. Escolhe imagens para o fornecedor seguir. Os fornecedores que não as aceitam usam só a descrição.",
+      "referencesVideoHint": "Opcional. Escolhe imagens para animar, ou imagens e vídeos para o modelo seguir.",
+      "referencesNone": "Carrega imagens ou clipes em Recursos para os usares como referências.",
+      "modelCantTake": "O {model} não pode usar estas referências. Escolhe {models}.",
+      "noModelTakes": "Nenhum modelo deste fornecedor aceita estas referências. Escolhe menos.",
+      "noReferencesHere": "Este fornecedor não aceita referências. Escolhe outro fornecedor ou remove-as."
     }
   },
   "delivery": {

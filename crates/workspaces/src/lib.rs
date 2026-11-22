@@ -72,6 +72,7 @@ mod profile_deliveries;
 mod profile_drafting;
 mod profile_formats;
 mod profile_organization;
+mod provider_media;
 mod provider_preferences;
 mod provider_usage;
 mod script_stage;
@@ -87,6 +88,7 @@ mod transcription;
 mod video_drafts;
 mod video_generation;
 pub use provider_usage::{ProviderUsage, USAGE_DANGER_PERCENT, USAGE_WARNING_PERCENT};
+pub use video_generation::{VideoModel, VideoVariant};
 mod workspace_feedback;
 
 pub use a2a::serve_a2a;
