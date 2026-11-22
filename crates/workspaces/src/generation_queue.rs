@@ -112,7 +112,12 @@ fn apply_output_overrides(
                 changed.push("portrait_derivatives.count".into());
             }
             if let Some(value) = &change.portrait_guidance {
-                supplemental["portrait_derivatives"]["source"]["guidance"] = json!(value);
+                if entry["portrait_source"].is_object() {
+                    entry["portrait_source"]["guidance"] = json!(value);
+                } else {
+                    entry["delivery"]["supplemental"]["portrait_derivatives"]["source"]["guidance"] =
+                        json!(value);
+                }
                 changed.push("portrait_derivatives.guidance".into());
             }
             entry["video_overrides"] = json!(changed);
@@ -294,6 +299,52 @@ impl WorkspaceStore {
         )
     }
 
+    /// When a format's portrait cuts follow another profile, copies that profile's guidance and its
+    /// portrait format's thumbnail settings into the run, so cuts are made the way that profile
+    /// makes videos. A profile deleted since falls back to unguided cuts.
+    fn resolve_portrait_source(
+        &self,
+        workspace_id: i64,
+        entry: &mut Value,
+    ) -> rusqlite::Result<()> {
+        let source = &entry["delivery"]["supplemental"]["portrait_derivatives"]["source"];
+        if source["type"] != "profile" {
+            return Ok(());
+        }
+        let Some(profile_id) = source["profile_id"].as_i64() else {
+            return Ok(());
+        };
+        let profile = self
+            .list_profiles(workspace_id)?
+            .into_iter()
+            .find(|profile| profile.id == profile_id);
+        let mut resolved = json!({"type": "profile", "profile_id": profile_id});
+        if let Some(profile) = profile {
+            let formats = self.list_profile_formats(workspace_id, profile.id)?;
+            let portrait = formats
+                .iter()
+                .find(|format| format.height > format.width)
+                .or(formats.first());
+            let mut guidance = vec![profile.guidance.trim().to_owned()];
+            resolved["profile_name"] = json!(profile.name);
+            if let Some(format) = portrait {
+                let supplemental = self
+                    .profile_delivery(workspace_id, profile.id, format.id)?
+                    .effective
+                    .supplemental;
+                guidance.push(supplemental.specifications.trim().to_owned());
+                resolved["thumbnails_per_video"] = json!(supplemental.thumbnails.min(3));
+                resolved["thumbnail_guidance"] = json!(supplemental.thumbnail_guidance);
+                resolved["thumbnail_reference_ids"] = json!(supplemental.thumbnail_reference_ids);
+            }
+            guidance.retain(|part| !part.is_empty());
+            resolved["guidance"] = json!(guidance.join("\n\n"));
+        }
+        // Kept beside the stored setting, which run planning reads with its strict shape.
+        entry["portrait_source"] = resolved;
+        Ok(())
+    }
+
     fn capture_generation_inputs(
         &self,
         workspace_id: i64,
@@ -335,6 +386,10 @@ impl WorkspaceStore {
         };
         if formats.is_empty() {
             return Err(rusqlite::Error::InvalidQuery);
+        }
+        let mut formats = formats;
+        for entry in &mut formats {
+            self.resolve_portrait_source(workspace_id, entry)?;
         }
         let chosen: Option<Vec<i64>> = options
             .get("formats")
@@ -478,6 +533,112 @@ pub(crate) fn read_run(row: &Row<'_>) -> rusqlite::Result<GenerationRun> {
 mod tests {
     use super::*;
     use crate::{DimensionOverrides, DraftSettings};
+
+    #[test]
+    fn portrait_cuts_follow_their_source_profile() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let studio = store.create("Studio").unwrap().id;
+        let shorts = store
+            .create_profile(studio, "Shorts", "Hook in the first second.", None)
+            .unwrap()
+            .id;
+        let formats = store.list_output_formats(studio).unwrap();
+        let landscape = formats
+            .iter()
+            .find(|f| f.settings.width > f.settings.height)
+            .unwrap()
+            .id;
+        let portrait = formats
+            .iter()
+            .find(|f| f.settings.height > f.settings.width)
+            .unwrap()
+            .id;
+        store
+            .set_format_delivery(
+                studio,
+                portrait,
+                &crate::SupplementalOutputs {
+                    thumbnails: 2,
+                    thumbnail_guidance: "Big face, one word".into(),
+                    specifications: "Under 45 seconds.".into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        store
+            .set_format_delivery(
+                studio,
+                landscape,
+                &crate::SupplementalOutputs {
+                    portrait_derivatives: crate::PortraitDerivatives {
+                        count: 2,
+                        source: crate::PortraitSource::Profile { profile_id: shorts },
+                    },
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let draft = store
+            .create_video_draft(
+                studio,
+                DraftSettings {
+                    title: "Explainer".into(),
+                    profile_id: None,
+                    intent: "Explain the cube".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(studio, draft.id, "portrait-source", &RunOptions::default())
+            .unwrap();
+        let entry = run.snapshot["formats"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["format"]["id"] == landscape)
+            .unwrap();
+        assert_eq!(
+            entry["delivery"]["supplemental"]["portrait_derivatives"]["source"],
+            json!({"type": "profile", "profile_id": shorts})
+        );
+        let source = &entry["portrait_source"];
+        assert_eq!(source["profile_name"], "Shorts");
+        assert_eq!(
+            source["guidance"],
+            "Hook in the first second.\n\nUnder 45 seconds."
+        );
+        assert_eq!(source["thumbnails_per_video"], 2);
+        assert_eq!(source["thumbnail_guidance"], "Big face, one word");
+        let request = &crate::portrait_cuts::cut_requests(&run.snapshot)[&landscape];
+        assert_eq!(request.thumbnails_per_cut, 2);
+        assert!(request.guidance.contains("Shorts"), "{}", request.guidance);
+
+        let customised = store
+            .enqueue_video_draft(
+                studio,
+                draft.id,
+                "portrait-guidance",
+                &RunOptions {
+                    format_overrides: BTreeMap::from([(
+                        landscape.to_string(),
+                        FormatOverride {
+                            portrait_guidance: Some("Only the reveal.".into()),
+                            ..FormatOverride::default()
+                        },
+                    )]),
+                    ..RunOptions::default()
+                },
+            )
+            .unwrap();
+        let request = &crate::portrait_cuts::cut_requests(&customised.snapshot)[&landscape];
+        assert!(
+            request.guidance.ends_with("Only the reveal."),
+            "{}",
+            request.guidance
+        );
+        assert_eq!(request.thumbnails_per_cut, 2);
+    }
 
     #[test]
     fn queue_freezes_inputs_and_retries_are_idempotent() {

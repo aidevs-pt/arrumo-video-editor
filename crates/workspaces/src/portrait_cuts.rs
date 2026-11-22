@@ -37,13 +37,25 @@ pub(crate) fn cut_requests(snapshot: &Value) -> BTreeMap<i64, CutRequest> {
         if count == 0 {
             continue;
         }
-        let source = &derivatives["source"];
+        let source = if entry["portrait_source"].is_object() {
+            &entry["portrait_source"]
+        } else {
+            &derivatives["source"]
+        };
         requests.insert(
             id,
             CutRequest {
                 count,
                 thumbnails_per_cut: source["thumbnails_per_video"].as_u64().unwrap_or(0).min(3),
-                guidance: source["guidance"].as_str().unwrap_or("").to_owned(),
+                guidance: match source["profile_name"].as_str() {
+                    Some(profile) => format!(
+                        "Make each cut the way the \"{profile}\" profile makes its videos.\n\n{}",
+                        source["guidance"].as_str().unwrap_or("")
+                    )
+                    .trim()
+                    .to_owned(),
+                    None => source["guidance"].as_str().unwrap_or("").to_owned(),
+                },
                 thumbnail_guidance: source["thumbnail_guidance"]
                     .as_str()
                     .unwrap_or("")
