@@ -18,6 +18,7 @@ Add a stdio MCP server that runs `arrumo-workspaces <absolute-database-path> mcp
 3. **Review like a critic.** Each review note should name a moment (a time or script line), say what is wrong and what would fix it. "Make it better" teaches nothing.
 4. **Teach the workspace once.** Feedback that applies to every video (tone, pacing, words to avoid) belongs in `add_workspace_feedback`, not repeated in each review.
 5. **Never guess what kind of video it is.** Look first, ask second, edit last.
+6. **Read the craft notes.** `list_editing_guides` and `get_editing_guide` return the guides Arrumo's own agent follows at each stage (script, visuals, animation, cutting, storyboard, portrait cuts, publishing text, review). Read the one for the stage you are reviewing so your notes and its work pull the same way.
 
 ## The process
 
@@ -29,13 +30,17 @@ Add a stdio MCP server that runs `arrumo-workspaces <absolute-database-path> mcp
    - Script, assets and supplemental items: read the result, then `review_production_result` with `approved`, `revise` (with notes) or `rejected`. On assets approval, `saveMotionIndexes` chooses which new animations join the library.
    - Previews: one decision per format with `review_preview_formats`. Approved formats are kept; only formats marked `revise` are rendered again.
    - Read `get_agent_log` when a result surprises you, to see what Arrumo's agent was asked.
-6. **Check the preview before approving.** For footage runs, compare the cuts with the transcript: no clipped first or last words, no repeated take, punchlines and reactions kept whole, no long dead air, the video ends on a finished thought. For storyboards, check that each scene's text is readable at phone size and stays on screen long enough to read.
+6. **Check the preview before approving.** For footage runs, compare the cuts with the transcript: no clipped first or last words, no repeated take, punchlines and reactions kept whole, no long dead air, the video ends on a finished thought. For storyboards, check that each scene's text is readable at phone size and stays on screen long enough to read. At each doubtful moment, `render_timeline_view` draws frames above the waveform for a stretch of up to 120 s of a preview (`runId`, `formatId`, `previewAttempt`), a final video or a footage asset into a PNG you can look at. Use it at decision points, not to scan a whole video, and say what you could not check.
 7. **Deliver.** After the delivery check passes, `get_completed_video` lists the files; `export_generation_delivery` writes them to a ZIP at an absolute path the creator chose.
 8. **Remember.** Save run-specific lessons with `add_completed_video_feedback` and lasting ones with `add_workspace_feedback`.
 
 ## Library media
 
-Generate images, speech or video clips for the library with `generate_library_images`, `generate_library_speech` and `generate_library_video`. `list_video_models` shows each video provider's models and how many reference images or videos each one takes; pass workspace asset IDs as `references`. Generated media lands in the asset library with notes saying which provider and model made it.
+Generate images, speech or video clips for the library with `generate_library_images`, `generate_library_speech` and `generate_library_video`. `list_video_models` shows each video provider's models and how many reference images or videos each one takes; pass workspace asset IDs as `references`. Generated media lands in the asset library with notes saying which provider and model made it. `list_speech_models` lists voice models, `transform_audio_asset` changes a voice or isolates it from noise, and `dub_asset` dubs an asset's speech into another language (`list_audio_transforms` and `list_dubbing_providers` show what the installed plugins offer).
+
+## Subtitles in the picture
+
+A format whose delivery sets `burned_captions` also ships a copy with subtitles drawn in. Its `caption_style` (font, size, colours, outline or box, position, margin) is set per format with `set_format_delivery`; a profile (`set_profile_delivery`) or one video (`format_overrides`) changes only the fields it names. `preview_caption_style` draws a style on a sample frame so you can check it before a run.
 
 ## Hard rules
 
