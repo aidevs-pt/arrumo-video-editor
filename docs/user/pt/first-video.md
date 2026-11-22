@@ -4,7 +4,7 @@
 
 ## Configura um espaço de trabalho
 
-Cria um espaço de trabalho e escolhe o agente de edição disponível no teu computador. Se pretendes gerar legendas a partir do áudio, configura um fornecedor de transcrição que devolva marcas temporais. Cada fornecedor precisa das suas próprias credenciais.
+Cria um espaço de trabalho e escolhe o agente de edição disponível no teu computador. Se pretendes gerar legendas a partir do áudio, configura um fornecedor de transcrição que devolva marcas temporais. Cada fornecedor precisa das suas próprias credenciais. Cada campo de chave tem **Onde a encontrar**, que abre a página do fornecedor para a criar. No primeiro arranque, o passo do espaço de trabalho também pergunta onde o agente te pode conhecer: adiciona os links do teu canal ou site e, quando o espaço existir, **Contexto** abre com eles e o agente redige o teu contexto e sugere perfis para escolheres.
 
 Cada espaço de trabalho começa com o seu próprio ícone e cor. Para os mudar, ou para mostrar uma imagem como o avatar do teu canal, escolhe **Personalizar espaço de trabalho** no menu do espaço de trabalho.
 
@@ -24,7 +24,7 @@ Abre **Saídas** e verifica os formatos ativos. Para a entrega ser verificada, c
 
 Numa execução guiada, abre **Rever execução** quando houver uma decisão pendente. Verifica o guião, os recursos ou a pré-visualização disponíveis. Prepara as tuas decisões e envia-as quando terminares. Se precisares de alterações, descreve-as nas notas da etapa antes de enviar a decisão.
 
-Em **Recursos e animações**, o agente também desenha animações para o vídeo, como um cartão de título, oráculos ou um cartão final, e o Arrumo renderiza-as para as reveres. Um vídeo começado do zero não tem gravações, por isso a pré-visualização é um storyboard de cenas animadas feito a partir do guião e das animações aprovadas. As legendas vêm do texto no ecrã. Se houver um fornecedor de texto para voz configurado, como o ElevenLabs, o storyboard é narrado e as legendas seguem a narração.
+Em **Recursos e animações**, o agente também desenha animações para o vídeo, como um cartão de título, oráculos ou um cartão final, e o Arrumo renderiza-as para as reveres. Um vídeo começado do zero não tem gravações, por isso a pré-visualização é um storyboard de cenas animadas feito a partir do guião e das animações aprovadas. As legendas vêm do texto no ecrã. Se houver um fornecedor de texto para voz configurado, como o ElevenLabs, o storyboard é narrado e as legendas seguem a narração. Decide cada animação com **Aprovar**, **Pedir alterações** (com uma nota) ou **Rejeitar**, e marca **Guardar na biblioteca ao aprovar** nas que queres manter. Se aprovares todas e não houver nota geral, o passo é aprovado; caso contrário, volta ao agente uma revisão com cada decisão. Também podes decidir sobre o passo inteiro.
 
 Os formatos que pedem cortes verticais recebem vídeos verticais curtos tirados do vídeo aprovado, cada um com as suas miniaturas, prontos a rever com os títulos e as descrições.
 
@@ -38,7 +38,7 @@ A aplicação de computador verifica a entrega quando todos os formatos ativos t
 
 ## Abre e exporta o resultado
 
-Vai a **Vídeos** → **Concluídos** e abre o vídeo finalizado. Seleciona uma saída para a pré-visualizar ou abre **Texto das legendas** para consultar as suas marcas temporais. Usa **Exportar ZIP** para guardar os ficheiros verificados num novo ZIP.
+Vai a **Vídeos** → **Concluídos** e abre o vídeo finalizado. Seleciona uma saída para a pré-visualizar ou abre **Texto das legendas** para consultar as suas marcas temporais. Usa **Exportar ZIP** para guardar os ficheiros verificados num novo ZIP. Por baixo do vídeo, **Como foi feito** mostra cada passo com o feedback que deixaste, onde podes comentar para o agente ler da próxima vez, além das animações usadas e do registo de atividade. **Definições usadas** permite repetir com as definições capturadas ou atuais e mudar o nome do vídeo.
 
 ## Cópia de segurança e restauro
 

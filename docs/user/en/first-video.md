@@ -4,7 +4,7 @@
 
 ## Set up a workspace
 
-Create a workspace and choose the editing agent available on your machine. If you plan to generate subtitles from audio, configure a transcription provider that supplies timestamps. A credential for one provider does not give access to another.
+Create a workspace and choose the editing agent available on your machine. If you plan to generate subtitles from audio, configure a transcription provider that supplies timestamps. A credential for one provider does not give access to another. Each key field has **Where to find it**, which opens the provider's page for creating that key. On first launch, the workspace step also asks where the agent can learn about you: add your channel or website links, and once the workspace exists, **Context** opens with them and the agent drafts your context and suggests profiles to tick.
 
 Each workspace starts with its own icon and color. To change them, or to show an image such as your channel avatar, choose **Customize workspace** in the workspace menu.
 
@@ -24,7 +24,7 @@ Open **Outputs** and check which formats are enabled. Each enabled format needs 
 
 For a guided run, open **Review run** when a stage needs a decision. Check the available script, media, or preview. Stage your decisions and send them when you are ready. If you want a revision, describe the change in the stage’s notes before sending.
 
-At **Assets and animations**, the agent also designs animations for the video, such as a title card, lower thirds or an end card, and Arrumo renders them for you to review. A video started from scratch has no footage, so its preview is a storyboard of animated scenes built from the approved script and animations. Its captions come from the text on screen. If a text-to-speech provider such as ElevenLabs is set up, the storyboard is narrated and its captions follow the narration.
+At **Assets and animations**, the agent also designs animations for the video, such as a title card, lower thirds or an end card, and Arrumo renders them for you to review. A video started from scratch has no footage, so its preview is a storyboard of animated scenes built from the approved script and animations. Its captions come from the text on screen. If a text-to-speech provider such as ElevenLabs is set up, the storyboard is narrated and its captions follow the narration. Decide on each animation with **Approve**, **Ask for changes** (with a note) or **Reject**, and tick **Save to the library when approved** on the ones to keep. When every animation is approved and there is no overall note, the step is approved; otherwise one revision with each decision goes back to the agent. You can also decide on the whole step instead.
 
 Formats that ask for portrait cuts get short vertical videos taken from the approved video, each with its own thumbnails, ready to review with the titles and descriptions.
 
@@ -38,7 +38,7 @@ The desktop verifies the delivery when all enabled formats have managed MP4 and 
 
 ## Open and export the result
 
-Go to **Videos** → **Completed** and open the finished video. Choose an output to preview it or open **Subtitle text** to inspect its cues. Use **Export ZIP** to save the verified delivery files to a new ZIP.
+Go to **Videos** → **Completed** and open the finished video. Choose an output to preview it or open **Subtitle text** to inspect its cues. Use **Export ZIP** to save the verified delivery files to a new ZIP. Below the video, **How it was made** lists each step with any feedback you left, where you can comment so the agent reads it next time, plus the animations used and the activity log. **Settings used** offers a replay with the captured or current settings and lets you rename the video.
 
 ## Back up and restore
 

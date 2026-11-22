@@ -4,7 +4,7 @@
 
 ## Configura un espacio de trabajo
 
-Crea un espacio de trabajo y selecciona el agente de edición disponible en tu equipo. Si vas a generar subtítulos a partir del audio, configura un proveedor de transcripción que devuelva marcas de tiempo. Cada proveedor necesita sus propias credenciales.
+Crea un espacio de trabajo y selecciona el agente de edición disponible en tu equipo. Si vas a generar subtítulos a partir del audio, configura un proveedor de transcripción que devuelva marcas de tiempo. Cada proveedor necesita sus propias credenciales. Cada campo de clave tiene **Dónde encontrarla**, que abre la página del proveedor para crearla. En el primer inicio, el paso del espacio de trabajo también pregunta dónde puede conocerte el agente: añade los enlaces de tu canal o tu web y, cuando el espacio exista, **Contexto** se abre con ellos y el agente redacta tu contexto y sugiere perfiles para que los marques.
 
 Cada espacio de trabajo empieza con su propio icono y color. Para cambiarlos, o para mostrar una imagen como el avatar de tu canal, elige **Personalizar espacio de trabajo** en el menú del espacio de trabajo.
 
@@ -24,7 +24,7 @@ Abre **Salidas** y comprueba qué formatos están activados. Para que la entrega
 
 En una ejecución guiada, abre **Revisar proceso** cuando haya una decisión pendiente. Comprueba el guion, los recursos o la vista previa disponibles. Prepara tus decisiones y envíalas cuando hayas terminado. Si necesitas una revisión, describe el cambio en las notas de la etapa antes de enviarla.
 
-En **Recursos y animaciones**, el agente también diseña animaciones para el vídeo, como un rótulo de título, rótulos inferiores o una tarjeta final, y Arrumo las renderiza para que las revises. Un vídeo empezado desde cero no tiene grabaciones, así que su vista previa es un guion gráfico de escenas animadas creado a partir del guion y las animaciones aprobadas. Sus subtítulos salen del texto en pantalla. Si hay un proveedor de texto a voz configurado, como ElevenLabs, el guion gráfico se narra y sus subtítulos siguen la narración.
+En **Recursos y animaciones**, el agente también diseña animaciones para el vídeo, como un rótulo de título, rótulos inferiores o una tarjeta final, y Arrumo las renderiza para que las revises. Un vídeo empezado desde cero no tiene grabaciones, así que su vista previa es un guion gráfico de escenas animadas creado a partir del guion y las animaciones aprobadas. Sus subtítulos salen del texto en pantalla. Si hay un proveedor de texto a voz configurado, como ElevenLabs, el guion gráfico se narra y sus subtítulos siguen la narración. Decide cada animación con **Aprobar**, **Pedir cambios** (con una nota) o **Rechazar**, y marca **Guardar en la biblioteca al aprobar** en las que quieras conservar. Si apruebas todas y no hay nota general, el paso se aprueba; si no, vuelve al agente una revisión con cada decisión. También puedes decidir sobre todo el paso.
 
 Los formatos que piden cortes verticales reciben vídeos verticales cortos sacados del vídeo aprobado, cada uno con sus miniaturas, listos para revisar con los títulos y las descripciones.
 
@@ -38,7 +38,7 @@ La aplicación de escritorio verifica la entrega cuando todos los formatos activ
 
 ## Abre y exporta el resultado
 
-Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una salida para previsualizarla o abre **Texto de los subtítulos** para consultar sus marcas de tiempo. Usa **Exportar ZIP** para guardar los archivos verificados en un ZIP nuevo.
+Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una salida para previsualizarla o abre **Texto de los subtítulos** para consultar sus marcas de tiempo. Usa **Exportar ZIP** para guardar los archivos verificados en un ZIP nuevo. Debajo del vídeo, **Cómo se hizo** muestra cada paso con los comentarios que dejaste, donde puedes comentar para que el agente lo lea la próxima vez, además de las animaciones usadas y el registro de actividad. **Ajustes usados** ofrece repetirlo con los ajustes capturados o los actuales y permite renombrar el vídeo.
 
 ## Copia de seguridad y restauración
 
