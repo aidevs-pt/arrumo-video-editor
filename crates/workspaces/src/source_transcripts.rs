@@ -165,7 +165,10 @@ pub(crate) fn snap_cut(words: &[TranscriptWord], start: f64, end: f64) -> (f64, 
     if let Some(index) = words.iter().position(|word| word.end > start) {
         let word = &words[index];
         if start > word.start && start - word.start > word.end - start {
-            snapped.0 = word.end;
+            snapped.0 = match words.get(index + 1) {
+                Some(next) if next.start < end => lead(index + 1).max(word.end),
+                _ => word.end,
+            };
         } else if word.start - start < CUT_LEAD_SECONDS && word.start < end {
             snapped.0 = lead(index);
         }
@@ -173,7 +176,10 @@ pub(crate) fn snap_cut(words: &[TranscriptWord], start: f64, end: f64) -> (f64, 
     if let Some(index) = words.iter().rposition(|word| word.start < end) {
         let word = &words[index];
         if end < word.end && word.end - end > end - word.start {
-            snapped.1 = word.start;
+            snapped.1 = match index.checked_sub(1).map(|before| (before, &words[before])) {
+                Some((before, kept)) if kept.end > start => tail(before).min(word.start),
+                _ => word.start,
+            };
         } else if end - word.end < CUT_TAIL_SECONDS && word.end > snapped.0 {
             snapped.1 = tail(index);
         }
@@ -394,9 +400,10 @@ mod tests {
         // The tail padding never reaches the next word.
         let (_, end) = snap_cut(&words, 2.0, 2.92);
         assert!((end - 2.95).abs() < 1e-9);
-        // Edges barely inside a long word drop it rather than keep it.
+        // Edges barely inside a long word drop it, padding from the kept neighbour rather than
+        // sitting on the dropped word's boundary.
         let (start, end) = snap_cut(&words, 5.3, 6.5);
-        assert!((start - 5.36).abs() < 1e-9 && (end - 6.82).abs() < 1e-9);
+        assert!((start - 6.03).abs() < 1e-9 && (end - 6.82).abs() < 1e-9);
         let (_, end) = snap_cut(&words, 2.0, 3.51);
         assert!((end - 3.45).abs() < 1e-9);
     }
