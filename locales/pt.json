@@ -268,7 +268,9 @@
     "previewSaved": "As pré-visualizações passam a {size} px. As execuções já em fila mantêm o tamanho.",
     "previewError": "Não foi possível guardar o tamanho.",
     "appliesTo": "Aplica-se a",
-    "appScope": "Todos os espaços de trabalho"
+    "appScope": "Todos os espaços de trabalho",
+    "backup": "Importar e exportar",
+    "backupIntro": "Faz uma cópia de tudo num ficheiro, ou restaura uma cópia."
   },
   "studio": {
     "videos": "Vídeos",
@@ -1363,5 +1365,30 @@
     "resetApp": "Usar a ordem predefinida",
     "resetWorkspace": "Usar a ordem da app",
     "saveError": "Não foi possível guardar a ordem. Tenta novamente."
+  },
+  "backup": {
+    "exportTitle": "Exportar",
+    "exportBody": "Tudo: definições, espaços de trabalho, perfis, recursos, animações, vídeos terminados e plugins instalados. As chaves de API ficam no cofre de credenciais deste computador.",
+    "checksum": "Cada ficheiro leva uma soma de verificação, por isso uma cópia danificada ou alterada é detetada antes de ser restaurada.",
+    "export": "Exportar .zip",
+    "exporting": "A exportar…",
+    "exported": "Foram guardados {files} ficheiros ({size}).",
+    "exportError": "Não foi possível exportar. Verifica se há espaço livre onde a guardaste e tenta novamente.",
+    "importTitle": "Importar",
+    "importBody": "Restaurar uma cópia substitui tudo o que está aqui, plugins incluídos. O que for substituído fica guardado numa pasta junto aos teus dados.",
+    "choose": "Escolher uma cópia .zip",
+    "checking": "A verificar a cópia…",
+    "confirmTitle": "Substituir tudo por esta cópia?",
+    "confirmBody": "Feita a {date} com o Arrumo {version}: {files} ficheiros, {size}. O Arrumo reinicia para a restaurar.",
+    "keptNote": "Os teus dados atuais são postos de parte, não apagados. As chaves guardadas neste computador continuam a funcionar.",
+    "restart": "Reiniciar e restaurar",
+    "cancel": "Cancelar",
+    "stagedEarlier": "Há uma cópia verificada à espera. Reinicia para a restaurar, ou cancela.",
+    "errors": {
+      "backup_not_arrumo": "Este ficheiro não é uma cópia do Arrumo.",
+      "backup_damaged": "Esta cópia foi alterada ou danificada depois de ser feita, por isso não foi restaurada.",
+      "backup_newer": "Esta cópia precisa de uma versão mais recente do Arrumo. Atualiza o Arrumo e tenta novamente.",
+      "backup_import_failed": "Não foi possível ler a cópia. Verifica se há espaço livre e tenta novamente."
+    }
   }
 }

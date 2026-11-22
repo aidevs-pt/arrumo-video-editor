@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Bot, Gauge, KeyRound, Package, Settings2 } from "lucide-react";
+import { ArrowUpRight, Bot, DatabaseBackup, Gauge, KeyRound, Package, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
@@ -24,6 +24,7 @@ import { PluginCatalog } from "./plugin-catalog";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
 import { AgentCapabilities, ScopedPluginPreferences } from "./plugin-preferences";
+import { BackupSettings } from "./backup-settings";
 
 type AgentPlugin = { id: string; label: string };
 type Settings = {
@@ -36,9 +37,9 @@ const unset = "__inherit__";
 type LoginStatus = "confirmed" | "unconfirmed" | "unavailable" | "timed_out" | "failed";
 
 
-const sections = ["general", "agent", "services", "plugins", "quality"] as const;
+const sections = ["general", "agent", "services", "plugins", "quality", "backup"] as const;
 type Section = (typeof sections)[number];
-const sectionIcons = { general: Settings2, agent: Bot, services: KeyRound, plugins: Package, quality: Gauge };
+const sectionIcons = { general: Settings2, agent: Bot, services: KeyRound, plugins: Package, quality: Gauge, backup: DatabaseBackup };
 
 export function AgentSettingsPage() {
   const { status, workspaces, load } = useWorkspaceCatalog();
@@ -68,6 +69,7 @@ export function AgentSettingsPage() {
     services: [text.services, text.servicesIntro],
     plugins: [text.plugins, text.pluginsIntro],
     quality: [text.quality, text.qualityIntro],
+    backup: [text.backup, text.backupIntro],
   };
 
   return (
@@ -100,6 +102,7 @@ export function AgentSettingsPage() {
             <div className="flex max-w-3xl flex-col gap-6">
               {tab === "general" && <GeneralSettings />}
               {tab === "quality" && <QualitySettings />}
+              {tab === "backup" && <BackupSettings />}
               {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
               {scoped && <div className="flex flex-wrap items-center gap-3">
                 <span id="settings-scope" className="font-semibold">{text.appliesTo}</span>

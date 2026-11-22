@@ -6,6 +6,7 @@ use serde_json::{Map, Value, json};
 use crate::WorkspaceStore;
 
 mod assets;
+mod backup;
 mod generation;
 mod jobs;
 mod motion;
@@ -66,6 +67,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     tools.extend(providers::definitions());
     tools.extend(settings::definitions());
     tools.extend(subtitles::definitions());
+    tools.extend(backup::definitions());
     tools
 }
 
@@ -108,6 +110,7 @@ pub(crate) fn invoke(
             .or_else(|| providers::call(store, name, &arguments))
             .or_else(|| settings::call(store, name, &arguments))
             .or_else(|| subtitles::call(store, database, name, &arguments))
+            .or_else(|| backup::call(store, database, name, &arguments))
             .or_else(|| generation::call(store, database, name, arguments))?,
     })
 }

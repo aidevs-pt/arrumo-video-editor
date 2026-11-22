@@ -17,6 +17,7 @@ mod asset_organization;
 mod asset_plan;
 mod assets;
 mod automatic_subtitles;
+mod backup;
 mod brand_assets;
 mod clip_render;
 mod completed_video;
@@ -86,6 +87,10 @@ pub use agent_run::AgentRunError;
 pub use agent_settings::{AgentProviderSource, AgentSettings};
 pub use asset_organization::AssetOrganization;
 pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
+pub use backup::{
+    BackupManifest, BackupSummary, apply_pending_import, cancel_backup_import,
+    pending_backup_import, stage_backup_import, verify_backup,
+};
 pub use brand_assets::{BrandAsset, BrandAssetRole};
 pub use completed_video::CompletedVideo;
 pub use completed_video_feedback::CompletedVideoFeedback;

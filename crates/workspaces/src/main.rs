@@ -1194,6 +1194,33 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )?;
             println!("{revision}");
         }
+        [database, command, destination] if command == "export-backup" => {
+            let summary = WorkspaceStore::open(Path::new(database))?
+                .export_backup(Path::new(database), Path::new(destination))?;
+            println!("{}", serde_json::to_string(&summary)?);
+        }
+        [_, command, archive] if command == "verify-backup" => {
+            let manifest = arrumo_workspaces::verify_backup(Path::new(archive))?;
+            println!(
+                "{}",
+                serde_json::to_string(&arrumo_workspaces::BackupSummary::from(&manifest))?
+            );
+        }
+        [database, command, archive] if command == "stage-backup-import" => {
+            let summary =
+                arrumo_workspaces::stage_backup_import(Path::new(database), Path::new(archive))?;
+            println!("{}", serde_json::to_string(&summary)?);
+        }
+        [database, command] if command == "cancel-backup-import" => {
+            arrumo_workspaces::cancel_backup_import(Path::new(database))?;
+        }
+        [database, command] if command == "apply-backup-import" => {
+            let kept = arrumo_workspaces::apply_pending_import(Path::new(database))?;
+            println!(
+                "{}",
+                serde_json::json!({"applied": kept.is_some(), "previousData": kept})
+            );
+        }
         [database, command, destination] if command == "snapshot-database" => {
             let snapshot = WorkspaceStore::open(Path::new(database))?
                 .snapshot_database(Path::new(destination))?;

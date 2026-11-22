@@ -268,7 +268,9 @@
     "previewSaved": "Previews now render at {size} px. Runs already queued keep their size.",
     "previewError": "The preview size couldn't be saved.",
     "appliesTo": "Applies to",
-    "appScope": "Every workspace"
+    "appScope": "Every workspace",
+    "backup": "Import and export",
+    "backupIntro": "Back up everything to one file, or restore a backup."
   },
   "studio": {
     "videos": "Videos",
@@ -1363,5 +1365,30 @@
     "resetApp": "Use the default order",
     "resetWorkspace": "Use the app's order",
     "saveError": "Could not save the order. Try again."
+  },
+  "backup": {
+    "exportTitle": "Export",
+    "exportBody": "Everything: settings, workspaces, profiles, assets, animations, finished videos and installed plugins. API keys stay in this computer's credential store.",
+    "checksum": "Each file is listed with a checksum, so a damaged or changed backup is caught before it is restored.",
+    "export": "Export .zip",
+    "exporting": "Exporting…",
+    "exported": "Saved {files} files ({size}).",
+    "exportError": "Could not export. Check there is free space where you saved it and try again.",
+    "importTitle": "Import",
+    "importBody": "Restoring a backup replaces everything here, plugins included. What it replaces is kept in a folder next to your data.",
+    "choose": "Choose a backup .zip",
+    "checking": "Checking the backup…",
+    "confirmTitle": "Replace everything with this backup?",
+    "confirmBody": "Made on {date} with Arrumo {version}: {files} files, {size}. Arrumo restarts to restore it.",
+    "keptNote": "Your current data is moved aside, not deleted. Keys you saved on this computer keep working.",
+    "restart": "Restart and restore",
+    "cancel": "Cancel",
+    "stagedEarlier": "A checked backup is waiting. Restart to restore it, or cancel.",
+    "errors": {
+      "backup_not_arrumo": "This file is not an Arrumo backup.",
+      "backup_damaged": "This backup was changed or damaged after it was made, so it was not restored.",
+      "backup_newer": "This backup needs a newer version of Arrumo. Update Arrumo, then try again.",
+      "backup_import_failed": "Could not read the backup. Check there is free space and try again."
+    }
   }
 }

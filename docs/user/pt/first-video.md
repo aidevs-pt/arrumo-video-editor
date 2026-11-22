@@ -35,3 +35,9 @@ A aplicação de computador verifica a entrega quando todos os formatos ativos t
 ## Abre e exporta o resultado
 
 Vai a **Vídeos** → **Concluídos** e abre o vídeo finalizado. Seleciona uma saída para a pré-visualizar ou abre **Texto das legendas** para consultar as suas marcas temporais. Usa **Exportar ZIP** para guardar os ficheiros verificados num novo ZIP.
+
+## Cópia de segurança e restauro
+
+**Definições › Importar e exportar** guarda tudo (definições, espaços de trabalho, perfis, recursos, animações, vídeos terminados e plugins instalados) num `.zip`. As chaves de API não são incluídas: ficam no cofre de credenciais deste computador, por isso volta a adicioná-las num computador novo.
+
+Para restaurar, escolhe uma cópia no mesmo sítio. O Arrumo verifica primeiro cada ficheiro com as somas da cópia, depois mostra o que contém e pergunta antes de substituir alguma coisa. Reinicia para a restaurar e guarda os dados substituídos numa pasta chamada `workspaces.sqlite.before-import-…` junto aos teus dados, caso precises deles.

@@ -35,3 +35,9 @@ The desktop verifies the delivery when all enabled formats have managed MP4 and 
 ## Open and export the result
 
 Go to **Videos** → **Completed** and open the finished video. Choose an output to preview it or open **Subtitle text** to inspect its cues. Use **Export ZIP** to save the verified delivery files to a new ZIP.
+
+## Back up and restore
+
+**Settings › Import and export** saves everything (settings, workspaces, profiles, assets, animations, finished videos and installed plugins) to one `.zip`. API keys are not included; they stay in this computer's credential store, so add them again on a new computer.
+
+To restore, choose a backup in the same place. Arrumo checks every file against the backup's checksums first, then shows what it contains and asks before replacing anything. It restarts to restore, and keeps the data it replaced in a folder named `workspaces.sqlite.before-import-…` next to your data, in case you need it back.

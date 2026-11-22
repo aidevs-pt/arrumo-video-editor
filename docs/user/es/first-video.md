@@ -35,3 +35,9 @@ La aplicación de escritorio verifica la entrega cuando todos los formatos activ
 ## Abre y exporta el resultado
 
 Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una salida para previsualizarla o abre **Texto de los subtítulos** para consultar sus marcas de tiempo. Usa **Exportar ZIP** para guardar los archivos verificados en un ZIP nuevo.
+
+## Copia de seguridad y restauración
+
+**Ajustes › Importar y exportar** guarda todo (ajustes, espacios de trabajo, perfiles, recursos, animaciones, vídeos terminados y plugins instalados) en un `.zip`. Las claves de API no se incluyen: se quedan en el almacén de credenciales de este equipo, así que vuelve a añadirlas en un equipo nuevo.
+
+Para restaurar, elige una copia en el mismo sitio. Arrumo comprueba primero cada archivo con las sumas de la copia, después muestra lo que contiene y pregunta antes de reemplazar nada. Se reinicia para restaurarla y guarda los datos reemplazados en una carpeta llamada `workspaces.sqlite.before-import-…` junto a tus datos, por si los necesitas.

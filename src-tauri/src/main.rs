@@ -12,6 +12,7 @@ use arrumo_workspaces::{
 use tauri::{AppHandle, Manager, State};
 
 mod agent_settings;
+mod backup;
 mod completed_video;
 mod delivery_stream;
 mod desktop_job_workers;
@@ -927,6 +928,10 @@ fn main() {
             let data_dir: PathBuf = app.path().app_local_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("workspaces.sqlite");
+            // A restored backup replaces the data before anything opens it.
+            if let Err(error) = arrumo_workspaces::apply_pending_import(&database) {
+                eprintln!("Arrumo could not restore the staged backup: {error}");
+            }
             app.manage(Mutex::new(WorkspaceStore::open(&database)?));
             app.manage(desktop_job_workers::DesktopJobWorkers::start(
                 app.handle().clone(),
@@ -989,6 +994,11 @@ fn main() {
             plugin_settings::invoke_reviewed_plugin_action,
             plugin_settings::list_provider_preferences,
             plugin_settings::write_provider_preferences,
+            backup::export_backup,
+            backup::stage_backup_import,
+            backup::pending_backup_import,
+            backup::cancel_backup_import,
+            backup::restart_to_restore,
             plugin_settings::list_plugin_surfaces,
             plugin_settings::read_plugin_surface_context,
             plugin_settings::list_plugin_context_requests,
