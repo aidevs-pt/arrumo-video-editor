@@ -44,9 +44,10 @@ struct VideoAdapter {
     /// Schema 2: which of `models` to use, from a plugin setting or this default.
     #[serde(default)]
     model: Option<ModelChoice>,
-    /// Schema 2: each model's request variants, picked by the reference media supplied.
+    /// Schema 2: each model's request variants, picked by the reference media supplied. Schema 3
+    /// models may also carry a label and what they are best for.
     #[serde(default)]
-    models: Option<BTreeMap<String, Vec<Variant>>>,
+    models: Option<BTreeMap<String, ModelEntry>>,
     /// Schema 2: how reference media reach the provider.
     #[serde(default)]
     upload: Option<UploadDescriptor>,
@@ -59,6 +60,26 @@ struct ModelChoice {
     setting: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ModelEntry {
+    Variants(Vec<Variant>),
+    #[serde(rename_all = "camelCase")]
+    Described {
+        label: String,
+        best_for: crate::provider_media::Localized,
+        variants: Vec<Variant>,
+    },
+}
+
+impl ModelEntry {
+    fn variants(&self) -> &[Variant] {
+        match self {
+            ModelEntry::Variants(variants) | ModelEntry::Described { variants, .. } => variants,
+        }
+    }
+}
+
 /// One way to call a model, for a number of reference images and videos (none when absent).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -67,9 +88,11 @@ struct Variant {
     /// Absent when the output follows the reference image's shape.
     #[serde(default)]
     aspect_ratios: Option<BTreeMap<String, String>>,
-    durations: Durations,
+    /// Schema 3: absent when the clip follows its reference video's length.
+    #[serde(default)]
+    durations: Option<Durations>,
     /// The JSON body; besides the schema 1 placeholders, `{image}` and `{video}` take the first
-    /// reference's address and `{images}` and `{videos}` the list.
+    /// reference's address, `{lastImage}` the second image and `{images}` and `{videos}` the list.
     request: Value,
     #[serde(default)]
     images: Option<Range>,
@@ -98,7 +121,7 @@ impl Variant {
 struct Call<'a> {
     endpoint: &'a str,
     aspect_ratios: Option<&'a BTreeMap<String, String>>,
-    durations: &'a Durations,
+    durations: Option<&'a Durations>,
     request: &'a Value,
 }
 
@@ -108,6 +131,39 @@ struct Durations {
     min: u32,
     max: u32,
     default: u32,
+    /// Schema 3: the only lengths the model takes.
+    #[serde(default)]
+    allowed: Option<Vec<u32>>,
+}
+
+impl Durations {
+    fn valid(&self, schema_version: u32) -> bool {
+        (1..=60).contains(&self.min)
+            && self.min <= self.default
+            && self.default <= self.max
+            && self.max <= 60
+            && self.allowed.as_ref().is_none_or(|allowed| {
+                schema_version >= 3
+                    && (1..=16).contains(&allowed.len())
+                    && allowed.contains(&self.default)
+                    && allowed
+                        .iter()
+                        .all(|seconds| (self.min..=self.max).contains(seconds))
+            })
+    }
+
+    /// The asked length, or the default, moved to the nearest length the model takes.
+    fn pick(&self, asked: Option<u32>) -> u32 {
+        let asked = asked.unwrap_or(self.default).clamp(self.min, self.max);
+        match &self.allowed {
+            Some(allowed) => allowed
+                .iter()
+                .copied()
+                .min_by_key(|seconds| (seconds.abs_diff(asked), *seconds))
+                .unwrap_or(self.default),
+            None => asked,
+        }
+    }
 }
 
 fn invalid_adapter() -> io::Error {
@@ -131,7 +187,7 @@ fn uses(value: &Value, placeholder: &str) -> bool {
     }
 }
 
-fn valid_variant(variant: &Variant, endpoint: &str) -> bool {
+fn valid_variant(variant: &Variant, endpoint: &str, schema_version: u32) -> bool {
     let range_ok = |range: &Option<Range>, single: &str, list: &str, most: usize| match range {
         None => !uses(&variant.request, single) && !uses(&variant.request, list),
         Some(range) => {
@@ -139,10 +195,23 @@ fn valid_variant(variant: &Variant, endpoint: &str) -> bool {
                 && range.max <= most
                 && range.max > 0
                 && (uses(&variant.request, list)
-                    || (range.max == 1 && uses(&variant.request, single)))
+                    || (range.max == 1 && uses(&variant.request, single))
+                    || (single == "{image}"
+                        && range.max == 2
+                        && uses(&variant.request, single)
+                        && uses(&variant.request, "{lastImage}")))
         }
     };
-    let durations = &variant.durations;
+    let last_image_ok = !uses(&variant.request, "{lastImage}")
+        || schema_version >= 3 && variant.images.as_ref().is_some_and(|range| range.max == 2);
+    let durations_ok = match &variant.durations {
+        Some(durations) => durations.valid(schema_version),
+        None => {
+            schema_version >= 3
+                && variant.videos.as_ref().is_some_and(|range| range.min > 0)
+                && !uses(&variant.request, "{duration}")
+        }
+    };
     safe_https(&variant.endpoint)
         && host(&variant.endpoint) == host(endpoint)
         && !variant.endpoint.contains('?')
@@ -155,11 +224,11 @@ fn valid_variant(variant: &Variant, endpoint: &str) -> bool {
                 })
         })
         && (variant.aspect_ratios.is_some()
-            || variant.images.as_ref().is_some_and(|range| range.min > 0))
-        && (1..=60).contains(&durations.min)
-        && durations.min <= durations.default
-        && durations.default <= durations.max
-        && durations.max <= 60
+            || variant.images.as_ref().is_some_and(|range| range.min > 0)
+            || variant.videos.as_ref().is_some_and(|range| range.min > 0))
+        && durations_ok
+        && last_image_ok
+        && uses(&variant.request, "{prompt}")
         && range_ok(
             &variant.images,
             "{image}",
@@ -180,7 +249,7 @@ fn valid_models(adapter: &VideoAdapter, manifest: &crate::PluginManifest) -> boo
         (None, None) => adapter.upload.is_none(),
         (Some(choice), Some(models)) => {
             let ids_ok = !models.is_empty()
-                && models.len() <= 32
+                && models.len() <= 64
                 && models.keys().all(|id| valid_model_id(id))
                 && models.contains_key(&choice.default);
             let setting_ok = choice.setting.as_ref().is_none_or(|id| {
@@ -194,16 +263,28 @@ fn valid_models(adapter: &VideoAdapter, manifest: &crate::PluginManifest) -> boo
             });
             let referenced = models
                 .values()
-                .flatten()
+                .flat_map(ModelEntry::variants)
                 .any(|variant| variant.images.is_some() || variant.videos.is_some());
             ids_ok
                 && setting_ok
-                && models.values().all(|variants| {
-                    !variants.is_empty()
+                && models.values().all(|model| {
+                    let variants = model.variants();
+                    let described_ok = match model {
+                        ModelEntry::Variants(_) => true,
+                        ModelEntry::Described {
+                            label, best_for, ..
+                        } => {
+                            adapter.schema_version >= 3
+                                && (1..=64).contains(&label.chars().count())
+                                && best_for.valid(240)
+                        }
+                    };
+                    described_ok
+                        && !variants.is_empty()
                         && variants.len() <= 4
-                        && variants
-                            .iter()
-                            .all(|variant| valid_variant(variant, &adapter.endpoint))
+                        && variants.iter().all(|variant| {
+                            valid_variant(variant, &adapter.endpoint, adapter.schema_version)
+                        })
                 })
                 && (!referenced
                     || adapter
@@ -227,9 +308,8 @@ fn valid(adapter: &VideoAdapter, manifest: &crate::PluginManifest) -> bool {
                 && !value.is_empty()
                 && value.len() <= 32
         });
-    let durations = &adapter.durations;
     (adapter.schema_version == 1 && adapter.model.is_none() && adapter.models.is_none()
-        || adapter.schema_version == 2 && valid_models(adapter, manifest))
+        || matches!(adapter.schema_version, 2 | 3) && valid_models(adapter, manifest))
         && adapter.plugin_id == manifest.id
         && manifest.capabilities.contains_key("video-generation")
         && has_secret
@@ -237,10 +317,7 @@ fn valid(adapter: &VideoAdapter, manifest: &crate::PluginManifest) -> bool {
         && safe_https(&adapter.endpoint)
         && !adapter.endpoint.contains('?')
         && ratios_ok
-        && (1..=60).contains(&durations.min)
-        && durations.min <= durations.default
-        && durations.default <= durations.max
-        && durations.max <= 60
+        && adapter.durations.valid(adapter.schema_version)
         && (2..=60).contains(&adapter.poll_seconds)
         && (60..=3600).contains(&adapter.timeout_seconds)
         && (1..=500 * 1024 * 1024).contains(&adapter.max_video_bytes)
@@ -270,7 +347,7 @@ fn video_adapter(plugin_id: &str) -> io::Result<Option<VideoAdapter>> {
 struct Inputs<'a> {
     prompt: &'a str,
     ratio: &'a str,
-    duration: u32,
+    duration: Option<u32>,
     images: &'a [String],
     videos: &'a [String],
 }
@@ -284,8 +361,9 @@ fn fill(template: &Value, inputs: &Inputs) -> Option<Value> {
         Value::String(text) => match text.as_str() {
             "{prompt}" => Some(Value::String(inputs.prompt.to_owned())),
             "{aspectRatio}" => Some(Value::String(inputs.ratio.to_owned())),
-            "{duration}" => Some(Value::from(inputs.duration)),
+            "{duration}" => inputs.duration.map(Value::from),
             "{image}" => first(inputs.images),
+            "{lastImage}" => inputs.images.get(1).map(|url| Value::String(url.clone())),
             "{video}" => first(inputs.videos),
             "{images}" => list(inputs.images),
             "{videos}" => list(inputs.videos),
@@ -395,6 +473,11 @@ fn clip_stem(prompt: &str) -> String {
 pub struct VideoModel {
     pub provider: String,
     pub id: String,
+    /// The model's name; empty when the descriptor gives none.
+    pub label: String,
+    /// When to choose it, per app language; absent when the descriptor gives none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub best_for: Option<crate::provider_media::Localized>,
     /// The one used when no model is named: the plugin setting, else the descriptor default.
     pub selected: bool,
     pub variants: Vec<VideoVariant>,
@@ -406,8 +489,11 @@ pub struct VideoVariant {
     /// Inclusive reference counts; `[0, 0]` takes none.
     pub images: [usize; 2],
     pub videos: [usize; 2],
+    /// Both 0 when the clip follows the reference video's length.
     pub min_seconds: u32,
     pub max_seconds: u32,
+    /// The only lengths it takes; empty when any length from min to max works.
+    pub allowed_seconds: Vec<u32>,
     /// Empty when the output follows the reference image's shape.
     pub aspect_ratios: Vec<String>,
 }
@@ -459,18 +545,32 @@ impl WorkspaceStore {
             let selected = self.video_model(&adapter, workspace_id, None);
             match &adapter.models {
                 Some(models) => {
-                    for (id, variants) in models {
+                    for (id, model) in models {
+                        let (label, best_for) = match model {
+                            ModelEntry::Described {
+                                label, best_for, ..
+                            } => (label.clone(), Some(best_for.clone())),
+                            ModelEntry::Variants(_) => (String::new(), None),
+                        };
                         listed.push(VideoModel {
                             provider: plugin.clone(),
                             id: id.clone(),
+                            label,
+                            best_for,
                             selected: selected.as_deref() == Some(id.as_str()),
-                            variants: variants
+                            variants: model
+                                .variants()
                                 .iter()
                                 .map(|variant| VideoVariant {
                                     images: range(&variant.images),
                                     videos: range(&variant.videos),
-                                    min_seconds: variant.durations.min,
-                                    max_seconds: variant.durations.max,
+                                    min_seconds: variant.durations.as_ref().map_or(0, |d| d.min),
+                                    max_seconds: variant.durations.as_ref().map_or(0, |d| d.max),
+                                    allowed_seconds: variant
+                                        .durations
+                                        .as_ref()
+                                        .and_then(|d| d.allowed.clone())
+                                        .unwrap_or_default(),
                                     aspect_ratios: variant
                                         .aspect_ratios
                                         .as_ref()
@@ -484,12 +584,15 @@ impl WorkspaceStore {
                 None => listed.push(VideoModel {
                     provider: plugin.clone(),
                     id: String::new(),
+                    label: String::new(),
+                    best_for: None,
                     selected: true,
                     variants: vec![VideoVariant {
                         images: [0, 0],
                         videos: [0, 0],
                         min_seconds: adapter.durations.min,
                         max_seconds: adapter.durations.max,
+                        allowed_seconds: adapter.durations.allowed.clone().unwrap_or_default(),
                         aspect_ratios: adapter.aspect_ratios.keys().cloned().collect(),
                     }],
                 }),
@@ -558,13 +661,17 @@ impl WorkspaceStore {
             let call = match (&chosen, &adapter.models) {
                 (Some(id), Some(models)) => {
                     let Some(variant) = models[id]
+                        .variants()
                         .iter()
                         .find(|variant| variant.takes(images, videos))
                     else {
                         let fitting: Vec<_> = models
                             .iter()
-                            .filter(|(_, variants)| {
-                                variants.iter().any(|variant| variant.takes(images, videos))
+                            .filter(|(_, model)| {
+                                model
+                                    .variants()
+                                    .iter()
+                                    .any(|variant| variant.takes(images, videos))
                             })
                             .map(|(id, _)| id.clone())
                             .collect();
@@ -584,7 +691,7 @@ impl WorkspaceStore {
                     Call {
                         endpoint: &variant.endpoint,
                         aspect_ratios: variant.aspect_ratios.as_ref(),
-                        durations: &variant.durations,
+                        durations: variant.durations.as_ref(),
                         request: &variant.request,
                     }
                 }
@@ -596,7 +703,7 @@ impl WorkspaceStore {
                 _ => Call {
                     endpoint: &adapter.endpoint,
                     aspect_ratios: Some(&adapter.aspect_ratios),
-                    durations: &adapter.durations,
+                    durations: Some(&adapter.durations),
                     request: &adapter.request,
                 },
             };
@@ -612,9 +719,7 @@ impl WorkspaceStore {
             else {
                 continue;
             };
-            let duration = duration
-                .unwrap_or(call.durations.default)
-                .clamp(call.durations.min, call.durations.max);
+            let duration = call.durations.map(|durations| durations.pick(duration));
             let attempt = (|| {
                 let (header, value) = credential(&adapter, &secret)?;
                 let mut image_urls = Vec::new();
@@ -695,6 +800,7 @@ mod tests {
         let models = adapter.models.as_ref().expect("schema 2 models");
         let pick = |model: &str, images, videos| {
             models[model]
+                .variants()
                 .iter()
                 .find(|variant| variant.takes(images, videos))
                 .map(|variant| variant.endpoint.rsplit('/').next().unwrap().to_owned())
@@ -707,17 +813,40 @@ mod tests {
             pick("kling-3.0-pro", 1, 0).as_deref(),
             Some("image-to-video")
         );
-        assert_eq!(pick("kling-3.0-std", 2, 0), None);
         assert_eq!(pick("kling-3.0-std", 0, 1), None);
-        assert_eq!(pick("seedance-2.0", 0, 0), None);
         assert_eq!(
-            pick("seedance-2.0", 3, 1).as_deref(),
+            pick("kling-3.0-pro", 2, 0).as_deref(),
+            Some("image-to-video")
+        );
+        assert_eq!(pick("seedance-2.0", 0, 0).as_deref(), Some("text-to-video"));
+        assert_eq!(
+            pick("seedance-2.0", 1, 0).as_deref(),
+            Some("image-to-video")
+        );
+        assert_eq!(pick("seedance-2.0", 3, 0), None);
+        assert_eq!(
+            pick("seedance-2.0-reference", 3, 1).as_deref(),
             Some("reference-to-video")
         );
         assert_eq!(
-            pick("seedance-2.0", 0, 2).as_deref(),
+            pick("seedance-2.0-reference", 0, 2).as_deref(),
             Some("reference-to-video")
         );
+        assert_eq!(pick("kling-3.0-motion-pro", 1, 1).as_deref(), Some("pro"));
+        assert_eq!(pick("kling-3.0-motion-pro", 1, 0), None);
+        assert_eq!(
+            pick("seedance-2.5-extend", 0, 1).as_deref(),
+            Some("video-extend")
+        );
+        for (id, model) in models {
+            let ModelEntry::Described {
+                label, best_for, ..
+            } = model
+            else {
+                panic!("{id} has no label");
+            };
+            assert!(!label.is_empty() && best_for.es.is_some() && best_for.pt.is_some());
+        }
         assert!(adapter.upload.is_some());
     }
 
@@ -733,7 +862,7 @@ mod tests {
             &Inputs {
                 prompt: "Waves",
                 ratio: "16:9",
-                duration: 5,
+                duration: Some(5),
                 images: &images,
                 videos: &[],
             },
@@ -755,29 +884,68 @@ mod tests {
             "request": {"prompt": "{prompt}", "image_url": "{image}"},
             "images": {"min": 1, "max": 1}
         }));
-        assert!(valid_variant(&ok, base));
-        assert!(!valid_variant(&ok, "https://other.example.com/model"));
+        assert!(valid_variant(&ok, base, 2));
+        assert!(!valid_variant(&ok, "https://other.example.com/model", 2));
         let unused = variant(serde_json::json!({
             "endpoint": "https://api.example.com/model/i2v",
             "durations": {"min": 3, "max": 10, "default": 5},
             "request": {"prompt": "{prompt}"},
             "images": {"min": 1, "max": 4}
         }));
-        assert!(!valid_variant(&unused, base));
+        assert!(!valid_variant(&unused, base, 2));
         let stray = variant(serde_json::json!({
             "endpoint": "https://api.example.com/model/t2v",
             "aspectRatios": {"16:9": "16:9"},
             "durations": {"min": 3, "max": 10, "default": 5},
             "request": {"prompt": "{prompt}", "video_urls": "{videos}"}
         }));
-        assert!(!valid_variant(&stray, base));
+        assert!(!valid_variant(&stray, base, 2));
+        let frames = variant(serde_json::json!({
+            "endpoint": "https://api.example.com/model/i2v",
+            "durations": {"min": 3, "max": 10, "default": 5},
+            "request": {"prompt": "{prompt}", "image_url": "{image}", "last_image_url": "{lastImage}"},
+            "images": {"min": 1, "max": 2}
+        }));
+        assert!(valid_variant(&frames, base, 3));
+        assert!(!valid_variant(&frames, base, 2));
+        let edit = variant(serde_json::json!({
+            "endpoint": "https://api.example.com/model/edit",
+            "request": {"prompt": "{prompt}", "video_url": "{video}"},
+            "videos": {"min": 1, "max": 1}
+        }));
+        assert!(valid_variant(&edit, base, 3));
+        assert!(!valid_variant(&edit, base, 2));
+        let timed_edit = variant(serde_json::json!({
+            "endpoint": "https://api.example.com/model/edit",
+            "request": {"prompt": "{prompt}", "video_url": "{video}", "duration": "{duration}"},
+            "videos": {"min": 1, "max": 1}
+        }));
+        assert!(!valid_variant(&timed_edit, base, 3));
+    }
+
+    #[test]
+    fn lengths_move_to_the_nearest_one_the_model_takes() {
+        let durations: Durations = serde_json::from_value(
+            serde_json::json!({"min": 5, "max": 10, "default": 5, "allowed": [5, 10]}),
+        )
+        .unwrap();
+        assert!(durations.valid(3));
+        assert!(!durations.valid(2));
+        assert_eq!(durations.pick(None), 5);
+        assert_eq!(durations.pick(Some(8)), 10);
+        assert_eq!(durations.pick(Some(7)), 5);
+        assert_eq!(durations.pick(Some(30)), 10);
+        let open: Durations =
+            serde_json::from_value(serde_json::json!({"min": 3, "max": 15, "default": 5})).unwrap();
+        assert_eq!(open.pick(Some(8)), 8);
+        assert_eq!(open.pick(Some(1)), 3);
     }
 
     #[test]
     fn templates_send_the_duration_as_a_number() {
         let body = fill(
             &serde_json::json!({"prompt": "{prompt}", "duration": "{duration}", "aspect_ratio": "{aspectRatio}", "sound": "off", "last_image_url": "{video}"}),
-            &Inputs { prompt: "Waves", ratio: "16:9", duration: 5, images: &[], videos: &[] },
+            &Inputs { prompt: "Waves", ratio: "16:9", duration: Some(5), images: &[], videos: &[] },
         )
         .unwrap();
         assert_eq!(

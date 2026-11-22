@@ -364,3 +364,23 @@ mod tests {
         );
     }
 }
+
+/// A provider descriptor's line in each app language; `en` is used when one is missing.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Localized {
+    pub en: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub es: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pt: Option<String>,
+}
+
+impl Localized {
+    pub(crate) fn valid(&self, most: usize) -> bool {
+        [Some(&self.en), self.es.as_ref(), self.pt.as_ref()]
+            .into_iter()
+            .flatten()
+            .all(|text| (1..=most).contains(&text.chars().count()) && !text.contains(['\0', '\n']))
+    }
+}

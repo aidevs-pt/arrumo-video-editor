@@ -44,6 +44,48 @@ struct ImageAdapter {
     /// Schema 2: how reference images are uploaded for `urls` references.
     #[serde(default)]
     upload: Option<crate::provider_media::UploadDescriptor>,
+    /// Schema 3: named models, each with its own endpoint, ratios, request and references.
+    #[serde(default)]
+    models: Option<BTreeMap<String, ImageModelSpec>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ImageModelSpec {
+    label: String,
+    best_for: crate::provider_media::Localized,
+    endpoint: String,
+    aspect_ratios: BTreeMap<String, String>,
+    request: Value,
+    #[serde(default)]
+    references: Option<ReferenceInput>,
+}
+
+/// Where and how one model is asked: the adapter's own fields, or a schema 3 model's.
+struct ImageCall<'a> {
+    endpoint: &'a str,
+    aspect_ratios: &'a BTreeMap<String, String>,
+    request: &'a Value,
+    references: Option<&'a ReferenceInput>,
+}
+
+impl ImageAdapter {
+    fn call(&self, model: &str) -> ImageCall<'_> {
+        match self.models.as_ref().and_then(|models| models.get(model)) {
+            Some(spec) => ImageCall {
+                endpoint: &spec.endpoint,
+                aspect_ratios: &spec.aspect_ratios,
+                request: &spec.request,
+                references: spec.references.as_ref(),
+            },
+            None => ImageCall {
+                endpoint: &self.endpoint,
+                aspect_ratios: &self.aspect_ratios,
+                request: &self.request,
+                references: self.references.as_ref(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,6 +124,9 @@ enum ReferenceInput {
         endpoint: String,
         field: String,
         max_images: usize,
+        /// Schema 3: the first address goes as a string, for providers that take one image.
+        #[serde(default)]
+        single: bool,
     },
 }
 
@@ -94,7 +139,24 @@ pub(crate) enum ReferenceUse {
     Follow,
 }
 
+/// A named image model a provider offers.
+#[derive(Debug, Clone, serde::Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageModel {
+    pub provider: String,
+    pub id: String,
+    pub label: String,
+    /// When to choose it, per app language.
+    pub best_for: crate::provider_media::Localized,
+    /// The one used when no model is named: the plugin setting, else the descriptor default.
+    pub selected: bool,
+    /// How many reference images it takes; 0 when none.
+    pub references: usize,
+    pub aspect_ratios: Vec<String>,
+}
+
 /// A generated image stored as a workspace asset.
+#[derive(Debug)]
 pub struct GeneratedAsset {
     pub id: i64,
     pub provider: String,
@@ -117,8 +179,8 @@ fn same_host(first: &str, second: &str) -> bool {
     host(first).is_some() && host(first) == host(second)
 }
 
-fn valid_references(adapter: &ImageAdapter) -> bool {
-    match &adapter.references {
+fn valid_references(adapter: &ImageAdapter, call: &ImageCall) -> bool {
+    match call.references {
         None => true,
         Some(ReferenceInput::Multipart {
             endpoint,
@@ -138,8 +200,10 @@ fn valid_references(adapter: &ImageAdapter) -> bool {
             endpoint,
             field,
             max_images,
+            single,
         }) => {
-            same_host(endpoint, &adapter.endpoint)
+            (!single || adapter.schema_version >= 3 && *max_images == 1)
+                && same_host(endpoint, &adapter.endpoint)
                 && !endpoint.contains(['?', '#', '@'])
                 && !endpoint.contains("/../")
                 && (1..=64).contains(&field.len())
@@ -157,10 +221,7 @@ fn valid_references(adapter: &ImageAdapter) -> bool {
         }) => {
             pointer.starts_with('/')
                 && pointer.len() <= 256
-                && adapter
-                    .request
-                    .pointer(pointer)
-                    .is_some_and(Value::is_array)
+                && call.request.pointer(pointer).is_some_and(Value::is_array)
                 && uses(item, "{imageBase64}")
                 && serde_json::to_vec(item).is_ok_and(|bytes| bytes.len() <= 2048)
                 && (1..=8).contains(max_images)
@@ -234,8 +295,44 @@ fn image_adapter(plugin_id: &str) -> io::Result<Option<ImageAdapter>> {
                 && adapter.upload.is_none()
                 && !matches!(adapter.references, Some(ReferenceInput::Urls { .. }))
         }
-        2 => true,
+        2 => adapter.models.is_none(),
+        3 => true,
         _ => false,
+    };
+    let valid_call = |call: &ImageCall| {
+        ["16:9", "9:16", "1:1"]
+            .iter()
+            .all(|ratio| call.aspect_ratios.contains_key(*ratio))
+            && call.aspect_ratios.len() <= 16
+            && call.endpoint.starts_with("https://")
+            && same_host(call.endpoint, &adapter.endpoint)
+            && !call.endpoint.contains(['?', '#', '@'])
+            && !call.endpoint.contains("/../")
+            && serde_json::to_vec(call.request).is_ok_and(|body| body.len() <= MAX_TEMPLATE_BYTES)
+            && uses(call.request, "{prompt}")
+            && valid_references(&adapter, call)
+    };
+    let models_ok = match &adapter.models {
+        None => true,
+        Some(models) => {
+            let setting_choices_ok = adapter.model.setting.as_ref().is_none_or(|id| {
+                manifest.settings.iter().flatten().any(|setting| {
+                    &setting.id == id
+                        && setting.choices.as_ref().is_some_and(|choices| {
+                            choices.iter().all(|choice| models.contains_key(choice))
+                        })
+                })
+            });
+            (1..=64).contains(&models.len())
+                && models.contains_key(&adapter.model.default)
+                && setting_choices_ok
+                && models.iter().all(|(id, spec)| {
+                    valid_model(id)
+                        && (1..=64).contains(&spec.label.chars().count())
+                        && spec.best_for.valid(240)
+                        && valid_call(&adapter.call(id))
+                })
+        }
     };
     let mode_ok = match &adapter.job {
         Some(job) => {
@@ -247,6 +344,7 @@ fn image_adapter(plugin_id: &str) -> io::Result<Option<ImageAdapter>> {
         None => adapter.response.is_some(),
     };
     if !schema_ok
+        || !models_ok
         || !mode_ok
         || adapter.plugin_id != manifest.id
         || !manifest.capabilities.contains_key("image-generation")
@@ -255,15 +353,7 @@ fn image_adapter(plugin_id: &str) -> io::Result<Option<ImageAdapter>> {
         || !valid_model(&adapter.model.default)
         || !matches!(adapter.credential_prefix.as_str(), "" | "Bearer " | "Key ")
         || !(1..=20 * 1024 * 1024).contains(&adapter.max_image_bytes)
-        || !["16:9", "9:16", "1:1"]
-            .iter()
-            .all(|ratio| adapter.aspect_ratios.contains_key(*ratio))
-        || !adapter.endpoint.starts_with("https://")
-        || adapter.endpoint.contains(['?', '#', '@'])
-        || adapter.endpoint.contains("/../")
-        || serde_json::to_vec(&adapter.request).map_or(true, |body| body.len() > MAX_TEMPLATE_BYTES)
-        || !uses(&adapter.request, "{prompt}")
-        || !valid_references(&adapter)
+        || !valid_call(&adapter.call(""))
     {
         return Err(invalid_adapter());
     }
@@ -343,24 +433,82 @@ fn credential_header(
 }
 
 impl WorkspaceStore {
-    fn image_model(&self, adapter: &ImageAdapter, workspace_id: i64) -> String {
-        adapter
-            .model
-            .setting
-            .as_ref()
-            .and_then(|id| {
-                self.plugin_settings(&adapter.plugin_id, Some(workspace_id))
-                    .ok()?
-                    .remove(id)
+    /// The caller's model when the adapter names it, then the plugin setting's, then the default.
+    fn image_model(
+        &self,
+        adapter: &ImageAdapter,
+        workspace_id: i64,
+        requested: Option<&str>,
+    ) -> String {
+        let known = |model: &String| {
+            valid_model(model)
+                && adapter
+                    .models
+                    .as_ref()
+                    .is_none_or(|models| models.contains_key(model))
+        };
+        requested
+            .map(str::to_owned)
+            .filter(|model| adapter.models.is_some() && known(model))
+            .or_else(|| {
+                adapter
+                    .model
+                    .setting
+                    .as_ref()
+                    .and_then(|id| {
+                        self.plugin_settings(&adapter.plugin_id, Some(workspace_id))
+                            .ok()?
+                            .remove(id)
+                    })
+                    .and_then(|setting| setting.effective)
+                    .and_then(|value| value.as_str().map(str::trim).map(str::to_owned))
+                    .filter(known)
             })
-            .and_then(|setting| setting.effective)
-            .and_then(|value| value.as_str().map(str::trim).map(str::to_owned))
-            .filter(|model| valid_model(model))
             .unwrap_or_else(|| adapter.model.default.clone())
+    }
+
+    /// The named models of each image provider on for this workspace, in provider order.
+    /// Providers without schema 3 models are left out.
+    pub fn image_models(&self, workspace_id: i64) -> Result<Vec<ImageModel>, Box<dyn Error>> {
+        let order = self
+            .capture_provider_orders(workspace_id, &BTreeMap::new())?
+            .get("image-generation")
+            .map(|order| order.effective.clone())
+            .unwrap_or_default();
+        let mut listed = Vec::new();
+        for plugin in order {
+            let Some(adapter) = image_adapter(&plugin)? else {
+                continue;
+            };
+            let Some(models) = &adapter.models else {
+                continue;
+            };
+            let selected = self.image_model(&adapter, workspace_id, None);
+            for (id, spec) in models {
+                listed.push(ImageModel {
+                    provider: plugin.clone(),
+                    id: id.clone(),
+                    label: spec.label.clone(),
+                    best_for: spec.best_for.clone(),
+                    selected: *id == selected,
+                    references: match &spec.references {
+                        Some(
+                            ReferenceInput::Multipart { max_images, .. }
+                            | ReferenceInput::Json { max_images, .. }
+                            | ReferenceInput::Urls { max_images, .. },
+                        ) => *max_images,
+                        None => 0,
+                    },
+                    aspect_ratios: spec.aspect_ratios.keys().cloned().collect(),
+                });
+            }
+        }
+        Ok(listed)
     }
 
     /// Asks each provider in `order` until one returns an image. Providers without an adapter or
     /// a configured key are skipped.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn generate_image(
         &self,
         workspace_id: i64,
@@ -369,6 +517,7 @@ impl WorkspaceStore {
         aspect_ratio: &str,
         references: &[ReferencePicture],
         reference_use: ReferenceUse,
+        model: Option<&str>,
     ) -> io::Result<GeneratedImage> {
         let prompt = prompt.trim();
         if prompt.is_empty()
@@ -398,12 +547,14 @@ impl WorkspaceStore {
                 }
                 continue;
             };
+            let model = self.image_model(&adapter, workspace_id, model);
+            let call = adapter.call(&model);
             // Other ratios are drawn at the nearest one every adapter maps, then cropped.
-            let Some(ratio) = adapter.aspect_ratios.get(aspect_ratio).or_else(|| {
-                adapter
-                    .aspect_ratios
-                    .get(nearest_mapped_ratio(aspect_ratio))
-            }) else {
+            let Some(ratio) = call
+                .aspect_ratios
+                .get(aspect_ratio)
+                .or_else(|| call.aspect_ratios.get(nearest_mapped_ratio(aspect_ratio)))
+            else {
                 continue;
             };
             let Some(secret) =
@@ -411,12 +562,11 @@ impl WorkspaceStore {
             else {
                 continue;
             };
-            let model = self.image_model(&adapter, workspace_id);
             // Images are cropped to the exact ratio afterwards, so nothing important may touch the edges.
             let framed = format!(
                 "{prompt}\n\nThe final image is cropped to {aspect_ratio}: keep all text and the main subject well inside the frame, away from every edge."
             );
-            let attached = match &adapter.references {
+            let attached = match call.references {
                 Some(
                     ReferenceInput::Multipart { max_images, .. }
                     | ReferenceInput::Json { max_images, .. }
@@ -425,8 +575,17 @@ impl WorkspaceStore {
                 None => &[][..],
             };
             let result = if attached.is_empty() {
-                request_image(&client, &adapter, &model, ratio, &framed, &secret, &[])
-                    .map(|image| (image, 0))
+                request_image(
+                    &client,
+                    &adapter,
+                    &call,
+                    &model,
+                    ratio,
+                    &framed,
+                    &secret,
+                    &[],
+                )
+                .map(|image| (image, 0))
             } else {
                 let guided = match reference_use {
                     ReferenceUse::Style => format!(
@@ -437,12 +596,23 @@ impl WorkspaceStore {
                     ),
                 };
                 // A provider that refuses the references still gets a plain request.
-                request_image(&client, &adapter, &model, ratio, &guided, &secret, attached)
-                    .map(|image| (image, attached.len()))
-                    .or_else(|_| {
-                        request_image(&client, &adapter, &model, ratio, &framed, &secret, &[])
-                            .map(|image| (image, 0))
-                    })
+                request_image(
+                    &client, &adapter, &call, &model, ratio, &guided, &secret, attached,
+                )
+                .map(|image| (image, attached.len()))
+                .or_else(|_| {
+                    request_image(
+                        &client,
+                        &adapter,
+                        &call,
+                        &model,
+                        ratio,
+                        &framed,
+                        &secret,
+                        &[],
+                    )
+                    .map(|image| (image, 0))
+                })
             };
             match result {
                 Ok(((bytes, extension), references)) => {
@@ -568,9 +738,31 @@ impl WorkspaceStore {
         count: usize,
         notes: &str,
         provider: Option<&str>,
+        model: Option<&str>,
         references: &[i64],
     ) -> Result<Vec<GeneratedAsset>, Box<dyn Error>> {
         let prompt = prompt.trim();
+        if let Some(asked) = model {
+            let provider = provider
+                .ok_or_else(|| io::Error::other("Name the provider whose model you want"))?;
+            let models = image_adapter(provider)
+                .ok()
+                .flatten()
+                .and_then(|adapter| adapter.models)
+                .map(|models| models.into_keys().collect::<Vec<_>>())
+                .unwrap_or_default();
+            if !models.iter().any(|id| id == asked) {
+                return Err(io::Error::other(if models.is_empty() {
+                    format!("{provider} has no image models to choose from")
+                } else {
+                    format!(
+                        "{provider} has no image model {asked}; it offers {}",
+                        models.join(", ")
+                    )
+                })
+                .into());
+            }
+        }
         if prompt.is_empty() || prompt.chars().count() > MAX_PROMPT_CHARACTERS {
             return Err(io::Error::other("Describe the image in up to 4,000 characters").into());
         }
@@ -628,6 +820,7 @@ impl WorkspaceStore {
                 },
                 references,
                 ReferenceUse::Follow,
+                model,
             )?;
             if !notes.trim().is_empty() {
                 self.set_asset_notes(workspace_id, image.id, notes.trim())?;
@@ -658,6 +851,7 @@ impl WorkspaceStore {
             stem,
             reference_ids,
             ReferenceUse::Style,
+            None,
         )
     }
 
@@ -672,6 +866,7 @@ impl WorkspaceStore {
         stem: &str,
         reference_ids: &[i64],
         reference_use: ReferenceUse,
+        model: Option<&str>,
     ) -> Result<GeneratedAsset, Box<dyn Error>> {
         let root = crate::asset_root(database);
         let references: Vec<ReferencePicture> = reference_ids
@@ -689,6 +884,7 @@ impl WorkspaceStore {
             aspect_ratio,
             &references,
             reference_use,
+            model,
         )?;
         let scratch = tempfile::tempdir()?;
         let downloaded = scratch.path().join(format!("{stem}.{}", image.extension));
@@ -752,19 +948,21 @@ fn crop_to_ratio(
     (status.success() && std::fs::rename(&output, &cropped).is_ok()).then_some(cropped)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn request_image(
     client: &Client,
     adapter: &ImageAdapter,
+    call: &ImageCall,
     model: &str,
     ratio: &str,
     prompt: &str,
     secret: &[u8],
     references: &[ReferencePicture],
 ) -> io::Result<(Vec<u8>, &'static str)> {
-    let mut endpoint = adapter.endpoint.replace("{model}", model);
+    let mut endpoint = call.endpoint.replace("{model}", model);
     let (header, value) = credential_header(adapter, secret)?;
     let body = fill(
-        &adapter.request,
+        call.request,
         &[
             ("{prompt}", prompt),
             ("{aspectRatio}", ratio),
@@ -772,7 +970,7 @@ fn request_image(
         ],
     );
     let encode = || io::Error::other("Could not encode the image request");
-    let request = match (&adapter.references, references.is_empty()) {
+    let request = match (call.references, references.is_empty()) {
         (
             Some(ReferenceInput::Multipart {
                 endpoint: edits,
@@ -807,6 +1005,7 @@ fn request_image(
             Some(ReferenceInput::Urls {
                 endpoint: edits,
                 field,
+                single,
                 ..
             }),
             false,
@@ -826,9 +1025,14 @@ fn request_image(
                 urls.push(upload.upload((&header, &value), &media)?);
             }
             let mut body = body;
-            body.as_object_mut()
-                .ok_or_else(encode)?
-                .insert(field.clone(), Value::from(urls));
+            body.as_object_mut().ok_or_else(encode)?.insert(
+                field.clone(),
+                if *single {
+                    Value::from(urls.swap_remove(0))
+                } else {
+                    Value::from(urls)
+                },
+            );
             client
                 .post(&endpoint)
                 .header(header.clone(), value.clone())
@@ -953,6 +1157,7 @@ mod tests {
                         count,
                         "",
                         None,
+                        None,
                         &[]
                     )
                     .is_err()
@@ -968,6 +1173,37 @@ mod tests {
                     1,
                     "",
                     Some("codex-not-a-provider"),
+                    None,
+                    &[]
+                )
+                .is_err()
+        );
+        let unknown = store
+            .generate_library_images(
+                database,
+                workspace,
+                "Desk",
+                "16:9",
+                1,
+                "",
+                Some("higgsfield"),
+                Some("no-such-model"),
+                &[],
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(unknown.contains("ideogram-4"), "{unknown}");
+        assert!(
+            store
+                .generate_library_images(
+                    database,
+                    workspace,
+                    "Desk",
+                    "16:9",
+                    1,
+                    "",
+                    None,
+                    Some("soul"),
                     &[]
                 )
                 .is_err()
@@ -990,10 +1226,28 @@ mod tests {
             .unwrap()
             .expect("Higgsfield ships an image adapter");
         assert!(adapter.job.is_some() && adapter.response.is_none());
+        let models = adapter.models.as_ref().expect("schema 3 models");
+        assert!(models.len() >= 10);
+        let qwen = adapter.call("qwen-image-3");
         assert!(matches!(
-            adapter.references,
+            qwen.references,
             Some(ReferenceInput::Urls { max_images: 3, .. })
         ));
+        let ideogram = adapter.call("ideogram-4");
+        assert!(ideogram.endpoint.ends_with("/ideogram/v4.0"));
+        assert!(matches!(
+            ideogram.references,
+            Some(ReferenceInput::Urls {
+                single: true,
+                max_images: 1,
+                ..
+            })
+        ));
+        assert_eq!(ideogram.aspect_ratios["4:5"], "4:5");
+        assert!(adapter.call("soul").references.is_none());
+        assert!(models.values().all(|model| !model.best_for.en.is_empty()
+            && model.best_for.es.is_some()
+            && model.best_for.pt.is_some()));
     }
 
     #[test]
@@ -1007,9 +1261,10 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        assert!(valid_references(&adapter));
+        assert!(valid_references(&adapter, &adapter.call("qwen-image-3")));
         adapter.upload = None;
-        assert!(!valid_references(&adapter));
+        assert!(!valid_references(&adapter, &adapter.call("qwen-image-3")));
+        assert!(valid_references(&adapter, &adapter.call("soul")));
     }
 
     #[test]

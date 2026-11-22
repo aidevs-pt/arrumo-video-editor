@@ -476,6 +476,7 @@ async fn generate_library_images(
     count: usize,
     notes: String,
     provider: Option<String>,
+    model: Option<String>,
     references: Option<Vec<i64>>,
     app: AppHandle,
 ) -> Result<Vec<i64>, String> {
@@ -495,6 +496,7 @@ async fn generate_library_images(
                 count,
                 &notes,
                 provider.as_deref(),
+                model.as_deref(),
                 &references.unwrap_or_default(),
             )
             .map(|images| images.into_iter().map(|image| image.id).collect())
@@ -560,6 +562,26 @@ fn notice_page(href: &str) -> bool {
         && href
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"/-?&=".contains(&byte))
+}
+
+#[tauri::command]
+async fn list_image_models(
+    workspace_id: i64,
+    app: AppHandle,
+) -> Result<Vec<arrumo_workspaces::ImageModel>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .image_models(workspace_id)
+            .map_err(|_| "image_models_unavailable".to_owned())
+    })
+    .await
+    .map_err(|_| "image_models_unavailable".to_owned())?
 }
 
 #[tauri::command]
@@ -1478,6 +1500,7 @@ fn main() {
             generate_library_speech,
             generate_library_audio,
             generate_library_video,
+            list_image_models,
             list_video_models,
             provider_usage,
             generate_motion_library_item,

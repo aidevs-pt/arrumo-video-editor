@@ -72,6 +72,8 @@ struct GenerateImagesInput {
     #[serde(default)]
     provider: Option<String>,
     #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
     references: Vec<i64>,
 }
 
@@ -169,14 +171,14 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 21] {
+pub(super) fn definitions() -> [Value; 22] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
     }, "required": ["workspaceId", "assetId", "role"], "additionalProperties": false});
     [
         json!({"name": "generate_library_images",
-            "description": "Generate one to four images from a description with the workspace's image providers (in their order, or one named provider) and add them to the workspace assets with the given notes. references are workspace image asset IDs to follow; each result's references count says how many the provider accepted (0 when it fell back to the description alone).",
+            "description": "Generate one to four images from a description with the workspace's image providers (in their order, or one named provider) and add them to the workspace assets with the given notes. model picks one of the named provider's models from list_image_models (choose by its bestFor line); without it the provider's selected model is used. references are workspace image asset IDs to follow; each result's references count says how many the provider accepted (0 when it fell back to the description alone).",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id,
                 "prompt": {"type": "string", "minLength": 1, "maxLength": 4000},
@@ -184,8 +186,14 @@ pub(super) fn definitions() -> [Value; 21] {
                 "count": {"type": "integer", "minimum": 1, "maximum": 4},
                 "notes": {"type": "string", "maxLength": 8000},
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+                "model": {"type": "string", "minLength": 1, "maxLength": 128},
                 "references": {"type": "array", "items": id, "maxItems": 9, "uniqueItems": true}
             }, "required": ["workspaceId", "prompt", "aspectRatio", "count"], "additionalProperties": false}}),
+        json!({"name": "list_image_models",
+            "description": "List the named models of each image provider on for this workspace, in provider order: label, what each is best for (per app language), whether it is selected by default, how many reference images it takes and its aspect ratios. Use it to choose provider and model for generate_library_images.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "generate_library_speech",
             "description": "Voice text with the workspace's first speech provider (or one named provider) and its configured voice, and add the audio to the workspace assets with the given notes.",
             "inputSchema": {"type": "object", "properties": {
@@ -217,7 +225,7 @@ pub(super) fn definitions() -> [Value; 21] {
                 "references": {"type": "array", "items": id, "maxItems": 12, "uniqueItems": true}
             }, "required": ["workspaceId", "prompt", "aspectRatio"], "additionalProperties": false}}),
         json!({"name": "list_video_models",
-            "description": "List the models of each video provider on for this workspace, in provider order: which one is selected by default, and for each way of calling it the reference images and videos it takes (inclusive [min, max]), its length limits and aspect ratios. Use it to choose provider, model and references for generate_library_video.",
+            "description": "List the models of each video provider on for this workspace, in provider order: label, what each is best for (per app language), which one is selected by default, and for each way of calling it the reference images and videos it takes (inclusive [min, max]; with two images the second is the closing frame where a variant allows it), its length limits (allowedSeconds lists the only lengths it takes; 0 to 0 means the clip follows the reference video) and aspect ratios. Use it to choose provider, model and references for generate_library_video.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
                 "required": ["workspaceId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
@@ -330,6 +338,7 @@ pub(super) fn call_generation(
                         args.count,
                         &args.notes,
                         args.provider.as_deref(),
+                        args.model.as_deref(),
                         &args.references,
                     )
                     .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider, "references": image.references})).collect::<Vec<_>>()}))
@@ -378,6 +387,14 @@ pub(super) fn call(
                     .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
+            }),
+        "list_image_models" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid image model arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .image_models(args.workspace_id)
+                    .map(|models| json!({"models": models}))
+                    .map_err(|_| "Could not list the image models")
             }),
         "list_video_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid video model arguments")

@@ -91,6 +91,8 @@ mod telemetry;
 mod transcription;
 mod video_drafts;
 mod video_generation;
+pub use image_generation::ImageModel;
+pub use provider_media::Localized;
 pub use provider_usage::{ProviderUsage, USAGE_DANGER_PERCENT, USAGE_WARNING_PERCENT};
 pub use video_generation::{VideoModel, VideoVariant};
 mod workspace_feedback;
