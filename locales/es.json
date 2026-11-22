@@ -632,6 +632,8 @@
     "filterEmpty": "No hay procesos en esta vista.",
     "emptyDescription": "Pon un borrador en cola para iniciar la producción.",
     "emptyActivity": "No hay actividad registrada.",
+    "activityShowLess": "Ver menos",
+    "activityShowAll": "Ver las {count}",
     "saveMotion": "Guardar animaciones y transiciones",
     "saveMotionHint": "Guarda las animaciones y transiciones aceptadas para reutilizarlas. Desactívalo para usarlas solo en esta generación.",
     "autopilotHint": "Avanza automáticamente por las etapas de revisión.",

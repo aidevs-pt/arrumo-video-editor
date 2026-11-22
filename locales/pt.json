@@ -632,6 +632,8 @@
     "filterEmpty": "Não há execuções nesta vista.",
     "emptyDescription": "Coloca um rascunho na fila para iniciar uma execução.",
     "emptyActivity": "Ainda não há atividade registada.",
+    "activityShowLess": "Ver menos",
+    "activityShowAll": "Ver as {count}",
     "saveMotion": "Guardar animações e transições",
     "saveMotionHint": "Guarda as animações e transições aceites para reutilização. Desativa para as usar apenas nesta geração.",
     "autopilotHint": "Avança automaticamente pelas etapas de revisão.",

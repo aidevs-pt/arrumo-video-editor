@@ -261,7 +261,7 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
 
   return (
     <Link href={href} onClick={() => setOpenMobile(false)}
-      className="mt-2 flex items-center gap-3 rounded-lg bg-[color-mix(in_oklch,var(--sidebar)_55%,var(--ink))] p-2.5 text-sidebar-foreground outline-none hover:bg-[color-mix(in_oklch,var(--sidebar)_40%,var(--ink))] focus-visible:ring-2 focus-visible:ring-attention group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
+      className="mt-2 me-2 flex items-center gap-3 rounded-lg group-data-[collapsible=icon]:me-0 bg-[color-mix(in_oklch,var(--sidebar)_55%,var(--ink))] p-2.5 text-sidebar-foreground outline-none hover:bg-[color-mix(in_oklch,var(--sidebar)_40%,var(--ink))] focus-visible:ring-2 focus-visible:ring-attention group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
       <PluginIcon pluginId={agentId} tone="dark" className="size-9" />
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
         <span className="block truncate text-sm font-bold">{title}</span>

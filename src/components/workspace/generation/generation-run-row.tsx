@@ -12,6 +12,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 import { StepTrack } from "@/components/workspace/step-track";
@@ -196,9 +197,13 @@ function sameDay(date: Date) {
   return date.toDateString() === new Date().toDateString();
 }
 
+/** Newest events shown before the creator asks for the whole history. */
+const ACTIVITY_SHOWN = 6;
+
 function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: number }) {
   const [activity, setActivity] = useState<Activity[]>();
   const [historyError, setHistoryError] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const { locale, messages: { queue: copy } } = useLocale();
 
   useEffect(() => {
@@ -242,8 +247,8 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
         {historyError && <Alert variant="destructive"><AlertDescription>{copy.activityError}</AlertDescription></Alert>}
         {!activity && !historyError && <Skeleton className="h-14" aria-label={copy.loading} />}
         {activity?.length ? (
-          <ol className="flex flex-col gap-0">
-            {[...activity].reverse().map((event, index, newestFirst) => {
+          <ol className={cn("flex flex-col gap-0", showAll && "max-h-[28rem] overflow-y-auto pe-2")}>
+            {[...activity].reverse().slice(0, showAll ? undefined : ACTIVITY_SHOWN).map((event, index, newestFirst) => {
               const date = new Date(event.created_at * 1000);
               return (
                 <li className="relative ms-1 border-s pb-4 ps-4 last:border-transparent last:pb-0" key={index}>
@@ -259,6 +264,12 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
             })}
           </ol>
         ) : activity && <p className="text-sm text-white/75">{copy.emptyActivity}</p>}
+        {activity && activity.length > ACTIVITY_SHOWN && (
+          <Button variant="link" size="sm" className="mt-2 h-auto px-0 text-white underline underline-offset-4"
+            aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
+            {showAll ? copy.activityShowLess : copy.activityShowAll.replace("{count}", String(activity.length))}
+          </Button>
+        )}
       </div>
     </aside>
   );
