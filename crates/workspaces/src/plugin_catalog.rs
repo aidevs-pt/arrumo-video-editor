@@ -158,6 +158,41 @@ pub(crate) struct StructuredRun {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub progress: Vec<ProgressPattern>,
     pub result: StructuredResult,
+    /// Arguments that stop the agent keeping its session, inserted at `{ephemeral}` when no
+    /// follow-up is expected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ephemeral_args: Option<Vec<String>>,
+    /// How to send a follow-up message to the same session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume: Option<ResumeRun>,
+}
+
+/// A follow-up run in an earlier session: `args` replace the run's arguments, with `{session}`
+/// for the session ID read from the agent's output.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ResumeRun {
+    pub args: Vec<String>,
+    pub session: SessionSource,
+}
+
+/// Where the agent prints its session ID: a regular expression whose first group is the ID, or
+/// a JSON Pointer into one-event-per-line output.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SessionSource {
+    pub stream: SessionStream,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pointer: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum SessionStream {
+    Stdout,
+    Stderr,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -232,6 +267,29 @@ impl StructuredRun {
                     .pointer
                     .as_deref()
                     .is_none_or(|value| pointer(value, false))
+            })
+            && self.ephemeral_args.as_ref().is_none_or(|args| {
+                (1..=4).contains(&args.len()) && args.iter().all(|arg| arg.len() <= 128)
+            })
+            && self.resume.as_ref().is_none_or(|resume| {
+                let has = |placeholder: &str| resume.args.iter().any(|arg| arg == placeholder);
+                (1..=40).contains(&resume.args.len())
+                    && resume
+                        .args
+                        .iter()
+                        .all(|arg| arg.len() <= 512 && !arg.contains('\0'))
+                    && has("{session}")
+                    && (has("{schema}") || has("{schemaPath}"))
+                    && (self.result.source != StructuredSource::OutputFile || has("{outputPath}"))
+                    && match (&resume.session.pattern, &resume.session.pointer) {
+                        (Some(pattern), None) => {
+                            pattern.len() <= 256
+                                && regex::Regex::new(pattern)
+                                    .is_ok_and(|compiled| compiled.captures_len() >= 2)
+                        }
+                        (None, Some(value)) => pointer(value, false),
+                        _ => false,
+                    }
             })
     }
 }

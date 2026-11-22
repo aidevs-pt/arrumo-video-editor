@@ -106,11 +106,33 @@ fn capture(mut stream: impl Read, sink: &Mutex<Vec<u8>>, limit: u64) -> io::Resu
     }
 }
 
-/// Runs the agent once, recording what it prints in `transcript`. `tick` is called about every
-/// second while it works, so callers can renew leases, save progress, or stop early by returning
-/// an error.
+/// Whether an agent run may be continued with a follow-up message.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) enum AgentSession {
+    /// A one-off run that leaves no session behind.
+    #[default]
+    Ephemeral,
+    /// A first run whose session is kept for a follow-up.
+    Keep,
+    /// A follow-up in this session; `keep` keeps it for another one.
+    Continue { id: String, keep: bool },
+}
+
+/// Whether the plugin can continue a session with a follow-up message.
+pub(crate) fn resumes_sessions(plugin: &AgentPlugin) -> bool {
+    plugin
+        .cli
+        .structured_run
+        .as_ref()
+        .is_some_and(|run| run.resume.is_some())
+}
+
+/// Runs the agent once, recording what it prints in `transcript`, and keeping or continuing its
+/// session as `session` says. `tick` is called about every second while it works, so callers can
+/// renew leases, save progress, or stop early by returning an error. After a run that keeps its session, `session` becomes `Continue` with the session ID the
+/// agent reported, or `Ephemeral` when it reported none.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn run_structured(
+pub(crate) fn run_structured_session(
     plugin: &AgentPlugin,
     prompt: &str,
     schema: &Value,
@@ -118,6 +140,7 @@ pub(crate) fn run_structured(
     settings: &BTreeMap<String, Value>,
     images: &[std::path::PathBuf],
     transcript: &AgentTranscript,
+    session: &mut AgentSession,
     tick: impl FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<Value, AgentRunError> {
     let run = plugin
@@ -125,6 +148,15 @@ pub(crate) fn run_structured(
         .structured_run
         .as_ref()
         .ok_or(AgentRunError::Unsupported)?;
+    let (template, keep, resumed) = match &*session {
+        AgentSession::Ephemeral => (&run.args, false, None),
+        AgentSession::Keep => (&run.args, run.resume.is_some(), None),
+        AgentSession::Continue { id, keep } => (
+            &run.resume.as_ref().ok_or(AgentRunError::Unsupported)?.args,
+            *keep,
+            Some(id.clone()),
+        ),
+    };
     let executable = find_agent_cli(plugin).ok_or(AgentRunError::Unavailable)?;
     let failed = |reason| AgentRunError::Failed(reason);
     let directory = tempfile::tempdir().map_err(|_| failed("Could not prepare the agent run"))?;
@@ -132,8 +164,14 @@ pub(crate) fn run_structured(
     let schema_path = directory.path().join("schema.json");
     let output_path = directory.path().join("answer.json");
     fs::write(&schema_path, &schema_text).map_err(|_| failed("Could not prepare the agent run"))?;
+    let places = Placeholders {
+        template,
+        keep,
+        session: resumed.as_deref(),
+    };
     let args = expand_args(
         run,
+        &places,
         settings,
         images,
         &schema_text,
@@ -142,7 +180,7 @@ pub(crate) fn run_structured(
     );
     if let Ok(mut command) = transcript.command.lock() {
         // Image paths are local; the log only says how many were attached.
-        *command = describe_command(&executable, &declared_args(run, settings, &[]));
+        *command = describe_command(&executable, &declared_args(run, &places, settings, &[]));
         if !images.is_empty() {
             command.push_str(&format!(" (+{} images)", images.len().min(MAX_IMAGES)));
         }
@@ -181,7 +219,58 @@ pub(crate) fn run_structured(
     if document.len() as u64 > MAX_ANSWER_BYTES {
         return Err(failed("The agent's answer is too large"));
     }
-    extract_answer(run, &document)
+    let answer = extract_answer(run, &document)?;
+    *session =
+        match (&run.resume, keep) {
+            (Some(resume), true) => reported_session(resume, transcript).or(resumed).map_or(
+                AgentSession::Ephemeral,
+                |id| AgentSession::Continue { id, keep: true },
+            ),
+            _ => AgentSession::Ephemeral,
+        };
+    Ok(answer)
+}
+
+/// The session ID the agent printed, found with the plugin's declared pattern or pointer.
+fn reported_session(
+    resume: &crate::plugin_catalog::ResumeRun,
+    transcript: &AgentTranscript,
+) -> Option<String> {
+    let stream = match resume.session.stream {
+        crate::plugin_catalog::SessionStream::Stdout => &transcript.output,
+        crate::plugin_catalog::SessionStream::Stderr => &transcript.errors,
+    };
+    let bytes = stream.lock().ok()?.clone();
+    let text = String::from_utf8_lossy(&bytes);
+    let pattern = resume
+        .session
+        .pattern
+        .as_deref()
+        .and_then(|pattern| regex::Regex::new(pattern).ok());
+    text.lines().find_map(|line| {
+        let candidate = match (&resume.session.pointer, &pattern) {
+            (Some(pointer), _) => serde_json::from_str::<Value>(line.trim())
+                .ok()?
+                .pointer(pointer)?
+                .as_str()?
+                .to_owned(),
+            (None, Some(pattern)) => pattern.captures(line)?.get(1)?.as_str().to_owned(),
+            (None, None) => return None,
+        };
+        (!candidate.is_empty()
+            && candidate.len() <= 128
+            && candidate
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte)))
+        .then_some(candidate)
+    })
+}
+
+/// Which declared arguments a run uses and what fills its session placeholders.
+struct Placeholders<'a> {
+    template: &'a [String],
+    keep: bool,
+    session: Option<&'a str>,
 }
 
 /// Starts the agent with `args`, writes the prompt to its stdin and waits for it to exit,
@@ -332,14 +421,19 @@ pub(crate) fn setting_arguments(
 /// written.
 fn declared_args(
     run: &StructuredRun,
+    places: &Placeholders<'_>,
     settings: &BTreeMap<String, Value>,
     images: &[std::path::PathBuf],
 ) -> Vec<String> {
-    run.args
+    places
+        .template
         .iter()
         .flat_map(|arg| match arg.as_str() {
             "{settings}" => setting_arguments(run, settings),
             "{images}" => image_arguments(run, images),
+            "{ephemeral}" if places.keep => Vec::new(),
+            "{ephemeral}" => run.ephemeral_args.clone().unwrap_or_default(),
+            "{session}" => vec![places.session.unwrap_or_default().to_owned()],
             _ => vec![arg.clone()],
         })
         .collect()
@@ -376,13 +470,14 @@ pub(crate) const MAX_IMAGES: usize = 8;
 
 fn expand_args(
     run: &StructuredRun,
+    places: &Placeholders<'_>,
     settings: &BTreeMap<String, Value>,
     images: &[std::path::PathBuf],
     schema: &str,
     schema_path: &std::path::Path,
     output_path: &std::path::Path,
 ) -> Vec<std::ffi::OsString> {
-    declared_args(run, settings, images)
+    declared_args(run, places, settings, images)
         .into_iter()
         .map(|arg| match arg.as_str() {
             "{schema}" => schema.into(),
@@ -441,6 +536,8 @@ mod tests {
                 pointer: pointer.map(Into::into),
                 error_pointer: error.map(Into::into),
             },
+            ephemeral_args: None,
+            resume: None,
         }
     }
 
@@ -495,9 +592,16 @@ mod tests {
                 pointer: None,
                 error_pointer: None,
             },
+            ephemeral_args: None,
+            resume: None,
         };
         let args = expand_args(
             &declared,
+            &Placeholders {
+                template: &declared.args,
+                keep: false,
+                session: None,
+            },
             &BTreeMap::new(),
             &[],
             "{}",
@@ -534,19 +638,103 @@ mod tests {
                 pointer: None,
                 error_pointer: None,
             },
+            ephemeral_args: None,
+            resume: None,
+        };
+        let places = Placeholders {
+            template: &declared.args,
+            keep: false,
+            session: None,
         };
         let settings = BTreeMap::from([
             ("web-search".to_owned(), serde_json::json!(true)),
             ("model".to_owned(), serde_json::json!("gpt-5.1")),
         ]);
         assert_eq!(
-            declared_args(&declared, &settings, &[]),
+            declared_args(&declared, &places, &settings, &[]),
             ["exec", "-c", "web_search=\"live\"", "-m", "gpt-5.1", "-"]
         );
         let unsafe_model = BTreeMap::from([("model".to_owned(), serde_json::json!("x --yolo"))]);
         assert_eq!(
-            declared_args(&declared, &unsafe_model, &[]),
+            declared_args(&declared, &places, &unsafe_model, &[]),
             ["exec", "-c", "web_search=\"disabled\"", "-"]
         );
+    }
+
+    #[test]
+    fn sessions_are_kept_only_when_a_follow_up_is_expected() {
+        for id in ["codex", "claude-code"] {
+            let plugin = crate::agent_plugin(id).unwrap();
+            assert!(resumes_sessions(plugin), "{id}");
+            let run = plugin.cli.structured_run.as_ref().unwrap();
+            let ephemeral = run.ephemeral_args.clone().unwrap();
+            let one_off = Placeholders {
+                template: &run.args,
+                keep: false,
+                session: None,
+            };
+            let kept = Placeholders {
+                template: &run.args,
+                keep: true,
+                session: None,
+            };
+            let resume = &run.resume.as_ref().unwrap().args;
+            let follow_up = Placeholders {
+                template: resume,
+                keep: true,
+                session: Some("abc-123"),
+            };
+            let settings = BTreeMap::new();
+            let has = |args: Vec<String>, wanted: &[String]| {
+                args.windows(wanted.len()).any(|window| window == wanted)
+            };
+            assert!(has(
+                declared_args(run, &one_off, &settings, &[]),
+                &ephemeral
+            ));
+            assert!(!has(declared_args(run, &kept, &settings, &[]), &ephemeral));
+            let resumed = declared_args(run, &follow_up, &settings, &[]);
+            assert!(resumed.iter().any(|arg| arg == "abc-123"));
+            assert!(!has(resumed, &ephemeral));
+        }
+    }
+
+    #[test]
+    fn the_session_id_comes_from_the_declared_stream() {
+        let codex = crate::agent_plugin("codex").unwrap();
+        let claude = crate::agent_plugin("claude-code").unwrap();
+        let resume = |plugin: &AgentPlugin| {
+            plugin
+                .cli
+                .structured_run
+                .as_ref()
+                .unwrap()
+                .resume
+                .clone()
+                .unwrap()
+        };
+        let transcript = AgentTranscript::default();
+        transcript.errors.lock().unwrap().extend_from_slice(
+            b"OpenAI Codex\n--------\nsession id: 01a2032b-7288-76b0-9171-c6b6877284bc\n",
+        );
+        assert_eq!(
+            reported_session(&resume(codex), &transcript).as_deref(),
+            Some("01a2032b-7288-76b0-9171-c6b6877284bc")
+        );
+        let transcript = AgentTranscript::default();
+        transcript.output.lock().unwrap().extend_from_slice(
+            b"{\"type\":\"system\",\"session_id\":\"385e96d5-d01e\"}\n{\"session_id\":\"../x\"}\n",
+        );
+        assert_eq!(
+            reported_session(&resume(claude), &transcript).as_deref(),
+            Some("385e96d5-d01e")
+        );
+        let transcript = AgentTranscript::default();
+        transcript
+            .output
+            .lock()
+            .unwrap()
+            .extend_from_slice(b"{\"session_id\":\"a b\"}\n");
+        assert_eq!(reported_session(&resume(claude), &transcript), None);
     }
 }

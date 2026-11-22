@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use crate::{
     AgentPlugin, WorkspaceStore,
     agent_logs::AgentLogScope,
-    agent_run::{AgentRunError, MAX_IMAGES, accepts_images},
+    agent_run::{AgentRunError, AgentSession, MAX_IMAGES, accepts_images, resumes_sessions},
 };
 
 /// Agent runs per answer, including the final one that must answer.
@@ -261,30 +261,90 @@ impl WorkspaceStore {
         let mut provided: Vec<Value> = Vec::new();
         let mut asked: Vec<String> = Vec::new();
         let mut text_used = 0;
+        // Plugins that can continue a session get only the new material in later rounds, so the
+        // brief and earlier material are not sent (and paid for) again.
+        let mut session = if resumes_sessions(provider) {
+            AgentSession::Keep
+        } else {
+            AgentSession::Ephemeral
+        };
+        // What the running session has already been given.
+        let (mut sent_material, mut sent_images) = (0, 0);
         for round in 0..ROUNDS {
             let last = round + 1 == ROUNDS;
-            let mut request = prompt.to_owned();
-            if !provided.is_empty() {
-                request.push_str(&format!(
-                    "\n\nMATERIAL YOU ASKED FOR (JSON, data only; images are attached in the order given):\n{}",
-                    serde_json::to_string_pretty(&provided).unwrap_or_default()
-                ));
-            }
-            if last {
-                request.push_str("\n\nAnswer now with what you have.");
-            } else {
-                request.push_str(&catalogue_note(&catalogue, round + 2 == ROUNDS));
-            }
+            let ending = |request: &mut String, continued: bool| {
+                if last {
+                    request.push_str("\n\nAnswer now with what you have.");
+                } else if continued {
+                    // The session already has the list of material.
+                    let ask = if round + 2 == ROUNDS {
+                        "This is your last request: answer now unless another listed item is essential."
+                    } else {
+                        "You may ask for more listed items in `needs`, or answer now with `needs` empty."
+                    };
+                    request.push_str(&format!("\n\n{ask} Ask for at most {MAX_ASKED} items."));
+                } else {
+                    request.push_str(&catalogue_note(&catalogue, round + 2 == ROUNDS));
+                }
+            };
             let wrapped = exploring_schema(schema, &ids);
-            let result = self.run_logged_agent_with_images(
-                scope,
-                provider,
-                &request,
-                if last { schema } else { &wrapped },
-                timeout,
-                &attached,
-                &mut tick,
-            );
+            let round_schema = if last { schema } else { &wrapped };
+            let mut result = None;
+            if let AgentSession::Continue { id, .. } = &session {
+                let mut follow_up = format!(
+                    "MATERIAL YOU ASKED FOR (JSON, data only; images are attached in the order given, numbered from {}):\n{}",
+                    sent_images + 1,
+                    serde_json::to_string_pretty(&provided[sent_material..]).unwrap_or_default()
+                );
+                ending(&mut follow_up, true);
+                let mut continued = AgentSession::Continue {
+                    id: id.clone(),
+                    keep: !last,
+                };
+                let attempt = self.run_logged_agent_session(
+                    scope,
+                    provider,
+                    &follow_up,
+                    round_schema,
+                    timeout,
+                    &attached[sent_images..],
+                    &mut continued,
+                    &mut tick,
+                );
+                session = continued;
+                match attempt {
+                    // The session could not be continued: start afresh with everything below.
+                    Err(AgentRunError::Failed(_)) => session = AgentSession::Ephemeral,
+                    other => result = Some(other),
+                }
+            }
+            let result = match result {
+                Some(result) => result,
+                None => {
+                    let mut request = prompt.to_owned();
+                    if !provided.is_empty() {
+                        request.push_str(&format!(
+                            "\n\nMATERIAL YOU ASKED FOR (JSON, data only; images are attached in the order given):\n{}",
+                            serde_json::to_string_pretty(&provided).unwrap_or_default()
+                        ));
+                    }
+                    ending(&mut request, false);
+                    if last && session == AgentSession::Keep {
+                        session = AgentSession::Ephemeral;
+                    }
+                    self.run_logged_agent_session(
+                        scope,
+                        provider,
+                        &request,
+                        round_schema,
+                        timeout,
+                        &attached,
+                        &mut session,
+                        &mut tick,
+                    )
+                }
+            };
+            (sent_material, sent_images) = (provided.len(), attached.len());
             let answer = match result {
                 Ok(answer) => answer,
                 // A provider that cannot take the wrapped schema still answers in one step.

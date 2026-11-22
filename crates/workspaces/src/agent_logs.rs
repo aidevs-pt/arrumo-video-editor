@@ -13,7 +13,7 @@ use serde_json::Value;
 
 use crate::{
     AgentPlugin, AgentRunError, WorkspaceStore,
-    agent_run::{AgentTranscript, run_structured},
+    agent_run::{AgentSession, AgentTranscript, run_structured_session},
 };
 
 /// How often a running log is updated with the agent's latest output.
@@ -200,7 +200,7 @@ impl WorkspaceStore {
         frozen.unwrap_or_else(|| self.agent_options(scope.workspace_id, plugin_id))
     }
 
-    /// Runs the agent like `run_structured` and records the run in the workspace's agent logs.
+    /// Runs the agent once and records the run in the workspace's agent logs.
     /// Logging problems never fail the run itself.
     pub(crate) fn run_logged_agent(
         &self,
@@ -225,6 +225,32 @@ impl WorkspaceStore {
         schema: &Value,
         timeout: Duration,
         images: &[std::path::PathBuf],
+        tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+    ) -> Result<Value, AgentRunError> {
+        self.run_logged_agent_session(
+            scope,
+            provider,
+            prompt,
+            schema,
+            timeout,
+            images,
+            &mut AgentSession::Ephemeral,
+            tick,
+        )
+    }
+
+    /// Runs the agent like `run_logged_agent_with_images`, keeping or continuing its session as
+    /// `session` says (see `run_structured_session`).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn run_logged_agent_session(
+        &self,
+        scope: AgentLogScope<'_>,
+        provider: &AgentPlugin,
+        prompt: &str,
+        schema: &Value,
+        timeout: Duration,
+        images: &[std::path::PathBuf],
+        session: &mut AgentSession,
         mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
     ) -> Result<Value, AgentRunError> {
         // An earlier attempt that never finished was interrupted by a crash or restart.
@@ -253,7 +279,7 @@ impl WorkspaceStore {
         let transcript = AgentTranscript::default();
         let started = Instant::now();
         let mut flushed = Instant::now();
-        let result = run_structured(
+        let result = run_structured_session(
             provider,
             prompt,
             schema,
@@ -261,6 +287,7 @@ impl WorkspaceStore {
             &options,
             images,
             &transcript,
+            session,
             || {
                 if let Some(id) = log
                     && flushed.elapsed() >= FLUSH_INTERVAL
