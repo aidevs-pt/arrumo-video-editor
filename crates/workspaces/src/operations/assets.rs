@@ -87,6 +87,18 @@ struct ListInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TransformAudioInput {
+    workspace_id: i64,
+    asset_id: i64,
+    transform: crate::AudioTransform,
+    #[serde(default)]
+    provider: Option<String>,
+    #[serde(default)]
+    voice: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ImportInput {
     workspace_id: i64,
     source: String,
@@ -173,7 +185,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 23] {
+pub(super) fn definitions() -> [Value; 25] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -205,6 +217,20 @@ pub(super) fn definitions() -> [Value; 23] {
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64},
                 "model": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
+        json!({"name": "transform_audio_asset",
+            "description": "Send the sound of a workspace audio or video asset to a provider and add the result as a new audio asset whose notes name the source. voice-change says the same words in another voice (voice overrides the provider's configured voice ID); voice-isolation keeps the voice and removes background noise and music. list_audio_transforms shows who offers each and the longest input they take.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "assetId": {"type": "integer", "minimum": 1},
+                "transform": {"enum": ["voice-change", "voice-isolation"]},
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+                "voice": {"type": "string", "minLength": 1, "maxLength": 256}
+            }, "required": ["workspaceId", "assetId", "transform"], "additionalProperties": false}}),
+        json!({"name": "list_audio_transforms",
+            "description": "List which providers on for this workspace change or isolate voices, and the shortest and longest sound in seconds each takes.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id},
+                "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
         json!({"name": "list_speech_models",
             "description": "List the named models of each speech provider on for this workspace, in provider order: label, what each is best for (per app language), whether it is selected by default and how many characters it voices per request. Use it to choose provider and model for generate_library_speech.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id},
@@ -369,6 +395,14 @@ pub(super) fn call_generation(
                     .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
                     .map_err(|error| Cow::Owned(format!("Could not make the audio: {error}")))
             }),
+        "transform_audio_asset" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| Cow::Borrowed("Invalid audio transform arguments"))
+            .and_then(|args: TransformAudioInput| {
+                store
+                    .transform_audio_asset(database, args.workspace_id, args.asset_id, args.transform, args.provider.as_deref(), args.voice.as_deref())
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|error| Cow::Owned(format!("Could not process the sound: {error}")))
+            }),
         "generate_library_speech" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| Cow::Borrowed("Invalid speech arguments"))
             .and_then(|args: GenerateSpeechInput| {
@@ -396,6 +430,14 @@ pub(super) fn call(
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
     Some(match name {
+        "list_audio_transforms" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid audio transform arguments")
+            .and_then(|args: ListInput| {
+                store
+                    .audio_transform_providers(args.workspace_id)
+                    .map(|providers| json!({"transforms": providers}))
+                    .map_err(|_| "Could not list the audio transforms")
+            }),
         "list_speech_models" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid speech model arguments")
             .and_then(|args: ListInput| {

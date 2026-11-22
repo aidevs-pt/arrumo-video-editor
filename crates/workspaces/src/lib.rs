@@ -54,6 +54,7 @@ mod plugin_action_jobs;
 mod plugin_actions;
 mod plugin_activation;
 pub use plugin_activation::plugin_activation_refusal_code;
+mod audio_transform;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
@@ -107,6 +108,7 @@ pub use agent_settings::{AgentProviderSource, AgentSettings};
 pub use asset_organization::AssetOrganization;
 pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root};
 pub use audio_generation::AudioKind;
+pub use audio_transform::{AudioTransform, AudioTransformProvider};
 pub use backup::{
     BackupManifest, BackupSummary, apply_pending_import, cancel_backup_import,
     pending_backup_import, stage_backup_import, verify_backup,

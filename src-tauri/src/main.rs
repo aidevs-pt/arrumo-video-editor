@@ -565,6 +565,58 @@ fn notice_page(href: &str) -> bool {
 }
 
 #[tauri::command]
+async fn transform_audio_asset(
+    workspace_id: i64,
+    asset_id: i64,
+    transform: arrumo_workspaces::AudioTransform,
+    provider: Option<String>,
+    voice: Option<String>,
+    app: AppHandle,
+) -> Result<i64, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .transform_audio_asset(
+                &database,
+                workspace_id,
+                asset_id,
+                transform,
+                provider.as_deref(),
+                voice.as_deref(),
+            )
+            .map(|(id, _)| id)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "audio_transform_failed".to_owned())?
+}
+
+#[tauri::command]
+async fn list_audio_transforms(
+    workspace_id: i64,
+    app: AppHandle,
+) -> Result<Vec<arrumo_workspaces::AudioTransformProvider>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .audio_transform_providers(workspace_id)
+            .map_err(|_| "audio_transforms_unavailable".to_owned())
+    })
+    .await
+    .map_err(|_| "audio_transforms_unavailable".to_owned())?
+}
+
+#[tauri::command]
 async fn list_speech_models(
     workspace_id: i64,
     app: AppHandle,
@@ -1530,6 +1582,8 @@ fn main() {
             generate_library_video,
             list_image_models,
             list_speech_models,
+            list_audio_transforms,
+            transform_audio_asset,
             list_video_models,
             provider_usage,
             generate_motion_library_item,
