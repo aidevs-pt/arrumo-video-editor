@@ -116,6 +116,51 @@ pub async fn export_completed_video(
     .map_err(|_| "export_completed_video_failed")?
 }
 
+/// Saves one format with its subtitles drawn into the picture where the creator chooses.
+/// Returns whether a file was written; cancelling the dialog is not an error.
+#[tauri::command]
+pub async fn export_captioned_output(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    app: AppHandle,
+) -> Result<bool, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
+        let Some(destination) = app
+            .dialog()
+            .file()
+            .add_filter("MP4", &["mp4"])
+            .set_file_name(format!("arrumo-{run_id}-{format_id}-captioned.mp4"))
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let destination = destination
+            .into_path()
+            .map_err(|_| "captioned_export_failed")?;
+        // The dialog already confirmed any overwrite, so the finished file replaces it.
+        let pending =
+            destination.with_file_name(format!(".arrumo-captioned-{}.mp4", std::process::id()));
+        let _ = std::fs::remove_file(&pending);
+        let written = store
+            .export_captioned_output(&database, workspace_id, run_id, format_id, &pending)
+            .and_then(|()| Ok(std::fs::rename(&pending, &destination)?));
+        if written.is_err() {
+            let _ = std::fs::remove_file(&pending);
+        }
+        written.map_err(|_| "captioned_export_failed")?;
+        Ok(true)
+    })
+    .await
+    .map_err(|_| "captioned_export_failed")?
+}
+
 #[tauri::command]
 pub async fn replay_completed_video(
     workspace_id: i64,

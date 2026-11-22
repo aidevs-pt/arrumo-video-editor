@@ -1535,6 +1535,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("null");
         }
+        [database, command, workspace, run, format, destination]
+            if command == "export-captioned-output" =>
+        {
+            let database = Path::new(database);
+            WorkspaceStore::open(database)?.export_captioned_output(
+                database,
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(format)?.parse()?,
+                Path::new(destination),
+            )?;
+            println!("null");
+        }
         [database, command, workspace, run, format] if command == "generate-delivery-subtitles" => {
             let database = Path::new(database);
             let cues = WorkspaceStore::open(database)?.generate_delivery_subtitles(
@@ -1657,7 +1670,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "add-completed-video-feedback <workspace-id> <run-id> <run|result-id> <markdown> | ",
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "generate-delivery-subtitles <workspace-id> <run-id> <format-id> | import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
-                "export-delivery <workspace-id> <run-id> <destination-zip> | ",
+                "export-delivery <workspace-id> <run-id> <destination-zip> | export-captioned-output <workspace-id> <run-id> <format-id> <destination-mp4> | ",
                 "set-plugin-active <plugin-id> on|off | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"

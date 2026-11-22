@@ -6,7 +6,7 @@ import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { completedSubtitleTracks } from "./completed-subtitle-tracks";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
-import { Archive, Captions, CheckCircle2, ChevronDown, ClipboardList, Film, FileText, Image, Music, Puzzle } from "lucide-react";
+import { Archive, Captions, CheckCircle2, ChevronDown, ClipboardList, Download, Film, FileText, Image, Music, Puzzle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -59,7 +59,7 @@ type CompletedVideo = {
     snapshot: {
       draft: { title: string; source_ids?: number[] };
       profile?: { name: string; color?: string | null } | null;
-      formats?: { format: Format }[];
+      formats?: { format: Format; delivery?: { supplemental?: { burned_captions?: boolean } } }[];
     };
   };
   plan: { steps: { stage: Stage; review_required: boolean }[] };
@@ -131,9 +131,9 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const { id: runId, snapshot } = video.run;
   const [savedTitle, setSavedTitle] = useState(video.title);
   const [title, setTitle] = useState(video.title);
-  const [action, setAction] = useState<"rename" | "export">();
-  const [error, setError] = useState<"renameError" | "exportError">();
-  const [notice, setNotice] = useState<"saved" | "exported">();
+  const [action, setAction] = useState<"rename" | "export" | "captioned">();
+  const [error, setError] = useState<"renameError" | "exportError" | "captionedError">();
+  const [notice, setNotice] = useState<"saved" | "exported" | "captionedSaved">();
   const [outputDates, setOutputDates] = useState(video.output_dates);
   const finished = [...video.activity].reverse().find((entry) => entry.state === "completed");
   const completedAt = finished ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(finished.created_at * 1000)) : null;
@@ -149,6 +149,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const selected = video.delivery.verified_outputs.find((output) => output.format_id === formatId);
   const formats = snapshot.formats ?? [];
   const format = formats.find(({ format }) => format.id === formatId)?.format;
+  const burnsCaptions = formats.find(({ format }) => format.id === formatId)?.delivery?.supplemental?.burned_captions === true;
   const outputName = (output: Output) => formats.find(({ format }) => format.id === output.format_id)?.format.name ?? output.video;
 
   const placed = usePlacedActions(workspaceId, "completed-video");
@@ -183,6 +184,20 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
       if (await invoke<boolean>("export_completed_video", { workspaceId, runId })) setNotice("exported");
     } catch {
       setError("exportError");
+    } finally {
+      setAction(undefined);
+    }
+  }
+
+  async function saveCaptioned(id: number) {
+    if (action) return;
+    setAction("captioned");
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      if (await invoke<boolean>("export_captioned_output", { workspaceId, runId, formatId: id })) setNotice("captionedSaved");
+    } catch {
+      setError("captionedError");
     } finally {
       setAction(undefined);
     }
@@ -358,6 +373,14 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
                       <Captions data-icon="inline-start" />{copy.subtitleText}
                     </Link>
                   </Button>
+                  {burnsCaptions && <>
+                    <Button size="sm" variant="outline" disabled={Boolean(action)} onClick={() => void saveCaptioned(selected.format_id)}>
+                      <Download data-icon="inline-start" />{action === "captioned" ? copy.savingCaptioned : copy.saveCaptioned}
+                    </Button>
+                    {action === "captioned" && <p role="status" className="text-sm text-muted-foreground">{copy.savingCaptionedHint}</p>}
+                    {error === "captionedError" && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
+                    {notice === "captionedSaved" && <p role="status" className="text-sm text-muted-foreground">{copy[notice]}</p>}
+                  </>}
                   <Separator />
                   <OutputDateField key={selected.format_id} workspaceId={workspaceId} runId={runId}
                     formatId={selected.format_id} savedDate={outputDates[selected.format_id] ?? ""}

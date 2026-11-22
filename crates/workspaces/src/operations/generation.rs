@@ -117,6 +117,15 @@ struct VerifyDeliveryInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ExportCaptionedInput {
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    destination: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ExportDeliveryInput {
     workspace_id: i64,
     run_id: i64,
@@ -241,7 +250,7 @@ struct CalendarInput {
     end: String,
 }
 
-pub(super) fn definitions() -> [Value; 41] {
+pub(super) fn definitions() -> [Value; 42] {
     let id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "object", "properties": {"workspaceId": id},
         "required": ["workspaceId"], "additionalProperties": false});
@@ -335,6 +344,10 @@ pub(super) fn definitions() -> [Value; 41] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "destination": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "destination"], "additionalProperties": false}}),
+        json!({"name": "export_captioned_output", "description": "Write one completed format's video with its latest subtitles drawn into the picture to a new MP4 at an absolute local path. Only formats whose delivery asks for captions in the picture qualify. Takes one encode.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "runId": id, "formatId": id, "destination": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "runId", "formatId", "destination"], "additionalProperties": false}}),
         json!({"name": "rename_completed_video", "description": "Change the display title of a completed video.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "title": {"type": "string", "minLength": 1}
@@ -574,6 +587,16 @@ pub(super) fn call(
                 .export_generation_delivery(database, args.workspace_id, args.run_id, destination)
                 .map(|()| json!({"destination": args.destination}))
                 .map_err(|_| "Could not export delivery. Check the verified files and choose a new destination")
+        }),
+        "export_captioned_output" => parse(arguments).and_then(|args: ExportCaptionedInput| {
+            let destination = Path::new(&args.destination);
+            if !destination.is_absolute() {
+                return Err("Export destination must be an absolute local path");
+            }
+            store
+                .export_captioned_output(database, args.workspace_id, args.run_id, args.format_id, destination)
+                .map(|()| json!({"destination": args.destination}))
+                .map_err(|_| "Could not save the captioned video. Check that the format asks for captions in the picture and choose a new destination")
         }),
         "rename_completed_video" => parse(arguments).and_then(|args: RenameCompletedInput| {
             store

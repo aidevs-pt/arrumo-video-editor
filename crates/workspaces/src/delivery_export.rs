@@ -96,19 +96,12 @@ impl WorkspaceStore {
                 }
             }
             if let Some(&dimensions) = burned.get(&output.format_id) {
-                let subtitles = match &edited {
-                    Some(latest) => latest.subtitles.clone(),
-                    None => {
-                        fs::read_to_string(source_dir.join(format!("{}.srt", output.format_id)))?
-                    }
-                };
                 let work = tempfile::tempdir()?;
                 let captioned = work.path().join("captioned.mp4");
-                crate::delivery_captions::burn_captions(
-                    &source_dir
-                        .join(format!("{}.mp4", output.format_id))
-                        .canonicalize()?,
-                    &subtitles,
+                burn_output(
+                    &source_dir,
+                    output.format_id,
+                    edited.as_ref().map(|latest| latest.subtitles.as_str()),
                     dimensions,
                     &captioned,
                 )?;
@@ -156,6 +149,89 @@ impl WorkspaceStore {
         pending.persist_noclobber(destination)?;
         Ok(())
     }
+}
+
+impl WorkspaceStore {
+    /// Writes one format's MP4 with the latest subtitles drawn into the picture to a new file
+    /// at `destination`. Only formats whose frozen delivery asks for a captioned copy qualify.
+    pub fn export_captioned_output(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        format_id: i64,
+        destination: &Path,
+    ) -> Result<(), Box<dyn Error>> {
+        let snapshot = self.0.unchecked_transaction()?;
+        let delivery = self.verified_delivery(workspace_id, run_id)?;
+        if !delivery
+            .verified_outputs
+            .iter()
+            .any(|output| output.format_id == format_id)
+        {
+            return Err(io::Error::other("That format has no verified delivery").into());
+        }
+        let snapshot_json: String = self.0.query_row(
+            "SELECT snapshot_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+            rusqlite::params![workspace_id, run_id],
+            |row| row.get(0),
+        )?;
+        let &dimensions = burned_formats(&snapshot_json)?
+            .get(&format_id)
+            .ok_or_else(|| {
+                io::Error::other("That format does not ask for captions in the picture")
+            })?;
+        let edited = self.read_edited_subtitles(run_id, format_id, "", None)?;
+        snapshot.commit()?;
+        if destination.symlink_metadata().is_ok() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "Export destination already exists",
+            )
+            .into());
+        }
+        let parent = destination
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let work = tempfile::tempdir_in(parent)?;
+        let captioned = work.path().join("captioned.mp4");
+        burn_output(
+            &delivery_directory(database, workspace_id, run_id),
+            format_id,
+            edited.as_ref().map(|latest| latest.subtitles.as_str()),
+            dimensions,
+            &captioned,
+        )?;
+        match fs::hard_link(&captioned, destination) {
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => return Err(error.into()),
+            Err(_) => {
+                fs::copy(&captioned, destination)?;
+            }
+            Ok(()) => {}
+        }
+        Ok(())
+    }
+}
+
+/// Draws the edited subtitles, or the delivered SRT, into a format's delivered MP4.
+fn burn_output(
+    source_dir: &Path,
+    format_id: i64,
+    edited: Option<&str>,
+    dimensions: (u32, u32),
+    output: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let subtitles = match edited {
+        Some(latest) => latest.to_owned(),
+        None => fs::read_to_string(source_dir.join(format!("{format_id}.srt")))?,
+    };
+    crate::delivery_captions::burn_captions(
+        &source_dir.join(format!("{format_id}.mp4")).canonicalize()?,
+        &subtitles,
+        dimensions,
+        output,
+    )
 }
 
 /// The frozen formats whose delivery adds a captioned copy, with their sizes.

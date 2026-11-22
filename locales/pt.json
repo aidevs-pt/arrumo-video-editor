@@ -1037,6 +1037,11 @@
     "save": "Guardar versão"
   },
   "completedVideo": {
+    "saveCaptioned": "Guardar com legendas",
+    "savingCaptioned": "A guardar…",
+    "savingCaptionedHint": "A desenhar as legendas no vídeo. Demora mais ou menos o que dura o vídeo.",
+    "captionedSaved": "Vídeo com legendas guardado.",
+    "captionedError": "Não foi possível guardar o vídeo com legendas. Verifica as legendas e escolhe outro local.",
     "importVariant": "Importar MP4 alternativo",
     "importingVariant": "A importar MP4…",
     "importVariantError": "Não foi possível importar este MP4. Escolhe um vídeo com áudio que corresponda à resolução e à duração da saída selecionada.",

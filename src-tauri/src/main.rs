@@ -1516,6 +1516,7 @@ fn main() {
             completed_video::export_completed_subtitles,
             completed_video::rename_completed_video,
             completed_video::export_completed_video,
+            completed_video::export_captioned_output,
             completed_video::delete_completed_video,
             completed_video::replay_completed_video,
             completed_video::add_completed_video_feedback,

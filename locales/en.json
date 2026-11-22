@@ -1037,6 +1037,11 @@
     "save": "Save version"
   },
   "completedVideo": {
+    "saveCaptioned": "Save with captions",
+    "savingCaptioned": "Saving…",
+    "savingCaptionedHint": "Drawing the subtitles into the video. This takes about as long as the video plays.",
+    "captionedSaved": "Video with captions saved.",
+    "captionedError": "Could not save the video with captions. Check the subtitles and choose another place.",
     "importVariant": "Import alternate MP4",
     "importingVariant": "Importing MP4…",
     "importVariantError": "Could not import this MP4. Choose a video with audio that matches the selected output’s resolution and duration.",
