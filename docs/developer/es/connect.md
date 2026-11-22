@@ -4,7 +4,7 @@
 
 ## Crea un espacio de trabajo de prueba
 
-Ejecuta estos comandos desde el repositorio del editor en una shell POSIX. El modo básico compila la interfaz local sin los repositorios privados de los plugins predeterminados. Usa la misma base de datos temporal en los tres ejemplos.
+Ejecuta estos comandos desde el repositorio del editor en una shell POSIX. El modo básico compila la interfaz local sin los repositorios privados de los complementos predeterminados. Usa la misma base de datos temporal en los tres ejemplos.
 
 ```sh
 ARRUMO_CORE_ONLY=1 cargo build --locked -p arrumo-workspaces
@@ -70,4 +70,4 @@ Para consultar los nombres y esquemas de las operaciones, envía el mismo mensaj
 
 ## Referencia
 
-Consulta la [referencia del editor](../../../README.md) para los comandos de generación, revisión, archivos multimedia y plugins. El [SDK de plugins](https://github.com/aidevs-pt/arrumo-plugin-sdk) explica cómo crearlos y el [registro oficial](https://github.com/aidevs-pt/arrumo-plugin-registry/blob/main/docs/es/plugins.md) enlaza los repositorios y los metadatos de las versiones.
+Consulta la [referencia del editor](../../../README.md) para los comandos de generación, revisión, archivos multimedia y complementos. El [SDK de complementos](https://github.com/aidevs-pt/arrumo-plugin-sdk) explica cómo crearlos y el [registro oficial](https://github.com/aidevs-pt/arrumo-plugin-registry/blob/main/docs/es/plugins.md) enlaza los repositorios y los metadatos de las versiones.

@@ -38,7 +38,7 @@ Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una s
 
 ## Copia de seguridad y restauración
 
-**Ajustes › Importar y exportar** guarda todo (ajustes, espacios de trabajo, perfiles, recursos, animaciones, vídeos terminados y plugins instalados) en un `.zip`. Las claves de API no se incluyen: se quedan en el almacén de credenciales de este equipo, así que vuelve a añadirlas en un equipo nuevo.
+**Ajustes › Importar y exportar** guarda todo (ajustes, espacios de trabajo, perfiles, recursos, animaciones, vídeos terminados y complementos instalados) en un `.zip`. Las claves de API no se incluyen: se quedan en el almacén de credenciales de este equipo, así que vuelve a añadirlas en un equipo nuevo.
 
 Para restaurar, elige una copia en el mismo sitio. Arrumo comprueba primero cada archivo con las sumas de la copia, después muestra lo que contiene y pregunta antes de reemplazar nada. Se reinicia para restaurarla y guarda los datos reemplazados en una carpeta llamada `workspaces.sqlite.before-import-…` junto a tus datos, por si los necesitas.
 
@@ -48,4 +48,4 @@ Arrumo cuenta qué funciones se usan e informa de los errores, para saber qué m
 
 ## Complementos nuevos
 
-Cuando llegan complementos, desde un ZIP, el registro o una actualización de Arrumo, Arrumo los presenta en un recorrido breve, una página por complemento. Puedes saltarlo cuando quieras; **Ajustes › Plugins › Ver el recorrido de complementos** vuelve a mostrar la presentación de cada uno.
+Cuando llegan complementos, desde un ZIP, el registro o una actualización de Arrumo, Arrumo los presenta en un recorrido breve, una página por complemento. Puedes saltarlo cuando quieras; **Ajustes › Complementos › Ver el recorrido de complementos** vuelve a mostrar la presentación de cada uno.
