@@ -1256,7 +1256,21 @@
       "not_a_page": "the address is not a web page",
       "no_text": "the page has no readable text, it may need sign-in or JavaScript",
       "too_many_redirects": "the page redirected too many times"
-    }
+    },
+    "foundTitle": "Also found on your pages",
+    "foundIntro": "Untick anything you don't want, then add the rest to this workspace.",
+    "foundColors": "Brand colours",
+    "foundImages": "Images",
+    "purposes": {
+      "brand": "Brand mark",
+      "thumbnail_reference": "Thumbnail reference",
+      "asset": "Asset"
+    },
+    "importSelected": "Add {count} to workspace",
+    "importing": "Adding…",
+    "imported": "Added {images} images, {colors} colours and {profiles} profiles.",
+    "importFailedImages": "{count} images could not be downloaded.",
+    "importError": "Could not add these items. Try again."
   },
   "agentLogs": {
     "open": "Agent logs",

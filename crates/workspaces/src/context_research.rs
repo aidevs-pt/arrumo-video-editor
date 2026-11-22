@@ -3,7 +3,7 @@
 
 use std::{error::Error, io, time::Duration};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
@@ -15,10 +15,27 @@ use crate::{
 const AGENT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const MAX_PROFILES: usize = 6;
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct SuggestedProfile {
     pub name: String,
     pub description: String,
+    /// What an editor should know about this kind of video, in Markdown.
+    #[serde(default)]
+    pub guidance: String,
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
+/// An image found on the creator's pages that the agent suggests keeping, and how.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct SuggestedImage {
+    pub url: String,
+    pub name: String,
+    pub description: String,
+    pub group: Option<String>,
+    pub labels: Vec<String>,
+    /// `brand` (logo, avatar, mark), `thumbnail_reference` or `asset`.
+    pub purpose: String,
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -26,6 +43,9 @@ pub struct ContextDraft {
     pub markdown: String,
     pub summary: String,
     pub profiles: Vec<SuggestedProfile>,
+    /// Brand colours as `#rrggbb`.
+    pub colors: Vec<String>,
+    pub images: Vec<SuggestedImage>,
     /// Addresses that could not be read, with a short reason, so the creator can fix them.
     pub unread: Vec<UnreadSource>,
 }
@@ -36,11 +56,20 @@ pub struct UnreadSource {
     pub reason: crate::source_pages::SourceProblem,
 }
 
-fn answer_schema() -> Value {
+const MAX_COLORS: usize = 8;
+const MAX_IMAGES: usize = 24;
+
+fn answer_schema(images: &[String]) -> Value {
+    let hex = json!({"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"});
+    let image = if images.is_empty() {
+        json!({"type": "string", "maxLength": 0})
+    } else {
+        json!({"enum": images})
+    };
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["summary", "markdown", "profiles"],
+        "required": ["summary", "markdown", "profiles", "colors", "images"],
         "properties": {
             "summary": {"type": "string", "maxLength": 400},
             "markdown": {"type": "string", "maxLength": 12000},
@@ -50,10 +79,30 @@ fn answer_schema() -> Value {
                 "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["name", "description"],
+                    "required": ["name", "description", "guidance", "color"],
                     "properties": {
                         "name": {"type": "string", "maxLength": 80},
-                        "description": {"type": "string", "maxLength": 400}
+                        "description": {"type": "string", "maxLength": 400},
+                        "guidance": {"type": "string", "maxLength": 3000},
+                        "color": {"anyOf": [{"type": "null"}, hex.clone()]}
+                    }
+                }
+            },
+            "colors": {"type": "array", "maxItems": MAX_COLORS, "items": hex},
+            "images": {
+                "type": "array",
+                "maxItems": MAX_IMAGES,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["url", "name", "description", "group", "labels", "purpose"],
+                    "properties": {
+                        "url": image,
+                        "name": {"type": "string", "maxLength": 80},
+                        "description": {"type": "string", "maxLength": 600},
+                        "group": {"type": ["string", "null"], "maxLength": 60},
+                        "labels": {"type": "array", "maxItems": 6, "items": {"type": "string", "maxLength": 40}},
+                        "purpose": {"enum": ["brand", "thumbnail_reference", "asset"]}
                     }
                 }
             }
@@ -62,6 +111,7 @@ fn answer_schema() -> Value {
 }
 
 fn research_prompt(pages: &[Value], existing: &str, notes: &str) -> String {
+    // Images and colours found on the pages are listed with each page.
     let brief = json!({"pages": pages, "currentContext": existing, "creatorNotes": notes});
     format!(
         "You help a video creator set up Arrumo by writing what an editor should know about them.\n\
@@ -71,11 +121,91 @@ fn research_prompt(pages: &[Value], existing: &str, notes: &str) -> String {
          ## Visual style, ## Do and don't, ## Links. Keep what is already in the current context unless the pages \
          contradict it. Do not invent facts, numbers or names.\n\
          Suggest profiles only when the creator clearly publishes distinct kinds of videos (for example a series, a \
-         brand or a format), each with a one-sentence description; otherwise return none.\n\
+         brand or a format), each with a one-sentence description, editing guidance in Markdown (pacing, structure, \
+         on-screen style, what to avoid) and a colour from the brand when one fits; otherwise return none.\n\
+         List the brand colours you can tell from the pages (theme colours, logos, recurring accents), most important first.\n\
+         From the images found on the pages, keep the ones worth having in the creator's library: logos, avatars and \
+         marks as brand; video thumbnails as thumbnail_reference, describing their style (layout, text treatment, \
+         faces, colours) so new thumbnails can follow it; and other useful pictures as asset. Skip decorative, \
+         tracking, duplicate and unrelated images. Name each one plainly, group similar ones (for example Logos or \
+         Channel thumbnails) and add a few short labels. Describe only what the page tells you about each image.\n\
          Write in the language the pages are written in. The summary is one sentence to the creator about what you found.\n\n\
          SOURCES (JSON):\n{}",
         serde_json::to_string_pretty(&brief).unwrap_or_default()
     )
+}
+
+fn hex_color(value: &str) -> Option<String> {
+    let value = value.trim().to_ascii_lowercase();
+    (value.len() == 7
+        && value.starts_with('#')
+        && value[1..].bytes().all(|b| b.is_ascii_hexdigit()))
+    .then_some(value)
+}
+
+fn suggested_images(answer: &Value, found: &[String]) -> Vec<SuggestedImage> {
+    let mut images: Vec<SuggestedImage> = Vec::new();
+    for image in answer
+        .get("images")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(MAX_IMAGES)
+    {
+        let Some(url) = image
+            .get("url")
+            .and_then(Value::as_str)
+            .filter(|url| found.iter().any(|known| known == url))
+        else {
+            continue;
+        };
+        if images.iter().any(|kept| kept.url == url) {
+            continue;
+        }
+        let text = |key: &str, limit: usize| -> String {
+            image
+                .get(key)
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim()
+                .chars()
+                .take(limit)
+                .collect()
+        };
+        let purpose = match image.get("purpose").and_then(Value::as_str) {
+            Some(purpose @ ("brand" | "thumbnail_reference" | "asset")) => purpose.to_owned(),
+            _ => "asset".to_owned(),
+        };
+        let name = text("name", 80);
+        images.push(SuggestedImage {
+            url: url.to_owned(),
+            name: if name.is_empty() {
+                "Image".into()
+            } else {
+                name
+            },
+            description: text("description", 600),
+            group: image
+                .get("group")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|group| !group.is_empty())
+                .map(|group| group.chars().take(60).collect()),
+            labels: image
+                .get("labels")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|label| !label.is_empty())
+                .take(6)
+                .map(|label| label.chars().take(40).collect())
+                .collect(),
+            purpose,
+        });
+    }
+    images
 }
 
 fn context_draft(answer: &Value, unread: Vec<UnreadSource>) -> Result<ContextDraft, &'static str> {
@@ -101,9 +231,20 @@ fn context_draft(answer: &Value, unread: Vec<UnreadSource>) -> Result<ContextDra
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .trim();
+            let guidance = profile
+                .get("guidance")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let color = profile
+                .get("color")
+                .and_then(Value::as_str)
+                .and_then(hex_color);
             (!name.is_empty()).then(|| SuggestedProfile {
                 name: name.to_owned(),
                 description: description.to_owned(),
+                guidance: guidance.to_owned(),
+                color,
             })
         })
         .collect();
@@ -116,6 +257,23 @@ fn context_draft(answer: &Value, unread: Vec<UnreadSource>) -> Result<ContextDra
             .trim()
             .to_owned(),
         profiles,
+        colors: {
+            let mut colors: Vec<String> = Vec::new();
+            for color in answer
+                .get("colors")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter_map(hex_color)
+            {
+                if !colors.contains(&color) && colors.len() < MAX_COLORS {
+                    colors.push(color);
+                }
+            }
+            colors
+        },
+        images: Vec::new(),
         unread,
     })
 }
@@ -146,12 +304,20 @@ impl WorkspaceStore {
         }
         let mut pages = Vec::new();
         let mut unread = Vec::new();
+        let mut found_images: Vec<String> = Vec::new();
         for source in sources {
             match source_url(source).and_then(|url| fetch_page(&url)) {
-                Ok(page) => pages.push(json!({
-                    "url": page.url, "title": page.title, "description": page.description, "text": page.text,
-                })),
-                Err(reason) => unread.push(UnreadSource { source: source.clone(), reason }),
+                Ok(page) => {
+                    found_images.extend(page.images.iter().map(|image| image.url.clone()));
+                    pages.push(json!({
+                        "url": page.url, "title": page.title, "description": page.description, "text": page.text,
+                        "themeColor": page.theme_color, "images": page.images,
+                    }));
+                }
+                Err(reason) => unread.push(UnreadSource {
+                    source: source.clone(),
+                    reason,
+                }),
             }
         }
         if pages.is_empty() && notes.trim().is_empty() {
@@ -159,6 +325,8 @@ impl WorkspaceStore {
                 markdown: String::new(),
                 summary: String::new(),
                 profiles: Vec::new(),
+                colors: Vec::new(),
+                images: Vec::new(),
                 unread,
             });
         }
@@ -171,11 +339,13 @@ impl WorkspaceStore {
             },
             provider,
             &research_prompt(&pages, &existing, notes.trim()),
-            &answer_schema(),
+            &answer_schema(&found_images),
             AGENT_TIMEOUT,
             || Ok(()),
         )?;
-        Ok(context_draft(&answer, unread).map_err(io::Error::other)?)
+        let mut draft = context_draft(&answer, unread).map_err(io::Error::other)?;
+        draft.images = suggested_images(&answer, &found_images);
+        Ok(draft)
     }
 }
 
@@ -194,7 +364,9 @@ mod tests {
             draft.profiles,
             vec![SuggestedProfile {
                 name: "Agent duels".into(),
-                description: "Head-to-head tests".into()
+                description: "Head-to-head tests".into(),
+                guidance: String::new(),
+                color: None,
             }]
         );
         assert!(

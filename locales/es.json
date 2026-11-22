@@ -1256,7 +1256,21 @@
       "not_a_page": "la dirección no es una página web",
       "no_text": "la página no tiene texto legible; puede requerir iniciar sesión o JavaScript",
       "too_many_redirects": "la página redirigió demasiadas veces"
-    }
+    },
+    "foundTitle": "También en tus páginas",
+    "foundIntro": "Desmarca lo que no quieras y añade el resto a este espacio de trabajo.",
+    "foundColors": "Colores de marca",
+    "foundImages": "Imágenes",
+    "purposes": {
+      "brand": "Marca",
+      "thumbnail_reference": "Referencia de miniatura",
+      "asset": "Recurso"
+    },
+    "importSelected": "Añadir {count} al espacio",
+    "importing": "Añadiendo…",
+    "imported": "Se han añadido {images} imágenes, {colors} colores y {profiles} perfiles.",
+    "importFailedImages": "No se pudieron descargar {count} imágenes.",
+    "importError": "No se pudieron añadir estos elementos. Inténtalo de nuevo."
   },
   "agentLogs": {
     "open": "Registros del agente",

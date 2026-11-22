@@ -1,10 +1,11 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronDown, Link2, LoaderCircle, Plus, Sparkles, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, Image as ImageIcon, Link2, LoaderCircle, Plus, Sparkles, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,12 +14,17 @@ import { useLocale } from "@/lib/locale-provider";
 const MAX_SOURCES = 8;
 
 type Problem = "invalid_address" | "not_public" | "not_found" | "unreachable" | "timed_out" | "http_error" | "not_a_page" | "no_text" | "too_many_redirects";
+type Profile = { name: string; description: string; guidance: string; color: string | null };
+type FoundImage = { url: string; name: string; description: string; group: string | null; labels: string[]; purpose: "brand" | "thumbnail_reference" | "asset" };
 type Draft = {
   markdown: string;
   summary: string;
-  profiles: { name: string; description: string }[];
+  profiles: Profile[];
+  colors: string[];
+  images: FoundImage[];
   unread: { source: string; reason: Problem }[];
 };
+type Outcome = { colors: number; images: number; profiles: number; failedImages: string[] };
 type Failure = "agent_unavailable" | "agent_timed_out" | "agent_failed" | "context_draft_failed";
 
 export function ContextResearch({ workspaceId, startOpen, onDraft }: {
@@ -33,7 +39,6 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure>();
   const [draft, setDraft] = useState<Draft>();
-  const [created, setCreated] = useState<string[]>([]);
   const [agent, setAgent] = useState<string>();
 
   useEffect(() => {
@@ -63,16 +68,6 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
       setFailure(typeof error === "string" && error in copy.failures ? error as Failure : "context_draft_failed");
     } finally {
       setPending(false);
-    }
-  }
-
-  async function createProfile(profile: Draft["profiles"][number]) {
-    try {
-      await invoke("create_profile", { workspaceId, name: profile.name, guidance: profile.description, color: null });
-      setCreated((current) => [...current, profile.name]);
-      window.dispatchEvent(new Event("arrumo:profiles-changed"));
-    } catch {
-      setFailure("context_draft_failed");
     }
   }
 
@@ -128,24 +123,8 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
                 ))}</ul>
               </div>
             )}
-            {draft.profiles.length > 0 && (
-              <section aria-labelledby="suggested-profiles" className="flex flex-col gap-2">
-                <h3 id="suggested-profiles" className="text-sm font-semibold">{copy.profiles}</h3>
-                <ul className="flex flex-col divide-y rounded-lg border">
-                  {draft.profiles.map((profile) => {
-                    const done = created.includes(profile.name);
-                    return (
-                      <li key={profile.name} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
-                        <span className="min-w-0 flex-1"><span className="block font-semibold">{profile.name}</span>
-                          {profile.description && <span className="block text-muted-foreground">{profile.description}</span>}</span>
-                        <Button type="button" size="sm" variant="outline" disabled={done} onClick={() => void createProfile(profile)}>
-                          {done ? <><Check data-icon="inline-start" />{copy.profileCreated}</> : <><Plus data-icon="inline-start" />{copy.createProfile}</>}
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
+            {(draft.profiles.length + draft.colors.length + draft.images.length) > 0 && (
+              <FoundItems key={draft.summary + draft.images.length} workspaceId={workspaceId} draft={draft} />
             )}
           </div>
         )}
@@ -153,3 +132,111 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
     </Collapsible>
   );
 }
+
+/** Everything else the agent found on the creator's pages, ticked by default, added in one go. */
+function FoundItems({ workspaceId, draft }: { workspaceId: number; draft: Draft }) {
+  const { messages: { contextResearch: copy } } = useLocale();
+  const [colors, setColors] = useState(() => new Set(draft.colors));
+  const [images, setImages] = useState(() => new Set(draft.images.map((image) => image.url)));
+  const [profiles, setProfiles] = useState(() => new Set(draft.profiles.map((profile) => profile.name)));
+  const [pending, setPending] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome>();
+  const [failed, setFailed] = useState(false);
+  const toggle = <T,>(set: Set<T>, value: T) => { const next = new Set(set); if (next.has(value)) next.delete(value); else next.add(value); return next; };
+  const chosen = colors.size + images.size + profiles.size;
+
+  async function apply() {
+    setPending(true);
+    setFailed(false);
+    try {
+      const result = await invoke<Outcome>("apply_context_import", { workspaceId, import: {
+        colors: draft.colors.filter((color) => colors.has(color)),
+        images: draft.images.filter((image) => images.has(image.url)),
+        profiles: draft.profiles.filter((profile) => profiles.has(profile.name)),
+      } });
+      setOutcome(result);
+      if (result.profiles) window.dispatchEvent(new Event("arrumo:profiles-changed"));
+    } catch {
+      setFailed(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="found-items" className="flex flex-col gap-4 rounded-lg border p-3">
+      <div>
+        <h3 id="found-items" className="text-sm font-semibold">{copy.foundTitle}</h3>
+        <p className="text-sm text-muted-foreground">{copy.foundIntro}</p>
+      </div>
+      {draft.colors.length > 0 && (
+        <fieldset className="flex flex-col gap-2" disabled={pending || !!outcome}>
+          <legend className="text-sm font-semibold">{copy.foundColors}</legend>
+          <div className="flex flex-wrap gap-2">
+            {draft.colors.map((color) => (
+              <label key={color} className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-sm has-checked:border-primary">
+                <Checkbox checked={colors.has(color)} onCheckedChange={() => setColors((current) => toggle(current, color))} />
+                <span className="size-4 rounded-sm border" style={{ background: color }} aria-hidden="true" />
+                <span className="font-mono text-xs">{color}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      {draft.images.length > 0 && (
+        <fieldset className="flex flex-col gap-2" disabled={pending || !!outcome}>
+          <legend className="text-sm font-semibold">{copy.foundImages}</legend>
+          <ul className="flex flex-col divide-y rounded-md border">
+            {draft.images.map((image) => (
+              <li key={image.url}>
+                <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 text-sm">
+                  <Checkbox className="mt-0.5" checked={images.has(image.url)} onCheckedChange={() => setImages((current) => toggle(current, image.url))} />
+                  <ImageIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2 font-semibold">{image.name}
+                      <span className="rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium">{copy.purposes[image.purpose]}</span>
+                      {image.group && <span className="text-xs font-normal text-muted-foreground">{image.group}</span>}
+                    </span>
+                    {image.description && <span className="block text-muted-foreground">{image.description}</span>}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+      {draft.profiles.length > 0 && (
+        <fieldset className="flex flex-col gap-2" disabled={pending || !!outcome}>
+          <legend className="text-sm font-semibold">{copy.profiles}</legend>
+          <ul className="flex flex-col divide-y rounded-md border">
+            {draft.profiles.map((profile) => (
+              <li key={profile.name}>
+                <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 text-sm">
+                  <Checkbox className="mt-0.5" checked={profiles.has(profile.name)} onCheckedChange={() => setProfiles((current) => toggle(current, profile.name))} />
+                  {profile.color && <span className="mt-1 size-3 shrink-0 rounded-sm" style={{ background: profile.color }} aria-hidden="true" />}
+                  <span className="min-w-0 flex-1"><span className="block font-semibold">{profile.name}</span>
+                    {profile.description && <span className="block text-muted-foreground">{profile.description}</span>}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+      {outcome ? (
+        <p role="status" className="flex items-start gap-2 text-sm">
+          <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-approval" />
+          <span>{copy.imported.replace("{images}", String(outcome.images)).replace("{colors}", String(outcome.colors)).replace("{profiles}", String(outcome.profiles))}
+            {outcome.failedImages.length > 0 && <> {copy.importFailedImages.replace("{count}", String(outcome.failedImages.length))}</>}</span>
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" disabled={pending || chosen === 0} onClick={() => void apply()}>
+            {pending ? <><LoaderCircle data-icon="inline-start" className="animate-spin motion-reduce:animate-none" />{copy.importing}</> : copy.importSelected.replace("{count}", String(chosen))}
+          </Button>
+          {failed && <p role="alert" className="text-sm text-destructive">{copy.importError}</p>}
+        </div>
+      )}
+    </section>
+  );
+}
+

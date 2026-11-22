@@ -469,6 +469,27 @@ async fn draft_workspace_context(
 }
 
 #[tauri::command]
+async fn apply_context_import(
+    workspace_id: i64,
+    import: arrumo_workspaces::ContextImport,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::ContextImportOutcome, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .apply_context_import(&database, workspace_id, &import)
+            .map_err(|_| "context_import_failed")
+    })
+    .await
+    .map_err(|_| "context_import_failed")?
+}
+
+#[tauri::command]
 async fn generate_motion_library_item(
     workspace_id: i64,
     profile_id: Option<i64>,
@@ -1011,6 +1032,7 @@ fn main() {
             get_workspace_context,
             draft_workspace_context,
             generate_motion_library_item,
+            apply_context_import,
             set_workspace_context,
             list_workspace_feedback,
             update_workspace_feedback,
