@@ -538,7 +538,10 @@
       "seconds": "{count} s",
       "noVideoProvider": "Nenhum fornecedor de vídeo está ativo. Ative um em Definições › Serviços e chaves e adicione a chave dele.",
       "submitVideo": "Gerar clipe",
-      "videoPendingHint": "Os clipes demoram alguns minutos. Mantenha esta janela aberta até o clipe estar pronto."
+      "videoPendingHint": "Os clipes demoram alguns minutos. Mantenha esta janela aberta até o clipe estar pronto.",
+      "openWith": "Gerar com {provider}",
+      "styleTitle": "Gerar uma referência de estilo",
+      "styleDescription": "Descreve o estilo que queres. A imagem junta-se aos recursos deste espaço de trabalho e às suas referências de estilo."
     }
   },
   "delivery": {

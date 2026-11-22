@@ -1,5 +1,6 @@
 "use client";
 
+import { GenerateAssetDialog } from "@/components/workspace/assets/generate-asset-dialog";
 import { useLocale } from "@/lib/locale-provider";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
@@ -90,6 +91,16 @@ export function WorkspaceBrandImages({ workspaceId }: {
     }
   }
 
+  async function attachGenerated(ids: number[]) {
+    setSaveError(false);
+    try {
+      for (const assetId of ids) await invoke("attach_brand_asset", { workspaceId, assetId, role: "style" });
+    } catch {
+      setSaveError(true);
+    }
+    setAttempt((value) => value + 1);
+  }
+
   function header(role: Role) {
     return (
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -97,11 +108,12 @@ export function WorkspaceBrandImages({ workspaceId }: {
           <h2 id={`brand-${role}-title`} className="text-[1.75rem]">{copy[role]}</h2>
           <p className="text-muted-foreground">{copy[role === "style" ? "styleHint" : "identityHint"]}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" disabled={pending || !images?.length} onClick={() => { setSaveError(false); setEditing(role); }}>
             <Images data-icon="inline-start" />{copy.manage}
           </Button>
           <Button variant="outline" disabled={pending} onClick={() => void upload(role)}><Upload data-icon="inline-start" />{copy.upload}</Button>
+          {role === "style" && <GenerateAssetDialog workspaceId={workspaceId} disabled={pending} imagesOnly onCreated={(ids) => void attachGenerated(ids)} />}
         </div>
       </div>
     );

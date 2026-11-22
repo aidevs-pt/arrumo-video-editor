@@ -538,7 +538,10 @@
       "seconds": "{count} s",
       "noVideoProvider": "No video provider is on. Turn one on in Settings › Services and keys and add its key.",
       "submitVideo": "Generate clip",
-      "videoPendingHint": "Clips take a few minutes. Keep this dialog open until the clip is ready."
+      "videoPendingHint": "Clips take a few minutes. Keep this dialog open until the clip is ready.",
+      "openWith": "Generate with {provider}",
+      "styleTitle": "Generate a style reference",
+      "styleDescription": "Describe the look you want. The image joins this workspace’s assets and its style references."
     }
   },
   "delivery": {

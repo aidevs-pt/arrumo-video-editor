@@ -30,10 +30,12 @@ const SIZES = [
 ];
 
 /** Describe an image or a clip, or write text to voice, and the workspace's providers make it for the library. */
-export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
+export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOnly = false }: {
   workspaceId: number;
   disabled?: boolean;
   onCreated: (ids: number[]) => void;
+  /** Only images, with the trigger naming the first image provider, as on the brand page. */
+  imagesOnly?: boolean;
 }) {
   const { messages: { assets: { generate: copy } } } = useLocale();
   const pluginText = usePluginText();
@@ -51,9 +53,9 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
   const [problem, setProblem] = useState<string>();
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !imagesOnly) return;
     invoke<Record<string, Preferences>>("list_provider_preferences", { workspaceId }).then(setAll, () => setAll({}));
-  }, [open, workspaceId]);
+  }, [imagesOnly, open, workspaceId]);
 
   const name = (entry: Provider) => pluginText.name(entry.id, entry.name);
   const inOrder = providers?.effective.map((id) => providers.available.find((entry) => entry.id === id)).filter((entry): entry is Provider => !!entry) ?? [];
@@ -90,22 +92,23 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated }: {
 
   return <Dialog open={open} onOpenChange={(next) => { if (!pending) setOpen(next); }}>
     <DialogTrigger asChild>
-      <Button variant="outline" disabled={disabled}><Sparkles data-icon="inline-start" />{copy.open}</Button>
+      <Button variant="outline" disabled={disabled}><Sparkles data-icon="inline-start" />
+        {imagesOnly && inOrder[0] ? copy.openWith.replace("{provider}", name(inOrder[0])) : copy.open}</Button>
     </DialogTrigger>
     <DialogContent className="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>{copy.title}</DialogTitle>
-        <DialogDescription>{copy.description}</DialogDescription>
+        <DialogTitle>{imagesOnly ? copy.styleTitle : copy.title}</DialogTitle>
+        <DialogDescription>{imagesOnly ? copy.styleDescription : copy.description}</DialogDescription>
       </DialogHeader>
       <form onSubmit={submit}>
         <FieldGroup>
-          <Tabs value={kind} onValueChange={(value) => { const next = value as Kind; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setProvider(""); setProblem(undefined); }}>
+          {!imagesOnly && <Tabs value={kind} onValueChange={(value) => { const next = value as Kind; setKind(next); if (next === "video" && ratio === "4:5") setRatio("16:9"); setProvider(""); setProblem(undefined); }}>
             <TabsList className="w-full justify-start">
               <TabsTrigger value="image" disabled={pending} className="flex-none"><ImageIcon data-icon="inline-start" />{copy.image}</TabsTrigger>
               <TabsTrigger value="audio" disabled={pending} className="flex-none"><AudioLines data-icon="inline-start" />{copy.audio}</TabsTrigger>
               <TabsTrigger value="video" disabled={pending} className="flex-none"><Clapperboard data-icon="inline-start" />{copy.video}</TabsTrigger>
             </TabsList>
-          </Tabs>
+          </Tabs>}
           <Field data-disabled={pending}>
             <FieldLabel htmlFor="generate-prompt">{kind === "audio" ? copy.speechText : copy.prompt}</FieldLabel>
             <Textarea id="generate-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending}

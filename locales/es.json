@@ -538,7 +538,10 @@
       "seconds": "{count} s",
       "noVideoProvider": "No hay ningún proveedor de vídeo activado. Actívalo en Ajustes › Servicios y claves y añade su clave.",
       "submitVideo": "Generar clip",
-      "videoPendingHint": "Los clips tardan unos minutos. Deja este diálogo abierto hasta que el clip esté listo."
+      "videoPendingHint": "Los clips tardan unos minutos. Deja este diálogo abierto hasta que el clip esté listo.",
+      "openWith": "Generar con {provider}",
+      "styleTitle": "Generar una referencia de estilo",
+      "styleDescription": "Describe el estilo que quieres. La imagen se añade a los recursos de este espacio de trabajo y a sus referencias de estilo."
     }
   },
   "delivery": {
