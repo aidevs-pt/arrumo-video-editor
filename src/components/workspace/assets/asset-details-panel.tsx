@@ -183,7 +183,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
       </Button>
       {single && <div className="flex flex-wrap items-center gap-2 border-t pt-4">
         <Button variant="outline" size="sm" disabled={busy} onClick={() => void replace(single)}>{messages.assets.replaceFile}</Button>
-        <ConfirmTitleDelete title={single.name} disabled={busy} copy={messages.assets.removal}
+        <ConfirmTitleDelete title={single.name} size="sm" disabled={busy} copy={messages.assets.removal}
           onConfirm={(confirmedName) => invoke<boolean>("remove_asset", { workspaceId, assetId: single.id, confirmedName })}
           onDelete={() => onRemoved(single.id)} />
       </div>}

@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false, open: controlled, onOpenChange }: {
+export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete, compact = false, size = "default", open: controlled, onOpenChange }: {
   title: string;
   disabled: boolean;
   compact?: boolean;
+  /** Matches the buttons beside it. */
+  size?: "default" | "sm";
   copy: {
     deleteTitle: string;
     deleteDescription: string;
@@ -64,7 +66,7 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
       }
     }}>
       <AlertDialogTrigger asChild>
-        <Button type="button" size={compact ? "icon-sm" : "sm"} variant="ghost" disabled={disabled} title={compact ? copy.deleteTitle : undefined}
+        <Button type="button" size={compact ? "icon-sm" : size} variant="ghost" disabled={disabled} title={compact ? copy.deleteTitle : undefined}
           aria-label={`${copy.deleteTitle} · ${title}`}>
           <Trash2 data-icon="inline-start" />{!compact && copy.deleteTitle}
         </Button>
