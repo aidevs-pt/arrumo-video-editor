@@ -217,9 +217,12 @@ fn narration_tracks(
 /// Delivered loudness: -14 LUFS integrated with -1.5 dBTP peaks, where social platforms
 /// normalize playback.
 const MASTER_LOUDNESS: &str = "I=-14:TP=-1.5:LRA=11";
+/// Audio quieter than this is room tone or near silence; raising it to the target would mostly
+/// amplify noise, so it is left as it is.
+const QUIETEST_MASTERED_LUFS: f64 = -45.0;
 
 /// The second loudnorm pass from the first pass's JSON report, or `None` when the audio is
-/// silent or could not be measured.
+/// silent, nearly silent or could not be measured.
 fn loudness_pass(report: &str) -> Option<String> {
     let start = report.rfind('{')?;
     let end = start + report[start..].find('}')?;
@@ -232,7 +235,7 @@ fn loudness_pass(report: &str) -> Option<String> {
             .ok()
             .filter(|value| value.is_finite())
     };
-    let input = field("input_i").filter(|loudness| *loudness > -70.0)?;
+    let input = field("input_i").filter(|loudness| *loudness > QUIETEST_MASTERED_LUFS)?;
     Some(format!(
         "loudnorm={MASTER_LOUDNESS}:measured_I={input}:measured_TP={}:measured_LRA={}:measured_thresh={}:offset={}:linear=true,aresample=48000",
         field("input_tp")?,
@@ -718,6 +721,8 @@ impl ActiveRender<'_> {
             "scenes.ffconcat",
             "-c",
             "copy",
+            "-movflags",
+            "+faststart",
             "-y",
         ]
         .map(String::from)
@@ -820,7 +825,7 @@ impl ActiveRender<'_> {
     }
 
     /// Writes `input` to `output` with its audio at the delivery loudness, measured first so
-    /// the gain is linear. A silent video is moved unchanged.
+    /// the gain is linear. A silent or nearly silent video is moved unchanged.
     fn master_audio(&self, input: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
         let measured = self.run_output(
             Command::new("ffmpeg")
@@ -1040,7 +1045,7 @@ impl ActiveRender<'_> {
                 "-i",
             ])
             .arg(list)
-            .args(["-c", "copy", "-y"])
+            .args(["-c", "copy", "-movflags", "+faststart", "-y"])
             .arg(scratch.join(format!("{id}-joined.mp4")));
         self.run(&mut command, "joining source clips")?;
         self.master_audio(
@@ -1079,5 +1084,7 @@ mod tests {
         let silent = "{\"input_i\" : \"-inf\", \"input_tp\" : \"-inf\", \"input_lra\" : \"0.00\", \"input_thresh\" : \"-70.00\", \"target_offset\" : \"inf\"}";
         assert_eq!(super::loudness_pass(silent), None);
         assert_eq!(super::loudness_pass("no report"), None);
+        let room_tone = loud.replace("-23.10", "-52.00");
+        assert_eq!(super::loudness_pass(&room_tone), None);
     }
 }

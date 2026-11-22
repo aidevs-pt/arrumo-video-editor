@@ -100,7 +100,7 @@ impl WorkspaceStore {
                     id: format!("transcript:{asset}:{}", index + 1),
                     kind: "transcript part",
                     title: format!("{name}, part {} of {count}", index + 1),
-                    detail: format!("Transcript lines from {} to {}", part.from, part.to),
+                    detail: format!("Transcript lines from {} s to {} s", part.from, part.to),
                 });
             }
         }

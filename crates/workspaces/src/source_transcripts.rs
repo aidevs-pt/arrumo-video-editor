@@ -138,36 +138,45 @@ const CUT_LEAD_SECONDS: f64 = 0.05;
 /// Padding kept after the last spoken word of a cut.
 const CUT_TAIL_SECONDS: f64 = 0.08;
 
-/// Moves a cut's edges so it never splits a word. An edge inside a word, or closer to it than
-/// the padding, moves out to the word's boundary plus the padding, but not into the neighbouring
-/// word. Edges in a longer silence stay where they are.
+/// Moves a cut's edges so it never splits a word. An edge inside a word moves to the nearer
+/// side: the cut keeps the word when the edge covers most of it and drops it otherwise. A kept
+/// first or last word gets padding, but never reaching into the neighbouring word. Edges in a
+/// longer silence stay where they are.
 pub(crate) fn snap_cut(words: &[TranscriptWord], start: f64, end: f64) -> (f64, f64) {
-    let mut snapped = (start, end);
-    if let Some((index, first)) = words.iter().enumerate().find(|(_, word)| word.end > start)
-        && first.start - start < CUT_LEAD_SECONDS
-        && first.start < end
-    {
+    let lead = |index: usize| {
+        let word = &words[index];
         let previous = words[..index]
             .iter()
             .map(|word| word.end)
             .fold(0.0_f64, f64::max)
-            .min(first.start);
-        snapped.0 = (first.start - CUT_LEAD_SECONDS).max(previous).max(0.0);
-    }
-    if let Some((index, last)) = words
-        .iter()
-        .enumerate()
-        .rev()
-        .find(|(_, word)| word.start < end)
-        && end - last.end < CUT_TAIL_SECONDS
-        && last.end > snapped.0
-    {
+            .min(word.start);
+        (word.start - CUT_LEAD_SECONDS).max(previous).max(0.0)
+    };
+    let tail = |index: usize| {
+        let word = &words[index];
         let next = words[index + 1..]
             .iter()
             .map(|word| word.start)
-            .filter(|next| *next >= last.end)
+            .filter(|next| *next >= word.end)
             .fold(f64::INFINITY, f64::min);
-        snapped.1 = (last.end + CUT_TAIL_SECONDS).min(next);
+        (word.end + CUT_TAIL_SECONDS).min(next)
+    };
+    let mut snapped = (start, end);
+    if let Some(index) = words.iter().position(|word| word.end > start) {
+        let word = &words[index];
+        if start > word.start && start - word.start > word.end - start {
+            snapped.0 = word.end;
+        } else if word.start - start < CUT_LEAD_SECONDS && word.start < end {
+            snapped.0 = lead(index);
+        }
+    }
+    if let Some(index) = words.iter().rposition(|word| word.start < end) {
+        let word = &words[index];
+        if end < word.end && word.end - end > end - word.start {
+            snapped.1 = word.start;
+        } else if end - word.end < CUT_TAIL_SECONDS && word.end > snapped.0 {
+            snapped.1 = tail(index);
+        }
     }
     if snapped.1 > snapped.0 {
         snapped
@@ -385,6 +394,11 @@ mod tests {
         // The tail padding never reaches the next word.
         let (_, end) = snap_cut(&words, 2.0, 2.92);
         assert!((end - 2.95).abs() < 1e-9);
+        // Edges barely inside a long word drop it rather than keep it.
+        let (start, end) = snap_cut(&words, 5.3, 6.5);
+        assert!((start - 5.36).abs() < 1e-9 && (end - 6.82).abs() < 1e-9);
+        let (_, end) = snap_cut(&words, 2.0, 3.51);
+        assert!((end - 3.45).abs() < 1e-9);
     }
 
     #[test]
