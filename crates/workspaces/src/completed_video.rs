@@ -51,6 +51,62 @@ impl WorkspaceStore {
         })
     }
 
+    /// A still that represents a finished video: its first generated thumbnail, or a frame of its
+    /// first delivered video, kept next to the delivery so later views reuse it.
+    pub fn completed_poster(
+        &self,
+        database: &std::path::Path,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        let video = self.completed_video(workspace_id, run_id)?;
+        if let Some(thumbnail) = video
+            .supplemental_media
+            .iter()
+            .find(|media| media.kind == "image")
+            .and_then(|media| media.managed_file(database, workspace_id).ok())
+        {
+            return Ok(thumbnail);
+        }
+        let output = video
+            .delivery
+            .verified_outputs
+            .first()
+            .ok_or_else(|| std::io::Error::other("The video has no delivered output"))?;
+        let source = crate::delivery_verification::managed_delivery_file(
+            database,
+            workspace_id,
+            run_id,
+            &output.video,
+        )?;
+        let directory = source
+            .parent()
+            .ok_or_else(|| std::io::Error::other("The delivery has no directory"))?;
+        let poster = directory.join("poster.jpg");
+        if !poster.is_file() {
+            let pending = directory.join("poster-pending.jpg");
+            let seconds = (output.duration_seconds * 0.2).min(3.0);
+            let made = std::process::Command::new("ffmpeg")
+                .args([
+                    "-nostdin",
+                    "-v",
+                    "error",
+                    "-ss",
+                    &format!("{seconds:.2}"),
+                    "-i",
+                ])
+                .arg(&source)
+                .args(["-frames:v", "1", "-vf", "scale=480:-2", "-y"])
+                .arg(&pending)
+                .status()?;
+            if !made.success() {
+                return Err(std::io::Error::other("Could not take a frame of the video").into());
+            }
+            std::fs::rename(&pending, &poster)?;
+        }
+        Ok(poster)
+    }
+
     pub fn rename_completed_video(
         &self,
         workspace_id: i64,

@@ -349,3 +349,33 @@ pub async fn preview_completed_supplemental_media(
     let mime = crate::delivery_stream::managed_media_type(&entry.name).ok_or(failed)?;
     stream.open_media(file, mime).map_err(|_| failed)
 }
+
+#[tauri::command]
+pub async fn completed_video_poster(
+    workspace_id: i64,
+    run_id: i64,
+    app: AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<String, &'static str> {
+    let failed = "completed_poster_failed";
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite");
+    let file = tauri::async_runtime::spawn_blocking(move || {
+        let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
+        store
+            .completed_poster(&database, workspace_id, run_id)
+            .and_then(|file| Ok(file.canonicalize()?))
+            .map_err(|_| failed)
+    })
+    .await
+    .map_err(|_| failed)??;
+    let name = file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    let mime = crate::delivery_stream::managed_media_type(name).ok_or(failed)?;
+    stream.open_media(file, mime).map_err(|_| failed)
+}

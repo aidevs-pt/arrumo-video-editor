@@ -87,7 +87,7 @@ function VideoLibrary({ workspaceId }: { workspaceId: number }) {
               <li key={run.id}>
                 <Link className="group flex items-center gap-3 px-1 py-3 hover:bg-muted/60 sm:gap-4"
                   href={completedVideoHref(workspaceId, run.id)}>
-                  <VideoPlaceholder />
+                  <VideoPoster workspaceId={workspaceId} runId={run.id} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="wrap-anywhere font-semibold">{title(run)}</span>
                     <span className="text-sm text-muted-foreground">{run.snapshot.profile?.name ?? messages.drafts.noProfile}</span>
@@ -108,10 +108,22 @@ function title(run: Run) {
   return run.display_title ?? run.snapshot.draft.title;
 }
 
-function VideoPlaceholder() {
+/** The video's thumbnail or a frame of it, with the film icon while it loads or when there is none. */
+function VideoPoster({ workspaceId, runId }: { workspaceId: number; runId: number }) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    invoke<string>("completed_video_poster", { workspaceId, runId })
+      .then((value) => { if (active) setUrl(value); }, () => {});
+    return () => { active = false; };
+  }, [workspaceId, runId]);
   return (
-    <span className="grid aspect-video w-22 shrink-0 place-items-center rounded-sm bg-muted text-muted-foreground sm:w-28" aria-hidden="true">
-      <Film className="size-4" />
+    <span className="grid aspect-video w-22 shrink-0 place-items-center overflow-hidden rounded-sm bg-muted text-muted-foreground sm:w-28" aria-hidden="true">
+      {url
+        // Managed local still served by the desktop host.
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={url} alt="" className="size-full object-cover" onError={() => setUrl(undefined)} />
+        : <Film className="size-4" />}
     </span>
   );
 }
