@@ -9,7 +9,7 @@ Arrumo is a local video editor. A *run* takes a draft (a brief plus optional foo
 
 ## Connect
 
-Add a stdio MCP server that runs `arrumo-workspaces <absolute-database-path> mcp` (see `docs/developer/en/connect.md`). The desktop app keeps its database at `workspaces.sqlite` in its data folder, `pt.aidevs.arrumo` under the platform's app-data directory. Most tools take `workspaceId`; start with `list_workspaces`.
+Add a stdio MCP server that runs `arrumo-workspaces <absolute-database-path> mcp` (see [Connect to Arrumo](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/en/developer/connect.md)). The desktop app keeps its database at `workspaces.sqlite` in its data folder, `pt.aidevs.arrumo` under the platform's app-data directory. Most tools take `workspaceId`; start with `list_workspaces`.
 
 ## Principles
 

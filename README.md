@@ -2,13 +2,15 @@
 
 The Tauri and Next.js desktop editor and shared application API for the UI, CLI, MCP, and A2A.
 
+User, developer and plugin guides live in [Arrumo Docs](https://github.com/aidevs-pt/arrumo-docs), in English, Spanish and Portuguese. This README is the full command and operation reference.
+
 ## User guide
 
-Create, review, and export a video. [English](docs/user/en/first-video.md) · [Español](docs/user/es/first-video.md) · [Português](docs/user/pt/first-video.md)
+Create, review, and export a video. [English](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/en/user/first-video.md) · [Español](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/es/user/first-video.md) · [Português](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/pt/user/first-video.md)
 
 ## Developer quickstart
 
-Connect through CLI, MCP, or A2A. [English](docs/developer/en/connect.md) · [Español](docs/developer/es/connect.md) · [Português](docs/developer/pt/connect.md)
+Connect through CLI, MCP, or A2A. [English](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/en/developer/connect.md) · [Español](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/es/developer/connect.md) · [Português](https://github.com/aidevs-pt/arrumo-docs/blob/main/content/docs/pt/developer/connect.md)
 
 Agents that drive Arrumo over MCP can load [`skills/arrumo/SKILL.md`](skills/arrumo/SKILL.md), the editing workflow and review checklist, as a Claude Code or Codex skill.
 
