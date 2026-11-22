@@ -133,6 +133,7 @@ export function PluginCatalog() {
                     <h3 className="text-sm font-semibold">{manifest.name}</h3>
                     <p className="text-sm text-muted-foreground">{manifest.description}</p>
                     {stored?.release && <p className="text-xs text-muted-foreground">{stored.release.version}</p>}
+                    {pluginText.iconNotice(manifest.id) && <p className="mt-1 text-xs text-muted-foreground">{pluginText.iconNotice(manifest.id)}</p>}
                   </div>
                   {bundled ? <Badge variant="secondary">{copy.bundled}</Badge> : (
                     <AlertDialog>

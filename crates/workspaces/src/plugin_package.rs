@@ -231,6 +231,16 @@ pub(crate) fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Err
         .take(MAX_PLUGIN_MANIFEST_BYTES as u64 + 1)
         .read_to_end(&mut manifest)?;
     let parsed = PluginManifest::parse(&manifest)?;
+    if let Some(icon) = &parsed.icon {
+        let entry = archive.by_name(icon)?;
+        let valid = entry.is_file() && entry.size() <= crate::plugin_text::MAX_ICON_BYTES as u64;
+        drop(entry);
+        if !valid || package_icon(bytes, &parsed).is_none() {
+            return Err(
+                invalid_package("Plugin icon must be an inert SVG of at most 8 KiB").into(),
+            );
+        }
+    }
     if let Some(code) = &parsed.code {
         for path in code.entrypoints() {
             let entry = archive.by_name(path)?;
@@ -242,6 +252,22 @@ pub(crate) fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Err
         }
     }
     Ok(manifest)
+}
+
+/// The manifest's icon read from its package, when it is present and passes the SVG checks.
+pub(crate) fn package_icon(bytes: &[u8], manifest: &PluginManifest) -> Option<String> {
+    let path = manifest.icon.as_deref()?;
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).ok()?;
+    let entry = archive.by_name(path).ok()?;
+    if !entry.is_file() || entry.size() > crate::plugin_text::MAX_ICON_BYTES as u64 {
+        return None;
+    }
+    let mut svg = String::new();
+    entry
+        .take(crate::plugin_text::MAX_ICON_BYTES as u64 + 1)
+        .read_to_string(&mut svg)
+        .ok()?;
+    crate::plugin_text::valid_icon(&svg).then_some(svg)
 }
 
 pub(crate) fn valid_sha256(digest: &str) -> bool {

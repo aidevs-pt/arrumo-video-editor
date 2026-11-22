@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::plugin_catalog::PluginManifest;
 
 pub const TRANSLATED_LANGUAGES: [&str; 3] = ["en", "es", "pt"];
-const MAX_ICON_BYTES: usize = 8 * 1024;
+pub(crate) const MAX_ICON_BYTES: usize = 8 * 1024;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -19,6 +19,8 @@ pub struct PluginTranslation {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_notice: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<ProviderTranslation>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -77,6 +79,10 @@ pub(crate) fn valid_translations(manifest: &PluginManifest) -> bool {
                 .description
                 .as_deref()
                 .is_none_or(|value| text(value, 500))
+            && entry
+                .icon_notice
+                .as_deref()
+                .is_none_or(|value| manifest.icon_notice.is_some() && text(value, 200))
             && entry.provider.as_ref().is_none_or(|provider| {
                 manifest.agent_provider.is_some() && text(&provider.label, 80)
             })
@@ -119,6 +125,18 @@ pub(crate) fn valid_translations(manifest: &PluginManifest) -> bool {
     })
 }
 
+/// A relative `.svg` path inside a plugin package.
+pub(crate) fn valid_icon_path(path: &str) -> bool {
+    path.len() <= 128
+        && path.ends_with(".svg")
+        && path.split('/').all(|part| {
+            part.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+                && part.bytes().all(|byte| {
+                    byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte)
+                })
+        })
+}
+
 /// A small, self-contained SVG: no script, event handlers, external references or embedded
 /// documents.
 pub(crate) fn valid_icon(svg: &str) -> bool {
@@ -153,6 +171,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bundled_icons_are_inert_svg() {
+        let catalog = crate::WorkspaceStore::open(":memory:")
+            .unwrap()
+            .plugin_catalog()
+            .unwrap();
+        for plugin in catalog.iter().filter(|plugin| plugin.bundled) {
+            assert!(plugin.icon_svg.is_some(), "{}", plugin.manifest.id);
+        }
+        assert!(valid_icon_path("icon.svg") && valid_icon_path("assets/mark-2.svg"));
+        for bad in [
+            "../icon.svg",
+            "/icon.svg",
+            "icon.png",
+            "a//b.svg",
+            "Icon.svg",
+            ".svg",
+        ] {
+            assert!(!valid_icon_path(bad), "{bad}");
+        }
+    }
+
+    #[test]
     fn icons_must_be_inert_svg() {
         assert!(valid_icon(
             r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg>"#
@@ -178,7 +218,7 @@ mod tests {
                 .find(|manifest| manifest.id == plugin.id)
                 .unwrap();
             assert!(valid_translations(manifest));
-            assert!(manifest.icon.as_deref().is_some_and(valid_icon), "{id}");
+            assert_eq!(manifest.icon.as_deref(), Some("icon.svg"), "{id}");
             let mut broken = manifest.clone();
             broken
                 .translations

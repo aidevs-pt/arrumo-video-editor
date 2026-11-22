@@ -13,12 +13,14 @@ type SettingText = { label?: string; description?: string; choices?: Record<stri
 type Translation = {
   name?: string;
   description?: string;
+  iconNotice?: string;
   provider?: { label: string };
   capabilities?: Record<string, Named>;
   settings?: Record<string, SettingText>;
   actions?: Record<string, Labelled>;
 };
-type CatalogManifest = { id: string; icon?: string; translations?: Record<string, Translation> };
+type CatalogManifest = { id: string; iconNotice?: string; translations?: Record<string, Translation> };
+type CatalogEntry = { manifest: CatalogManifest; iconSvg?: string };
 
 export const PLUGINS_CHANGED = "arrumo:plugins-changed";
 
@@ -32,6 +34,8 @@ type PluginText = {
   choice: (pluginId: string, settingId: string, value: string) => string;
   action: (pluginId: string, actionId: string, field: keyof Labelled, fallback: string) => string;
   icon: (pluginId: string) => string | undefined;
+  /** Who owns the brand mark the plugin uses as its icon, if it is one. */
+  iconNotice: (pluginId: string) => string | undefined;
   /** A setting declaration with its label, description and choice labels translated. */
   field: <T extends SettingDeclaration>(pluginId: string, field: T) => T & { choiceLabels: Record<string, string> };
 };
@@ -41,14 +45,15 @@ type SettingDeclaration = { id: string; label: string; description: string; choi
 const PluginTextContext = createContext<PluginText | null>(null);
 
 /** Plugin text and icons come from the plugins themselves (their manifest `translations` and
- * `icon`); English stays in the fields every API already returns. */
+ * the SVG file their `icon` names, checked by the host); English stays in the fields every API
+ * already returns. */
 export function PluginTextProvider({ children }: { children: ReactNode }) {
   const { locale } = useLocale();
-  const [manifests, setManifests] = useState<Map<string, CatalogManifest>>(new Map());
+  const [plugins, setPlugins] = useState<Map<string, CatalogEntry>>(new Map());
 
   const load = useCallback(() => {
-    invoke<{ manifest: CatalogManifest }[]>("list_plugin_catalog").then(
-      (plugins) => setManifests(new Map(plugins.map(({ manifest }) => [manifest.id, manifest]))),
+    invoke<CatalogEntry[]>("list_plugin_catalog").then(
+      (entries) => setPlugins(new Map(entries.map((entry) => [entry.manifest.id, entry]))),
       () => undefined,
     );
   }, []);
@@ -60,7 +65,7 @@ export function PluginTextProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const value = useMemo<PluginText>(() => {
-    const entry = (id: string, language = locale) => manifests.get(id)?.translations?.[language];
+    const entry = (id: string, language = locale) => plugins.get(id)?.manifest.translations?.[language];
     return {
       name: (id, fallback) => entry(id)?.name ?? fallback,
       description: (id, fallback) => entry(id)?.description ?? fallback,
@@ -70,7 +75,8 @@ export function PluginTextProvider({ children }: { children: ReactNode }) {
       choice: (id, setting, choice) =>
         entry(id)?.settings?.[setting]?.choices?.[choice] ?? entry(id, "en")?.settings?.[setting]?.choices?.[choice] ?? choice,
       action: (id, action, field, fallback) => entry(id)?.actions?.[action]?.[field] ?? fallback,
-      icon: (id) => manifests.get(id)?.icon,
+      icon: (id) => plugins.get(id)?.iconSvg,
+      iconNotice: (id) => entry(id)?.iconNotice ?? plugins.get(id)?.manifest.iconNotice,
       field: (id, field) => ({
         ...field,
         label: entry(id)?.settings?.[field.id]?.label ?? field.label,
@@ -79,7 +85,7 @@ export function PluginTextProvider({ children }: { children: ReactNode }) {
           entry(id)?.settings?.[field.id]?.choices?.[choice] ?? entry(id, "en")?.settings?.[field.id]?.choices?.[choice] ?? choice])),
       }),
     };
-  }, [manifests, locale]);
+  }, [plugins, locale]);
 
   return <PluginTextContext.Provider value={value}>{children}</PluginTextContext.Provider>;
 }
@@ -93,6 +99,7 @@ const english: PluginText = {
   choice: (_, __, choice) => choice,
   action: (_, __, ___, fallback) => fallback,
   icon: () => undefined,
+  iconNotice: () => undefined,
   field: (_, field) => ({ ...field, choiceLabels: Object.fromEntries((field.choices ?? []).map((choice) => [choice, choice])) }),
 };
 
@@ -108,12 +115,12 @@ export function PluginIcon({ pluginId, className, tone = "light" }: {
   /** The surface it sits on, for the placeholder's contrast. */
   tone?: "light" | "dark";
 }) {
-  const { icon } = usePluginText();
+  const { icon, iconNotice } = usePluginText();
   const svg = pluginId ? icon(pluginId) : undefined;
   if (svg) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`} alt="" aria-hidden="true"
-      className={cn("size-8 shrink-0 rounded-md", className)} />;
+      title={pluginId ? iconNotice(pluginId) : undefined} className={cn("size-8 shrink-0 rounded-md", className)} />;
   }
   return (
     <span aria-hidden="true" className={cn("grid size-8 shrink-0 place-items-center rounded-md",

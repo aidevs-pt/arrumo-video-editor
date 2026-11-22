@@ -52,13 +52,20 @@ pub struct PluginManifest {
         skip_serializing_if = "Option::is_none"
     )]
     pub introduction: Option<PluginIntroduction>,
-    /// A small SVG the plugin is shown with (schema 8).
+    /// Path inside the package of the SVG the plugin is shown with (schema 8).
     #[serde(
         default,
         deserialize_with = "deserialize_present",
         skip_serializing_if = "Option::is_none"
     )]
     pub icon: Option<String>,
+    /// Who owns a brand mark used as the icon, shown beside it (schema 8).
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub icon_notice: Option<String>,
     /// The plugin's own text in other languages, keyed `es` and `pt` (schema 8).
     #[serde(
         default,
@@ -347,6 +354,9 @@ pub struct CatalogPlugin {
     pub manifest: PluginManifest,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package: Option<PluginPackageInfo>,
+    /// The checked SVG the manifest's `icon` names; absent means the default icon.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_svg: Option<String>,
 }
 
 impl PluginManifest {
@@ -390,12 +400,17 @@ impl PluginManifest {
         {
             return Err(invalid_manifest("Invalid plugin introduction").into());
         }
-        if (manifest.icon.is_some() || manifest.translations.is_some())
+        if (manifest.icon.is_some()
+            || manifest.translations.is_some()
+            || manifest.icon_notice.is_some())
             && manifest.schema_version < 8
+            || manifest.icon_notice.as_deref().is_some_and(|notice| {
+                notice.trim().is_empty() || notice.chars().count() > 200 || manifest.icon.is_none()
+            })
             || manifest
                 .icon
                 .as_deref()
-                .is_some_and(|icon| !crate::plugin_text::valid_icon(icon))
+                .is_some_and(|icon| !crate::plugin_text::valid_icon_path(icon))
         {
             return Err(invalid_manifest("Invalid plugin icon").into());
         }
@@ -505,6 +520,7 @@ pub(crate) struct BundledSource {
     pub transcription_timed: Option<&'static [u8]>,
     pub speech_synthesis: Option<&'static [u8]>,
     pub image_generation: Option<&'static [u8]>,
+    icon: Option<&'static [u8]>,
     package: Option<&'static [u8]>,
     release: Option<&'static str>,
 }
@@ -608,6 +624,9 @@ impl WorkspaceStore {
         if manifest.code.is_some() && package.is_none() {
             return Err(invalid_manifest("Plugins with code require a ZIP package").into());
         }
+        if manifest.icon.is_some() && package.is_none() {
+            return Err(invalid_manifest("Plugins with an icon require a ZIP package").into());
+        }
         let (info, archive) = package.unzip();
         let source = info.and_then(|info| info.release.as_ref());
         if source.is_some_and(|source| source.plugin_id != manifest.id) {
@@ -657,10 +676,13 @@ impl WorkspaceStore {
                 return Err(invalid_manifest("Plugin ID is already installed").into());
             }
         }
+        let icon_svg =
+            archive.and_then(|bytes| crate::plugin_package::package_icon(bytes, &manifest));
         Ok(CatalogPlugin {
             bundled: false,
             manifest,
             package: info.cloned(),
+            icon_svg,
         })
     }
 
@@ -668,19 +690,27 @@ impl WorkspaceStore {
         let mut plugins: Vec<_> = bundled_manifests()
             .iter()
             .cloned()
-            .map(|manifest| {
+            .zip(BUNDLED)
+            .map(|(manifest, source)| {
                 let package = bundled_package(&manifest.id)
                     .map_err(io::Error::other)?
                     .map(|(_, _, info)| info.clone());
+                let icon_svg = source
+                    .icon
+                    .and_then(|bytes| std::str::from_utf8(bytes).ok())
+                    .filter(|svg| crate::plugin_text::valid_icon(svg))
+                    .map(str::to_owned);
                 Ok(CatalogPlugin {
                     bundled: true,
                     manifest,
                     package,
+                    icon_svg,
                 })
             })
             .collect::<io::Result<_>>()?;
         let mut query = self.0.prepare(
-            "SELECT manifest, package_sha256, length(package_bytes), release_source
+            "SELECT manifest, package_sha256, length(package_bytes), release_source,
+                    CASE WHEN json_extract(manifest, '$.icon') IS NOT NULL THEN package_bytes END
              FROM installed_plugin_manifests ORDER BY plugin_id",
         )?;
         let rows = query.query_map([], |row| {
@@ -695,10 +725,10 @@ impl WorkspaceStore {
                     ))
                 })
                 .transpose()?;
-            Ok((manifest, package))
+            Ok((manifest, package, row.get::<_, Option<Vec<u8>>>(4)?))
         })?;
         for stored in rows {
-            let (manifest, package) = stored?;
+            let (manifest, package, archive) = stored?;
             let package = package
                 .map(|(sha256, byte_length, release)| {
                     Ok::<_, serde_json::Error>(PluginPackageInfo {
@@ -716,10 +746,14 @@ impl WorkspaceStore {
                 .iter()
                 .any(|plugin| plugin.id == manifest.id)
             {
+                let icon_svg = archive
+                    .as_deref()
+                    .and_then(|bytes| crate::plugin_package::package_icon(bytes, &manifest));
                 plugins.push(CatalogPlugin {
                     bundled: false,
                     manifest,
                     package,
+                    icon_svg,
                 });
             }
         }

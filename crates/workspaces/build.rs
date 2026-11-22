@@ -106,7 +106,12 @@ fn main() {
             let transcription_timed = adapter("transcription-timed.json");
             let speech_synthesis = adapter("speech-synthesis.json");
             let image_generation = adapter("image-generation.json");
-            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, image_generation: {image_generation}, package: {package}, release: {source} }},\n"));
+            let icon = match (checkout["icon"].as_str(), &mut verified_zip) {
+                (None, _) => "None".into(),
+                (Some(name), Some(archive)) => release_adapter(&output, id, archive, name),
+                (Some(name), None) => optional_adapter(&directory, name),
+            };
+            index.push_str(&format!("    BundledSource {{ manifest: include_bytes!({manifest:?}), transcription: {transcription}, transcription_timed: {transcription_timed}, speech_synthesis: {speech_synthesis}, image_generation: {image_generation}, icon: {icon}, package: {package}, release: {source} }},\n"));
         }
     }
     index.push_str("];\n");
@@ -132,7 +137,7 @@ fn release_adapter(
     let Some(bytes) = read_release_entry(id, archive, name) else {
         return "None".into();
     };
-    let snapshot = output.join(format!("default-{id}-{name}"));
+    let snapshot = output.join(format!("default-{id}-{}", name.replace('/', "-")));
     fs::write(&snapshot, bytes).expect("write verified adapter snapshot");
     format!("Some(include_bytes!({snapshot:?}))")
 }
