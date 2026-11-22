@@ -1190,7 +1190,6 @@
     "draftTitle": "{stage} draft v{version}",
     "reviewHint": "Approve, ask for changes or reject. Nothing is sent until you press Send.",
     "noTranscript": "Written without hearing {clips}. Add a transcription key, then ask for changes to redraft from what you said.",
-    "loudJoins": "Possible click at {times}. Listen there before approving.",
     "addKey": "Add a key",
     "cutsTitle": "What {agent} kept",
     "cutsTitleFallback": "What the agent kept",

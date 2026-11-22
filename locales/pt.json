@@ -1190,7 +1190,6 @@
     "draftTitle": "{stage}, rascunho v{version}",
     "reviewHint": "Aprove, peça alterações ou rejeite. Nada é enviado até carregar em Enviar.",
     "noTranscript": "Escrito sem ouvir {clips}. Adicione uma chave de transcrição e peça alterações para o refazer a partir do que disse.",
-    "loudJoins": "Possível clique em {times}. Ouve nesse ponto antes de aprovar.",
     "addKey": "Adicionar uma chave",
     "cutsTitle": "O que {agent} manteve",
     "cutsTitleFallback": "O que o agente manteve",

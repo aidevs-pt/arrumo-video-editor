@@ -245,14 +245,11 @@ fn loudness_pass(report: &str) -> Option<String> {
     ))
 }
 
-/// Fades the first and last 30 ms of a cut's audio so joined cuts don't click.
 /// What the host measured on one rendered format, kept with the stage result.
 #[derive(Debug, PartialEq)]
 pub(crate) struct RenderCheck {
     pub seconds: f64,
     pub expected_seconds: f64,
-    /// Joins whose audio peaks well above the speech around them, a likely click.
-    pub loud_joins: Vec<f64>,
 }
 
 impl RenderCheck {
@@ -261,12 +258,9 @@ impl RenderCheck {
         json!({
             "seconds": round(self.seconds),
             "expected_seconds": round(self.expected_seconds),
-            "loud_joins": self.loud_joins.iter().map(|at| round(*at)).collect::<Vec<_>>(),
         })
     }
 }
-
-const CHECK_RATE: u32 = 24_000;
 
 /// Every concatenated part may gain or lose an audio frame, so allow a little per part.
 fn duration_matches(seconds: f64, parts: &[f64]) -> bool {
@@ -274,35 +268,7 @@ fn duration_matches(seconds: f64, parts: &[f64]) -> bool {
     (seconds - expected).abs() <= 0.1 + 0.05 * parts.len() as f64
 }
 
-/// Joins where the peak within 15 ms is at least -20 dBFS and three times the RMS of the
-/// half second either side. Cuts fade over 30 ms, so a clean join is quieter than its context.
-fn loud_joins(samples: &[i16], rate: u32, joins: &[f64]) -> Vec<f64> {
-    let at = |seconds: f64| ((seconds.max(0.0) * f64::from(rate)) as usize).min(samples.len());
-    let level = |sample: &i16| f64::from(*sample) / 32768.0;
-    joins
-        .iter()
-        .copied()
-        .filter(|&join| {
-            let peak = samples[at(join - 0.015)..at(join + 0.015)]
-                .iter()
-                .map(|sample| level(sample).abs())
-                .fold(0.0, f64::max);
-            let context = samples[at(join - 0.5)..at(join - 0.05)]
-                .iter()
-                .chain(&samples[at(join + 0.05)..at(join + 0.5)]);
-            let (sum, count) = context.fold((0.0, 0usize), |(sum, count), sample| {
-                (sum + level(sample).powi(2), count + 1)
-            });
-            let rms = if count == 0 {
-                0.0
-            } else {
-                (sum / count as f64).sqrt()
-            };
-            peak >= 0.1 && peak >= rms * 3.0
-        })
-        .collect()
-}
-
+/// Fades the first and last 30 ms of a cut's audio so joined cuts don't click.
 fn cut_audio_filter(length_ms: u32) -> String {
     let fade = (length_ms / 4).min(30);
     if fade == 0 {
@@ -1125,7 +1091,7 @@ impl ActiveRender<'_> {
         self.check_render(&output, &parts)
     }
 
-    /// Compares the finished video with its parts and listens at each join, without vision.
+    /// Compares the finished video's duration with the parts it was joined from.
     fn check_render(&self, video: &Path, parts: &[f64]) -> Result<RenderCheck, Box<dyn Error>> {
         let seconds = probe_duration(video)?;
         let expected_seconds = parts.iter().sum();
@@ -1135,48 +1101,9 @@ impl ActiveRender<'_> {
             ))
             .into());
         }
-        let joins: Vec<f64> = parts
-            .iter()
-            .scan(0.0, |end, part| {
-                *end += part;
-                Some(*end)
-            })
-            .take(parts.len().saturating_sub(1))
-            .collect();
-        let mut loud = Vec::new();
-        if !joins.is_empty() {
-            let pcm = video.with_extension("pcm");
-            self.run(
-                Command::new("ffmpeg")
-                    .args([
-                        "-nostdin",
-                        "-v",
-                        "error",
-                        "-protocol_whitelist",
-                        "file",
-                        "-i",
-                    ])
-                    .arg(video)
-                    .args(["-map", "0:a:0", "-ac", "1", "-ar"])
-                    .arg(CHECK_RATE.to_string())
-                    .args(["-f", "s16le", "-y"])
-                    .arg(&pcm),
-                "listening to the joins",
-            )?;
-            let bytes = fs::read(&pcm)?;
-            fs::remove_file(&pcm)?;
-            let samples: Vec<i16> = bytes
-                .as_chunks::<2>()
-                .0
-                .iter()
-                .map(|pair| i16::from_le_bytes(*pair))
-                .collect();
-            loud = loud_joins(&samples, CHECK_RATE, &joins);
-        }
         Ok(RenderCheck {
             seconds,
             expected_seconds,
-            loud_joins: loud,
         })
     }
 }
@@ -1197,7 +1124,7 @@ fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{cut_audio_filter, duration_matches, loud_joins};
+    use super::{cut_audio_filter, duration_matches};
 
     #[test]
     fn cut_audio_fades_in_and_out() {
@@ -1233,26 +1160,5 @@ mod tests {
         assert!(duration_matches(10.12, &[4.0, 6.0]));
         assert!(!duration_matches(10.5, &[4.0, 6.0]));
         assert!(!duration_matches(8.0, &[4.0, 6.0]));
-    }
-
-    #[test]
-    fn a_click_at_a_join_is_heard_and_a_faded_join_is_not() {
-        let rate = 1000;
-        // Steady speech-like level either side, faded to silence at 1 s and 3 s.
-        let mut samples: Vec<i16> = (0..4000)
-            .map(|index| if index % 2 == 0 { 6000 } else { -6000 })
-            .collect();
-        for centre in [1000usize, 3000] {
-            for offset in 0..30 {
-                let gain = offset as f64 / 30.0;
-                for index in [centre - offset, centre + offset] {
-                    samples[index] = (f64::from(samples[index]) * gain) as i16;
-                }
-            }
-        }
-        samples[3000] = 20000;
-        assert_eq!(loud_joins(&samples, rate, &[1.0, 3.0]), vec![3.0]);
-        let silence = vec![0i16; 4000];
-        assert!(loud_joins(&silence, rate, &[1.0]).is_empty());
     }
 }
