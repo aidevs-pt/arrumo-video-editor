@@ -109,6 +109,7 @@ fn capture(mut stream: impl Read, sink: &Mutex<Vec<u8>>, limit: u64) -> io::Resu
 /// Runs the agent once, recording what it prints in `transcript`. `tick` is called about every
 /// second while it works, so callers can renew leases, save progress, or stop early by returning
 /// an error.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_structured(
     plugin: &AgentPlugin,
     prompt: &str,
