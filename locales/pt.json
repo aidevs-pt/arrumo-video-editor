@@ -347,7 +347,8 @@
     "agentChoose": "Escolha um nas Definições",
     "workspaceSettingsHint": "Aplica-se a todos os perfis e vídeos de {workspace}, salvo se um perfil indicar o contrário.",
     "workspaceCounts": "{profiles} perfis, {videos} vídeos",
-    "workspaceCountsOne": "1 perfil, {videos} vídeos"
+    "workspaceCountsOne": "1 perfil, {videos} vídeos",
+    "importWorkspaces": "Importar"
   },
   "motionLibrary": {
     "renderer": "Renderizador instalado",

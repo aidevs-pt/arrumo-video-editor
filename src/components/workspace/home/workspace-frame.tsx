@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PluginTourHost } from "@/components/workspace/plugins/plugin-tour";
 import { PluginIcon } from "@/lib/plugin-text";
-import { CalendarDays, Check, ChevronDown, Film, FolderCog, House, Images, Paintbrush, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Download, Film, FolderCog, House, Images, Paintbrush, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -117,7 +117,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, childre
                     <ChevronDown className="group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="bottom" align="start" className="w-64">
+                <DropdownMenuContent side="bottom" align="start" className="w-72">
                   <DropdownMenuGroup aria-label={messages.workspaces.list}>
                     {workspaces.map((entry) => (
                       <DropdownMenuItem key={entry.id} onSelect={() => choose(entry)} className="gap-3 py-2">
@@ -142,7 +142,12 @@ function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, childre
                       <FolderCog />{copy.workspaceSettings}
                     </Link>
                   </DropdownMenuItem>}
-                  <DropdownMenuItem onSelect={() => choose(null)}><Plus />{copy.newWorkspace}</DropdownMenuItem>
+                  <div className="flex gap-2 border-t p-2 mt-1 -mx-1 -mb-1">
+                    <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => choose(null)}><Plus data-icon="inline-start" />{copy.newWorkspace}</Button>
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <Link href={workspace ? `/settings?workspace=${workspace.id}&scope=app&section=backup` : "/settings?section=backup"} onClick={() => setOpenMobile(false)}><Download data-icon="inline-start" />{copy.importWorkspaces}</Link>
+                    </Button>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>

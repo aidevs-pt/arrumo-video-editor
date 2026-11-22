@@ -347,7 +347,8 @@
     "agentChoose": "Choose one in Settings",
     "workspaceSettingsHint": "Applies to every profile and video in {workspace} unless a profile says otherwise.",
     "workspaceCounts": "{profiles} profiles, {videos} videos",
-    "workspaceCountsOne": "1 profile, {videos} videos"
+    "workspaceCountsOne": "1 profile, {videos} videos",
+    "importWorkspaces": "Import"
   },
   "motionLibrary": {
     "renderer": "Installed renderer",
