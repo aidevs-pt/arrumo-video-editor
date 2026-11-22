@@ -61,7 +61,29 @@
     "invalidInput": "Introduza JSON válido com até 64 KiB.",
     "runError": "Não foi possível executar esta ação. Verifique as permissões e volte a abrir Definições se o pacote tiver sido alterado.",
     "result": "Resultado",
-    "finished": "A ação do plugin terminou."
+    "finished": "A ação do plugin terminou.",
+    "optional": "Opcional",
+    "subtitlesSource": "Legendas",
+    "subtitlesOwn": "Colar ou abrir um ficheiro SRT",
+    "openFile": "Abrir ficheiro SRT",
+    "fileError": "Não foi possível ler esse ficheiro. Escolhe um ficheiro SRT com 64 KiB no máximo.",
+    "trackError": "Não foi possível carregar essas legendas.",
+    "required": "Preenche {field}.",
+    "invalidNumber": "Escreve um número em {field}.",
+    "invalidJson": "Escreve JSON válido em {field}.",
+    "chooseLanguage": "Escolhe uma língua",
+    "chooseOption": "Escolhe uma opção",
+    "yes": "Sim",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "placedTitle": "Ações de plugins",
+    "placedDescription": "Executa a ação de um plugin instalado neste {place}.",
+    "place": {
+      "draft": "rascunho",
+      "generation": "vídeo",
+      "completed-video": "vídeo"
+    },
+    "cues": "{count} legendas"
   },
   "pluginGrants": {
     "title": "Permissões de plugins",

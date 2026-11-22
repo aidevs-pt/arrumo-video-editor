@@ -134,8 +134,8 @@ pub use plugin_registry::{
 };
 pub use plugin_runtime::MAX_PLUGIN_IO_BYTES;
 pub use plugin_schema::{
-    PluginAction, PluginActionScope, PluginCode, PluginSetting, PluginSettingKind,
-    PluginSettingScope, PluginSurfacePlacement,
+    ActionInput, ActionInputKind, ActionPlacement, PluginAction, PluginActionScope, PluginCode,
+    PluginSetting, PluginSettingKind, PluginSettingScope, PluginSurfacePlacement,
 };
 pub use plugin_settings::ResolvedPluginSetting;
 pub use plugin_surfaces::InstalledPluginSurface;

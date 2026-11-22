@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -519,6 +519,9 @@ impl PluginManifest {
                         || !ids.insert(&action.id)
                         || blank(&action.label)
                         || blank(&action.description)
+                        || !action.valid_form()
+                        || (!action.inputs.is_empty() || !action.placements.is_empty())
+                            && manifest.schema_version < 9
                 })
             {
                 return Err(invalid_manifest("Invalid plugin action declaration").into());

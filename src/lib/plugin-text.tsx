@@ -17,7 +17,7 @@ type Translation = {
   provider?: { label: string };
   capabilities?: Record<string, Named>;
   settings?: Record<string, SettingText>;
-  actions?: Record<string, Labelled>;
+  actions?: Record<string, Partial<Labelled> & { inputs?: Record<string, SettingText> }>;
 };
 type CatalogManifest = { id: string; iconNotice?: string; translations?: Record<string, Translation> };
 type CatalogEntry = { manifest: CatalogManifest; iconSvg?: string };
@@ -38,6 +38,8 @@ type PluginText = {
   iconNotice: (pluginId: string) => string | undefined;
   /** A setting declaration with its label, description and choice labels translated. */
   field: <T extends SettingDeclaration>(pluginId: string, field: T) => T & { choiceLabels: Record<string, string> };
+  /** An action input with its label, description and choice labels translated. */
+  actionInput: <T extends SettingDeclaration>(pluginId: string, actionId: string, input: T) => T & { choiceLabels: Record<string, string> };
 };
 
 type SettingDeclaration = { id: string; label: string; description: string; choices?: string[] };
@@ -75,6 +77,16 @@ export function PluginTextProvider({ children }: { children: ReactNode }) {
       choice: (id, setting, choice) =>
         entry(id)?.settings?.[setting]?.choices?.[choice] ?? entry(id, "en")?.settings?.[setting]?.choices?.[choice] ?? choice,
       action: (id, action, field, fallback) => entry(id)?.actions?.[action]?.[field] ?? fallback,
+      actionInput: (id, action, input) => {
+        const text = (language?: string) => entry(id, language)?.actions?.[action]?.inputs?.[input.id];
+        return {
+          ...input,
+          label: text()?.label ?? input.label,
+          description: text()?.description ?? input.description,
+          choiceLabels: Object.fromEntries((input.choices ?? []).map((choice) => [choice,
+            text()?.choices?.[choice] ?? text("en")?.choices?.[choice] ?? choice])),
+        };
+      },
       icon: (id) => plugins.get(id)?.iconSvg,
       iconNotice: (id) => entry(id)?.iconNotice ?? plugins.get(id)?.manifest.iconNotice,
       field: (id, field) => ({
@@ -98,6 +110,7 @@ const english: PluginText = {
   setting: (_, __, ___, fallback) => fallback,
   choice: (_, __, choice) => choice,
   action: (_, __, ___, fallback) => fallback,
+  actionInput: (_, __, input) => ({ ...input, choiceLabels: Object.fromEntries((input.choices ?? []).map((choice) => [choice, choice])) }),
   icon: () => undefined,
   iconNotice: () => undefined,
   field: (_, field) => ({ ...field, choiceLabels: Object.fromEntries((field.choices ?? []).map((choice) => [choice, choice])) }),

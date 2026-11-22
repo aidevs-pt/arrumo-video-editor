@@ -61,7 +61,29 @@
     "invalidInput": "Enter valid JSON of at most 64 KiB.",
     "runError": "Could not run this action. Check plugin permissions and reopen Settings if the package changed.",
     "result": "Result",
-    "finished": "Plugin action finished."
+    "finished": "Plugin action finished.",
+    "optional": "Optional",
+    "subtitlesSource": "Subtitles",
+    "subtitlesOwn": "Paste or open an SRT file",
+    "openFile": "Open SRT file",
+    "fileError": "Could not read that file. Choose an SRT file of at most 64 KiB.",
+    "trackError": "Could not load those subtitles.",
+    "required": "Fill in {field}.",
+    "invalidNumber": "Enter a number in {field}.",
+    "invalidJson": "Enter valid JSON in {field}.",
+    "chooseLanguage": "Choose a language",
+    "chooseOption": "Choose an option",
+    "yes": "Yes",
+    "copy": "Copy",
+    "copied": "Copied",
+    "placedTitle": "Plugin actions",
+    "placedDescription": "Run an installed plugin's action on this {place}.",
+    "place": {
+      "draft": "draft",
+      "generation": "video",
+      "completed-video": "video"
+    },
+    "cues": "{count} cues"
   },
   "pluginGrants": {
     "title": "Plugin permissions",

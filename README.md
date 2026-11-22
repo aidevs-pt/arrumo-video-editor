@@ -315,7 +315,7 @@ Use `install-plugin-release <catalog.json> <plugin-id> <version> <package.zip>` 
 
 Use `download-plugin-release <catalog-url> <plugin-id> <version>` to fetch an exact release from an HTTPS registry and register it locally. Arrumo verifies the release using the same checks as local snapshot registration and records the registry URL. The command expects a registry and package that can be fetched without authentication.
 
-List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 through 6. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
+List plugin IDs, source repositories, defaults, and available release versions with `read-plugin-registry <catalog.json>` or `fetch-plugin-registry <catalog-url>`. This host supports manifest schemas 1 through 9. Entries with an empty release list have no downloadable version in that catalog. Both commands validate the catalog and can run without opening the app database.
 
 In desktop Settings, open **Browse registry** under **Plugins** and load an HTTPS catalog URL. Expand a plugin to review its source repository and available versions. Arrumo checks the reviewed release again before downloading. If its source or checksum changed, reload the catalog and review the release again.
 
@@ -357,7 +357,7 @@ Workspace and completed video plugin panels can request the host’s selected wo
 
 Use `plugin-actions` to discover named backend actions. Invoke an action with `invoke-plugin-action <plugin-id> <action-id> <app|workspace-id>` and pass JSON on standard input. The host validates the action's declared scope before running the component.
 
-In desktop Settings, expand an action under **Plugin actions**. The Settings scope determines which actions are shown. Enter JSON, select **Run action**, and review the result. The editor checks that the package matches the version shown when the form was opened.
+In desktop Settings, expand an action under **Plugin actions**. The Settings scope determines which actions are shown. Fill in the form the action declares (schema 9 `inputs`), or enter JSON for actions without one, select **Run action**, and review the result. Actions that declare `placements` also appear in a **Plugin actions** card beside drafts, on generation pages or on finished videos, where a subtitles input offers the tracks of the video in view. The editor checks that the package matches the version shown when the form was opened.
 
 ### Local MCP
 

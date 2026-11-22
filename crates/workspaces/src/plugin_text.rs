@@ -28,7 +28,7 @@ pub struct PluginTranslation {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub settings: BTreeMap<String, SettingText>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub actions: BTreeMap<String, LabelledText>,
+    pub actions: BTreeMap<String, ActionText>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -44,11 +44,16 @@ pub struct NamedText {
     pub description: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// An action's text; an `en` entry may carry only input choice labels.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LabelledText {
-    pub label: String,
-    pub description: String,
+pub struct ActionText {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub inputs: BTreeMap<String, SettingText>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -96,9 +101,33 @@ pub(crate) fn valid_translations(manifest: &PluginManifest) -> bool {
                     .actions
                     .iter()
                     .flatten()
-                    .any(|action| &action.id == id)
-                    && text(&value.label, 80)
-                    && text(&value.description, 500)
+                    .find(|action| &action.id == id)
+                    .is_some_and(|action| {
+                        value.label.as_deref().is_none_or(|label| text(label, 80))
+                            && value
+                                .description
+                                .as_deref()
+                                .is_none_or(|value| text(value, 500))
+                            && value.inputs.iter().all(|(input, translated)| {
+                                action
+                                    .inputs
+                                    .iter()
+                                    .find(|declared| &declared.id == input)
+                                    .is_some_and(|declared| {
+                                        translated
+                                            .label
+                                            .as_deref()
+                                            .is_none_or(|label| text(label, 80))
+                                            && translated
+                                                .description
+                                                .as_deref()
+                                                .is_none_or(|value| text(value, 300))
+                                            && translated.choices.iter().all(|(choice, label)| {
+                                                declared.choices.contains(choice) && text(label, 80)
+                                            })
+                                    })
+                            })
+                    })
             })
             && entry.settings.iter().all(|(id, value)| {
                 manifest

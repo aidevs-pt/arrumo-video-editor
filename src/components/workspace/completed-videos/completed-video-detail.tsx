@@ -1,5 +1,7 @@
 "use client";
 
+import { PlacedPluginActions } from "@/components/workspace/plugins/placed-actions";
+import type { SubtitleTrack } from "@/components/workspace/plugins/action-form";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
 import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, Image, MessageSquare, Music } from "lucide-react";
@@ -123,7 +125,7 @@ export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, file
 }
 
 function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAttach, onDetach }: { workspaceId: number; video: CompletedVideo; initialFormatId: number; file?: CompletedFile; onAttach: () => void; onDetach: (id: number) => void }) {
-  const { locale, messages: { completedVideo: copy, queue, studio } } = useLocale();
+  const { locale, messages: { completedVideo: copy, queue, studio, subtitleRevisions } } = useLocale();
   const router = useRouter();
   const { id: runId, snapshot } = video.run;
   const [savedTitle, setSavedTitle] = useState(video.title);
@@ -139,6 +141,22 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const formats = snapshot.formats ?? [];
   const format = formats.find(({ format }) => format.id === formatId)?.format;
   const outputName = (output: Output) => formats.find(({ format }) => format.id === output.format_id)?.format.name ?? output.video;
+
+  /** Every subtitle track of every output: the primary one, then each added language. */
+  async function subtitleTracks(): Promise<SubtitleTrack[]> {
+    const names = new Intl.DisplayNames([locale], { type: "language" });
+    const outputs = await Promise.all(video.delivery.verified_outputs.map(async (output) => {
+      const preview = await invoke<{ languages: string[] }>("preview_completed_output", { workspaceId, runId, formatId: output.format_id });
+      return ["", ...preview.languages].map((language) => ({
+        id: `${output.format_id}:${language}`,
+        label: `${outputName(output)} · ${language ? (names.of(language) ?? language) : subtitleRevisions.primary}`,
+        load: async () => (await invoke<{ subtitles: string }>("read_completed_subtitle_revision", {
+          workspaceId, runId, formatId: output.format_id, language: language || null,
+        })).subtitles,
+      }));
+    }));
+    return outputs.flat();
+  }
 
   async function rename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -354,6 +372,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
             </div>
             <div className="flex flex-wrap gap-2">{textLinks}{mediaLinks}</div>
           </section>}
+          <PlacedPluginActions className="mt-6" workspaceId={workspaceId} placement="completed-video" context={{ subtitleTracks }} />
         </TabsContent>
         <TabsContent value="details" forceMount className="flex flex-col gap-5 data-[state=inactive]:hidden">
           <RunMotionResults workspaceId={workspaceId} runId={runId} results={video.production.results}

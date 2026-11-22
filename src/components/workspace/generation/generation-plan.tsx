@@ -1,5 +1,6 @@
 "use client";
 
+import { PlacedPluginActions } from "@/components/workspace/plugins/placed-actions";
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowUpRight, Check, ChevronDown, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
@@ -245,6 +246,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                 reviewing={reviewing} reviewError={reviewError} onReview={review} saveMotionDefault={saveMotionDefault}
                 previousSupplementalReview={previousReview?.supplemental_review} previousPreviewReview={previousReview?.preview_review} />
             )}
+            <PlacedPluginActions workspaceId={workspaceId} placement="generation" />
           </div>
           {activity}
         </div>

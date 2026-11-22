@@ -1,5 +1,6 @@
 "use client";
 
+import { PlacedPluginActions } from "@/components/workspace/plugins/placed-actions";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, Zap } from "lucide-react";
 import Link from "next/link";
@@ -238,6 +239,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               </div>
               <p id="run-autopilot-description" className="mt-2 text-sm text-muted-foreground">{copy.autopilotHint.replace("{agent}", agentName)}</p>
             </section>
+            <PlacedPluginActions workspaceId={workspaceId} placement="draft" />
             {message && <Alert variant={message === "saved" ? "default" : "destructive"}><AlertDescription role="status">{copy[message]}</AlertDescription></Alert>}
             <Button type="submit" size="lg" className="h-12 text-base">{pending === "generating" ? copy.generating : copy.generate}</Button>
             {next && <p className="text-center text-sm text-muted-foreground">{copy.thenNext.replace("{title}", next.title)}</p>}

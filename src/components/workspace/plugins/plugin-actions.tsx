@@ -3,30 +3,15 @@
 import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
 
-type InstalledAction = {
-  pluginId: string;
-  pluginName: string;
-  packageSha256: string;
-  action: { id: string; label: string; description: string };
-};
-
-type ActionJob = {
-  id: string;
-  pluginId: string;
-  actionId: string;
-  state: "queued" | "running" | "completed" | "failed";
-  result: string | null;
-};
+import { ActionForm, type ActionJob, type InstalledAction } from "./action-form";
 
 export function PluginActions({ workspaceId, revision = "" }: {
   workspaceId: number | null;
@@ -109,66 +94,6 @@ export function PluginActions({ workspaceId, revision = "" }: {
       </section>}
     </CardContent>
   </Card>;
-}
-
-function ActionForm({ entry, workspaceId, onChanged }: { entry: InstalledAction; workspaceId: number | null; onChanged: () => void }) {
-  const pluginText = usePluginText();
-  const { messages: { pluginActions: copy } } = useLocale();
-  const field = useId();
-  const result = useId();
-  const [input, setInput] = useState("{}");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<"invalidInput" | "runError">();
-  const [output, setOutput] = useState<string>();
-
-  async function run(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending) return;
-    setError(undefined);
-    setOutput(undefined);
-    try {
-      JSON.parse(input);
-    } catch {
-      setError("invalidInput");
-      return;
-    }
-    setPending(true);
-    try {
-      const id = crypto.randomUUID();
-      await invoke<void>("queue_plugin_action_job", { request: {
-        id, workspaceId, inputJson: input, actionId: entry.action.id,
-        pluginId: entry.pluginId, packageSha256: entry.packageSha256,
-      } });
-      onChanged();
-      const job = await invoke<ActionJob>("process_plugin_action_job", { workspaceId, id });
-      if (job.state === "failed") setError("runError");
-      if (job.state === "completed") setOutput(job.result ?? undefined);
-    } catch (reason) {
-      setError(reason === "plugin_action_input_invalid" ? "invalidInput" : "runError");
-    } finally {
-      onChanged();
-      setPending(false);
-    }
-  }
-
-  return <form className="flex flex-col gap-3" onSubmit={run} aria-busy={pending}>
-    <Field data-invalid={error === "invalidInput"}>
-      <FieldDescription id={field + "-description"}>{pluginText.action(entry.pluginId, entry.action.id, "description", entry.action.description)}</FieldDescription>
-      <FieldLabel htmlFor={field}>{copy.input}</FieldLabel>
-      <Textarea id={field} aria-describedby={field + "-description"} aria-invalid={error === "invalidInput"}
-        className="max-h-60 font-mono" spellCheck={false} maxLength={65_536} disabled={pending}
-        value={input} onChange={(event) => { setInput(event.target.value); setError(undefined); setOutput(undefined); }} />
-    </Field>
-    <Button type="submit" size="sm" className="self-start" disabled={pending}>
-      {pending ? copy.running : copy.run}
-    </Button>
-    {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-    {output !== undefined && <section className="flex min-w-0 flex-col gap-2" aria-labelledby={result}>
-      <h3 id={result} className="text-sm font-medium">{copy.result}</h3>
-      <pre tabIndex={0} className="max-h-72 overflow-auto rounded-md border bg-muted p-3 text-xs">{output}</pre>
-    </section>}
-    <span role="status" className="sr-only">{output !== undefined ? copy.finished : ""}</span>
-  </form>;
 }
 
 function JobHistoryItem({ job, label, workspaceId, onChanged }: {

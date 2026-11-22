@@ -61,7 +61,29 @@
     "invalidInput": "Introduce JSON válido de hasta 64 KiB.",
     "runError": "No se pudo ejecutar esta acción. Comprueba los permisos y vuelve a abrir Configuración si el paquete cambió.",
     "result": "Resultado",
-    "finished": "La acción del complemento ha terminado."
+    "finished": "La acción del complemento ha terminado.",
+    "optional": "Opcional",
+    "subtitlesSource": "Subtítulos",
+    "subtitlesOwn": "Pegar o abrir un archivo SRT",
+    "openFile": "Abrir archivo SRT",
+    "fileError": "No se pudo leer ese archivo. Elige un archivo SRT de 64 KiB como máximo.",
+    "trackError": "No se pudieron cargar esos subtítulos.",
+    "required": "Rellena {field}.",
+    "invalidNumber": "Escribe un número en {field}.",
+    "invalidJson": "Escribe JSON válido en {field}.",
+    "chooseLanguage": "Elige un idioma",
+    "chooseOption": "Elige una opción",
+    "yes": "Sí",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "placedTitle": "Acciones de complementos",
+    "placedDescription": "Ejecuta la acción de un complemento instalado sobre este {place}.",
+    "place": {
+      "draft": "borrador",
+      "generation": "vídeo",
+      "completed-video": "vídeo"
+    },
+    "cues": "{count} subtítulos"
   },
   "pluginGrants": {
     "title": "Permisos de complementos",
