@@ -9,6 +9,12 @@ CREATE TABLE generation_notifications_v2 (
 );
 INSERT INTO generation_notifications_v2 (id, run_id, kind, created_at, read_at)
 SELECT id, run_id, kind, created_at, read_at FROM generation_notifications;
+-- Keep the cursor high-water mark, so ids of deleted events are never reused.
+DELETE FROM sqlite_sequence WHERE name = 'generation_notifications_v2';
+INSERT INTO sqlite_sequence (name, seq)
+SELECT 'generation_notifications_v2', MAX(
+    COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'generation_notifications'), 0),
+    COALESCE((SELECT MAX(id) FROM generation_notifications_v2), 0));
 DROP TABLE generation_notifications;
 ALTER TABLE generation_notifications_v2 RENAME TO generation_notifications;
 CREATE INDEX generation_notifications_by_run ON generation_notifications(run_id, id);
