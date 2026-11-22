@@ -114,7 +114,8 @@ impl WorkspaceStore {
             .optional()
     }
 
-    /// The latest approved result of an earlier stage, such as the approved script.
+    /// The latest accepted result of an earlier stage, such as the approved script: approved by
+    /// the creator, or finished without review on autopilot.
     pub(crate) fn approved_stage_result(
         &self,
         run_id: i64,
@@ -124,7 +125,10 @@ impl WorkspaceStore {
             .query_row(
                 "SELECT result.result_json FROM production_results AS result
                  JOIN generation_runs AS run ON run.id = result.run_id
-                 WHERE result.run_id = ?1 AND result.decision = 'approved'
+                 WHERE result.run_id = ?1
+                   AND (result.decision = 'approved'
+                        OR (result.decision IS NULL AND result.stage_index < run.stage_index
+                            AND json_extract(run.plan_json, '$.steps[' || result.stage_index || '].review_required') = 0))
                    AND json_extract(run.plan_json, '$.steps[' || result.stage_index || '].stage') = ?2
                  ORDER BY result.id DESC LIMIT 1",
                 params![run_id, stage],
@@ -133,5 +137,48 @@ impl WorkspaceStore {
             .optional()?
             .map(|text| serde_json::from_str(&text).map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error))))
             .transpose()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{DraftSettings, ProductionStage, RunOptions, WorkspaceStore};
+
+    #[test]
+    fn autopilot_results_count_as_approved_once_their_step_is_done() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Tips".into(),
+                    intent: "Three tips".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "key",
+                &RunOptions {
+                    autopilot: true,
+                    ..RunOptions::default()
+                },
+            )
+            .unwrap();
+        let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+        let script = serde_json::json!({"markdown": "## Hook"});
+        store
+            .submit_production_result(workspace, run.id, attempt, ProductionStage::Script, &script)
+            .unwrap();
+        assert_eq!(
+            store.approved_stage_result(run.id, "script").unwrap(),
+            Some(script)
+        );
+        assert_eq!(store.approved_stage_result(run.id, "assets").unwrap(), None);
     }
 }

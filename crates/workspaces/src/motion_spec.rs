@@ -642,8 +642,11 @@ fn render_arguments(
     };
     write!(graph, "[{current}]format={pixel_format},setsar=1[out]").ok();
     // Sound effects mix over the soundtrack (narration or silence) at each layer's entrance.
-    let mut mix =
-        String::from(";[1:a:0]aformat=sample_rates=48000:channel_layouts=stereo,apad[bed]");
+    // The soundtrack is padded to exactly the animation's length: an endless pad in the same
+    // graph as the picture occasionally deadlocked FFmpeg 8.
+    let mut mix = format!(
+        ";[1:a:0]aformat=sample_rates=48000:channel_layouts=stereo,apad=whole_dur={duration:.3},atrim=end={duration:.3}[bed]"
+    );
     let mut inputs = vec!["[bed]".to_owned()];
     for (index, layer) in spec.layers.iter().enumerate() {
         if let Some(source) = layer.sound.source() {
@@ -656,13 +659,17 @@ fn render_arguments(
             inputs.push(format!("[fx{index}]"));
         }
     }
-    write!(
-        mix,
-        ";{}amix=inputs={}:normalize=0:duration=first[audio]",
-        inputs.join(""),
-        inputs.len()
-    )
-    .ok();
+    if inputs.len() == 1 {
+        mix.push_str(";[bed]anull[audio]");
+    } else {
+        write!(
+            mix,
+            ";{}amix=inputs={}:normalize=0:duration=first[audio]",
+            inputs.join(""),
+            inputs.len()
+        )
+        .ok();
+    }
     graph.push_str(&mix);
     args.extend(["-filter_complex".into(), graph]);
     args.extend(["-map", "[out]", "-map", "[audio]", "-t"].map(String::from));
@@ -692,11 +699,41 @@ fn render_arguments(
 }
 
 /// Runs FFmpeg in `directory`, calling `check` while it works so callers can keep a lease or stop.
+/// How long FFmpeg may go without its output growing before it is considered stuck.
+const STALL: Duration = Duration::from_secs(30);
+const ATTEMPTS: usize = 3;
+
 pub(crate) fn run_ffmpeg(
     directory: &Path,
     args: &[String],
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
+    for attempt in 1..=ATTEMPTS {
+        match run_ffmpeg_once(directory, args, check)? {
+            Some(()) => return Ok(()),
+            None if attempt < ATTEMPTS => {
+                eprintln!("FFmpeg stalled; retrying ({attempt}/{ATTEMPTS})")
+            }
+            None => {}
+        }
+    }
+    Err(io::Error::other("FFmpeg stopped making progress").into())
+}
+
+/// Runs FFmpeg once. `Ok(None)` means it stalled and was stopped.
+fn run_ffmpeg_once(
+    directory: &Path,
+    args: &[String],
+    check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
+) -> Result<Option<()>, Box<dyn Error>> {
+    let output = args.last().map(|name| directory.join(name));
+    let size = || {
+        output
+            .as_ref()
+            .and_then(|path| fs::metadata(path).ok())
+            .map_or(0, |meta| meta.len())
+    };
+    let mut grown = (size(), Instant::now());
     let log = directory.join("ffmpeg-errors.txt");
     let mut process = Command::new("ffmpeg")
         .args(args)
@@ -709,7 +746,7 @@ pub(crate) fn run_ffmpeg(
     loop {
         if let Some(status) = process.try_wait()? {
             if status.success() {
-                return Ok(());
+                return Ok(Some(()));
             }
             let errors = fs::read_to_string(&log).unwrap_or_default();
             let tail: String = errors.lines().rev().take(6).collect::<Vec<_>>().join(" | ");
@@ -723,6 +760,14 @@ pub(crate) fn run_ffmpeg(
                 let _ = process.kill();
                 let _ = process.wait();
                 return Err(error);
+            }
+            let now = size();
+            if now != grown.0 {
+                grown = (now, Instant::now());
+            } else if grown.1.elapsed() >= STALL {
+                let _ = process.kill();
+                let _ = process.wait();
+                return Ok(None);
             }
         }
         thread::sleep(Duration::from_millis(100));
