@@ -19,6 +19,17 @@ struct ContextImportInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GenerateSpeechInput {
+    workspace_id: i64,
+    text: String,
+    #[serde(default)]
+    notes: String,
+    #[serde(default)]
+    provider: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct GenerateImagesInput {
     workspace_id: i64,
     prompt: String,
@@ -124,7 +135,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 17] {
+pub(super) fn definitions() -> [Value; 18] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -140,6 +151,14 @@ pub(super) fn definitions() -> [Value; 17] {
                 "notes": {"type": "string", "maxLength": 8000},
                 "provider": {"type": "string", "minLength": 1, "maxLength": 64}
             }, "required": ["workspaceId", "prompt", "aspectRatio", "count"], "additionalProperties": false}}),
+        json!({"name": "generate_library_speech",
+            "description": "Voice text with the workspace's first speech provider (or one named provider) and its configured voice, and add the audio to the workspace assets with the given notes.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "text": {"type": "string", "minLength": 1, "maxLength": 5000},
+                "notes": {"type": "string", "maxLength": 8000},
+                "provider": {"type": "string", "minLength": 1, "maxLength": 64}
+            }, "required": ["workspaceId", "text"], "additionalProperties": false}}),
         json!({"name": "detach_completed_media",
             "description": "Remove a post-completion attachment from a verified output while retaining the managed asset.",
             "inputSchema": {"type": "object", "properties": {
@@ -250,6 +269,14 @@ pub(super) fn call(
                     )
                     .map(|images| json!({"assets": images.iter().map(|image| json!({"assetId": image.id, "provider": image.provider})).collect::<Vec<_>>()}))
                     .map_err(|_| "Could not generate the images. Check the image providers and their keys")
+            }),
+        "generate_library_speech" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid speech arguments")
+            .and_then(|args: GenerateSpeechInput| {
+                store
+                    .generate_library_speech(database, args.workspace_id, &args.text, &args.notes, args.provider.as_deref())
+                    .map(|(id, provider)| json!({"assetId": id, "provider": provider}))
+                    .map_err(|_| "Could not voice the text. Check the speech provider, its key and its voice")
             }),
         "detach_completed_media" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid completed media arguments")
