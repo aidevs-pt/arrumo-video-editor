@@ -391,6 +391,8 @@ impl WorkspaceStore {
             .and_then(|result| result.get("markdown"))
             .and_then(Value::as_str);
         let approved = self.approved_stage_result(run_id, "assets")?;
+        let tracks = approved_tracks(approved.as_ref().map(|result| &result["asset_plan"]));
+        let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
         let animations = approved
             .as_ref()
             .map(|result| result["motion_specs"].clone())
@@ -439,8 +441,25 @@ impl WorkspaceStore {
              script's language, short enough to say within the scene. Leave it empty where nothing is said.\n\
              Each scene is an animation: {guide}\n\
              {revision}\
+             {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
              BRIEF (JSON):\n{brief}",
+            music = if tracks.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "The creator approved these audio tracks. If one is meant as background music, return it in \
+                     music and Arrumo plays it under every scene, quieter while the narration speaks. Return an \
+                     empty list when none is music for the whole video.\nAPPROVED AUDIO (JSON):\n{}\n",
+                    serde_json::to_string(
+                        &tracks
+                            .iter()
+                            .map(|(_, summary)| summary)
+                            .collect::<Vec<_>>()
+                    )
+                    .unwrap_or_default()
+                )
+            },
             guide = crate::motion_spec::SPEC_GUIDE,
             revision = if earlier.is_empty() {
                 ""
@@ -472,7 +491,7 @@ impl WorkspaceStore {
             },
             provider,
             &prompt,
-            &schema,
+            &with_music_schema(schema, &track_ids),
             AGENT_TIMEOUT,
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
@@ -481,6 +500,7 @@ impl WorkspaceStore {
             },
         )?;
         let mut edit = storyboard(&answer, &image_ids, &provider.id).map_err(io::Error::other)?;
+        place_music(&mut edit, &answer, &track_ids);
         self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)?;
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
         self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)

@@ -472,8 +472,14 @@ impl WorkspaceStore {
                     format.scale_preview(preview_max_edge);
                 }
                 if let Some(scenes) = &scenes {
-                    let check =
-                        renderer.render_scenes(&root, &scratch, scenes, &narration, &format)?;
+                    let check = renderer.render_scenes(
+                        &root,
+                        &scratch,
+                        scenes,
+                        &narration,
+                        &format,
+                        music.as_deref(),
+                    )?;
                     checks.insert(format.id.to_string(), check.to_json());
                     if stage == ProductionStage::FinalRender {
                         // Storyboards have no speech to transcribe; caption their on-screen text.
@@ -604,7 +610,15 @@ impl WorkspaceStore {
         };
         if let Some(scenes) = self.storyboard_scenes(workspace_id, &edit)? {
             let narration = narration_tracks(database, workspace_id, run_id, &edit, scenes.len())?;
-            renderer.render_scenes(&root, directory, &scenes, &narration, &format)?;
+            let music = self.edit_music(&root, workspace_id, &edit)?;
+            renderer.render_scenes(
+                &root,
+                directory,
+                &scenes,
+                &narration,
+                &format,
+                music.as_deref(),
+            )?;
         } else {
             let source_ids = &inputs.draft.source_ids;
             let cuts = preview_cuts(&edit, source_ids)?;
@@ -737,6 +751,7 @@ impl ActiveRender<'_> {
         scenes: &[MotionSpec],
         narration: &[NarrationTrack],
         format: &Dimensions,
+        music: Option<&Path>,
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
         fs::create_dir(&directory)?;
@@ -794,7 +809,22 @@ impl ActiveRender<'_> {
         .collect();
         run_ffmpeg(&directory, &args, &mut check)?;
         let finished = scratch.join(format!("{}.mp4", format.id));
-        self.master_audio(&output, &finished)?;
+        let staged = scratch.join(format!("{}-staged.mp4", format.id));
+        match music {
+            // With a voice, the music sits under the mastered narration as it does under speech.
+            Some(music) if narration.iter().any(|(audio, _)| audio.is_some()) => {
+                self.master_audio(&output, &staged)?;
+                self.lay_music(&staged, music, &finished)?;
+                fs::remove_file(staged)?;
+            }
+            // Without one, the music is the whole soundtrack, so it is mastered to full level.
+            Some(music) => {
+                self.lay_music(&output, music, &staged)?;
+                self.master_audio(&staged, &finished)?;
+                fs::remove_file(staged)?;
+            }
+            None => self.master_audio(&output, &finished)?,
+        }
         self.check_render(&finished, &parts)
     }
 
