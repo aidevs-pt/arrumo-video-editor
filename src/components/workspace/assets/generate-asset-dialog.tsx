@@ -101,7 +101,11 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
 
   useEffect(() => {
     if (!open && !imagesOnly) return;
-    invoke<Record<string, Preferences>>("list_provider_preferences", { workspaceId }).then(setAll, () => setAll({}));
+    Promise.all([
+      invoke<Record<string, Preferences>>("list_provider_preferences", { workspaceId }),
+      invoke<string[]>("list_ready_plugins", { workspaceId }),
+    ]).then(([preferences, ready]) => setAll(Object.fromEntries(Object.entries(preferences).map(([capability, entry]) =>
+      [capability, { available: entry.available.filter((item) => ready.includes(item.id)), effective: entry.effective.filter((id) => ready.includes(id)) }]))), () => setAll({}));
   }, [imagesOnly, open, workspaceId]);
 
   useEffect(() => {
@@ -160,22 +164,22 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       if (kind === "image") {
         onCreated(await invoke<number[]>("generate_library_images", {
           workspaceId, prompt: prompt.trim(), aspectRatio: ratio, count, notes: notes.trim(),
-          provider: provider || (model ? videoProvider : null), model: model || null, references: chosen,
+          provider: provider || inOrder[0]?.id || null, model: model || null, references: chosen,
         }));
       } else if (kind === "video") {
         onCreated([await invoke<number>("generate_library_video", {
           workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: followsVideo ? null : length, notes: notes.trim(),
-          provider: provider || (model ? videoProvider : null), model: model || null, references: chosen,
+          provider: provider || inOrder[0]?.id || null, model: model || null, references: chosen,
         })]);
       } else if (made) {
         onCreated([await invoke<number>("generate_library_audio", {
           workspaceId, kind: kind === "music" ? "music" : "sound-effect", prompt: prompt.trim(), seconds: duration,
-          notes: notes.trim(), provider: provider || null, label: kind === "music" ? copy.music : copy.sound,
+          notes: notes.trim(), provider: provider || inOrder[0]?.id || null, label: kind === "music" ? copy.music : copy.sound,
         })]);
       } else {
         onCreated([await invoke<number>("generate_library_speech", {
           workspaceId, text: prompt.trim(), notes: notes.trim(),
-          provider: provider || (model ? videoProvider : null), model: model || null,
+          provider: provider || inOrder[0]?.id || null, model: model || null,
         })]);
       }
       setOpen(false);

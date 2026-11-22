@@ -37,7 +37,7 @@ struct AgentProbeInput {
     plugin_id: String,
 }
 
-pub(super) fn definitions() -> [Value; 9] {
+pub(super) fn definitions() -> [Value; 10] {
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let capability = json!({"type": "string", "minLength": 1});
     let preference = json!({"type": "object", "properties": {"workspaceId": workspace, "capability": capability},
@@ -45,6 +45,9 @@ pub(super) fn definitions() -> [Value; 9] {
     let scope = json!({"type": "object", "properties": {"workspaceId": workspace}, "additionalProperties": false});
     [
         json!({"name": "list_provider_preferences", "description": "List provider capabilities with available providers, configured orders and effective sources.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": workspace}, "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "list_ready_plugins", "description": "List the turned-on plugins whose required settings, such as an API key, are filled in for this scope. Providers missing from this list can't do their work yet.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": workspace}, "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_provider_preferences", "description": "Read provider ordering for one capability and scope.",
@@ -85,6 +88,12 @@ pub(super) fn call(
                 .list_provider_preferences(args.workspace_id)
                 .map(|preferences| json!({"preferences": preferences}))
                 .map_err(|_| "Could not list provider preferences")
+        }),
+        "list_ready_plugins" => parse(arguments).and_then(|args: Scope| {
+            store
+                .ready_plugins(args.workspace_id)
+                .map(|plugins| json!({"plugins": plugins}))
+                .map_err(|_| "Could not list ready plugins")
         }),
         "get_provider_preferences" => parse(arguments).and_then(|args: PreferenceInput| {
             store

@@ -647,6 +647,26 @@ async fn list_dubbing_providers(
 }
 
 #[tauri::command]
+async fn list_ready_plugins(
+    workspace_id: Option<i64>,
+    app: AppHandle,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .ready_plugins(workspace_id)
+            .map_err(|_| "plugins_unavailable".to_owned())
+    })
+    .await
+    .map_err(|_| "plugins_unavailable".to_owned())?
+}
+
+#[tauri::command]
 async fn list_audio_transforms(
     workspace_id: i64,
     app: AppHandle,
@@ -1633,6 +1653,7 @@ fn main() {
             list_image_models,
             list_speech_models,
             list_audio_transforms,
+            list_ready_plugins,
             list_dubbing_providers,
             dub_asset,
             transform_audio_asset,

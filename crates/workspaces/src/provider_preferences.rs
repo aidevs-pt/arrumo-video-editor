@@ -262,3 +262,53 @@ fn validate_provider_order(order: &[String], available: &[CapabilityProvider]) -
 fn invalid_preference(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
+
+impl WorkspaceStore {
+    /// The active plugins whose required settings all have a value for this workspace, so they
+    /// can do their work. A plugin missing a key or other required setting is left out.
+    pub fn ready_plugins(&self, workspace_id: Option<i64>) -> Result<Vec<String>, Box<dyn Error>> {
+        let mut ready = Vec::new();
+        for plugin in self.active_plugin_catalog()? {
+            let id = &plugin.manifest.id;
+            let required: Vec<_> = plugin
+                .manifest
+                .settings
+                .iter()
+                .flatten()
+                .filter(|setting| setting.required)
+                .collect();
+            let values = if required
+                .iter()
+                .any(|setting| setting.kind != crate::PluginSettingKind::Secret)
+            {
+                self.plugin_settings(id, workspace_id)?
+            } else {
+                BTreeMap::new()
+            };
+            let mut all = true;
+            for setting in required {
+                let filled = if setting.kind == crate::PluginSettingKind::Secret {
+                    self.plugin_credential_status(id, &setting.id, workspace_id)?
+                        .source
+                        .is_some()
+                } else {
+                    values
+                        .get(&setting.id)
+                        .and_then(|value| value.effective.as_ref())
+                        .is_some_and(|value| {
+                            !value.is_null()
+                                && value.as_str().is_none_or(|text| !text.trim().is_empty())
+                        })
+                };
+                if !filled {
+                    all = false;
+                    break;
+                }
+            }
+            if all {
+                ready.push(id.clone());
+            }
+        }
+        Ok(ready)
+    }
+}
