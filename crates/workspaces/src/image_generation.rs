@@ -60,6 +60,14 @@ enum ReferenceInput {
     },
 }
 
+/// A generated image stored as a workspace asset.
+pub struct GeneratedAsset {
+    pub id: i64,
+    pub provider: String,
+    /// Reference images the provider accepted; 0 when none were sent or it fell back.
+    pub references: usize,
+}
+
 /// A reference image to send with a request.
 pub(crate) struct ReferencePicture {
     pub mime: &'static str,
@@ -130,6 +138,8 @@ pub(crate) struct GeneratedImage {
     pub provider: String,
     pub bytes: Vec<u8>,
     pub extension: &'static str,
+    /// Reference images the provider accepted with the request.
+    pub references: usize,
 }
 
 fn invalid_adapter() -> io::Error {
@@ -332,21 +342,26 @@ impl WorkspaceStore {
             };
             let result = if attached.is_empty() {
                 request_image(&client, &adapter, &model, ratio, &framed, &secret, &[])
+                    .map(|image| (image, 0))
             } else {
                 let guided = format!(
                     "{framed}\nThe attached images are the creator's style references: follow their layout, type and colours, but do not copy their text or subjects."
                 );
                 // A provider that refuses the references still gets a plain request.
-                request_image(&client, &adapter, &model, ratio, &guided, &secret, attached).or_else(
-                    |_| request_image(&client, &adapter, &model, ratio, &framed, &secret, &[]),
-                )
+                request_image(&client, &adapter, &model, ratio, &guided, &secret, attached)
+                    .map(|image| (image, attached.len()))
+                    .or_else(|_| {
+                        request_image(&client, &adapter, &model, ratio, &framed, &secret, &[])
+                            .map(|image| (image, 0))
+                    })
             };
             match result {
-                Ok((bytes, extension)) => {
+                Ok(((bytes, extension), references)) => {
                     return Ok(GeneratedImage {
                         provider: provider.clone(),
                         bytes,
                         extension,
+                        references,
                     });
                 }
                 Err(error) => failure = Some(error),
@@ -368,7 +383,7 @@ impl WorkspaceStore {
         aspect_ratio: &str,
         stem: &str,
         reference_ids: &[i64],
-    ) -> Result<(i64, String), Box<dyn Error>> {
+    ) -> Result<GeneratedAsset, Box<dyn Error>> {
         let root = crate::asset_root(database);
         let references: Vec<ReferencePicture> = reference_ids
             .iter()
@@ -399,7 +414,11 @@ impl WorkspaceStore {
         let asset = writer
             .import_asset(&crate::asset_root(database), workspace_id, &file)
             .map_err(|error| io::Error::other(error.to_string()))?;
-        Ok((asset.id, image.provider))
+        Ok(GeneratedAsset {
+            id: asset.id,
+            provider: image.provider,
+            references: image.references,
+        })
     }
 }
 

@@ -714,7 +714,7 @@ impl WorkspaceStore {
                     .collect(),
                 (None, _) => Vec::new(),
             };
-            let (asset_id, image_provider) = self
+            let image = self
                 .generate_image_asset(
                     database,
                     workspace_id,
@@ -727,9 +727,11 @@ impl WorkspaceStore {
                 .map_err(|error| {
                     StageFailure(format!("The thumbnails could not be generated: {error}"))
                 })?;
+            let asset_id = image.id;
             crate::assets::mark_generated(&self.0, workspace_id, &[asset_id])?;
             media.push(json!({"asset_id": asset_id, "format_id": format}));
-            let mut record = json!({"asset_id": asset_id, "format_id": format, "prompt": prompt, "provider": image_provider});
+            let mut record = json!({"asset_id": asset_id, "format_id": format, "prompt": prompt,
+                "provider": image.provider, "references_sent": image.references});
             if let Some(aspect) = aspect {
                 record["aspect_ratio"] = json!(aspect);
             }

@@ -1282,20 +1282,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .take(16 * 1024)
                 .read_to_string(&mut prompt)?;
             let order: Vec<String> = serde_json::from_str(utf8(order)?)?;
-            let (asset_id, provider) = WorkspaceStore::open(Path::new(database))?
-                .generate_image_asset(
-                    Path::new(database),
-                    utf8(workspace)?.parse()?,
-                    &order,
-                    &prompt,
-                    utf8(aspect)?,
-                    "generated-image",
-                    &references,
-                )?;
+            let image = WorkspaceStore::open(Path::new(database))?.generate_image_asset(
+                Path::new(database),
+                utf8(workspace)?.parse()?,
+                &order,
+                &prompt,
+                utf8(aspect)?,
+                "generated-image",
+                &references,
+            )?;
             println!(
                 "{}",
                 serde_json::to_string(
-                    &serde_json::json!({ "assetId": asset_id, "provider": provider })
+                    &serde_json::json!({ "assetId": image.id, "provider": image.provider, "referencesSent": image.references })
                 )?
             );
         }

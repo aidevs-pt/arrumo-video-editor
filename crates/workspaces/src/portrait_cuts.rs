@@ -445,7 +445,7 @@ impl WorkspaceStore {
                     file_stem(&cut.title, run_id, attempt, index),
                     number + 1
                 );
-                let (asset_id, image_provider) = self
+                let image = self
                     .generate_image_asset(
                         database,
                         workspace_id,
@@ -462,11 +462,12 @@ impl WorkspaceStore {
                             "The portrait cut thumbnails could not be generated: {error}"
                         ))
                     })?;
+                let asset_id = image.id;
                 crate::assets::mark_generated(&self.0, workspace_id, &[asset_id])?;
                 media.push(json!({"asset_id": asset_id, "format_id": cut.format_id}));
                 records.push(json!({
                     "asset_id": asset_id, "format_id": cut.format_id, "prompt": prompt,
-                    "provider": image_provider, "aspect_ratio": "9:16",
+                    "provider": image.provider, "aspect_ratio": "9:16", "references_sent": image.references,
                 }));
             }
         }
