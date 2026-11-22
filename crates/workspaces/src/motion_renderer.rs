@@ -106,6 +106,9 @@ impl WorkspaceStore {
             return Ok(None);
         };
         let renderer: CapturedMotionRenderer = serde_json::from_value(renderer.clone())?;
+        if !self.renders_motion(&snapshot)? {
+            return Ok(None);
+        }
         self.render_run_motion_with_worker(
             database,
             workspace_id,

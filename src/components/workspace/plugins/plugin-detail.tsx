@@ -109,7 +109,7 @@ export function PluginDetail({ pluginId, backHref }: { pluginId: string; backHre
       <AlertDialog open={refusal !== undefined} onOpenChange={(open) => { if (!open) setRefusal(undefined); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{copy.refusedTitle.replace("{plugin}", name)}</AlertDialogTitle>
+            <AlertDialogTitle>{(refusal?.startsWith("plugin_agent_") ? copy.refusedTitle : copy.failedTitle).replace("{plugin}", name)}</AlertDialogTitle>
             <AlertDialogDescription>{refusal && refusals[refusal]}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter><AlertDialogAction>{copy.refusedOk}</AlertDialogAction></AlertDialogFooter>

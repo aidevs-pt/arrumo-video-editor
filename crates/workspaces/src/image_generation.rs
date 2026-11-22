@@ -587,6 +587,7 @@ impl WorkspaceStore {
             .unwrap_or_default();
         let order = match provider {
             Some(id) => {
+                self.check_named_provider(id)?;
                 let known = self
                     .capability_index(Some(workspace_id))?
                     .get("image-generation")

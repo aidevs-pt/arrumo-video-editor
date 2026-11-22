@@ -148,12 +148,25 @@ fn has_motion_renderer(snapshot: &Value) -> bool {
 }
 
 impl WorkspaceStore {
+    /// Whether the run's captured motion renderer will make its animations. A renderer that was
+    /// turned off since counts as none, so the run's agent makes them instead.
+    pub(crate) fn renders_motion(&self, snapshot: &Value) -> Result<bool, Box<dyn Error>> {
+        if !has_motion_renderer(snapshot) {
+            return Ok(false);
+        }
+        match snapshot["motion_renderer"]["plugin_id"].as_str() {
+            Some(id) => Ok(self.without_inactive(vec![id.to_owned()])?.len() == 1),
+            None => Ok(true),
+        }
+    }
+
     /// Finds an Assets stage with no motion renderer whose agent can plan it.
     pub fn process_next_asset_plan(&self, database: &Path) -> Result<Option<i64>, Box<dyn Error>> {
         for (workspace_id, run_id) in self.runs_ready_for_agent("assets")? {
-            let unrendered = self
-                .generation_run(workspace_id, run_id)?
-                .is_some_and(|run| !has_motion_renderer(&run.snapshot));
+            let unrendered = match self.generation_run(workspace_id, run_id)? {
+                Some(run) => !self.renders_motion(&run.snapshot)?,
+                None => false,
+            };
             if unrendered {
                 return self.process_asset_plan(database, workspace_id, run_id);
             }
@@ -174,7 +187,7 @@ impl WorkspaceStore {
             "assets",
             "The asset plan could not be made.",
             |run, provider, attempt| {
-                if has_motion_renderer(&run.snapshot) {
+                if self.renders_motion(&run.snapshot)? {
                     return Err(io::Error::other(
                         "This run renders its animations with a motion renderer",
                     )

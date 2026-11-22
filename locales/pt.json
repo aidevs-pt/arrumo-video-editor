@@ -1707,6 +1707,7 @@
     "off": "Desativado",
     "offHint": "Este plugin está desativado. O Arrumo mantém as definições, mas não o executa: sai das ordens de fornecedores, das ações, dos hooks e da utilização.",
     "refusedTitle": "Ainda não é possível desativar {plugin}",
+    "failedTitle": "O Arrumo não conseguiu alterar {plugin}",
     "refused": {
       "plugin_agent_app": "É o agente de edição da aplicação. Escolhe outro agente nas Definições primeiro.",
       "plugin_agent_workspace": "Um espaço de trabalho usa-o como agente de edição. Escolhe outro agente para esse espaço primeiro.",

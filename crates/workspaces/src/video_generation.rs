@@ -530,7 +530,10 @@ impl WorkspaceStore {
             .count();
         let videos = media.len() - images;
         let order = match provider {
-            Some(id) => vec![id.to_owned()],
+            Some(id) => {
+                self.check_named_provider(id)?;
+                vec![id.to_owned()]
+            }
             None => self
                 .capture_provider_orders(workspace_id, &BTreeMap::new())?
                 .get("video-generation")

@@ -397,6 +397,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{result_id}");
         }
+        [database, command, id, state] if command == "set-plugin-active" => {
+            let active = match utf8(state)? {
+                "on" => true,
+                "off" => false,
+                _ => return Err("Use on or off".into()),
+            };
+            WorkspaceStore::open(Path::new(database))?.set_plugin_active(utf8(id)?, active)?;
+            println!(
+                "{}",
+                serde_json::json!({"pluginId": utf8(id)?, "active": active})
+            );
+        }
         [database, command, id] if command == "remove-plugin-manifest" => {
             let removed = WorkspaceStore::open(Path::new(database))?
                 .remove_installed_plugin_manifest(utf8(id)?)?;
@@ -1646,6 +1658,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "rename-completed-video <workspace-id> <run-id> <title> | ",
                 "generate-delivery-subtitles <workspace-id> <run-id> <format-id> | import-delivery-subtitles <workspace-id> <run-id> <format-id> <source-srt> | ",
                 "export-delivery <workspace-id> <run-id> <destination-zip> | ",
+                "set-plugin-active <plugin-id> on|off | ",
                 "render-preview <workspace-id> <run-id> <attempt> <edit-json> | ",
                 "render-primary <workspace-id> <run-id> <attempt> | verify-delivery <workspace-id> <run-id> <attempt>"
             )

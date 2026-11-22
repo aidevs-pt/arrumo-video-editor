@@ -147,6 +147,9 @@ impl WorkspaceStore {
             .get("text-to-speech")
             .map(|order| order.effective.clone())
             .unwrap_or_default();
+        if let Some(id) = provider {
+            self.check_named_provider(id)?;
+        }
         let plugin = match provider {
             Some(id)
                 if self

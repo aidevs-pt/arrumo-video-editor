@@ -1707,6 +1707,7 @@
     "off": "Desactivado",
     "offHint": "Este complemento está desactivado. Arrumo conserva sus ajustes, pero no lo ejecuta: sale de los órdenes de proveedores, las acciones, los hooks y el uso.",
     "refusedTitle": "Aún no se puede desactivar {plugin}",
+    "failedTitle": "Arrumo no pudo cambiar {plugin}",
     "refused": {
       "plugin_agent_app": "Es el agente de edición de la aplicación. Elige otro agente en Ajustes primero.",
       "plugin_agent_workspace": "Un espacio de trabajo lo usa como agente de edición. Elige otro agente para ese espacio primero.",

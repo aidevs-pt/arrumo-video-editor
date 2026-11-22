@@ -75,6 +75,22 @@ impl WorkspaceStore {
             .any(|plugin| plugin.active && plugin.manifest.id == plugin_id))
     }
 
+    /// Refuses a provider a caller named when it is installed but turned off.
+    pub(crate) fn check_named_provider(&self, plugin_id: &str) -> Result<(), Box<dyn Error>> {
+        let off = self
+            .plugin_catalog()?
+            .into_iter()
+            .find(|plugin| plugin.manifest.id == plugin_id && !plugin.active);
+        match off {
+            Some(plugin) => Err(io::Error::other(format!(
+                "{} is turned off. Turn it on in Settings › Plugins.",
+                plugin.manifest.name
+            ))
+            .into()),
+            None => Ok(()),
+        }
+    }
+
     /// A captured provider order without the installed plugins turned off since.
     pub(crate) fn without_inactive(
         &self,
@@ -271,6 +287,69 @@ mod tests {
             store.without_inactive(vec!["other".into()]).unwrap(),
             ["other"]
         );
+    }
+
+    #[test]
+    fn named_providers_and_captured_renderers_respect_the_switch() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        store.install_plugin_manifest(FIXTURE).unwrap();
+        let refused = store.check_named_provider("fixture-provider").unwrap_err();
+        assert!(refused.to_string().contains("turned off"));
+        store.check_named_provider("elevenlabs").unwrap();
+        let snapshot = json!({"motion_renderer": {"plugin_id": "fixture-provider"}});
+        assert!(
+            !store.renders_motion(&snapshot).unwrap(),
+            "falls back to agent animations"
+        );
+        store.set_plugin_active("fixture-provider", true).unwrap();
+        assert!(store.renders_motion(&snapshot).unwrap());
+        assert!(!store.renders_motion(&json!({})).unwrap());
+    }
+
+    #[test]
+    fn a_retried_run_whose_agent_was_turned_off_fails_with_the_reason() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        store.set_agent_provider(None, Some("codex")).unwrap();
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Explainer".into(),
+                    profile_id: None,
+                    intent: "Explain the cube".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap()
+            .id;
+        let run = store
+            .enqueue_video_draft(workspace, draft, "k", &crate::RunOptions::default())
+            .unwrap()
+            .id;
+        store
+            .0
+            .execute("UPDATE generation_runs SET state = 'failed'", [])
+            .unwrap();
+        store.set_agent_provider(None, None).unwrap();
+        store.set_plugin_active("codex", false).unwrap();
+        store
+            .0
+            .execute("UPDATE generation_runs SET state = 'queued'", [])
+            .unwrap();
+        let error = store
+            .process_script_stage(std::path::Path::new(":memory:"), workspace, run)
+            .unwrap_err();
+        assert!(error.to_string().contains("is turned off"));
+        let state: String = store
+            .0
+            .query_row(
+                "SELECT state FROM generation_runs WHERE id = ?1",
+                [run],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(state, "failed");
     }
 
     #[test]

@@ -75,6 +75,17 @@ impl WorkspaceStore {
         let Some(attempt) = self.claim_queued_stage(workspace_id, run_id, stage)? else {
             return Ok(None);
         };
+        if !self.plugin_is_active(&provider.id)? {
+            let reason = format!(
+                "The run's agent, {}, is turned off. Turn it on in Settings › Plugins, then retry.",
+                provider.label
+            );
+            match self.fail_generation(workspace_id, run_id, attempt, &reason) {
+                Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
+                Err(failure) => return Err(failure.into()),
+            }
+            return Err(io::Error::other(reason).into());
+        }
         match work(&run, provider, attempt) {
             Ok(id) => Ok(Some(id)),
             Err(error) => {

@@ -373,6 +373,35 @@ mod tests {
                 )
                 .is_err()
         );
+        let later = store
+            .enqueue_video_draft(workspace, draft.id, "later", &crate::RunOptions::default())
+            .unwrap()
+            .id;
+        store
+            .0
+            .execute_batch(&format!(
+                "UPDATE generation_runs SET state = 'completed', stage_index = 1,
+                 plan_json = (SELECT plan_json FROM generation_runs WHERE id = {run})
+             WHERE id = {later};
+             INSERT INTO production_results (run_id, stage_index, attempt, result_json)
+             VALUES ({later}, 0, 1, '{delivery}');"
+            ))
+            .unwrap();
+        store.set_plugin_active("fixture-hooks", false).unwrap();
+        assert_eq!(
+            store.queue_video_completed_hooks(workspace, later),
+            0,
+            "a plugin that is off runs no hooks"
+        );
+        store.set_plugin_active("fixture-hooks", true).unwrap();
+        assert_eq!(store.queue_video_completed_hooks(workspace, later), 1);
+        store.set_plugin_active("fixture-hooks", false).unwrap();
+        let job = store.process_next_plugin_action_job().unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(&job).unwrap()["state"],
+            "failed",
+            "a job queued before the plugin was turned off does not run"
+        );
     }
 
     #[test]

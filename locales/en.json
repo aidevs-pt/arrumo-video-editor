@@ -1707,6 +1707,7 @@
     "off": "Off",
     "offHint": "This plugin is off. Arrumo keeps its settings but doesn't run it: it leaves provider orders, actions, hooks and usage.",
     "refusedTitle": "{plugin} can't be turned off yet",
+    "failedTitle": "Arrumo couldn't change {plugin}",
     "refused": {
       "plugin_agent_app": "It is the app's editing agent. Choose another agent in Settings first.",
       "plugin_agent_workspace": "A workspace uses it as its editing agent. Choose another agent for that workspace first.",
