@@ -16,6 +16,8 @@ use crate::{
     AgentPlugin, WorkspaceStore,
     agent_logs::AgentLogScope,
     agent_run::{AgentRunError, AgentSession, MAX_IMAGES, accepts_images, resumes_sessions},
+    script_stage::MAX_TRANSCRIPT_CHARS,
+    source_transcripts::TranscriptPart,
 };
 
 /// Agent runs per answer, including the final one that must answer.
@@ -24,6 +26,8 @@ const MAX_ASKED: usize = 6;
 const MAX_CATALOGUE: usize = 60;
 const ITEM_CHARS: usize = 12_000;
 const TOTAL_CHARS: usize = 48_000;
+/// Transcript parts listed per clip; longer clips list their first parts.
+const MAX_TRANSCRIPT_PARTS: usize = 12;
 
 /// One item the agent may ask for.
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +92,18 @@ impl WorkspaceStore {
         provider: &AgentPlugin,
     ) -> rusqlite::Result<Vec<Material>> {
         let mut catalogue = Vec::new();
+        // The rest of this run's footage transcripts, when they were too long to include.
+        for (asset, name, parts) in self.run_transcript_parts(workspace_id, run_id)? {
+            let count = parts.len();
+            for (index, part) in parts.into_iter().enumerate().take(MAX_TRANSCRIPT_PARTS) {
+                catalogue.push(Material {
+                    id: format!("transcript:{asset}:{}", index + 1),
+                    kind: "transcript part",
+                    title: format!("{name}, part {} of {count}", index + 1),
+                    detail: format!("Transcript lines from {} to {}", part.from, part.to),
+                });
+            }
+        }
         if accepts_images(provider) {
             let mut images = self.0.prepare(
                 "SELECT id, name, notes FROM workspace_assets
@@ -158,13 +174,68 @@ impl WorkspaceStore {
         Ok(catalogue)
     }
 
+    /// For each of the run's footage clips whose transcript did not fit in the prompt, the
+    /// asset, its name and the parts left out.
+    fn run_transcript_parts(
+        &self,
+        workspace_id: i64,
+        run_id: Option<i64>,
+    ) -> rusqlite::Result<Vec<(i64, String, Vec<TranscriptPart>)>> {
+        let Some(run_id) = run_id else {
+            return Ok(Vec::new());
+        };
+        let sources: Option<String> = self
+            .0
+            .query_row(
+                "SELECT json_extract(snapshot_json, '$.draft.source_ids') FROM generation_runs
+                 WHERE workspace_id = ?1 AND id = ?2",
+                params![workspace_id, run_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        let ids: Vec<i64> = sources
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default();
+        let budget = MAX_TRANSCRIPT_CHARS / ids.len().max(1);
+        let mut found = Vec::new();
+        for id in ids {
+            let Some(transcript) = self.source_transcript(workspace_id, id)? else {
+                continue;
+            };
+            let parts = transcript.remaining_parts(budget, ITEM_CHARS);
+            if parts.is_empty() {
+                continue;
+            }
+            let name: String = self.0.query_row(
+                "SELECT name FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2",
+                params![workspace_id, id],
+                |row| row.get(0),
+            )?;
+            found.push((id, name, parts));
+        }
+        Ok(found)
+    }
+
     fn provide_material(
         &self,
         database: &Path,
         workspace_id: i64,
+        run_id: Option<i64>,
         id: &str,
         folder: &Path,
     ) -> Result<Option<Provided>, Box<dyn Error>> {
+        if let Some(rest) = id.strip_prefix("transcript:") {
+            let Some((asset, part)) = rest.split_once(':') else {
+                return Ok(None);
+            };
+            let (asset, part): (i64, usize) = (asset.parse()?, part.parse()?);
+            return Ok(self
+                .run_transcript_parts_for(workspace_id, run_id, asset)?
+                .into_iter()
+                .nth(part.saturating_sub(1))
+                .map(|part| Provided::Text(part.text)));
+        }
         let Some((kind, number)) = id.split_once(':') else {
             return Ok(None);
         };
@@ -230,6 +301,21 @@ impl WorkspaceStore {
             }
             _ => None,
         })
+    }
+
+    /// The parts of one clip's transcript beyond the prompt, split as the catalogue listed them.
+    fn run_transcript_parts_for(
+        &self,
+        workspace_id: i64,
+        run_id: Option<i64>,
+        asset: i64,
+    ) -> rusqlite::Result<Vec<TranscriptPart>> {
+        Ok(self
+            .run_transcript_parts(workspace_id, run_id)?
+            .into_iter()
+            .find(|(id, _, _)| *id == asset)
+            .map(|(_, _, parts)| parts)
+            .unwrap_or_default())
     }
 
     /// Runs the agent like `run_logged_agent_with_images`, letting it ask for workspace material
@@ -374,7 +460,13 @@ impl WorkspaceStore {
             }
             for id in &needs {
                 asked.push(id.clone());
-                match self.provide_material(database, scope.workspace_id, id, folder.path()) {
+                match self.provide_material(
+                    database,
+                    scope.workspace_id,
+                    scope.run_id,
+                    id,
+                    folder.path(),
+                ) {
                     Ok(Some(Provided::Image(path))) if attached.len() < MAX_IMAGES => {
                         attached.push(path);
                         provided.push(json!({"id": id, "attachedImage": attached.len()}));
@@ -431,13 +523,13 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         assert!(
             store
-                .provide_material(&database, workspace, "video:99", folder.path())
+                .provide_material(&database, workspace, None, "video:99", folder.path())
                 .unwrap()
                 .is_none()
         );
         assert!(
             store
-                .provide_material(&database, workspace, "shell:1", folder.path())
+                .provide_material(&database, workspace, None, "shell:1", folder.path())
                 .unwrap()
                 .is_none()
         );

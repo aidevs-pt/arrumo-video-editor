@@ -11,7 +11,7 @@ use crate::{AgentPlugin, ProductionStage, WorkspaceStore};
 pub(crate) const AGENT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_SECTIONS: usize = 40;
 /// Keeps the whole prompt well inside what agents accept in one turn.
-const MAX_TRANSCRIPT_CHARS: usize = 120_000;
+pub(crate) const MAX_TRANSCRIPT_CHARS: usize = 120_000;
 
 fn answer_schema() -> Value {
     let text = |max: u32| json!({"type": "string", "maxLength": max});
@@ -295,6 +295,7 @@ impl WorkspaceStore {
                 "clip": name,
                 "notes": notes,
                 "language": transcript.as_ref().map(|entry| entry.language_code.clone()),
+                "transcriptContinues": transcript.as_ref().is_some_and(|entry| !entry.remaining_parts(budget, usize::MAX).is_empty()),
                 "transcript": transcript.map(|entry| entry.timed_lines(budget)),
             }));
         }

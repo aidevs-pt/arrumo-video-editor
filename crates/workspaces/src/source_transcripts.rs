@@ -56,6 +56,48 @@ impl SourceTranscript {
         }
         lines.chars().take(max_chars).collect()
     }
+
+    /// What `timed_lines(inline)` leaves out, as whole lines grouped into parts of at most
+    /// `part` characters, each with the time of its first and last line.
+    pub(crate) fn remaining_parts(&self, inline: usize, part: usize) -> Vec<TranscriptPart> {
+        let full = self.timed_lines(usize::MAX);
+        let mut shown = 0;
+        let mut parts: Vec<TranscriptPart> = Vec::new();
+        for line in full.lines() {
+            let length = line.chars().count() + 1;
+            if shown + length <= inline {
+                shown += length;
+                continue;
+            }
+            shown = inline;
+            let time = line
+                .strip_prefix('[')
+                .and_then(|rest| rest.split_once(']'))
+                .map(|(time, _)| time.to_owned())
+                .unwrap_or_default();
+            match parts.last_mut() {
+                Some(current) if current.text.chars().count() + length <= part => {
+                    current.text.push_str(line);
+                    current.text.push('\n');
+                    current.to = time;
+                }
+                _ => parts.push(TranscriptPart {
+                    text: format!("{line}\n").chars().take(part).collect(),
+                    from: time.clone(),
+                    to: time,
+                }),
+            }
+        }
+        parts
+    }
+}
+
+/// A stretch of a transcript beyond what a prompt includes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TranscriptPart {
+    pub text: String,
+    pub from: String,
+    pub to: String,
 }
 
 fn clock(seconds: f64) -> String {
@@ -239,6 +281,37 @@ mod tests {
             end: start + 0.3,
             speaker_id: None,
         }
+    }
+
+    #[test]
+    fn what_the_prompt_leaves_out_is_split_into_whole_line_parts() {
+        let words: Vec<TranscriptWord> = (0..40)
+            .map(|index| word(&format!("Sentence{index}."), index as f64 * 60.0))
+            .collect();
+        let transcript = SourceTranscript {
+            provider: "fixture".into(),
+            language_code: "en".into(),
+            text: String::new(),
+            words,
+        };
+        let full = transcript.timed_lines(usize::MAX);
+        let inline = transcript.timed_lines(100);
+        let parts = transcript.remaining_parts(100, 120);
+        assert!(parts.iter().all(|part| part.text.chars().count() <= 120));
+        assert!(parts.iter().all(|part| part.text.ends_with('\n')));
+        // Inline lines plus the parts cover the whole transcript, the cut line included.
+        let joined: String = parts.iter().map(|part| part.text.as_str()).collect();
+        assert!(full.ends_with(&joined));
+        assert!(inline.len() + joined.len() >= full.len());
+        assert_eq!(
+            parts[0].from,
+            joined.lines().next().unwrap()[1..]
+                .split(']')
+                .next()
+                .unwrap()
+        );
+        assert_eq!(parts.last().unwrap().to, "39:00");
+        assert!(transcript.remaining_parts(usize::MAX, 120).is_empty());
     }
 
     #[test]
