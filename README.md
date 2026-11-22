@@ -381,7 +381,7 @@ Use `get_generation_plan` to inspect a run's prepared steps. A worker can use `f
 
 Use `create_video_draft` and `update_video_draft` to save drafts before enqueueing. Pass the full `settings` object with a title and either an intent or an ordered `source_ids` list of managed video assets in the workspace. An optional `profile_id` selects a workspace profile. Keep the returned draft ID for updates and enqueueing.
 
-Use `import_workspace_asset` with a workspace ID and an absolute local `source` path to copy a media file into managed storage. Use `list_workspace_assets` to find asset IDs for draft sources. Use `generate_library_images` to make one to four images from a description (`aspectRatio` `16:9`, `9:16`, `1:1` or `4:5`) with the workspace's image providers, or one named `provider`; they join the assets with the given `notes`.
+Use `import_workspace_asset` with a workspace ID and an absolute local `source` path to copy a media file into managed storage. Use `list_workspace_assets` to find asset IDs for draft sources. Use `generate_library_images` to make one to four images from a description (`aspectRatio` `16:9`, `9:16`, `1:1` or `4:5`) with the workspace's image providers, or one named `provider`; they join the assets with the given `notes`. The desktop can also voice text into an audio asset with the first speech provider.
 
 Use `replace_workspace_asset` through MCP or A2A with `workspaceId`, the active `assetId`, and an absolute local `source` path to media of the same kind. The returned `asset` has a new ID. Use that ID for subsequent operations on the replacement.
 

@@ -127,6 +127,69 @@ impl WorkspaceStore {
         })
     }
 
+    /// Voices `text` with the workspace's first speech provider (or `provider`) and adds the
+    /// audio to the workspace assets with `notes`. Returns the asset ID and the provider used.
+    pub fn generate_library_speech(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        text: &str,
+        notes: &str,
+        provider: Option<&str>,
+    ) -> Result<(i64, String), Box<dyn std::error::Error>> {
+        let text = text.trim();
+        if text.is_empty() || text.chars().count() > 5000 || notes.len() > 8000 {
+            return Err(io::Error::other("Write up to 5,000 characters to voice").into());
+        }
+        let orders =
+            self.capture_provider_orders(workspace_id, &std::collections::BTreeMap::new())?;
+        let order = orders
+            .get("text-to-speech")
+            .map(|order| order.effective.clone())
+            .unwrap_or_default();
+        let plugin = match provider {
+            Some(id)
+                if self
+                    .capability_index(Some(workspace_id))?
+                    .get("text-to-speech")
+                    .is_some_and(|providers| providers.iter().any(|entry| entry.id == id)) =>
+            {
+                id.to_owned()
+            }
+            Some(_) => return Err(io::Error::other("That provider does not voice text").into()),
+            None => order.first().cloned().ok_or_else(|| {
+                io::Error::other("Turn on a speech provider in Settings › Services and keys")
+            })?,
+        };
+        let voice = self
+            .narration_voice(workspace_id, &plugin)?
+            .ok_or_else(|| io::Error::other("Choose a voice in the speech plugin's settings"))?;
+        let extension = speech_extension(&plugin)?;
+        let scratch = tempfile::tempdir()?;
+        let stem = text
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .take(6)
+            .collect::<Vec<_>>()
+            .join("-")
+            .to_ascii_lowercase();
+        let stem = if stem.is_empty() {
+            "narration".to_owned()
+        } else {
+            format!("narration-{stem}")
+        };
+        let file = scratch.path().join(format!("{stem}.{extension}"));
+        self.synthesize_speech_to_file(workspace_id, &plugin, &voice, text, &file)?;
+        let mut writer = WorkspaceStore::open(database)?;
+        let asset = writer
+            .import_asset(&crate::asset_root(database), workspace_id, &file)
+            .map_err(|error| io::Error::other(error.to_string()))?;
+        if !notes.trim().is_empty() {
+            writer.set_asset_notes(workspace_id, asset.id, notes.trim())?;
+        }
+        Ok((asset.id, plugin))
+    }
+
     pub fn synthesize_speech_to_file(
         &self,
         workspace_id: i64,

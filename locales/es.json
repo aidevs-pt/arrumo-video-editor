@@ -498,8 +498,8 @@
     "copyName": "Copiar nombre",
     "generate": {
       "open": "Generar",
-      "title": "Generar una imagen",
-      "description": "Descríbela y tus proveedores de imágenes la crean. Se añade a los recursos de este espacio de trabajo.",
+      "title": "Generar un recurso",
+      "description": "Describe una imagen o escribe un texto para locutar. Tus proveedores lo crean y se añade a los recursos de este espacio de trabajo.",
       "prompt": "Descríbela",
       "promptPlaceholder": "Ilustración plana de un escritorio desordenado con tiras de película que se apilan, cobalto y amarillo, sin texto.",
       "provider": "Hecha con",
@@ -509,14 +509,20 @@
       "variations": "Variaciones",
       "notes": "Contexto para el agente",
       "notesPlaceholder": "Fondo para el teaser de lanzamiento. Detrás de la aparición del logo.",
-      "notesHint": "Se guarda con la imagen para que no aparezca sin contexto.",
+      "notesHint": "Se guarda con el recurso para que no aparezca sin contexto.",
       "noProvider": "No hay ningún proveedor de imágenes activado. Actívalo en Ajustes › Servicios y claves.",
       "error": "No se pudo generar la imagen. Inténtalo de nuevo.",
       "pendingHint": "Generando. Puede tardar un minuto por imagen.",
       "cancel": "Cancelar",
       "generating": "Generando…",
       "submitOne": "Generar 1 imagen",
-      "submitMany": "Generar {count} imágenes"
+      "submitMany": "Generar {count} imágenes",
+      "image": "Imagen",
+      "audio": "Audio",
+      "speechText": "Texto para locutar",
+      "speechPlaceholder": "Material desordenado dentro. Un vídeo brillante fuera.",
+      "noSpeechProvider": "No hay ningún proveedor de voz activado. Actívalo en Ajustes › Servicios y claves y elige una voz en sus ajustes.",
+      "submitAudio": "Generar audio"
     }
   },
   "delivery": {

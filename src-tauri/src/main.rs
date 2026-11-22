@@ -502,6 +502,30 @@ async fn generate_library_images(
 }
 
 #[tauri::command]
+async fn generate_library_speech(
+    workspace_id: i64,
+    text: String,
+    notes: String,
+    provider: Option<String>,
+    app: AppHandle,
+) -> Result<i64, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .generate_library_speech(&database, workspace_id, &text, &notes, provider.as_deref())
+            .map(|(id, _)| id)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "speech_generation_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn draft_profile(
     workspace_id: i64,
     name: String,
@@ -1175,6 +1199,7 @@ fn main() {
             draft_workspace_context,
             draft_profile,
             generate_library_images,
+            generate_library_speech,
             generate_motion_library_item,
             apply_context_import,
             set_workspace_context,
