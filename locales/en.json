@@ -1003,7 +1003,12 @@
     "noFeedback": "No feedback yet",
     "exporting": "Exporting…",
     "replayMode": "Settings to use",
-    "notScheduled": "Not scheduled yet."
+    "notScheduled": "Not scheduled yet.",
+    "subtitlesIntro": "Subtitles for {video}, {output}. Edits are saved as a new version; earlier versions stay in the history.",
+    "download": "Download",
+    "downloading": "Saving…",
+    "downloaded": "Subtitles saved.",
+    "downloadError": "Could not save the subtitles. Check the folder and try again."
   },
   "productionPlan": {
     "addItemNote": "Add note",

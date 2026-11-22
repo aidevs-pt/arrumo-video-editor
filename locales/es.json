@@ -1003,7 +1003,12 @@
     "noFeedback": "Todavía no hay comentarios",
     "exporting": "Exportando…",
     "replayMode": "Ajustes que se usarán",
-    "notScheduled": "Aún sin programar."
+    "notScheduled": "Aún sin programar.",
+    "subtitlesIntro": "Subtítulos de {video}, {output}. Los cambios se guardan como una versión nueva; las anteriores siguen en el historial.",
+    "download": "Descargar",
+    "downloading": "Guardando…",
+    "downloaded": "Subtítulos guardados.",
+    "downloadError": "No se pudieron guardar los subtítulos. Revisa la carpeta e inténtalo de nuevo."
   },
   "productionPlan": {
     "addItemNote": "Añadir nota",

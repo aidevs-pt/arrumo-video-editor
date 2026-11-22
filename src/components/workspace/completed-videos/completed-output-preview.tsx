@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { CodecHint } from "@/components/workspace/media/codec-hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,11 +33,13 @@ function readCues(subtitles: string): Cue[] {
   });
 }
 
-export function CompletedOutputPreview({ workspaceId, runId, formatId, label, showTranscript = false }: {
+export function CompletedOutputPreview({ workspaceId, runId, formatId, label, subtitleName, showTranscript = false }: {
   workspaceId: number;
   runId: number;
   formatId: number;
   label: string;
+  /** The subtitle file's name, used when saving a track. */
+  subtitleName?: string;
   showTranscript?: boolean;
 }) {
   const { locale, messages: { completedVideo: copy, queue, subtitleRevisions: tracks } } = useLocale();
@@ -49,6 +53,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
   const [loadingTrack, setLoadingTrack] = useState(false);
   const [trackError, setTrackError] = useState(false);
   const languageSelect = useRef<HTMLSelectElement>(null);
+  const [saving, setSaving] = useState<"saving" | "saved" | "failed">();
   const languageNames = useMemo(() => new Intl.DisplayNames([locale], { type: "language" }), [locale]);
   const displayed = track?.historical ?? track?.latest;
   const [query, setQuery] = useState("");
@@ -98,6 +103,21 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
     }
   }
 
+  async function downloadTrack() {
+    if (!track) return;
+    setSaving("saving");
+    const base = (subtitleName ?? "subtitles.srt").replace(/\.srt$/i, "");
+    try {
+      const written = await invoke<boolean>("export_completed_subtitles", {
+        workspaceId, runId, formatId, language: track.language || null,
+        revision: track.historical?.revision ?? null, fileName: `${base}${track.language ? `.${track.language}` : ""}.srt`,
+      });
+      setSaving(written ? "saved" : undefined);
+    } catch {
+      setSaving("failed");
+    }
+  }
+
   function languageName(language: string) {
     try {
       return languageNames.of(language) ?? language;
@@ -139,14 +159,27 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
         </div>
       )}
       {showTranscript && preview && track && <section className="min-w-0" aria-labelledby="delivery-transcript">
-        <h2 id="delivery-transcript" className="mb-3 text-[1.3125rem]">{copy.subtitleText}</h2>
-        <NativeSelect ref={languageSelect} className="mb-3 w-full" aria-label={tracks.language}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="delivery-transcript" className="text-[1.3125rem]">{copy.subtitleText}</h2>
+          <Button type="button" variant="outline" size="sm" disabled={saving === "saving"} onClick={() => void downloadTrack()}>
+            <Download data-icon="inline-start" />{saving === "saving" ? copy.downloading : copy.download}
+          </Button>
+        </div>
+        {preview.languages.length > 0 && preview.languages.length <= 3 ? (
+          <ToggleGroup type="single" variant="outline" className="mb-3 w-full" aria-label={tracks.language}
+            value={track.language} disabled={loadingTrack} onValueChange={(value) => { if (value !== track.language && (value || track.language)) void selectTrack(value); }}>
+            <ToggleGroupItem value="" className="flex-1">{tracks.primary}</ToggleGroupItem>
+            {preview.languages.map((language) => <ToggleGroupItem key={language} value={language} className="flex-1">{languageName(language)}</ToggleGroupItem>)}
+          </ToggleGroup>
+        ) : preview.languages.length > 3 && <NativeSelect ref={languageSelect} className="mb-3 w-full" aria-label={tracks.language}
           value={track.language} disabled={loadingTrack} onChange={(event) => void selectTrack(event.target.value)}>
           <NativeSelectOption value="">{tracks.primary}</NativeSelectOption>
           {preview.languages.map((language) => <NativeSelectOption key={language} value={language}>
             {languageName(language)}
           </NativeSelectOption>)}
-        </NativeSelect>
+        </NativeSelect>}
+        {saving === "saved" && <p role="status" className="mb-3 text-sm text-muted-foreground">{copy.downloaded}</p>}
+        {saving === "failed" && <Alert variant="destructive" className="mb-3"><AlertDescription>{copy.downloadError}</AlertDescription></Alert>}
         {trackError && <Alert variant="destructive" className="mb-3"><AlertDescription>{tracks.readError}</AlertDescription></Alert>}
         <SubtitleRevisionControls key={track.language} workspaceId={workspaceId} runId={runId} formatId={formatId}
           language={track.language} languages={preview.languages} disabled={loadingTrack}
@@ -166,7 +199,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, sh
               </span>
               <span className="min-w-0 wrap-anywhere whitespace-pre-wrap">{cue.text}</span>
             </>;
-            return <li key={`${cue.timestamp}-${index}`} className={cn(active && "bg-accent text-accent-foreground")}>
+            return <li key={`${cue.timestamp}-${index}`} className={cn(active && "bg-primary/8 font-medium")}>
               {seekable ? <button type="button" className="flex w-full gap-3 p-3 text-start text-sm hover:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 aria-current={active ? "true" : undefined}
                 onClick={() => { if (video.current) video.current.currentTime = cue.start; }}>

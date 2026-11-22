@@ -220,6 +220,61 @@ pub async fn read_completed_subtitle_revision(
     .map_err(|_| "subtitle_revision_read_failed")?
 }
 
+/// Saves one subtitle track (a revision, or the latest) where the creator chooses. Returns
+/// whether a file was written; cancelling the dialog is not an error.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn export_completed_subtitles(
+    workspace_id: i64,
+    run_id: i64,
+    format_id: i64,
+    revision: Option<i64>,
+    language: Option<String>,
+    file_name: String,
+    app: AppHandle,
+) -> Result<bool, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        let track = WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .completed_subtitle_track(
+                &database,
+                workspace_id,
+                run_id,
+                format_id,
+                language.as_deref(),
+                revision,
+            )
+            .map_err(|_| "subtitle_export_failed")?;
+        let name: String = file_name
+            .chars()
+            .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            .take(80)
+            .collect();
+        let name = if name.ends_with(".srt") { name } else { "subtitles.srt".to_owned() };
+        let Some(destination) = app
+            .dialog()
+            .file()
+            .add_filter("SRT", &["srt"])
+            .set_file_name(name)
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let destination = destination
+            .into_path()
+            .map_err(|_| "subtitle_export_failed")?;
+        std::fs::write(destination, track.subtitles).map_err(|_| "subtitle_export_failed")?;
+        Ok(true)
+    })
+    .await
+    .map_err(|_| "subtitle_export_failed")?
+}
+
 #[tauri::command]
 pub async fn save_completed_subtitle_revision(
     workspace_id: i64,

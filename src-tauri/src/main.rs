@@ -1303,6 +1303,7 @@ fn main() {
             completed_video::completed_video_poster,
             completed_video::set_output_schedule,
             completed_video::read_completion_notification,
+            completed_video::export_completed_subtitles,
             completed_video::rename_completed_video,
             completed_video::export_completed_video,
             completed_video::delete_completed_video,

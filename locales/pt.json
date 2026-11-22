@@ -1003,7 +1003,12 @@
     "noFeedback": "Ainda sem comentários",
     "exporting": "A exportar…",
     "replayMode": "Definições a usar",
-    "notScheduled": "Ainda não agendado."
+    "notScheduled": "Ainda não agendado.",
+    "subtitlesIntro": "Legendas de {video}, {output}. As alterações ficam guardadas como uma versão nova; as anteriores ficam no histórico.",
+    "download": "Transferir",
+    "downloading": "A guardar…",
+    "downloaded": "Legendas guardadas.",
+    "downloadError": "Não foi possível guardar as legendas. Verifique a pasta e tente novamente."
   },
   "productionPlan": {
     "addItemNote": "Adicionar nota",

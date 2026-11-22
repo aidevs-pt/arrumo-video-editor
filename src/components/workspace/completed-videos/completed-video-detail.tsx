@@ -136,7 +136,13 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const [error, setError] = useState<"renameError" | "exportError">();
   const [notice, setNotice] = useState<"saved" | "exported">();
   const [outputDates, setOutputDates] = useState(video.output_dates);
-  useStudioTrail([{ label: studio.videos, href: workspaceHref("videos", workspaceId) }, { label: savedTitle }]);
+  const crumbOutput = video.delivery.verified_outputs.find((output) => output.format_id === initialFormatId) ?? video.delivery.verified_outputs[0];
+  const fileCrumb = file === "subtitles" ? crumbOutput?.subtitles : undefined;
+  useStudioTrail([
+    { label: studio.videos, href: workspaceHref("videos", workspaceId) },
+    { label: savedTitle, href: fileCrumb ? completedVideoHref(workspaceId, runId, crumbOutput?.format_id) : undefined },
+    ...(fileCrumb ? [{ label: fileCrumb }] : []),
+  ]);
   const [formatId, setFormatId] = useState(video.delivery.verified_outputs.find((output) => output.format_id === initialFormatId)?.format_id
     ?? video.delivery.verified_outputs[0]?.format_id);
   const selected = video.delivery.verified_outputs.find((output) => output.format_id === formatId);
@@ -243,14 +249,14 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <WorkspaceHeading className="mb-0">
           <h1>{selected.subtitles}</h1>
-          <p>{savedTitle} / {outputName(selected)}</p>
+          <p>{copy.subtitlesIntro.replace("{video}", savedTitle).replace("{output}", outputName(selected))}</p>
         </WorkspaceHeading>
         <Button asChild variant="outline" size="sm">
           <Link href={completedVideoHref(workspaceId, runId, selected.format_id)}>{copy.videoTab}</Link>
         </Button>
       </div>
       <CompletedOutputPreview key={selected.format_id} workspaceId={workspaceId} runId={runId}
-        formatId={selected.format_id} label={outputName(selected)} showTranscript />
+        formatId={selected.format_id} label={outputName(selected)} subtitleName={selected.subtitles} showTranscript />
       <section className="mt-6 border-t pt-4">
         <h2 className="mb-2 text-[1.3125rem]">{copy.otherFiles}</h2>
         <div className="flex flex-wrap gap-2">
