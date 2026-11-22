@@ -1489,9 +1489,7 @@
     "choose": "Escolher uma cópia .zip",
     "checking": "A verificar a cópia…",
     "confirmTitle": "Substituir tudo por esta cópia?",
-    "confirmBody": "Feita a {date} com o Arrumo {version}: {files} ficheiros, {size}. O Arrumo reinicia para a restaurar.",
-    "keptNote": "Os teus dados atuais são postos de parte, não apagados. As chaves guardadas neste computador continuam a funcionar.",
-    "restart": "Reiniciar e restaurar",
+    "restart": "Reiniciar e substituir",
     "cancel": "Cancelar",
     "stagedEarlier": "Há uma cópia verificada à espera. Reinicia para a restaurar, ou cancela.",
     "errors": {
@@ -1499,7 +1497,22 @@
       "backup_damaged": "Esta cópia foi alterada ou danificada depois de ser feita, por isso não foi restaurada.",
       "backup_newer": "Esta cópia precisa de uma versão mais recente do Arrumo. Atualiza o Arrumo e tenta novamente.",
       "backup_import_failed": "Não foi possível ler a cópia. Verifica se há espaço livre e tenta novamente."
-    }
+    },
+    "checksumMatches": "A soma de verificação coincide.",
+    "unchanged": "{file} não foi alterado desde que foi exportado.",
+    "rowWorkspaces": "Espaços de trabalho",
+    "workspacesValue": "{count}",
+    "workspacesReplacing": "{count}, substituem os seus {current}",
+    "rowPlugins": "Plugins",
+    "pluginsValue": "{count}, reinstalados a partir do ficheiro",
+    "pluginsUnknown": "Reinstalados a partir do ficheiro",
+    "rowFiles": "Tamanho",
+    "rowMade": "Criada",
+    "madeValue": "{date}, Arrumo {version}",
+    "rowKeys": "Chaves de API",
+    "keysValue": "Não incluídas, as suas mantêm-se",
+    "replaceWarning": "Os seus espaços de trabalho, vídeos e definições atuais serão substituídos. São movidos para uma pasta junto aos seus dados, mas exporte-os antes se puder precisar deles aqui.",
+    "exportFirst": "Exportar os meus antes"
   },
   "pluginTour": {
     "newPlugins": "Plugins novos, {current} de {total}",

@@ -42,7 +42,7 @@ Ve a **Vídeos** → **Terminados** y abre el vídeo terminado. Selecciona una s
 
 **Ajustes › Importar y exportar** guarda todo (ajustes, espacios de trabajo, perfiles, recursos, animaciones, vídeos terminados y complementos instalados) en un `.zip`. Las claves de API no se incluyen: se quedan en el almacén de credenciales de este equipo, así que vuelve a añadirlas en un equipo nuevo.
 
-Para restaurar, elige una copia en el mismo sitio. Arrumo comprueba primero cada archivo con las sumas de la copia, después muestra lo que contiene y pregunta antes de reemplazar nada. Se reinicia para restaurarla y guarda los datos reemplazados en una carpeta llamada `workspaces.sqlite.before-import-…` junto a tus datos, por si los necesitas.
+Para restaurar, elige una copia en el mismo sitio. Arrumo comprueba primero cada archivo con las sumas de la copia, después muestra lo que contiene (espacios de trabajo, complementos, tamaño) y pregunta antes de reemplazar nada; **Exportar los míos antes** guarda tus datos actuales antes de decidir. Se reinicia para restaurarla y guarda los datos reemplazados en una carpeta llamada `workspaces.sqlite.before-import-…` junto a tus datos, por si los necesitas.
 
 ## Datos y privacidad
 

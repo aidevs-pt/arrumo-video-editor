@@ -43,6 +43,9 @@ pub struct BackupManifest {
     pub app_version: String,
     pub created_at: u64,
     pub workspaces: Vec<String>,
+    /// Installed plugin IDs; absent in backups made before it was recorded.
+    #[serde(default)]
+    pub plugins: Vec<String>,
     pub files: Vec<BackupFile>,
 }
 
@@ -52,6 +55,7 @@ pub struct BackupSummary {
     pub app_version: String,
     pub created_at: u64,
     pub workspaces: Vec<String>,
+    pub plugins: usize,
     pub files: usize,
     pub bytes: u64,
 }
@@ -62,6 +66,7 @@ impl From<&BackupManifest> for BackupSummary {
             app_version: manifest.app_version.clone(),
             created_at: manifest.created_at,
             workspaces: manifest.workspaces.clone(),
+            plugins: manifest.plugins.len(),
             files: manifest.files.len(),
             bytes: manifest.files.iter().map(|file| file.size).sum(),
         }
@@ -179,6 +184,11 @@ impl WorkspaceStore {
             .into_iter()
             .map(|workspace| workspace.name)
             .collect();
+        let plugins = self
+            .0
+            .prepare("SELECT plugin_id FROM installed_plugin_manifests ORDER BY plugin_id")?
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
 
         let pending = NamedTempFile::new_in(parent)?;
         let mut archive = ZipWriter::new(pending.reopen()?);
@@ -197,6 +207,7 @@ impl WorkspaceStore {
             app_version: env!("CARGO_PKG_VERSION").to_owned(),
             created_at: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
             workspaces,
+            plugins,
             files,
         };
         archive.start_file(MANIFEST, SimpleFileOptions::default())?;

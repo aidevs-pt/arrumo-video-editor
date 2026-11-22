@@ -2,8 +2,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Download, RotateCcw, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Download, RotateCcw, ShieldCheck, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/locale-provider";
 
-type Summary = { appVersion: string; createdAt: number; workspaces: string[]; files: number; bytes: number };
+type Summary = { appVersion: string; createdAt: number; workspaces: string[]; plugins: number; files: number; bytes: number };
 type ImportError = "backup_not_arrumo" | "backup_damaged" | "backup_newer" | "backup_import_failed";
 
 function size(bytes: number, locale: string) {
@@ -33,6 +33,9 @@ export function BackupSettings() {
   const [checking, setChecking] = useState(false);
   const [staged, setStaged] = useState<Summary | "earlier">();
   const [importError, setImportError] = useState<ImportError>();
+  const [archiveName, setArchiveName] = useState("");
+  const [current, setCurrent] = useState<number>();
+  const restoring = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -61,6 +64,8 @@ export function BackupSettings() {
     if (typeof archive !== "string") return;
     setChecking(true);
     setImportError(undefined);
+    setArchiveName(archive.split(/[\\/]/).pop() ?? archive);
+    invoke<unknown[]>("list_workspaces").then((list) => setCurrent(list.length), () => setCurrent(undefined));
     try {
       setStaged(await invoke<Summary>("stage_backup_import", { archive }));
     } catch (error) {
@@ -110,28 +115,41 @@ export function BackupSettings() {
         </Alert>}
       </section>
 
-      <AlertDialog open={staged !== undefined && staged !== "earlier"} onOpenChange={(openDialog) => { if (!openDialog) void cancel(); }}>
-        <AlertDialogContent>
+      <AlertDialog open={staged !== undefined && staged !== "earlier"} onOpenChange={(openDialog) => { if (!openDialog && !restoring.current) void cancel(); }}>
+        <AlertDialogContent className="max-w-[calc(100%-2rem)]! sm:max-w-xl! sm:p-6">
           <AlertDialogHeader>
-            <AlertDialogTitle>{copy.confirmTitle}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {staged && staged !== "earlier" && copy.confirmBody
-                .replace("{date}", made)
-                .replace("{version}", staged.appVersion)
-                .replace("{files}", String(staged.files))
-                .replace("{size}", size(staged.bytes, locale))}
-            </AlertDialogDescription>
+            <AlertDialogTitle className="font-heading text-3xl leading-none font-[850] [font-variation-settings:'wdth'_120]">{copy.confirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription className="sr-only">{copy.replaceWarning}</AlertDialogDescription>
           </AlertDialogHeader>
-          {staged && staged !== "earlier" && staged.workspaces.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5">
-              {staged.workspaces.map((name) => <li key={name} className="rounded-md bg-secondary px-2 py-0.5 text-sm font-medium">{name}</li>)}
-            </ul>
-          )}
-          <p className="text-sm text-muted-foreground">{copy.keptNote}</p>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{copy.cancel}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void invoke("restart_to_restore")}>{copy.restart}</AlertDialogAction>
+          {staged && staged !== "earlier" && <>
+            <div className="flex items-start gap-3 rounded-lg bg-secondary p-4 text-sm">
+              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-approval" aria-hidden="true" />
+              <p><strong>{copy.checksumMatches}</strong> {copy.unchanged.replace("{file}", archiveName)}</p>
+            </div>
+            <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2.5 text-sm">
+              <dt className="text-muted-foreground">{copy.rowWorkspaces}</dt>
+              <dd className="text-end font-semibold">{(current === undefined ? copy.workspacesValue : copy.workspacesReplacing)
+                .replace("{count}", String(staged.workspaces.length)).replace("{current}", String(current ?? 0))}</dd>
+              <dt className="text-muted-foreground">{copy.rowPlugins}</dt>
+              <dd className="text-end font-semibold">{staged.plugins ? copy.pluginsValue.replace("{count}", String(staged.plugins)) : copy.pluginsUnknown}</dd>
+              <dt className="text-muted-foreground">{copy.rowFiles}</dt>
+              <dd className="text-end font-semibold">{size(staged.bytes, locale)}</dd>
+              <dt className="text-muted-foreground">{copy.rowMade}</dt>
+              <dd className="text-end font-semibold">{copy.madeValue.replace("{date}", made).replace("{version}", staged.appVersion)}</dd>
+              <dt className="text-muted-foreground">{copy.rowKeys}</dt>
+              <dd className="text-end font-semibold">{copy.keysValue}</dd>
+            </dl>
+            <p className="text-sm font-semibold text-destructive">{copy.replaceWarning}</p>
+          </>}
+          <AlertDialogFooter className="items-center sm:-mx-6 sm:-mb-6">
+            <AlertDialogCancel variant="ghost">{copy.cancel}</AlertDialogCancel>
+            <Button variant="outline" disabled={exporting} onClick={() => void exportBackup()}>
+              <Download data-icon="inline-start" />{exporting ? copy.exporting : copy.exportFirst}
+            </Button>
+            <AlertDialogAction variant="destructive" className="bg-destructive! text-white! hover:bg-destructive/90!" onClick={() => { restoring.current = true; void invoke("restart_to_restore"); }}>{copy.restart}</AlertDialogAction>
           </AlertDialogFooter>
+          {exported && <p role="status" className="text-sm">{copy.exported.replace("{files}", String(exported.files)).replace("{size}", size(exported.bytes, locale))}</p>}
+          {exportFailed && <Alert variant="destructive"><AlertDescription>{copy.exportError}</AlertDescription></Alert>}
         </AlertDialogContent>
       </AlertDialog>
     </div>

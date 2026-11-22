@@ -60,7 +60,7 @@ snapshot includes SQLite records and stored plugin ZIPs. Managed media,
 delivery files, and system-store credentials require separate backup steps.
 
 For a full backup, `export-backup <new-zip>` writes the database snapshot,
-managed media and verified deliveries to one ZIP, with a manifest listing each
+managed media and verified deliveries to one ZIP, with a manifest naming the workspaces and installed plugins and listing each
 file's size and SHA-256 (`verify-backup <zip>` checks it). Credentials stay in
 the system store. `stage-backup-import <zip>` verifies a backup and stages it
 beside the database; the desktop app applies it at its next start, before

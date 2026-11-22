@@ -1489,9 +1489,7 @@
     "choose": "Choose a backup .zip",
     "checking": "Checking the backup…",
     "confirmTitle": "Replace everything with this backup?",
-    "confirmBody": "Made on {date} with Arrumo {version}: {files} files, {size}. Arrumo restarts to restore it.",
-    "keptNote": "Your current data is moved aside, not deleted. Keys you saved on this computer keep working.",
-    "restart": "Restart and restore",
+    "restart": "Restart and replace",
     "cancel": "Cancel",
     "stagedEarlier": "A checked backup is waiting. Restart to restore it, or cancel.",
     "errors": {
@@ -1499,7 +1497,22 @@
       "backup_damaged": "This backup was changed or damaged after it was made, so it was not restored.",
       "backup_newer": "This backup needs a newer version of Arrumo. Update Arrumo, then try again.",
       "backup_import_failed": "Could not read the backup. Check there is free space and try again."
-    }
+    },
+    "checksumMatches": "Checksum matches.",
+    "unchanged": "{file} hasn’t been changed since it was exported.",
+    "rowWorkspaces": "Workspaces",
+    "workspacesValue": "{count}",
+    "workspacesReplacing": "{count}, replacing your {current}",
+    "rowPlugins": "Plugins",
+    "pluginsValue": "{count}, reinstalled from the file",
+    "pluginsUnknown": "Reinstalled from the file",
+    "rowFiles": "Size",
+    "rowMade": "Made",
+    "madeValue": "{date}, Arrumo {version}",
+    "rowKeys": "API keys",
+    "keysValue": "Not included, yours are kept",
+    "replaceWarning": "Your current workspaces, videos and settings will be replaced. They’re moved to a folder next to your data, but export them first if you might need them here.",
+    "exportFirst": "Export mine first"
   },
   "pluginTour": {
     "newPlugins": "New plugins, {current} of {total}",
