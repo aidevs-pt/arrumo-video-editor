@@ -1,7 +1,8 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { AudioLines, Check, Clapperboard, ImageIcon, Music, Sparkles, Volume2 } from "lucide-react";
+import { open as openFiles } from "@tauri-apps/plugin-dialog";
+import { AudioLines, Check, Clapperboard, ImageIcon, Info, Music, Sparkles, Upload, Volume2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,6 +36,11 @@ const MAX_VIDEO_REFERENCES = 3;
 
 function fits(variant: VideoVariant, images: number, videos: number) {
   return images >= variant.images[0] && images <= variant.images[1] && videos >= variant.videos[0] && videos <= variant.videos[1];
+}
+
+/** Whether some variant could run with the images and videos the library could supply. */
+function reachable(model: VideoModel, images: number, videos: number) {
+  return model.variants.some((variant) => variant.images[0] <= images && variant.videos[0] <= videos);
 }
 
 function takes(model: VideoModel, images: number, videos: number) {
@@ -124,10 +130,18 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const imageCount = chosen.filter((id) => choices.find((asset) => asset.id === id)?.kind === "image").length;
   const videoCount = chosen.length - imageCount;
   const videoProvider = provider || inOrder[0]?.id || "";
-  const providerModels = models.filter((entry) => entry.provider === videoProvider && entry.id);
-  const activeModel = providerModels.find((entry) => entry.id === model) ?? providerModels.find((entry) => entry.selected);
+  const libraryImages = Math.min(MAX_IMAGE_REFERENCES, library.filter((asset) => asset.kind === "image").length);
+  const libraryVideos = Math.min(MAX_VIDEO_REFERENCES, library.filter((asset) => asset.kind === "video").length);
+  const providerModels = models.filter((entry) => entry.provider === videoProvider && entry.id && reachable(entry, libraryImages, libraryVideos));
+  const activeModel = providerModels.find((entry) => entry.id === model) ?? providerModels.find((entry) => entry.selected) ?? providerModels[0];
   const fitting = providerModels.filter((entry) => takes(entry, imageCount, videoCount));
   const unfit = kind === "video" && activeModel !== undefined && !takes(activeModel, imageCount, videoCount);
+  // The model takes no variant with this few references: say what it needs rather than "can't use".
+  const smallest = activeModel?.variants.reduce((best, entry) => entry.images[0] + entry.videos[0] < best.images[0] + best.videos[0] ? entry : best);
+  const needs = unfit && !!activeModel && activeModel.variants.every((entry) => entry.images[0] > imageCount || entry.videos[0] > videoCount);
+  const needsText = !smallest ? "" : smallest.videos[0] > videoCount
+    ? (smallest.images[0] ? copy.modelNeedsVideoAndImages.replace("{count}", String(smallest.images[0])) : copy.modelNeedsVideo)
+    : smallest.images[0] === 1 ? copy.modelNeedsImage : copy.modelNeedsImages.replace("{count}", String(smallest.images[0]));
   const unsupported = kind === "video" && chosen.length > 0 && providerModels.length === 0 && models.some((entry) => entry.provider === videoProvider);
   const variant = activeModel?.variants.find((entry) => fits(entry, imageCount, videoCount)) ?? activeModel?.variants[0];
   const followsVideo = variant !== undefined && variant.maxSeconds === 0;
@@ -144,6 +158,31 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const prettify = (id: string) => id.replace(/-/g, " ").replace(/\b([a-z])/g, (letter) => letter.toUpperCase()).replace(/ Std$/, " Standard");
   const modelName = (id: string) => pickable.find((entry) => entry.id === id)?.label || prettify(id);
   const bestFor = (text?: BestFor) => text && (text[locale as keyof BestFor] ?? text.en);
+
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadReferences() {
+    const picked = await openFiles({
+      multiple: true, title: copy.uploadReferences,
+      filters: [{ name: copy.references, extensions: kind === "video" ? ["png", "jpg", "jpeg", "webp", "mp4", "mov", "webm"] : ["png", "jpg", "jpeg", "webp"] }],
+    }).catch(() => null);
+    if (!picked?.length) return;
+    setUploading(true);
+    setProblem(undefined);
+    const added: LibraryAsset[] = [];
+    for (const source of picked) {
+      try {
+        added.push(await invoke<LibraryAsset>("import_asset", { workspaceId, source }));
+      } catch {
+        setProblem(copy.uploadFailed);
+      }
+    }
+    setUploading(false);
+    if (!added.length) return;
+    setLibrary((current) => [...current, ...added]);
+    for (const asset of added) toggleReference(asset);
+    onCreated(added.map((asset) => asset.id));
+  }
 
   function toggleReference(asset: LibraryAsset) {
     setProblem(undefined);
@@ -169,7 +208,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       } else if (kind === "video") {
         onCreated([await invoke<number>("generate_library_video", {
           workspaceId, prompt: prompt.trim(), aspectRatio: ratio, durationSeconds: followsVideo ? null : length, notes: notes.trim(),
-          provider: provider || inOrder[0]?.id || null, model: model || null, references: chosen,
+          provider: provider || inOrder[0]?.id || null, model: model || activeModel?.id || null, references: chosen,
         })]);
       } else if (made) {
         onCreated([await invoke<number>("generate_library_audio", {
@@ -264,7 +303,12 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
           </Field>}
           {kind !== "audio" && !made && !imagesOnly && <Field data-disabled={pending}>
             <FieldLabel id="generate-references">{copy.references}</FieldLabel>
-            <FieldDescription>{kind === "video" ? copy.referencesVideoHint : copy.referencesImageHint}</FieldDescription>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <FieldDescription className="min-w-0 flex-1">{kind === "video" ? copy.referencesVideoHint : copy.referencesImageHint}</FieldDescription>
+              <Button type="button" variant="outline" size="sm" disabled={pending || uploading} onClick={() => void uploadReferences()}>
+                <Upload data-icon="inline-start" />{uploading ? copy.uploading : copy.uploadReferences}
+              </Button>
+            </div>
             {choices.length ? <div role="group" aria-labelledby="generate-references" className="scroll-fade grid max-h-44 grid-cols-4 gap-2 overflow-y-auto p-0.5 sm:grid-cols-5">
               {choices.map((asset) => {
                 const selected = chosen.includes(asset.id);
@@ -276,14 +320,14 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
                   {selected && <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3.5" aria-hidden="true" /></span>}
                 </button>;
               })}
-            </div> : <p className="text-sm text-muted-foreground">{copy.referencesNone}</p>}
+            </div> : <p className="text-sm text-muted-foreground">{copy.referencesNoneUpload}</p>}
           </Field>}
-          {unfit && activeModel && <Alert role="status"><AlertDescription>{(fitting.length ? copy.modelCantTake : copy.noModelTakes)
+          {unfit && activeModel && <Alert role="status"><Info /><AlertDescription>{(needs ? (fitting.length ? `${needsText} ${copy.orChoose}` : needsText) : fitting.length ? copy.modelCantTake : copy.noModelTakes)
             .replace("{model}", modelName(activeModel.id)).replace("{models}", new Intl.ListFormat(locale, { type: "disjunction" }).format(fitting.map((entry) => modelName(entry.id))))}</AlertDescription></Alert>}
-          {unsupported && <Alert role="status"><AlertDescription>{copy.noReferencesHere}</AlertDescription></Alert>}
-          {wrongRatio && variant && activeModel && <Alert role="status"><AlertDescription>{copy.modelRatios
+          {unsupported && <Alert role="status"><Info /><AlertDescription>{copy.noReferencesHere}</AlertDescription></Alert>}
+          {wrongRatio && variant && activeModel && <Alert role="status"><Info /><AlertDescription>{copy.modelRatios
             .replace("{model}", modelName(activeModel.id)).replace("{ratios}", new Intl.ListFormat(locale, { type: "conjunction" }).format(variant.aspectRatios))}</AlertDescription></Alert>}
-          {kind === "image" && activeImageModel && imageCount > activeImageModel.references && <Alert role="status"><AlertDescription>
+          {kind === "image" && activeImageModel && imageCount > activeImageModel.references && <Alert role="status"><Info /><AlertDescription>
             {(activeImageModel.references ? copy.imageModelReferences : copy.imageModelNoReferences)
               .replace("{model}", activeImageModel.label).replace("{count}", String(activeImageModel.references))}</AlertDescription></Alert>}
           <Field data-disabled={pending}>
@@ -292,7 +336,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
               placeholder={copy.notesPlaceholder} maxLength={8000} aria-describedby="generate-notes-hint" />
             <FieldDescription id="generate-notes-hint">{copy.notesHint}</FieldDescription>
           </Field>
-          {none && <Alert><AlertDescription>{kind === "image" ? copy.noProvider : kind === "video" ? copy.noVideoProvider : made ? copy.noAudioProvider : copy.noSpeechProvider}</AlertDescription></Alert>}
+          {none && <Alert><Info /><AlertDescription>{kind === "image" ? copy.noProvider : kind === "video" ? copy.noVideoProvider : made ? copy.noAudioProvider : copy.noSpeechProvider}</AlertDescription></Alert>}
           {problem && <Alert variant="destructive" role="alert"><AlertDescription>{problem}</AlertDescription></Alert>}
           {pending && <p role="status" className="text-sm text-muted-foreground">{kind === "video" ? copy.videoPendingHint : made ? copy.audioPendingHint : copy.pendingHint}</p>}
           <DialogFooter>

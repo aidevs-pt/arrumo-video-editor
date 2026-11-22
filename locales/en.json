@@ -591,7 +591,16 @@
       "referencesNone": "Upload images or clips to Assets to use them as references.",
       "modelCantTake": "{model} can’t use these references. Choose {models}.",
       "noModelTakes": "No model from this provider takes these references. Pick fewer.",
-      "noReferencesHere": "This provider doesn’t take references. Choose another provider or clear them."
+      "noReferencesHere": "This provider doesn’t take references. Choose another provider or clear them.",
+      "uploadReferences": "Upload",
+      "uploading": "Uploading…",
+      "uploadFailed": "Some files couldn’t be added. Use images or clips Arrumo can read.",
+      "referencesNoneUpload": "No images or clips in Assets yet. Upload one to use it as a reference.",
+      "modelNeedsImage": "{model} needs a reference image. Pick or upload one.",
+      "modelNeedsImages": "{model} needs at least {count} reference images. Pick or upload them.",
+      "modelNeedsVideo": "{model} needs a reference video. Pick or upload one.",
+      "modelNeedsVideoAndImages": "{model} needs a reference video and at least {count} images. Pick or upload them.",
+      "orChoose": "Or choose {models}."
     }
   },
   "delivery": {

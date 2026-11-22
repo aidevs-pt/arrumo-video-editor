@@ -591,7 +591,16 @@
       "referencesNone": "Sube imágenes o clips a Recursos para usarlos como referencias.",
       "modelCantTake": "{model} no puede usar estas referencias. Elige {models}.",
       "noModelTakes": "Ningún modelo de este proveedor admite estas referencias. Elige menos.",
-      "noReferencesHere": "Este proveedor no admite referencias. Elige otro proveedor o quítalas."
+      "noReferencesHere": "Este proveedor no admite referencias. Elige otro proveedor o quítalas.",
+      "uploadReferences": "Subir",
+      "uploading": "Subiendo…",
+      "uploadFailed": "No se pudieron añadir algunos archivos. Usa imágenes o clips que Arrumo pueda leer.",
+      "referencesNoneUpload": "Aún no hay imágenes ni clips en Recursos. Sube uno para usarlo como referencia.",
+      "modelNeedsImage": "{model} necesita una imagen de referencia. Elige o sube una.",
+      "modelNeedsImages": "{model} necesita al menos {count} imágenes de referencia. Elígelas o súbelas.",
+      "modelNeedsVideo": "{model} necesita un vídeo de referencia. Elige o sube uno.",
+      "modelNeedsVideoAndImages": "{model} necesita un vídeo de referencia y al menos {count} imágenes. Elígelos o súbelos.",
+      "orChoose": "O elige {models}."
     }
   },
   "delivery": {
