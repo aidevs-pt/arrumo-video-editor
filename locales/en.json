@@ -582,7 +582,20 @@
     "saved": "Delivery settings saved.",
     "saveError": "Delivery settings couldn’t be saved. Try again.",
     "portraitFollowsProfile": "Cuts follow the guidance of the {profile} profile and the thumbnails its portrait format asks for.",
-    "uploadReference": "Upload"
+    "uploadReference": "Upload",
+    "rowThumbnails": "Thumbnails",
+    "rowThumbnailsHint": "Made for every {format} video",
+    "perVideo": "per video",
+    "thumbnailGuidancePlaceholder": "What the thumbnails should show, for example two A/B variants.",
+    "rowPortrait": "Portrait cuts",
+    "rowPortraitHint": "Short vertical videos cut from each {format} video",
+    "rowText": "Titles, descriptions and tags",
+    "rowTextHint": "How many the agent writes for each video",
+    "rowSpecs": "Extra specifications",
+    "rowSpecsHint": "Anything else, in plain words",
+    "titlesShort": "Titles",
+    "descriptionsShort": "Descriptions",
+    "tagsShort": "Tags"
   },
   "drafts": {
     "deleteDraft": "Delete draft",
@@ -650,7 +663,15 @@
     "width": "Width in pixels",
     "height": "Height in pixels",
     "enabled": "Enabled",
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "alwaysShips": "Every video always ships with the video file and its subtitle file. The formats below add more on top.",
+    "formatHint": "{width} × {height}. Applies to every profile unless it overrides this.",
+    "formatOff": "Turned off. No video gets this format.",
+    "addFormat": "Add a format, like square or podcast audio",
+    "moreFor": "More for {format}",
+    "makeFormat": "Make {format} videos",
+    "formatDialogHint": "Name the format and set its size. You choose what it ships with on its card.",
+    "namePlaceholder": "Square"
   },
   "profiles": {
     "saved": "Changes saved.",

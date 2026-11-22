@@ -582,7 +582,20 @@
     "saved": "Ajustes de entrega guardados.",
     "saveError": "No se pudieron guardar los ajustes de entrega. Inténtalo de nuevo.",
     "portraitFollowsProfile": "Los cortes siguen las indicaciones de {profile} y las miniaturas que pide su formato vertical.",
-    "uploadReference": "Subir"
+    "uploadReference": "Subir",
+    "rowThumbnails": "Miniaturas",
+    "rowThumbnailsHint": "Para cada vídeo {format}",
+    "perVideo": "por vídeo",
+    "thumbnailGuidancePlaceholder": "Qué deben mostrar las miniaturas; por ejemplo, dos variantes A/B.",
+    "rowPortrait": "Cortes verticales",
+    "rowPortraitHint": "Vídeos verticales cortos sacados de cada vídeo {format}",
+    "rowText": "Títulos, descripciones y etiquetas",
+    "rowTextHint": "Cuántos escribe el agente para cada vídeo",
+    "rowSpecs": "Especificaciones extra",
+    "rowSpecsHint": "Cualquier otra cosa, con tus palabras",
+    "titlesShort": "Títulos",
+    "descriptionsShort": "Descripciones",
+    "tagsShort": "Etiquetas"
   },
   "drafts": {
     "deleteDraft": "Eliminar borrador",
@@ -650,7 +663,15 @@
     "width": "Ancho en píxeles",
     "height": "Alto en píxeles",
     "enabled": "Activo",
-    "disabled": "Desactivado"
+    "disabled": "Desactivado",
+    "alwaysShips": "Cada vídeo incluye siempre el archivo de vídeo y su archivo de subtítulos. Los formatos de abajo añaden más.",
+    "formatHint": "{width} × {height}. Se aplica a todos los perfiles salvo que lo cambien.",
+    "formatOff": "Desactivado. Ningún vídeo recibe este formato.",
+    "addFormat": "Añadir un formato, como cuadrado o audio de pódcast",
+    "moreFor": "Más para {format}",
+    "makeFormat": "Hacer vídeos {format}",
+    "formatDialogHint": "Ponle nombre al formato y elige su tamaño. Lo que incluye se elige en su tarjeta.",
+    "namePlaceholder": "Cuadrado"
   },
   "profiles": {
     "saved": "Cambios guardados.",

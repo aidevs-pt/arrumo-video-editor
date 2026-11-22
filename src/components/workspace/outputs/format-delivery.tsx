@@ -5,7 +5,7 @@ import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceShell } fro
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, FileText, Film } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,13 +46,14 @@ const countFields = ["thumbnails", "titles", "descriptions"] as const;
 const textFields = ["thumbnail_guidance", "specifications"] as const;
 
 export function FormatDelivery({
-  workspaceId, profileId, format, onBack,
+  workspaceId, profileId, format, onBack, embedded = false,
 }: {
   workspaceId: number;
   profileId?: number;
   format: { id: number; name: string; width: number; height: number };
-
-  onBack: () => void;
+  onBack?: () => void;
+  /** Workspace settings for one format, laid out as rows inside its card on the Outputs page. */
+  embedded?: boolean;
 }) {
   const [delivery, setDelivery] = useState<Delivery>();
   const [profileDelivery, setProfileDelivery] = useState<ProfileDelivery>();
@@ -71,7 +72,7 @@ export function FormatDelivery({
   const { messages } = useLocale();
   const copy = messages.delivery;
 
-  useEffect(() => { heading.current?.focus(); }, []);
+  useEffect(() => { if (!embedded) heading.current?.focus(); }, [embedded]);
   useEffect(() => {
     let active = true;
     async function load() {
@@ -199,6 +200,67 @@ export function FormatDelivery({
           <FieldLabel htmlFor={`override-${field}`}>{copy.override}</FieldLabel>
         </Field>
       </div>
+    );
+  }
+
+  if (embedded && !isProfile) {
+    const formatName = format.name.toLocaleLowerCase();
+    const row = (title: string, hint: string, children: ReactNode) => (
+      <div className="grid gap-3 px-4 py-5 sm:px-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:gap-6">
+        <div>
+          <h4 className="font-semibold">{title}</h4>
+          <p className="text-sm text-muted-foreground">{hint}</p>
+        </div>
+        <div className="flex min-w-0 flex-col gap-3">{children}</div>
+      </div>
+    );
+    const count = (field: (typeof countFields)[number], label: string) => (
+      <label className="flex items-center gap-2 text-sm">
+        <span>{label}</span>
+        <Input name={field} type="number" min={0} max={65535} required defaultValue={delivery?.supplemental[field]}
+          className="w-20 tabular-nums" aria-label={copy[field]} />
+      </label>
+    );
+    if (loadError) return (
+      <Alert variant="destructive" className="m-4 w-auto">
+        <AlertDescription>{copy.loadError}</AlertDescription>
+        <Button type="button" variant="outline" onClick={() => { setLoadError(false); setAttempt((value) => value + 1); }}>{copy.retry}</Button>
+      </Alert>
+    );
+    if (!delivery || !portrait) return <Skeleton className="m-4 h-40" role="status" aria-label={copy.loading} />;
+    return (
+      <form aria-busy={pending} onSubmit={save} onChange={() => setResult(null)}>
+        <fieldset disabled={pending} className="divide-y divide-border/70">
+          {row(copy.rowThumbnails, copy.rowThumbnailsHint.replace("{format}", formatName), <>
+            <label className="flex items-center gap-2 text-sm">
+              <Input name="thumbnails" type="number" min={0} max={65535} required defaultValue={delivery.supplemental.thumbnails}
+                className="w-20 tabular-nums" aria-label={copy.thumbnails} />
+              <span>{copy.perVideo}</span>
+            </label>
+            <Textarea name="thumbnail_guidance" aria-label={copy.thumbnail_guidance} defaultValue={delivery.supplemental.thumbnail_guidance}
+              placeholder={copy.thumbnailGuidancePlaceholder} className="min-h-16" />
+            <ThumbnailReferences id={`delivery-reference-${format.id}`} workspaceId={workspaceId} images={images} selected={references} copy={copy}
+              onChange={setReferences} onImport={() => void importReference("thumbnail")} />
+          </>)}
+          {showPortrait && row(copy.rowPortrait, copy.rowPortraitHint.replace("{format}", formatName),
+            <PortraitFields workspaceId={workspaceId} value={portrait} profiles={profiles} images={images} copy={copy}
+              onChange={setPortrait} onImportReference={() => void importReference("portrait")} compact />)}
+          {row(copy.rowText, copy.rowTextHint, <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            {count("titles", copy.titlesShort)}
+            {count("descriptions", copy.descriptionsShort)}
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox name="tags" defaultChecked={delivery.supplemental.tags} />{copy.tagsShort}
+            </label>
+          </div>)}
+          {row(copy.rowSpecs, copy.rowSpecsHint,
+            <Textarea name="specifications" aria-label={copy.specifications} defaultValue={delivery.supplemental.specifications} className="min-h-20" />)}
+          <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-4 sm:px-5">
+            {result === "saved" && <p role="status" className="text-sm text-muted-foreground">{copy.saved}</p>}
+            {(result === "saveError" || result === "importReferenceError") && <p role="alert" className="text-sm text-destructive">{copy[result]}</p>}
+            <Button type="submit">{copy.save}</Button>
+          </div>
+        </fieldset>
+      </form>
     );
   }
 

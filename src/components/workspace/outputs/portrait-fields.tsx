@@ -20,7 +20,7 @@ const emptyManual: ManualSource = {
   type: "manual", guidance: "", thumbnails_per_video: 0, thumbnail_guidance: "", thumbnail_reference_ids: [],
 };
 
-export function PortraitFields({ workspaceId, value, profiles, images, copy, onChange, onImportReference }: {
+export function PortraitFields({ workspaceId, value, profiles, images, copy, onChange, onImportReference, compact = false }: {
   workspaceId: number;
   value: PortraitDerivatives;
   profiles: SourceProfile[];
@@ -28,15 +28,17 @@ export function PortraitFields({ workspaceId, value, profiles, images, copy, onC
   copy: LocaleMessages["delivery"];
   onChange: (value: PortraitDerivatives) => void;
   onImportReference: () => void;
+  /** Inside a labelled row: no legend, and short number inputs. */
+  compact?: boolean;
 }) {
   const { count, source } = value;
   return (
     <FieldSet>
-      <FieldLegend>{copy.portrait_derivatives}</FieldLegend>
+      <FieldLegend className={compact ? "sr-only" : undefined}>{copy.portrait_derivatives}</FieldLegend>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="portrait-count">{copy.portraitCount}</FieldLabel>
-          <Input id="portrait-count" type="number" min={0} max={65535} required value={count}
+          <Input id="portrait-count" className={compact ? "w-24 tabular-nums" : undefined} type="number" min={0} max={65535} required value={count}
             onChange={(event) => onChange({ ...value, count: Number(event.target.value) })} />
         </Field>
         {count > 0 && (
@@ -71,7 +73,7 @@ export function PortraitFields({ workspaceId, value, profiles, images, copy, onC
             </Field>
             <Field>
               <FieldLabel htmlFor="portrait-thumbnails">{copy.portraitThumbnails}</FieldLabel>
-              <Input id="portrait-thumbnails" type="number" min={0} max={65535} required value={source.thumbnails_per_video}
+              <Input id="portrait-thumbnails" className={compact ? "w-24 tabular-nums" : undefined} type="number" min={0} max={65535} required value={source.thumbnails_per_video}
                 onChange={(event) => onChange({ ...value, source: { ...source, thumbnails_per_video: Number(event.target.value) } })} />
             </Field>
             <Field>
