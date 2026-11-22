@@ -169,7 +169,7 @@ pub(crate) fn run_structured_session(
         keep,
         session: resumed.as_deref(),
     };
-    let args = expand_args(
+    let mut args = expand_args(
         run,
         &places,
         settings,
@@ -178,6 +178,14 @@ pub(crate) fn run_structured_session(
         &schema_path,
         &output_path,
     );
+    let stdin = match (&run.image_input, images.is_empty()) {
+        (Some(input), false) => {
+            args.extend(input.args.iter().map(std::ffi::OsString::from));
+            image_stdin(input, prompt, images)
+                .map_err(|_| failed("Could not attach the images for the agent"))?
+        }
+        _ => prompt.to_owned(),
+    };
     if let Ok(mut command) = transcript.command.lock() {
         // Image paths are local; the log only says how many were attached.
         *command = describe_command(&executable, &declared_args(run, &places, settings, &[]));
@@ -190,7 +198,7 @@ pub(crate) fn run_structured_session(
         executable,
         args,
         directory.path(),
-        prompt,
+        &stdin,
         timeout,
         transcript,
         tick,
@@ -458,11 +466,78 @@ fn image_arguments(run: &StructuredRun, images: &[std::path::PathBuf]) -> Vec<St
 
 /// Whether the agent can look at images it is given.
 pub(crate) fn accepts_images(plugin: &AgentPlugin) -> bool {
-    plugin
-        .cli
-        .structured_run
-        .as_ref()
-        .is_some_and(|run| run.image_args.is_some() && run.args.iter().any(|arg| arg == "{images}"))
+    plugin.cli.structured_run.as_ref().is_some_and(|run| {
+        run.image_input.is_some()
+            || run.image_args.is_some() && run.args.iter().any(|arg| arg == "{images}")
+    })
+}
+
+/// The one JSON line a plugin's `imageInput` template makes from the prompt and the images.
+fn image_stdin(
+    input: &crate::plugin_catalog::ImageInput,
+    prompt: &str,
+    images: &[std::path::PathBuf],
+) -> Result<String, Box<dyn Error>> {
+    use base64::Engine as _;
+    fn fill(value: &Value, prompt: &str, images: &[Value]) -> Value {
+        match value {
+            Value::String(text) if text == "{prompt}" => Value::String(prompt.to_owned()),
+            Value::Array(items) => Value::Array(
+                items
+                    .iter()
+                    .flat_map(|item| match item {
+                        Value::String(text) if text == "{images}" => images.to_vec(),
+                        _ => vec![fill(item, prompt, images)],
+                    })
+                    .collect(),
+            ),
+            Value::Object(fields) => Value::Object(
+                fields
+                    .iter()
+                    .map(|(key, item)| (key.clone(), fill(item, prompt, images)))
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+    fn image(template: &Value, data: &str, media_type: &str) -> Value {
+        match template {
+            Value::String(text) if text == "{data}" => Value::String(data.to_owned()),
+            Value::String(text) if text == "{mediaType}" => Value::String(media_type.to_owned()),
+            Value::Array(items) => Value::Array(
+                items
+                    .iter()
+                    .map(|item| image(item, data, media_type))
+                    .collect(),
+            ),
+            Value::Object(fields) => Value::Object(
+                fields
+                    .iter()
+                    .map(|(key, item)| (key.clone(), image(item, data, media_type)))
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+    let attached = images
+        .iter()
+        .take(MAX_IMAGES)
+        .map(|path| {
+            let bytes = fs::read(path)?;
+            let media_type = if bytes.starts_with(b"\x89PNG") {
+                "image/png"
+            } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+                "image/jpeg"
+            } else {
+                return Err(io::Error::other("Only PNG and JPEG images can be attached"));
+            };
+            let data = base64::engine::general_purpose::STANDARD.encode(bytes);
+            Ok(image(&input.image, &data, media_type))
+        })
+        .collect::<io::Result<Vec<_>>>()?;
+    let mut line = serde_json::to_string(&fill(&input.stdin, prompt, &attached))?;
+    line.push('\n');
+    Ok(line)
 }
 
 /// The most images one agent run is shown.
@@ -522,6 +597,33 @@ fn extract_answer(run: &StructuredRun, document: &[u8]) -> Result<Value, AgentRu
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn image_input_puts_images_and_prompt_in_one_stdin_line() {
+        let input: crate::plugin_catalog::ImageInput = serde_json::from_value(serde_json::json!({
+            "args": ["--input-format", "stream-json"],
+            "stdin": {"type": "user", "message": {"content": ["{images}", {"type": "text", "text": "{prompt}"}]}},
+            "image": {"type": "image", "source": {"media_type": "{mediaType}", "data": "{data}"}}
+        }))
+        .unwrap();
+        let work = tempfile::tempdir().unwrap();
+        let png = work.path().join("a.png");
+        std::fs::write(&png, b"\x89PNG\r\n\x1a\nrest").unwrap();
+        let jpeg = work.path().join("b.jpg");
+        std::fs::write(&jpeg, [0xFF, 0xD8, 0xFF, 0xE0]).unwrap();
+        let line = super::image_stdin(&input, "Check the joins", &[png, jpeg]).unwrap();
+        assert!(line.ends_with('\n') && line.matches('\n').count() == 1);
+        let value: Value = serde_json::from_str(line.trim()).unwrap();
+        let content = value["message"]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 3);
+        assert_eq!(content[0]["source"]["media_type"], "image/png");
+        assert_eq!(content[1]["source"]["media_type"], "image/jpeg");
+        assert_eq!(content[1]["source"]["data"], "/9j/4A==");
+        assert_eq!(content[2]["text"], "Check the joins");
+        let text = work.path().join("c.png");
+        std::fs::write(&text, b"not an image").unwrap();
+        assert!(super::image_stdin(&input, "x", &[text]).is_err());
+    }
     use super::*;
     use crate::plugin_catalog::StructuredResult;
 
@@ -530,6 +632,7 @@ mod tests {
             args: vec!["{schema}".into(), "{outputPath}".into()],
             setting_args: Vec::new(),
             image_args: None,
+            image_input: None,
             progress: Vec::new(),
             result: StructuredResult {
                 source,
@@ -586,6 +689,7 @@ mod tests {
             ],
             setting_args: Vec::new(),
             image_args: None,
+            image_input: None,
             progress: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::OutputFile,
@@ -632,6 +736,7 @@ mod tests {
                 },
             ],
             image_args: None,
+            image_input: None,
             progress: Vec::new(),
             result: StructuredResult {
                 source: StructuredSource::Stdout,

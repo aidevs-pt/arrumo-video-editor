@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 13] =
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -339,6 +340,9 @@ pub(crate) struct StructuredRun {
     /// Arguments attaching one image, repeated per image at `{images}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_args: Option<Vec<String>>,
+    /// Schema 13: images sent inside a structured stdin message instead of as arguments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_input: Option<ImageInput>,
     /// Patterns that turn the agent's printed lines into steps creators can follow.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub progress: Vec<ProgressPattern>,
@@ -350,6 +354,17 @@ pub(crate) struct StructuredRun {
     /// How to send a follow-up message to the same session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resume: Option<ResumeRun>,
+}
+
+/// With images attached, `args` join the run and stdin is one JSON line from `stdin`: the string
+/// `"{prompt}"` becomes the prompt and an array element `"{images}"` becomes one `image` per
+/// image, with `"{data}"` as its base64 bytes and `"{mediaType}"` as its type.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ImageInput {
+    pub args: Vec<String>,
+    pub stdin: serde_json::Value,
+    pub image: serde_json::Value,
 }
 
 /// A follow-up run in an earlier session: `args` replace the run's arguments, with `{session}`
@@ -497,6 +512,21 @@ impl StructuredRun {
                     .pointer
                     .as_deref()
                     .is_none_or(|value| pointer(value, false))
+            })
+            && self.image_input.as_ref().is_none_or(|input| {
+                let text = |value: &serde_json::Value| value.to_string();
+                input.args.len() <= 8
+                    && input
+                        .args
+                        .iter()
+                        .all(|arg| arg.len() <= 128 && !arg.contains('\0'))
+                    && input.stdin.is_object()
+                    && input.image.is_object()
+                    && text(&input.stdin).contains("\"{prompt}\"")
+                    && text(&input.stdin).contains("\"{images}\"")
+                    && text(&input.image).contains("\"{data}\"")
+                    && text(&input.stdin).len() <= 4096
+                    && text(&input.image).len() <= 4096
             })
             && self.ephemeral_args.as_ref().is_none_or(|args| {
                 (1..=4).contains(&args.len()) && args.iter().all(|arg| arg.len() <= 128)
@@ -694,11 +724,11 @@ impl PluginManifest {
                     .auth_status_args
                     .iter()
                     .all(|arg| identifier(arg))
-                || provider
-                    .cli
-                    .structured_run
-                    .as_ref()
-                    .is_some_and(|run| manifest.schema_version < 7 || !run.valid())
+                || provider.cli.structured_run.as_ref().is_some_and(|run| {
+                    manifest.schema_version < 7
+                        || !run.valid()
+                        || run.image_input.is_some() && manifest.schema_version < 13
+                })
                 || provider
                     .cli
                     .usage_run
