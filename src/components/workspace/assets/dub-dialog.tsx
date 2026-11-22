@@ -11,6 +11,7 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useLocale } from "@/lib/locale-provider";
+import { soundLength } from "./audio-transform-dialog";
 
 export type DubbingProvider = { provider: string; languages: string[]; maxInputSeconds: number };
 
@@ -60,7 +61,7 @@ export function DubDialog({ workspaceId, assetId, assetName, offer, disabled, on
           <DialogDescription>{copy.description.replace("{name}", assetName)}</DialogDescription>
         </DialogHeader>
         <Alert><Info /><AlertDescription>
-          {shared.limitsMax.replace("{max}", String(offer.maxInputSeconds))} {copy.wait} {shared.cost}
+          {shared.limitsMax.replace("{max}", soundLength(offer.maxInputSeconds, locale))} {copy.wait} {shared.cost}
         </AlertDescription></Alert>
         <Field>
           <FieldLabel htmlFor="dub-language">{copy.language}</FieldLabel>

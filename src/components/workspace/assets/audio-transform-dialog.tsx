@@ -28,7 +28,7 @@ export function AudioTransformDialog({ workspaceId, assetId, assetName, offer, d
   disabled?: boolean;
   onCreated: (id: number) => void;
 }) {
-  const { messages } = useLocale();
+  const { locale, messages } = useLocale();
   const copy = messages.assetLibrary.audioTransform;
   const text = offer.transform === "voice-change" ? copy.change : copy.isolate;
   const [open, setOpen] = useState(false);
@@ -36,8 +36,8 @@ export function AudioTransformDialog({ workspaceId, assetId, assetName, offer, d
   const [state, setState] = useState<"idle" | "working" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const limits = offer.minInputSeconds
-    ? copy.limitsBoth.replace("{min}", String(offer.minInputSeconds)).replace("{max}", String(offer.maxInputSeconds))
-    : copy.limitsMax.replace("{max}", String(offer.maxInputSeconds));
+    ? copy.limitsBoth.replace("{min}", soundLength(offer.minInputSeconds, locale)).replace("{max}", soundLength(offer.maxInputSeconds, locale))
+    : copy.limitsMax.replace("{max}", soundLength(offer.maxInputSeconds, locale));
 
   async function run() {
     setState("working");
@@ -82,4 +82,11 @@ export function AudioTransformDialog({ workspaceId, assetId, assetName, offer, d
       </DialogContent>
     </Dialog>
   );
+}
+
+/** A length of sound in the largest whole unit, such as "5 minutes" or "4.6 seconds". */
+export function soundLength(seconds: number, locale: string) {
+  const [value, unit] = seconds >= 3600 && seconds % 3600 === 0 ? [seconds / 3600, "hour"]
+    : seconds >= 120 && seconds % 60 === 0 ? [seconds / 60, "minute"] : [seconds, "second"];
+  return new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "long", maximumFractionDigits: 1 }).format(value);
 }

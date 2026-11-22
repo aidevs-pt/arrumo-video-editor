@@ -1448,8 +1448,8 @@
         "description": "Crea una copia del sonido de {name} que conserva la voz y elimina el ruido y la música de fondo.",
         "confirm": "Aislar voz"
       },
-      "limitsMax": "El proveedor acepta hasta {max} segundos de sonido.",
-      "limitsBoth": "El proveedor acepta de {min} a {max} segundos de sonido.",
+      "limitsMax": "El proveedor acepta hasta {max} de sonido.",
+      "limitsBoth": "El proveedor acepta de {min} a {max} de sonido.",
       "cost": "Usa tus créditos del proveedor. El recurso original no cambia.",
       "voice": "ID de voz",
       "voicePlaceholder": "La voz del complemento",

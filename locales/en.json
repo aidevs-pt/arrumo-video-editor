@@ -1448,8 +1448,8 @@
         "description": "Make a copy of the sound in {name} that keeps the voice and removes background noise and music.",
         "confirm": "Isolate voice"
       },
-      "limitsMax": "The provider takes up to {max} seconds of sound.",
-      "limitsBoth": "The provider takes {min} to {max} seconds of sound.",
+      "limitsMax": "The provider takes up to {max} of sound.",
+      "limitsBoth": "The provider takes {min} to {max} of sound.",
       "cost": "It uses your provider credits. The original asset stays as it is.",
       "voice": "Voice ID",
       "voicePlaceholder": "The plugin's voice",

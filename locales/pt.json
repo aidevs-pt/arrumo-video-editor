@@ -1448,8 +1448,8 @@
         "description": "Cria uma cópia do som de {name} que mantém a voz e remove o ruído e a música de fundo.",
         "confirm": "Isolar voz"
       },
-      "limitsMax": "O fornecedor aceita até {max} segundos de som.",
-      "limitsBoth": "O fornecedor aceita de {min} a {max} segundos de som.",
+      "limitsMax": "O fornecedor aceita até {max} de som.",
+      "limitsBoth": "O fornecedor aceita de {min} a {max} de som.",
       "cost": "Usa os teus créditos do fornecedor. O recurso original fica como está.",
       "voice": "ID da voz",
       "voicePlaceholder": "A voz do plugin",
