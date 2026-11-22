@@ -10,6 +10,8 @@ Create, review, and export a video. [English](docs/user/en/first-video.md) · [E
 
 Connect through CLI, MCP, or A2A. [English](docs/developer/en/connect.md) · [Español](docs/developer/es/connect.md) · [Português](docs/developer/pt/connect.md)
 
+Agents that drive Arrumo over MCP can load [`skills/arrumo/SKILL.md`](skills/arrumo/SKILL.md), the editing workflow and review checklist, as a Claude Code or Codex skill.
+
 ## Official plugins
 
 Find setup and capability guides in the [official plugin documentation index](https://github.com/aidevs-pt/arrumo-plugin-registry#plugin-guides).
