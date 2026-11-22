@@ -14,6 +14,23 @@ struct WorkspaceName {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkspaceRename {
+    workspace_id: i64,
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkspaceAppearance {
+    workspace_id: i64,
+    color: String,
+    icon: String,
+    #[serde(default)]
+    image_asset_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct WorkspaceInput {
     workspace_id: i64,
 }
@@ -140,7 +157,7 @@ struct BrandColorsInput {
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 23] {
+pub(super) fn definitions() -> [Value; 25] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -178,6 +195,15 @@ pub(super) fn definitions() -> [Value; 23] {
         json!({"name": "create_workspace", "description": "Create a workspace with its default output formats.",
             "inputSchema": {"type": "object", "properties": {"name": name},
                 "required": ["name"], "additionalProperties": false}}),
+        json!({"name": "rename_workspace", "description": "Rename a workspace.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "name": {"type": "string", "minLength": 1, "maxLength": 120}},
+                "required": ["workspaceId", "name"], "additionalProperties": false}}),
+        json!({"name": "set_workspace_appearance", "description": "Set how a workspace is shown in the switcher: a #RRGGBB color, a preset icon, and optionally one of its image assets, which replaces the icon.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id,
+                "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+                "icon": {"enum": crate::WORKSPACE_ICONS},
+                "imageAssetId": {"type": ["integer", "null"], "minimum": 1}},
+                "required": ["workspaceId", "color", "icon"], "additionalProperties": false}}),
         json!({"name": "get_workspace_context", "description": "Read the workspace's saved Markdown context.",
             "inputSchema": workspace, "annotations": {"readOnlyHint": true}}),
         json!({"name": "set_workspace_context", "description": "Replace the workspace's saved Markdown context.",
@@ -261,6 +287,18 @@ pub(super) fn call(
                 .create(&args.name)
                 .map(|workspace| json!({"workspace": workspace}))
                 .map_err(|_| "Could not create workspace")
+        }),
+        "rename_workspace" => parse(arguments).and_then(|args: WorkspaceRename| {
+            store
+                .rename_workspace(args.workspace_id, &args.name)
+                .map(|workspace| json!({"workspace": workspace}))
+                .map_err(|_| "Could not rename workspace")
+        }),
+        "set_workspace_appearance" => parse(arguments).and_then(|args: WorkspaceAppearance| {
+            store
+                .set_workspace_appearance(args.workspace_id, &args.color, &args.icon, args.image_asset_id)
+                .map(|workspace| json!({"workspace": workspace}))
+                .map_err(|_| "Could not set the workspace appearance")
         }),
         "get_workspace_context" => parse(arguments).and_then(|args: WorkspaceInput| {
             store

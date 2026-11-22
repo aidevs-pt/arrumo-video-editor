@@ -760,7 +760,19 @@
     "loadError": "Workspaces couldn’t be loaded.",
     "createError": "The workspace couldn’t be saved. Try again.",
     "retry": "Retry",
-    "desktop": "Open Arrumo on your desktop to manage workspaces."
+    "desktop": "Open Arrumo on your desktop to manage workspaces.",
+    "customize": "Customize workspace",
+    "customizeHint": "An icon and color, or an image, help you tell workspaces apart.",
+    "icon": "Icon",
+    "image": "Image",
+    "color": "Color",
+    "pickImage": "Choose an image",
+    "importImage": "Import an image",
+    "noImages": "Import an image, such as a channel avatar. It is saved with the workspace assets.",
+    "customizeError": "The workspace couldn’t be saved. Try again.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…"
   },
   "brand": {
     "title": "Brand",

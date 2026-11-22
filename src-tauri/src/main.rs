@@ -66,6 +66,34 @@ fn create_workspace(name: String, store: State<'_, Store>) -> Result<Workspace, 
 }
 
 #[tauri::command]
+fn set_workspace_appearance(
+    workspace_id: i64,
+    color: String,
+    icon: String,
+    image_asset_id: Option<i64>,
+    store: State<'_, Store>,
+) -> Result<Workspace, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_workspace_appearance(workspace_id, &color, &icon, image_asset_id)
+        .map_err(|_| "workspace_appearance_failed")
+}
+
+#[tauri::command]
+fn rename_workspace(
+    workspace_id: i64,
+    name: String,
+    store: State<'_, Store>,
+) -> Result<Workspace, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .rename_workspace(workspace_id, &name)
+        .map_err(|_| "workspace_rename_failed")
+}
+
+#[tauri::command]
 async fn list_profiles(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -1054,6 +1082,8 @@ fn main() {
             agent_settings::agent_login_status,
             agent_settings::open_agent_setup_guide,
             create_workspace,
+            set_workspace_appearance,
+            rename_workspace,
             list_profiles,
             create_profile,
             update_profile,

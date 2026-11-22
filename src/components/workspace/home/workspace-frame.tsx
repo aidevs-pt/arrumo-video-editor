@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PluginTourHost } from "@/components/workspace/plugins/plugin-tour";
 import { PluginIcon } from "@/lib/plugin-text";
-import { CalendarDays, Check, ChevronDown, Film, FolderCog, House, Images, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Film, FolderCog, House, Images, Paintbrush, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -17,6 +17,8 @@ import { useLocale } from "@/lib/locale-provider";
 import { ReviewInbox, useGenerationInbox } from "./review-inbox";
 import { StudioTrailProvider, useStudioTrailItems } from "./studio-trail";
 import { WorkspaceSearch } from "./workspace-search";
+import { WorkspaceAppearanceDialog } from "../workspaces/workspace-appearance";
+import { WorkspaceMark } from "../workspaces/workspace-mark";
 import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
 
@@ -27,6 +29,7 @@ export function WorkspaceFrame(props: {
   workspace: Workspace | null;
   view: WorkspaceView;
   onSelect: (workspace: Workspace | null) => void;
+  onUpdate: (workspace: Workspace) => void;
   children: ReactNode;
 }) {
   return (
@@ -47,7 +50,7 @@ function FaceMark({ className = "size-8" }: { className?: string }) {
   );
 }
 
-function StudioLayout({ workspaces, workspace, view, onSelect, children }: Parameters<typeof WorkspaceFrame>[0]) {
+function StudioLayout({ workspaces, workspace, view, onSelect, onUpdate, children }: Parameters<typeof WorkspaceFrame>[0]) {
   const { messages } = useLocale();
   const { setOpenMobile, setOpen } = useSidebar();
   const pathname = usePathname().replace(/\/$/, "");
@@ -77,6 +80,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
     : view === "motion-library" ? messages.profileHub.animations
     : messages.profiles.title;
 
+  const [customizing, setCustomizing] = useState(false);
   const [counts, setCounts] = useState<Record<number, { profiles: number; videos: number }>>({});
 
   function loadCounts(open: boolean) {
@@ -105,7 +109,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
               <DropdownMenu onOpenChange={loadCounts}>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton size="lg" tooltip={copy.workspace} className="h-12 px-1.5" aria-label={copy.workspace}>
-                    <FaceMark />
+                    {workspace ? <WorkspaceMark workspace={workspace} /> : <FaceMark />}
                     <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                       <span className="block truncate font-heading text-[0.95rem] leading-tight font-[850] [font-variation-settings:'wdth'_120]">{workspace?.name ?? "Arrumo"}</span>
                       <span className="block truncate text-xs text-sidebar-foreground/80">{copy.workspace}</span>
@@ -117,7 +121,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
                   <DropdownMenuGroup aria-label={messages.workspaces.list}>
                     {workspaces.map((entry) => (
                       <DropdownMenuItem key={entry.id} onSelect={() => choose(entry)} className="gap-3 py-2">
-                        <FaceMark className="size-7" />
+                        <WorkspaceMark workspace={entry} className="size-7" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-semibold">{entry.name}</span>
                           {counts[entry.id] && <span className="block truncate text-xs text-muted-foreground">
@@ -130,6 +134,9 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
                     ))}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
+                  {workspace && <DropdownMenuItem onSelect={() => setCustomizing(true)}>
+                    <Paintbrush />{messages.workspaces.customize}
+                  </DropdownMenuItem>}
                   {workspace && <DropdownMenuItem asChild>
                     <Link href={workspaceHref("context", workspace.id)} onClick={() => setOpenMobile(false)}>
                       <FolderCog />{copy.workspaceSettings}
@@ -197,6 +204,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
           {workspace && <AgentStatus workspaceId={workspace.id} working={inbox?.working ?? 0} />}
         </SidebarFooter>
       </Sidebar>
+      {workspace && <WorkspaceAppearanceDialog workspace={workspace} open={customizing} onOpenChange={setCustomizing} onSaved={onUpdate} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background px-3 sm:px-5">

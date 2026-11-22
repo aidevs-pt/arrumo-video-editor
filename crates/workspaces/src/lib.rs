@@ -163,10 +163,40 @@ pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Workspace {
     pub id: i64,
     pub name: String,
+    /// `#RRGGBB` behind the icon.
+    pub color: Option<String>,
+    /// One of [`WORKSPACE_ICONS`].
+    pub icon: Option<String>,
+    /// A workspace image shown instead of the icon.
+    pub image_asset_id: Option<i64>,
 }
+
+/// Icons a workspace can be shown with. The desktop draws each with the matching Lucide icon.
+pub const WORKSPACE_ICONS: [&str; 16] = [
+    "clapperboard",
+    "camera",
+    "mic",
+    "sparkles",
+    "rocket",
+    "gamepad",
+    "book",
+    "palette",
+    "music",
+    "code",
+    "heart",
+    "leaf",
+    "briefcase",
+    "graduation-cap",
+    "utensils",
+    "dumbbell",
+];
+const WORKSPACE_COLORS: [&str; 8] = [
+    "#E86AA8", "#4BA3F2", "#3DBB6B", "#E55D4D", "#C68820", "#138778", "#6974D6", "#AB5980",
+];
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Profile {
@@ -247,6 +277,7 @@ impl WorkspaceStore {
             include_str!("../migrations/057-privacy-settings.sql"),
             include_str!("../migrations/058-plugin-tour.sql"),
             include_str!("../migrations/059-agent-sessions.sql"),
+            include_str!("../migrations/060-workspace-appearance.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -261,16 +292,75 @@ impl WorkspaceStore {
 
     pub fn create(&self, name: &str) -> rusqlite::Result<Workspace> {
         let name = name.trim();
+        let seed = uuid::Uuid::new_v4().into_bytes();
+        let color = WORKSPACE_COLORS[usize::from(seed[0]) % WORKSPACE_COLORS.len()];
+        let icon = WORKSPACE_ICONS[usize::from(seed[1]) % 8];
         self.0.query_row(
-            "INSERT INTO workspaces (name) VALUES (?1) RETURNING id, name",
-            [name],
+            "INSERT INTO workspaces (name, color, icon) VALUES (?1, ?2, ?3)
+             RETURNING id, name, color, icon, image_asset_id",
+            rusqlite::params![name, color, icon],
+            Self::read_workspace,
+        )
+    }
+
+    /// Sets how the workspace is shown: a color, a preset icon, and optionally one of its
+    /// images, which then replaces the icon.
+    pub fn set_workspace_appearance(
+        &self,
+        workspace_id: i64,
+        color: &str,
+        icon: &str,
+        image_asset_id: Option<i64>,
+    ) -> rusqlite::Result<Workspace> {
+        let hex = color
+            .strip_prefix('#')
+            .filter(|value| {
+                value.len() == 6 && value.bytes().all(|digit| digit.is_ascii_hexdigit())
+            })
+            .ok_or(rusqlite::Error::InvalidQuery)?;
+        if !WORKSPACE_ICONS.contains(&icon) {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        if let Some(asset) = image_asset_id {
+            let usable: bool = self.0.query_row(
+                "SELECT EXISTS (SELECT 1 FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2
+                 AND kind = 'image' AND superseded = 0)",
+                rusqlite::params![workspace_id, asset],
+                |row| row.get(0),
+            )?;
+            if !usable {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+        }
+        self.0.query_row(
+            "UPDATE workspaces SET color = ?2, icon = ?3, image_asset_id = ?4 WHERE id = ?1
+             RETURNING id, name, color, icon, image_asset_id",
+            rusqlite::params![
+                workspace_id,
+                format!("#{}", hex.to_ascii_uppercase()),
+                icon,
+                image_asset_id
+            ],
+            Self::read_workspace,
+        )
+    }
+
+    /// Renames a workspace.
+    pub fn rename_workspace(&self, workspace_id: i64, name: &str) -> rusqlite::Result<Workspace> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        self.0.query_row(
+            "UPDATE workspaces SET name = ?2 WHERE id = ?1 RETURNING id, name, color, icon, image_asset_id",
+            rusqlite::params![workspace_id, name],
             Self::read_workspace,
         )
     }
 
     pub fn list(&self) -> rusqlite::Result<Vec<Workspace>> {
         self.0
-            .prepare("SELECT id, name FROM workspaces ORDER BY id")?
+            .prepare("SELECT id, name, color, icon, image_asset_id FROM workspaces ORDER BY id")?
             .query_map([], Self::read_workspace)?
             .collect()
     }
@@ -386,6 +476,9 @@ impl WorkspaceStore {
         Ok(Workspace {
             id: row.get(0)?,
             name: row.get(1)?,
+            color: row.get(2)?,
+            icon: row.get(3)?,
+            image_asset_id: row.get(4)?,
         })
     }
 }
@@ -401,6 +494,39 @@ mod tests {
         let workspace = store.create("  Studio  ").unwrap();
         assert_eq!(workspace.name, "Studio");
         assert_eq!(store.list().unwrap(), vec![workspace]);
+    }
+
+    #[test]
+    fn workspaces_start_with_a_preset_look_that_can_be_changed() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap();
+        assert!(WORKSPACE_ICONS.contains(&workspace.icon.as_deref().unwrap()));
+        assert!(WORKSPACE_COLORS.contains(&workspace.color.as_deref().unwrap()));
+        let changed = store
+            .set_workspace_appearance(workspace.id, "#a1b2c3", "music", None)
+            .unwrap();
+        assert_eq!(changed.color.as_deref(), Some("#A1B2C3"));
+        assert_eq!(changed.icon.as_deref(), Some("music"));
+        assert!(
+            store
+                .set_workspace_appearance(workspace.id, "red", "music", None)
+                .is_err()
+        );
+        assert!(
+            store
+                .set_workspace_appearance(workspace.id, "#A1B2C3", "skull", None)
+                .is_err()
+        );
+        assert!(
+            store
+                .set_workspace_appearance(workspace.id, "#A1B2C3", "music", Some(99))
+                .is_err()
+        );
+        assert_eq!(
+            store.rename_workspace(workspace.id, " Lab ").unwrap().name,
+            "Lab"
+        );
+        assert!(store.rename_workspace(workspace.id, "  ").is_err());
     }
 
     #[test]

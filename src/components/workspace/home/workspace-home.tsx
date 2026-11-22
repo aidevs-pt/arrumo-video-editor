@@ -1,10 +1,10 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowRight, FolderOpen, Plus } from "lucide-react";
+import { Paintbrush, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,12 @@ import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceOnboarding } from "./workspace-onboarding";
 import { useWorkspaceCatalog, workspaceHref } from "./workspace-router";
 import type { Workspace } from "./workspace-links";
+import { WorkspaceAppearanceDialog } from "../workspaces/workspace-appearance";
+import { WorkspaceMark } from "../workspaces/workspace-mark";
 
 export function WorkspaceHome() {
-  const { status, workspaces, load, add } = useWorkspaceCatalog();
+  const { status, workspaces, load, add, update } = useWorkspaceCatalog();
+  const [customizing, setCustomizing] = useState<Workspace | null>(null);
   const router = useRouter();
   const { messages: { workspaces: copy } } = useLocale();
   const [open, setOpen] = useState(false);
@@ -54,8 +57,8 @@ export function WorkspaceHome() {
 
   return (
     <WorkspaceShell>
-      <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
-        <WorkspaceHeading><h1>{copy.title}</h1><p>{copy.intro}</p></WorkspaceHeading>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
+        <WorkspaceHeading className="mb-0 flex-1"><h1>{copy.title}</h1><p>{copy.intro}</p></WorkspaceHeading>
         <Dialog open={open} onOpenChange={(next) => {
           if (pending) return;
           setOpen(next);
@@ -79,17 +82,50 @@ export function WorkspaceHome() {
         <AlertDescription>{copy.loadError}</AlertDescription>
         <Button variant="outline" onClick={load}>{copy.retry}</Button>
       </Alert>}
-      <ul className="divide-y border-y" aria-label={copy.list}>
-        {workspaces.map((workspace) => <li key={workspace.id}>
-          <Button className="h-auto min-h-14 w-full justify-start whitespace-normal py-3 text-start font-semibold" variant="ghost" asChild>
-            <Link href={`/?workspace=${workspace.id}`}>
-              <span className="grid size-8 shrink-0 place-items-center rounded-md bg-accent text-accent-foreground"><FolderOpen className="size-4" aria-hidden="true" /></span>
-              <span className="min-w-0 flex-1 wrap-anywhere">{workspace.name}</span>
-              <ArrowRight data-icon="inline-end" aria-hidden="true" />
-            </Link>
-          </Button>
-        </li>)}
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={copy.list}>
+        {workspaces.map((workspace) => <WorkspaceCard key={workspace.id} workspace={workspace} onCustomize={() => setCustomizing(workspace)} />)}
+        <li>
+          <button type="button" disabled={status !== "ready"} onClick={() => setOpen(true)}
+            className="flex size-full min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-5 text-center text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 motion-reduce:transition-none">
+            <Plus className="size-5" aria-hidden="true" />
+            <span className="font-semibold">{copy.form}</span>
+            <span className="max-w-56 text-sm">{copy.intro}</span>
+          </button>
+        </li>
       </ul>
+      {customizing && <WorkspaceAppearanceDialog workspace={customizing} open onOpenChange={(next) => { if (!next) setCustomizing(null); }} onSaved={update} />}
     </WorkspaceShell>
   );
+}
+
+function WorkspaceCard({ workspace, onCustomize }: { workspace: Workspace; onCustomize: () => void }) {
+  const { messages: { workspaces: copy, studio } } = useLocale();
+  const [counts, setCounts] = useState<{ profiles: number; videos: number }>();
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      invoke<unknown[]>("list_profiles", { workspaceId: workspace.id }),
+      invoke<unknown[]>("list_generation_runs", { workspaceId: workspace.id }),
+    ]).then(([profiles, runs]) => { if (active) setCounts({ profiles: profiles.length, videos: runs.length }); }, () => {});
+    return () => { active = false; };
+  }, [workspace.id]);
+
+  return <li className="relative flex min-h-40 flex-col rounded-xl border bg-card p-5 transition-colors hover:border-foreground/40 motion-reduce:transition-none">
+    <div className="flex items-start justify-between gap-3">
+      <WorkspaceMark workspace={workspace} className="size-12" />
+      <Button type="button" size="icon-sm" variant="ghost" className="relative z-[1]" aria-label={`${copy.customize} · ${workspace.name}`} onClick={onCustomize}>
+        <Paintbrush />
+      </Button>
+    </div>
+    <h2 className="mt-4 text-[1.375rem] leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_125]">
+      <Link href={`/?workspace=${workspace.id}`}
+        className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring">
+        {workspace.name}
+      </Link>
+    </h2>
+    <p className="mt-auto pt-2 text-sm text-muted-foreground">
+      {counts ? (counts.profiles === 1 ? studio.workspaceCountsOne : studio.workspaceCounts)
+        .replace("{profiles}", String(counts.profiles)).replace("{videos}", String(counts.videos)) : "\u00a0"}
+    </p>
+  </li>;
 }

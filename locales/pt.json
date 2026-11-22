@@ -760,7 +760,19 @@
     "loadError": "Não foi possível carregar os espaços de trabalho.",
     "createError": "Não foi possível guardar o espaço de trabalho. Tente novamente.",
     "retry": "Tentar novamente",
-    "desktop": "Abra o Arrumo no computador para gerir os espaços de trabalho."
+    "desktop": "Abra o Arrumo no computador para gerir os espaços de trabalho.",
+    "customize": "Personalizar espaço de trabalho",
+    "customizeHint": "Um ícone e uma cor, ou uma imagem, ajudam a distinguir os espaços de trabalho.",
+    "icon": "Ícone",
+    "image": "Imagem",
+    "color": "Cor",
+    "pickImage": "Escolha uma imagem",
+    "importImage": "Importar uma imagem",
+    "noImages": "Importe uma imagem, como o avatar de um canal. Fica guardada com os recursos do espaço de trabalho.",
+    "customizeError": "Não foi possível guardar o espaço de trabalho. Tente novamente.",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "saving": "A guardar…"
   },
   "brand": {
     "title": "Marca",

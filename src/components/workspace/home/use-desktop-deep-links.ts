@@ -20,6 +20,7 @@ function internalRoute(value: string) {
   try { url = new URL(value); } catch { return; }
   if (url.protocol !== "arrumo:" || url.host !== "open" || url.username || url.password || url.hash) return;
   const query = url.searchParams;
+  if (url.pathname === "/workspaces" && !url.search) return "/?manage=1";
   const workspace = numericId(query, "workspace");
   if (!workspace) return;
   if (url.pathname === "/profile") {

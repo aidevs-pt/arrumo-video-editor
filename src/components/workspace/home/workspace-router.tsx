@@ -22,6 +22,7 @@ type WorkspaceCatalog = {
   status: Status;
   load: () => Promise<void>;
   add: (workspace: Workspace) => void;
+  update: (workspace: Workspace) => void;
   workspace: Workspace | undefined;
   navigate: (view: WorkspaceView, profile?: number) => void;
   draftProfile: number | null;
@@ -79,9 +80,11 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
     <Catalog.Provider value={{
       workspaces, status, load, workspace, navigate, draftProfile,
       add: (entry) => setWorkspaces((current) => [...current, entry]),
+      update: (entry) => setWorkspaces((current) => current.map((item) => item.id === entry.id ? entry : item)),
     }}>
       {!section && !workspaces.length ? children : <WorkspaceFrame workspaces={workspaces} workspace={workspace ?? null} view={view ?? "profiles"}
-        onSelect={(entry) => router.push(entry ? `/?workspace=${entry.id}` : "/?manage=1")}>
+        onSelect={(entry) => router.push(entry ? `/?workspace=${entry.id}` : "/?manage=1")}
+        onUpdate={(entry) => setWorkspaces((current) => current.map((item) => item.id === entry.id ? entry : item))}>
         {!view || workspace ? children : (
           <WorkspaceShell>
             {status === "loading" ? <p role="status">{copy.loading}</p> : (

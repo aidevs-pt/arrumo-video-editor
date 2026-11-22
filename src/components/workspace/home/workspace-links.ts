@@ -1,4 +1,4 @@
-export type Workspace = { id: number; name: string };
+export type Workspace = { id: number; name: string; color?: string | null; icon?: string | null; imageAssetId?: number | null };
 export type WorkspaceView = "profiles" | "context" | "brand" | "assets" | "motion-library" | "outputs"
   | "drafts" | "generations" | "videos" | "calendar";
 
