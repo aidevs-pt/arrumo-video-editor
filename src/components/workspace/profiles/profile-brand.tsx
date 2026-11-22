@@ -12,7 +12,8 @@ import type { Profile } from "./profile-route";
 
 type Association = { asset_id: number; role: "identity" | "style" };
 type ProfileAsset = { id: number; name: string; kind: "image" | "audio" | "video" };
-type Brand = { colors: string[]; images: Association[]; profileImages: ProfileAsset[] };
+type BrandColor = { hex: string; name: string; forVideos: boolean };
+type Brand = { colors: BrandColor[]; images: Association[]; profileImages: ProfileAsset[] };
 
 export function ProfileBrand({ workspaceId, profile }: {
   workspaceId: number;
@@ -27,14 +28,14 @@ export function ProfileBrand({ workspaceId, profile }: {
   useEffect(() => {
     let active = true;
     Promise.all([
-      invoke<string[]>("get_brand_colors", { workspaceId }),
+      invoke<BrandColor[]>("get_brand_palette", { workspaceId }),
       invoke<Association[]>("list_brand_assets", { workspaceId }),
       invoke<ProfileAsset[]>("list_profile_assets", { workspaceId, profileId: profile.id }),
     ]).then(([colors, images, shared]) => {
       if (!active) return;
       const seen = new Set<number>();
       const profileImages = shared.filter((asset) => asset.kind === "image" && !seen.has(asset.id) && seen.add(asset.id));
-      setBrand({ colors, images: images.filter((image, index) => images.findIndex(({ asset_id }) => asset_id === image.asset_id) === index), profileImages });
+      setBrand({ colors: colors.filter((color) => color.forVideos), images: images.filter((image, index) => images.findIndex(({ asset_id }) => asset_id === image.asset_id) === index), profileImages });
     }, () => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [profile.id, workspaceId]);
@@ -52,9 +53,10 @@ export function ProfileBrand({ workspaceId, profile }: {
         <h2 className="mb-1 text-[1.5rem]">{copy.workspaceBrand}</h2>
         <p className="mb-4 text-muted-foreground">{copy.workspaceBrandHint.replace("{profile}", profile.name)}</p>
         {brand.colors.length ? <ul className="mb-4 flex flex-wrap gap-2" aria-label={messages.brand.colors}>
-          {brand.colors.map((color) => (
-            <li key={color} className="flex items-center gap-2 rounded-lg border bg-card py-1.5 ps-1.5 pe-3 text-sm tabular-nums">
-              <span aria-hidden="true" className="size-6 rounded-[4px] border" style={{ backgroundColor: color }} />{color}
+          {brand.colors.map(({ hex, name }) => (
+            <li key={hex} className="flex items-center gap-2 rounded-lg border bg-card py-1.5 ps-1.5 pe-3 text-sm tabular-nums">
+              <span aria-hidden="true" className="size-6 rounded-[4px] border" style={{ backgroundColor: hex }} />
+              {name ? <><span className="font-semibold">{name}</span><span className="text-muted-foreground">{hex}</span></> : hex}
             </li>
           ))}
         </ul> : <p className="mb-4 text-sm text-muted-foreground">{copy.noBrandColors}</p>}

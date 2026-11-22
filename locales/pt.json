@@ -847,7 +847,11 @@
     "retry": "Tentar novamente",
     "save": "Guardar cores",
     "saved": "Cores guardadas.",
-    "saveError": "Não foi possível guardar as cores."
+    "saveError": "Não foi possível guardar as cores.",
+    "forVideosCount": "{count} de {total} usadas nos vídeos",
+    "forVideos": "Usar {color} nos vídeos",
+    "namePlaceholder": "Dar um nome",
+    "nameLabel": "Nome de {color}"
   },
   "brandImages": {
     "manage": "Da biblioteca",

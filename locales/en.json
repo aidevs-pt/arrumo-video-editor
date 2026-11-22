@@ -847,7 +847,11 @@
     "retry": "Retry",
     "save": "Save colors",
     "saved": "Brand colors saved.",
-    "saveError": "Brand colors couldn’t be saved."
+    "saveError": "Brand colors couldn’t be saved.",
+    "forVideosCount": "{count} of {total} used in videos",
+    "forVideos": "Use {color} in videos",
+    "namePlaceholder": "Name it",
+    "nameLabel": "Name for {color}"
   },
   "brandImages": {
     "manage": "From library",

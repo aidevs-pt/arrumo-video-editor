@@ -8,6 +8,8 @@ Create a workspace and choose the editing agent available on your machine. If yo
 
 Each workspace starts with its own icon and color. To change them, or to show an image such as your channel avatar, choose **Customize workspace** in the workspace menu.
 
+In **Workspace settings › Brand**, name each brand color and use its check mark to choose whether videos use it; colors without the check stay in the palette but are left out of generation.
+
 Open **Outputs** and check which formats are enabled. Each enabled format needs its own final MP4 and SRT for the delivery to pass verification.
 
 ## Save and queue a draft

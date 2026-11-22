@@ -847,7 +847,11 @@
     "retry": "Reintentar",
     "save": "Guardar colores",
     "saved": "Colores guardados.",
-    "saveError": "No se pudieron guardar los colores."
+    "saveError": "No se pudieron guardar los colores.",
+    "forVideosCount": "{count} de {total} se usan en los vídeos",
+    "forVideos": "Usar {color} en los vídeos",
+    "namePlaceholder": "Ponle nombre",
+    "nameLabel": "Nombre de {color}"
   },
   "brandImages": {
     "manage": "De la biblioteca",

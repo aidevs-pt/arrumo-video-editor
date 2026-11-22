@@ -399,7 +399,7 @@ Use `list_profile_formats` and `get_profile_delivery` to inspect inherited and e
 
 Use `process_media_stage` to claim and execute a ready media stage for one run. Pass `previewEdit` at Preview, using an empty object for whole clips. Omit it for final rendering or delivery verification. For each rendered format, call `import_delivery_subtitles` with its format ID and an absolute local SRT `source` before verifying delivery.
 
-Use `list_workspace_feedback`, `add_workspace_feedback`, and `update_workspace_feedback` to manage workspace guidance cards. Use `get_brand_colors` and `set_brand_colors` to read or replace the workspace palette. New generation runs capture both inputs.
+Use `list_workspace_feedback`, `add_workspace_feedback`, and `update_workspace_feedback` to manage workspace guidance cards. Use `get_brand_colors` and `set_brand_colors` to read or replace the workspace palette; `get_brand_colors` also returns `palette`, each color's name and whether videos use it, and `set_brand_color_details` changes those. Generation reads only the colors videos use. New generation runs capture both inputs.
 
 Use `list_provider_preferences` or `get_provider_preferences` to inspect provider availability, effective ordering, and provenance. Use `set_provider_preferences` to save an order and `clear_provider_preferences` to restore inheritance. Omit `workspaceId` for app scope. Passing an empty order explicitly disables providers for the capability at that scope.
 

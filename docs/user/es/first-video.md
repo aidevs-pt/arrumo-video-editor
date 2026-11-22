@@ -8,6 +8,8 @@ Crea un espacio de trabajo y selecciona el agente de edición disponible en tu e
 
 Cada espacio de trabajo empieza con su propio icono y color. Para cambiarlos, o para mostrar una imagen como el avatar de tu canal, elige **Personalizar espacio de trabajo** en el menú del espacio de trabajo.
 
+En **Ajustes del espacio de trabajo › Marca**, pon nombre a cada color de marca y usa su marca de verificación para elegir si los vídeos lo usan; los colores sin ella siguen en la paleta, pero no se usan al generar.
+
 Abre **Salidas** y comprueba qué formatos están activados. Para que la entrega se verifique, cada formato activado necesita su propio vídeo MP4 final y su archivo SRT.
 
 ## Guarda un borrador y añádelo a la cola
