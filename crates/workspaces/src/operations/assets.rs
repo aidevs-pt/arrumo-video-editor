@@ -3,7 +3,19 @@ use std::path::Path;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::{AssetOrganization, BrandAssetRole, WorkspaceStore, asset_root};
+use crate::{AssetOrganization, BrandAssetRole, ContextImport, WorkspaceStore, asset_root};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ContextImportInput {
+    workspace_id: i64,
+    #[serde(default)]
+    colors: Vec<String>,
+    #[serde(default)]
+    images: Vec<crate::context_research::SuggestedImage>,
+    #[serde(default)]
+    profiles: Vec<crate::context_research::SuggestedProfile>,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -99,7 +111,7 @@ struct ImportCompletedVideoVariant {
     source: String,
 }
 
-pub(super) fn definitions() -> [Value; 15] {
+pub(super) fn definitions() -> [Value; 16] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -135,6 +147,21 @@ pub(super) fn definitions() -> [Value; 15] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "source": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "source"], "additionalProperties": false}}),
+        json!({"name": "import_workspace_context", "description": "Add what draft_workspace_context found to the workspace: brand colours, images (downloaded from their public pages with their descriptions, groups and labels, as brand marks, thumbnail references or assets) and profiles. Pass only the suggestions to keep. Existing colours and profiles with the same name are skipped.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "colors": {"type": "array", "maxItems": 16, "items": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}},
+                "images": {"type": "array", "maxItems": 40, "items": {"type": "object", "properties": {
+                    "url": {"type": "string"}, "name": {"type": "string"}, "description": {"type": "string"},
+                    "group": {"type": ["string", "null"]}, "labels": {"type": "array", "items": {"type": "string"}},
+                    "purpose": {"enum": ["brand", "thumbnail_reference", "asset"]}
+                }, "required": ["url", "name", "description", "group", "labels", "purpose"], "additionalProperties": false}},
+                "profiles": {"type": "array", "maxItems": 12, "items": {"type": "object", "properties": {
+                    "name": {"type": "string"}, "description": {"type": "string"}, "guidance": {"type": "string"},
+                    "color": {"type": ["string", "null"]}
+                }, "required": ["name", "description"], "additionalProperties": false}}
+            }, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"openWorldHint": true}}),
         json!({"name": "set_asset_notes", "description": "Replace the usage notes for a managed asset. Pass an empty string to clear them.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "notes": {"type": "string"}
@@ -237,6 +264,22 @@ pub(super) fn call(
                         .map_err(|_| "Could not import asset. Check the workspace and media file")
                 })
         }
+        "import_workspace_context" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid context import arguments")
+            .and_then(|args: ContextImportInput| {
+                store
+                    .apply_context_import(
+                        database,
+                        args.workspace_id,
+                        &ContextImport {
+                            colors: args.colors,
+                            images: args.images,
+                            profiles: args.profiles,
+                        },
+                    )
+                    .map(|outcome| json!(outcome))
+                    .map_err(|_| "Could not import the context suggestions. Check the workspace and the counts")
+            }),
         "set_asset_notes" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid workspace asset arguments")
             .and_then(|args: NotesInput| {

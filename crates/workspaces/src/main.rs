@@ -785,6 +785,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&draft)?);
         }
+        [database, command, workspace, import] if command == "import-context" => {
+            let import: arrumo_workspaces::ContextImport = serde_json::from_str(utf8(import)?)?;
+            let database = Path::new(database);
+            let outcome = WorkspaceStore::open(database)?.apply_context_import(
+                database,
+                utf8(workspace)?.parse()?,
+                &import,
+            )?;
+            println!("{}", serde_json::to_string(&outcome)?);
+        }
         [database, command, workspace, markdown] if command == "set-context" => {
             WorkspaceStore::open(Path::new(database))?
                 .set_workspace_context(utf8(workspace)?.parse()?, utf8(markdown)?)?;
@@ -1552,7 +1562,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "import-thumbnail-reference <workspace-id> <source-path> | ",
                 "remove-asset <workspace-id> <asset-id> <confirmed-name> | asset-organization <workspace-id> <asset-id> | set-asset-organization <workspace-id> <asset-id> <settings-json> | ",
                 "set-batch-asset-notes <workspace-id> <asset-ids-json> <markdown> | set-asset-notes <workspace-id> <asset-id> <notes> | ",
-                "context <workspace-id> | set-context <workspace-id> <markdown> | draft-context <workspace-id> <sources-json> [notes] | ",
+                "context <workspace-id> | set-context <workspace-id> <markdown> | draft-context <workspace-id> <sources-json> [notes] | import-context <workspace-id> <import-json> | ",
                 "feedback <workspace-id> | add-feedback <workspace-id> <title> <markdown> | ",
                 "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",
                 "remove-feedback <workspace-id> <feedback-id> | ",

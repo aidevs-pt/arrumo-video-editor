@@ -175,13 +175,42 @@ mod tests {
         assert_eq!(responses[2]["id"], "list");
         assert_eq!(
             responses[2]["result"]["tools"].as_array().unwrap().len(),
-            132
+            133
         );
         assert_eq!(
             responses[3]["result"]["structuredContent"]["workspaces"][0]["name"],
             "Studio"
         );
         assert_eq!(responses[4]["result"]["isError"], true);
+    }
+
+    #[test]
+    fn imports_context_suggestions_like_the_desktop() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("studio.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let call = |store: &mut WorkspaceStore, arguments: Value| {
+            call_tool(
+                store,
+                &database,
+                ToolCall {
+                    name: "import_workspace_context".into(),
+                    arguments: arguments.as_object().unwrap().clone(),
+                },
+            )
+            .unwrap()
+        };
+        let result = call(
+            &mut store,
+            json!({"workspaceId": workspace, "colors": ["#ffcc00"],
+                "profiles": [{"name": "Speedruns", "description": "Fast solves", "guidance": "", "color": null}]}),
+        );
+        assert_eq!(result["structuredContent"]["colors"], 1);
+        assert_eq!(result["structuredContent"]["profiles"], 1);
+        assert_eq!(store.brand_colors(workspace).unwrap(), vec!["#FFCC00"]);
+        let rejected = call(&mut store, json!({"workspaceId": workspace, "extra": true}));
+        assert_eq!(rejected["isError"], true);
     }
 
     #[test]
