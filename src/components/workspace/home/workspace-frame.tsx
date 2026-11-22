@@ -96,7 +96,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
 
   return (
     <>
-      <Sidebar collapsible="icon" mobileTitle={copy.navigation}>
+      <Sidebar collapsible="icon" className="border-r-0!" mobileTitle={copy.navigation}>
         <SidebarHeader className="relative gap-2 px-2 pt-3 pb-2">
           <Button variant="ghost" size="icon" className="absolute end-2 top-0 md:hidden"
             onClick={() => setOpenMobile(false)} aria-label={copy.closeNavigation}><X /></Button>
@@ -262,7 +262,7 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
   return (
     <Link href={href} onClick={() => setOpenMobile(false)}
       className="mt-2 me-2 flex items-center gap-3 rounded-lg group-data-[collapsible=icon]:me-0 bg-[color-mix(in_oklch,var(--sidebar)_55%,var(--ink))] p-2.5 text-sidebar-foreground outline-none hover:bg-[color-mix(in_oklch,var(--sidebar)_40%,var(--ink))] focus-visible:ring-2 focus-visible:ring-attention group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
-      <PluginIcon pluginId={agentId} tone="dark" className="size-9" />
+      <PluginIcon pluginId={agentId} tone="dark" className="size-9 group-data-[collapsible=icon]:size-8" />
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
         <span className="block truncate text-sm font-bold">{title}</span>
         <span className="block truncate text-xs text-sidebar-foreground/80">{detail}</span>
@@ -281,7 +281,7 @@ function NavLink({ href, label, active, icon: Icon, count = 0, countLabel }: {
 }) {
   const { setOpenMobile } = useSidebar();
   return (
-    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground">
+    <SidebarMenuButton asChild isActive={active} tooltip={label} className="h-9 rounded-e-none pe-3 group-data-[collapsible=icon]:rounded-md data-active:bg-sidebar-primary data-active:font-bold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground">
       <Link href={href} aria-current={active ? "page" : undefined}
         aria-label={count && countLabel ? `${label}, ${count} ${countLabel}` : label}
         onClick={() => setOpenMobile(false)}>

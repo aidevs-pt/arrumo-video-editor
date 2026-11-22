@@ -6,6 +6,7 @@ const workspaceSections: readonly WorkspaceView[] = [
   "profiles", "context", "brand", "assets", "motion-library", "outputs", "drafts", "generations", "videos", "calendar",
 ];
 
+const settingsSections = ["general", "agent", "services", "plugins", "quality", "backup"] as const;
 const profileTabs = ["context", "brand", "assets", "outputs", "animations", "calendar"] as const;
 
 function numericId(query: URLSearchParams, name: string) {
@@ -30,6 +31,10 @@ function internalRoute(value: string) {
     if (run) return url.pathname === "/completed-video"
       ? completedVideoHref(workspace, run, numericId(query, "format"), completedFile(query.get("file")))
       : `/generation-run?workspace=${workspace}&run=${run}`;
+  } else if (url.pathname === "/settings") {
+    const section = settingsSections.find((id) => id === query.get("section")) ?? "general";
+    const scope = query.get("scope") === "workspace" ? "workspace" : "app";
+    return `/settings?workspace=${workspace}&scope=${scope}&section=${section}`;
   } else if (url.pathname === "/calendar") {
     return calendarHref(workspace, numericId(query, "profile"), query.get("month"));
   } else {

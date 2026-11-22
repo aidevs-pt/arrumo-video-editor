@@ -7,7 +7,7 @@ import { ArrowLeft, ListVideo, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldContent } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -139,26 +139,26 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
                     </Field>
                     <Field orientation="horizontal">
                       <Switch id="run-autopilot" name="autopilot" disabled={pending} aria-describedby="run-autopilot-description" />
-                      <div className="flex flex-col gap-1">
+                      <FieldContent>
                         <FieldLabel htmlFor="run-autopilot">{copy.autopilot}</FieldLabel>
                         <FieldDescription id="run-autopilot-description">{copy.autopilotHint}</FieldDescription>
-                      </div>
+                      </FieldContent>
                     </Field>
                     <Field orientation="horizontal">
                       <Switch id="run-generate-subtitles" name="generate-subtitles" disabled={pending}
                         aria-describedby="run-generate-subtitles-description" />
-                      <div className="flex flex-col gap-1">
+                      <FieldContent>
                         <FieldLabel htmlFor="run-generate-subtitles">{copy.automaticSubtitles}</FieldLabel>
                         <FieldDescription id="run-generate-subtitles-description">{copy.automaticSubtitlesHint}</FieldDescription>
-                      </div>
+                      </FieldContent>
                     </Field>
                     <Field orientation="horizontal">
                       <Switch id="run-save-motion" name="save-motion" defaultChecked disabled={pending}
                         aria-describedby="run-save-motion-description" />
-                      <div className="flex flex-col gap-1">
+                      <FieldContent>
                         <FieldLabel htmlFor="run-save-motion">{copy.saveMotion}</FieldLabel>
                         <FieldDescription id="run-save-motion-description">{copy.saveMotionHint}</FieldDescription>
-                      </div>
+                      </FieldContent>
                     </Field>
                     <RunHooks workspaceId={workspaceId} disabled={pending} />
                     <RunProviders workspaceId={workspaceId} disabled={pending} />

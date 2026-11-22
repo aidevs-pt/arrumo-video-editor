@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldContent } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { TagInput } from "@/components/ui/tag-input";
@@ -205,17 +205,17 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               <CollapsibleContent forceMount className="flex flex-col gap-5 border-t px-5 py-4 data-[state=closed]:hidden">
                 <Field orientation="horizontal">
                   <Switch id="run-generate-subtitles" name="generate-subtitles" aria-describedby="run-generate-subtitles-description" />
-                  <div className="flex flex-col gap-1">
+                  <FieldContent>
                     <FieldLabel htmlFor="run-generate-subtitles">{messages.queue.automaticSubtitles}</FieldLabel>
                     <FieldDescription id="run-generate-subtitles-description">{messages.queue.automaticSubtitlesHint}</FieldDescription>
-                  </div>
+                  </FieldContent>
                 </Field>
                 <Field orientation="horizontal">
                   <Switch id="run-save-motion" name="save-motion" defaultChecked aria-describedby="run-save-motion-description" />
-                  <div className="flex flex-col gap-1">
+                  <FieldContent>
                     <FieldLabel htmlFor="run-save-motion">{messages.queue.saveMotion}</FieldLabel>
                     <FieldDescription id="run-save-motion-description">{messages.queue.saveMotionHint}</FieldDescription>
-                  </div>
+                  </FieldContent>
                 </Field>
                 <RunHooks workspaceId={workspaceId} disabled={pending !== null} />
                 <RunProviders workspaceId={workspaceId} disabled={pending !== null} />

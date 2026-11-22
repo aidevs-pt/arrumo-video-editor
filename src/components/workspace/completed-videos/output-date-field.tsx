@@ -51,7 +51,7 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
 
   const selected = savedDate ? day(savedDate) : undefined;
   const label = selected
-    ? new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "long", year: "numeric" }).format(selected)
+    ? new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(selected)
     : copy.notScheduled;
 
   return (
@@ -61,9 +61,9 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button id={id} type="button" variant="outline" disabled={pending}
-              className="h-auto min-h-9 w-full justify-start gap-2 py-1.5 text-start font-normal whitespace-normal">
+              className="w-full justify-start gap-2 text-start font-normal">
               <CalendarDays data-icon="inline-start" className="text-muted-foreground" />
-              <span className={selected ? "" : "text-muted-foreground"}>{label}</span>
+              <span className={selected ? "truncate" : "truncate text-muted-foreground"}>{label}</span>
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">

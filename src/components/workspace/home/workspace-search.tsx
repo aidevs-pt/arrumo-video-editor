@@ -51,7 +51,7 @@ export function WorkspaceSearch({ workspaceId }: { workspaceId: number }) {
 
   return <>
     <Button type="button" variant="outline" onClick={() => setOpen(true)} aria-label={copy.search} aria-keyshortcuts="Control+k Meta+k"
-      className="justify-start border-border bg-card font-normal text-muted-foreground hover:border-primary hover:text-foreground sm:w-56 lg:w-72">
+      className="justify-start border-border bg-card font-normal text-muted-foreground hover:border-primary hover:bg-card hover:text-foreground sm:w-56 lg:w-72">
       <Search data-icon="inline-start" />
       <span className="hidden truncate sm:inline">{copy.search}</span>
       <kbd className="ms-auto hidden rounded-sm bg-secondary px-1.5 font-sans text-xs font-semibold text-muted-foreground lg:inline">Ctrl K</kbd>
