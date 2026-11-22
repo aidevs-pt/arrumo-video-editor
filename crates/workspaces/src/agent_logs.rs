@@ -314,7 +314,11 @@ impl WorkspaceStore {
             },
         );
         if let Some(event) = &provider.cli.usage_event
-            && let Some((used, resets_at, minutes)) = event.read(&transcript.output_text())
+            && let Some((used, resets_at, minutes)) = transcript
+                .output
+                .lock()
+                .ok()
+                .and_then(|bytes| event.read(&String::from_utf8_lossy(&bytes)))
         {
             let _ = self.0.execute(
                 "INSERT INTO agent_usage_observations
