@@ -1256,6 +1256,80 @@ mod tests {
     }
 
     #[test]
+    fn shaped_overlays_take_their_own_inputs_over_footage() {
+        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let spec = MotionSpec::from_answer(
+            &json!({
+                "title": "Lower third", "kind": "animation", "usage": "", "durationSeconds": 2,
+                "background": "#000000", "backgroundTo": null,
+                "layers": [{"type": "box", "text": null, "assetId": null, "x": 0.5, "y": 0.8,
+                    "width": 0.6, "height": 0.2, "size": 0.05, "color": "#FF00FF", "bold": false,
+                    "opacity": 1, "start": 0, "end": 2, "enter": "none", "exit": "none",
+                    "sound": "none", "align": "center", "radius": 0.2, "gradientTo": null,
+                    "shadow": true}]
+            }),
+            |_| true,
+        )
+        .unwrap();
+        let (mut graph, mut inputs) = (String::new(), Vec::new());
+        let mut drawn = "0:v".to_owned();
+        for (number, at) in [0.0, 0.5].into_iter().enumerate() {
+            let first = 1 + inputs.iter().filter(|arg| *arg == "-i").count();
+            drawn = overlay_graph(
+                &spec,
+                (320, 180),
+                directory.path(),
+                &format!("o{number}"),
+                at,
+                &drawn,
+                first,
+                &mut graph,
+                &mut inputs,
+                &|_| None,
+            )
+            .unwrap();
+        }
+        assert_eq!(inputs.iter().filter(|arg| *arg == "-i").count(), 2);
+        graph.push_str(&format!("[{drawn}]null[video]"));
+        let frame = Command::new("ffmpeg")
+            .args([
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=0x404040:s=320x180:d=2:r=30",
+            ])
+            .args(&inputs)
+            .args([
+                "-filter_complex",
+                &graph,
+                "-map",
+                "[video]",
+                "-ss",
+                "1",
+                "-frames:v",
+                "1",
+            ])
+            .args(["-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+            .current_dir(directory.path())
+            .output()
+            .unwrap();
+        assert!(
+            frame.status.success(),
+            "{}",
+            String::from_utf8_lossy(&frame.stderr)
+        );
+        let at = (144 * 320 + 160) * 3;
+        let [r, g, b] = [frame.stdout[at], frame.stdout[at + 1], frame.stdout[at + 2]];
+        assert!(r > 200 && g < 60 && b > 200, "{r} {g} {b}");
+    }
+
+    #[test]
     fn renders_a_spec_with_ffmpeg() {
         if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
         {
