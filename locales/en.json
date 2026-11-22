@@ -1082,7 +1082,10 @@
     "downloading": "Saving…",
     "downloaded": "Subtitles saved.",
     "downloadError": "Could not save the subtitles. Check the folder and try again.",
-    "completedAt": "Completed {date}"
+    "completedAt": "Completed {date}",
+    "story": "How it was made",
+    "storyHint": "Comment on any step; the agent reads it next time.",
+    "settingsUsed": "Settings used"
   },
   "productionPlan": {
     "addItemNote": "Add note",

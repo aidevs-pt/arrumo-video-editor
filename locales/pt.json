@@ -1082,7 +1082,10 @@
     "downloading": "A guardar…",
     "downloaded": "Legendas guardadas.",
     "downloadError": "Não foi possível guardar as legendas. Verifique a pasta e tente novamente.",
-    "completedAt": "Concluído a {date}"
+    "completedAt": "Concluído a {date}",
+    "story": "Como foi feito",
+    "storyHint": "Comenta qualquer passo; o agente lê-o da próxima vez.",
+    "settingsUsed": "Definições usadas"
   },
   "productionPlan": {
     "addItemNote": "Adicionar nota",

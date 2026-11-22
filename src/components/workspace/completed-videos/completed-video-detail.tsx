@@ -6,7 +6,7 @@ import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { completedSubtitleTracks } from "./completed-subtitle-tracks";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
 import { invoke } from "@tauri-apps/api/core";
-import { Archive, Captions, CheckCircle2, ClipboardList, Film, FileText, Image, MessageSquare, Music, Puzzle } from "lucide-react";
+import { Archive, Captions, CheckCircle2, ChevronDown, ClipboardList, Film, FileText, Image, Music, Puzzle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { WorkspaceHeading } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
@@ -317,14 +317,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
       </div>
       {error === "exportError" && <Alert variant="destructive" className="mb-4"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
       {notice === "exported" && <p role="status" className="mb-4 text-sm text-muted-foreground">{copy[notice]}</p>}
-      <Tabs defaultValue="video" className="gap-5">
-        <TabsList variant="line" aria-label={copy.details} className="h-auto max-w-full flex-wrap justify-start gap-2">
-          <TabsTrigger value="video"><Film data-icon="inline-start" />{copy.videoTab}</TabsTrigger>
-          <TabsTrigger value="details"><FileText data-icon="inline-start" />{copy.detailsTab}</TabsTrigger>
-          <TabsTrigger value="activity"><ClipboardList data-icon="inline-start" />{queue.activity}</TabsTrigger>
-          <TabsTrigger value="feedback"><MessageSquare data-icon="inline-start" />{copy.feedback}</TabsTrigger>
-        </TabsList>
-        <TabsContent value="video" className="@container">
+      <div className="@container">
           {selected ? (
             <div className="grid items-start gap-5 @3xl:grid-cols-[minmax(0,1fr)_13rem]">
               <ItemContextMenu label={savedTitle} items={[
@@ -390,10 +383,33 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
           </section>}
           <PlacedPluginActions className="mt-6" workspaceId={workspaceId} placement="completed-video" context={trackContext} />
           <ActionSheet workspaceId={workspaceId} entry={placedOpen} context={trackContext} onClose={() => setPlacedOpen(undefined)} />
-        </TabsContent>
-        <TabsContent value="details" forceMount className="flex flex-col gap-5 data-[state=inactive]:hidden">
+      </div>
+      <div className="mt-10 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section aria-labelledby="completed-story" className="flex min-w-0 flex-col gap-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="completed-story" className="text-[1.5rem]">{copy.story}</h2>
+            <p className="text-sm text-muted-foreground">{copy.storyHint}</p>
+          </div>
+          <CompletedVideoFeedback workspaceId={workspaceId} runId={runId} initialFeedback={video.feedback}
+            results={video.production.results} stages={video.plan.steps} />
           <RunMotionResults workspaceId={workspaceId} runId={runId} results={video.production.results}
             steps={video.plan.steps} stageIndex={video.production.stage_index} />
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="group self-start">
+                <ClipboardList data-icon="inline-start" />{queue.activity}<ChevronDown data-icon="inline-end" className="group-data-[state=open]:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2"><CompletedVideoActivity events={video.activity} /></CollapsibleContent>
+          </Collapsible>
+        </section>
+        <aside aria-labelledby="completed-settings" className="flex min-w-0 flex-col gap-5">
+          <h2 id="completed-settings" className="text-[1.5rem]">{copy.settingsUsed}</h2>
+          <Card>
+            <CardHeader><CardTitle>{copy.replaySettings}</CardTitle></CardHeader>
+            <CardContent><CompletedVideoReplay workspaceId={workspaceId} runId={runId} /></CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle>{copy.detailsTab}</CardTitle></CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -420,19 +436,8 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
               </form>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader><CardTitle>{copy.replaySettings}</CardTitle></CardHeader>
-            <CardContent><CompletedVideoReplay workspaceId={workspaceId} runId={runId} /></CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="activity">
-          <CompletedVideoActivity events={video.activity} />
-        </TabsContent>
-        <TabsContent value="feedback" forceMount className="data-[state=inactive]:hidden">
-          <CompletedVideoFeedback workspaceId={workspaceId} runId={runId} initialFeedback={video.feedback}
-            results={video.production.results} stages={video.plan.steps} />
-        </TabsContent>
-      </Tabs>
+        </aside>
+      </div>
       <PluginSurfaces placement="completed_video" workspaceId={workspaceId} />
     </>
   );

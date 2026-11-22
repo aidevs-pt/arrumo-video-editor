@@ -1082,7 +1082,10 @@
     "downloading": "Guardando…",
     "downloaded": "Subtítulos guardados.",
     "downloadError": "No se pudieron guardar los subtítulos. Revisa la carpeta e inténtalo de nuevo.",
-    "completedAt": "Terminado el {date}"
+    "completedAt": "Terminado el {date}",
+    "story": "Cómo se hizo",
+    "storyHint": "Comenta cualquier paso; el agente lo leerá la próxima vez.",
+    "settingsUsed": "Ajustes usados"
   },
   "productionPlan": {
     "addItemNote": "Añadir nota",
