@@ -51,6 +51,8 @@ mod output_formats;
 mod output_schedule;
 mod plugin_action_jobs;
 mod plugin_actions;
+mod plugin_activation;
+pub use plugin_activation::plugin_activation_refusal_code;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
@@ -301,6 +303,7 @@ impl WorkspaceStore {
             include_str!("../migrations/061-context-sources.sql"),
             include_str!("../migrations/062-brand-color-details.sql"),
             include_str!("../migrations/063-system-notifications.sql"),
+            include_str!("../migrations/064-plugin-activation.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

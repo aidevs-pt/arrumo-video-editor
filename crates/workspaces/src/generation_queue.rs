@@ -827,6 +827,7 @@ mod tests {
             "description": "Test fixture",
             "capabilities": {"transcription": {"name": "Transcription", "description": "Test fixture"}}
         }"#).unwrap();
+        store.set_plugin_active("fixture-provider", true).unwrap();
         let override_options = RunOptions {
             provider_overrides: BTreeMap::from([(
                 "transcription".into(),

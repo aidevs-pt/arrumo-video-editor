@@ -26,12 +26,13 @@ import type { PluginSettingsManifest } from "./plugin-preferences";
 
 type Plugin = {
   bundled: boolean;
+  active: boolean;
   manifest: PluginSettingsManifest & { description: string };
   package?: { sha256: string; release?: { version: string } };
 };
 
 export function PluginCatalog() {
-  const { messages: { pluginCatalog: copy, workspaces: workspaceCopy, pluginTour: tourCopy } } = useLocale();
+  const { messages: { pluginCatalog: copy, pluginDetail: detailCopy, workspaces: workspaceCopy, pluginTour: tourCopy } } = useLocale();
   const pluginText = usePluginText();
   const query = useSearchParams();
   const detailHref = (id: string) => {
@@ -133,7 +134,7 @@ export function PluginCatalog() {
           {!plugins && !error && <Skeleton className="h-24" aria-label={copy.loading} />}
           {plugins && (
             <ul className="divide-y">
-              {plugins.map(({ bundled, manifest: declared, package: stored }) => {
+              {plugins.map(({ bundled, active, manifest: declared, package: stored }) => {
                 const manifest = { ...declared, name: pluginText.name(declared.id, declared.name), description: pluginText.description(declared.id, declared.description) };
                 return (
                 <li key={manifest.id} className="flex flex-wrap items-start gap-3 py-3 first:pt-0 last:pb-0">
@@ -144,6 +145,7 @@ export function PluginCatalog() {
                     {stored?.release && <p className="text-xs text-muted-foreground">{stored.release.version}</p>}
                     {pluginText.iconNotice(manifest.id) && <p className="mt-1 text-xs text-muted-foreground">{pluginText.iconNotice(manifest.id)}</p>}
                   </div>
+                  {!active && <Badge variant="outline">{detailCopy.off}</Badge>}
                   {bundled ? <Badge variant="secondary">{copy.bundled}</Badge> : (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>

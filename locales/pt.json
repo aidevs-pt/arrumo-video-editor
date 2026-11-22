@@ -202,7 +202,7 @@
     "description": "Gira os pacotes de plugins desta instalação do Arrumo.",
     "import": "Importar ZIP",
     "chooseFile": "Escolher ficheiro ZIP",
-    "warning": "Os plugins de terceiros podem ser inseguros. Verifique quem publica o pacote e o seu código-fonte antes de o escolher. Os pacotes importados ficam inativos.",
+    "warning": "Os plugins de terceiros podem ser inseguros. Verifique quem publica o pacote e o seu código-fonte antes de o escolher. Os pacotes importados ficam desativados até os ativar na respetiva página.",
     "cancel": "Cancelar",
     "loading": "A carregar plugins…",
     "loadError": "Não foi possível carregar os plugins. Tente novamente.",
@@ -1701,7 +1701,20 @@
     "layerHint": "Estes valores aplicam-se a toda a app. Um espaço de trabalho pode substituí-los em Definições › Serviços e chaves.",
     "adds": "O que adiciona",
     "agentsCall": "Os agentes podem chamar",
-    "agentsCallHint": "através de queue_plugin_action_job, a partir da CLI, MCP e A2A."
+    "agentsCallHint": "através de queue_plugin_action_job, a partir da CLI, MCP e A2A.",
+    "turnOn": "Ativar {plugin}",
+    "turnOff": "Desativar {plugin}",
+    "off": "Desativado",
+    "offHint": "Este plugin está desativado. O Arrumo mantém as definições, mas não o executa: sai das ordens de fornecedores, das ações, dos hooks e da utilização.",
+    "refusedTitle": "Ainda não é possível desativar {plugin}",
+    "refused": {
+      "plugin_agent_app": "É o agente de edição da aplicação. Escolhe outro agente nas Definições primeiro.",
+      "plugin_agent_workspace": "Um espaço de trabalho usa-o como agente de edição. Escolhe outro agente para esse espaço primeiro.",
+      "plugin_agent_run": "Um vídeo por terminar usa-o. Termina ou cancela esse vídeo primeiro.",
+      "plugin_missing": "Este plugin já não está instalado.",
+      "plugin_activation_failed": "O Arrumo não conseguiu guardar a alteração. Tenta novamente."
+    },
+    "refusedOk": "OK"
   },
   "systemNotifications": {
     "review_required": "{title} aguarda a tua revisão",

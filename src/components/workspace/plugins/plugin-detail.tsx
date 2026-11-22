@@ -6,9 +6,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { PluginCredentialField } from "@/components/workspace/settings/plugin-credential-field";
@@ -16,10 +18,11 @@ import { PluginFields, type PluginSettingDeclaration } from "@/components/worksp
 import { useStudioTrail } from "@/components/workspace/home/studio-trail";
 import { replayPluginTour } from "./plugin-tour";
 import { useLocale } from "@/lib/locale-provider";
-import { PluginIcon, usePluginText } from "@/lib/plugin-text";
+import { PLUGINS_CHANGED, PluginIcon, usePluginText } from "@/lib/plugin-text";
 
 type Entry = {
   bundled: boolean;
+  active: boolean;
   manifest: {
     id: string;
     name: string;
@@ -39,6 +42,8 @@ export function PluginDetail({ pluginId, backHref }: { pluginId: string; backHre
   const pluginText = usePluginText();
   const [entry, setEntry] = useState<Entry | null>();
   const [failed, setFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [refusal, setRefusal] = useState<string>();
 
   useEffect(() => {
     let active = true;
@@ -57,6 +62,19 @@ export function PluginDetail({ pluginId, backHref }: { pluginId: string; backHre
   if (!entry) return <Skeleton className="h-64" aria-label={pluginCatalog.loading} />;
 
   const { manifest } = entry;
+  const refusals = copy.refused as Record<string, string>;
+  async function setActive(active: boolean) {
+    setSaving(true);
+    try {
+      await invoke("set_plugin_active", { pluginId, active });
+      setEntry((current) => current && { ...current, active });
+      window.dispatchEvent(new Event(PLUGINS_CHANGED));
+    } catch (code) {
+      setRefusal(typeof code === "string" && code in refusals ? code : "plugin_activation_failed");
+    } finally {
+      setSaving(false);
+    }
+  }
   const fields = (manifest.settings ?? []).filter(({ kind }) => kind !== "secret" || entry.bundled).map((field) => pluginText.field(pluginId, field));
   const ordinary = fields.filter(({ kind }) => kind !== "secret");
   const credentials = fields.filter(({ kind }) => kind === "secret");
@@ -70,6 +88,7 @@ export function PluginDetail({ pluginId, backHref }: { pluginId: string; backHre
         <div className="flex min-w-0 max-w-2xl flex-col gap-3">
           <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Badge variant="secondary">{entry.bundled ? copy.bundled : copy.installed}</Badge>
+            {!entry.active && <Badge variant="outline">{copy.off}</Badge>}
             {entry.package?.release && <span>{copy.version.replace("{version}", entry.package.release.version)}</span>}
           </p>
           <h1 className="flex items-center gap-4 text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] [font-variation-settings:'wdth'_135]">
@@ -78,10 +97,24 @@ export function PluginDetail({ pluginId, backHref }: { pluginId: string; backHre
           <p className="text-lg text-muted-foreground">{pluginText.description(pluginId, manifest.description)}</p>
           {pluginText.iconNotice(pluginId) && <p className="text-xs text-muted-foreground">{pluginText.iconNotice(pluginId)}</p>}
         </div>
-        {Boolean(manifest.introduction) && <Button variant="outline" onClick={() => replayPluginTour([pluginId])}>
-          <Play data-icon="inline-start" />{pluginTour.replayOne}
-        </Button>}
+        <div className="ml-auto flex items-center gap-3">
+          {Boolean(manifest.introduction) && entry.active && <Button variant="outline" onClick={() => replayPluginTour([pluginId])}>
+            <Play data-icon="inline-start" />{pluginTour.replayOne}
+          </Button>}
+          <Switch checked={entry.active} disabled={saving} onCheckedChange={setActive}
+            aria-label={(entry.active ? copy.turnOff : copy.turnOn).replace("{plugin}", name)} />
+        </div>
       </header>
+      {!entry.active && <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">{copy.offHint}</p>}
+      <AlertDialog open={refusal !== undefined} onOpenChange={(open) => { if (!open) setRefusal(undefined); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.refusedTitle.replace("{plugin}", name)}</AlertDialogTitle>
+            <AlertDialogDescription>{refusal && refusals[refusal]}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction>{copy.refusedOk}</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Tabs defaultValue={fields.length ? "settings" : "actions"} className="min-w-0 gap-6">
           <TabsList variant="line" className="justify-start">

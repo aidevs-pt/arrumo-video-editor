@@ -516,6 +516,7 @@ impl WorkspaceStore {
             serde_json::from_str::<serde_json::Value>(&snapshot)?
                 ["provider_orders"]["transcription"]["effective"].clone(),
         ).map_err(|_| io::Error::other("The run has no captured transcription provider order"))?;
+        let order = self.without_inactive(order)?;
         if order.is_empty() {
             return Err(io::Error::other("The run has no selected transcription provider").into());
         }

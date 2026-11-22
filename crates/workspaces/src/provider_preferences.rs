@@ -117,7 +117,7 @@ impl WorkspaceStore {
         workspace_id: Option<i64>,
     ) -> Result<BTreeMap<String, Vec<CapabilityProvider>>, Box<dyn Error>> {
         let mut capabilities: BTreeMap<String, Vec<CapabilityProvider>> = BTreeMap::new();
-        for plugin in self.plugin_catalog()? {
+        for plugin in self.active_plugin_catalog()? {
             for capability in plugin.manifest.capabilities.keys() {
                 capabilities
                     .entry(capability.clone())
@@ -218,7 +218,7 @@ impl WorkspaceStore {
         capability: &str,
     ) -> Result<Vec<CapabilityProvider>, Box<dyn Error>> {
         Ok(self
-            .plugin_catalog()?
+            .active_plugin_catalog()?
             .into_iter()
             .filter(|plugin| plugin.manifest.capabilities.contains_key(capability))
             .map(|plugin| CapabilityProvider {

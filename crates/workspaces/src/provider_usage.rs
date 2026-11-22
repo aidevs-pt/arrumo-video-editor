@@ -214,7 +214,7 @@ impl WorkspaceStore {
     /// this workspace. Providers are read one after another; one that fails is `unknown`.
     pub fn provider_usage(&self, workspace_id: i64) -> Result<Vec<ProviderUsage>, Box<dyn Error>> {
         let installed: Vec<String> = self
-            .plugin_catalog()?
+            .active_plugin_catalog()?
             .into_iter()
             .map(|plugin| plugin.manifest.id)
             .collect();

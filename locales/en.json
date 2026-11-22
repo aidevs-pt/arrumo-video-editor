@@ -202,7 +202,7 @@
     "description": "Manage plugin packages for this Arrumo installation.",
     "import": "Import ZIP",
     "chooseFile": "Choose ZIP file",
-    "warning": "Third-party plugins may be unsafe. Review the publisher and source before choosing a package. Imported packages stay inactive.",
+    "warning": "Third-party plugins may be unsafe. Review the publisher and source before choosing a package. Imported packages stay off until you turn them on from their page.",
     "cancel": "Cancel",
     "loading": "Loading plugins…",
     "loadError": "Could not load plugins. Try again.",
@@ -1701,7 +1701,20 @@
     "layerHint": "These values are for the whole app. A workspace can override them in Settings › Services and keys.",
     "adds": "What it adds",
     "agentsCall": "Agents can call",
-    "agentsCallHint": "through queue_plugin_action_job, from the CLI, MCP and A2A."
+    "agentsCallHint": "through queue_plugin_action_job, from the CLI, MCP and A2A.",
+    "turnOn": "Turn {plugin} on",
+    "turnOff": "Turn {plugin} off",
+    "off": "Off",
+    "offHint": "This plugin is off. Arrumo keeps its settings but doesn't run it: it leaves provider orders, actions, hooks and usage.",
+    "refusedTitle": "{plugin} can't be turned off yet",
+    "refused": {
+      "plugin_agent_app": "It is the app's editing agent. Choose another agent in Settings first.",
+      "plugin_agent_workspace": "A workspace uses it as its editing agent. Choose another agent for that workspace first.",
+      "plugin_agent_run": "An unfinished video uses it. Finish or cancel that video first.",
+      "plugin_missing": "This plugin isn't installed any more.",
+      "plugin_activation_failed": "Arrumo couldn't save the change. Try again."
+    },
+    "refusedOk": "OK"
   },
   "systemNotifications": {
     "review_required": "{title} is waiting for your review",

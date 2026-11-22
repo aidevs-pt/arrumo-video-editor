@@ -685,6 +685,7 @@ impl WorkspaceStore {
                     .collect()
             })
             .unwrap_or_default();
+        let order = self.without_inactive(order)?;
         let mut media = Vec::new();
         let mut prompts = revision.as_ref().map(kept_prompts).unwrap_or_default();
         for (index, (format, prompt, aspect)) in draft.thumbnails.iter().enumerate() {

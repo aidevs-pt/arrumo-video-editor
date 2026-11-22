@@ -402,11 +402,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .remove_installed_plugin_manifest(utf8(id)?)?;
             println!("{removed}");
         }
-        [_database, command] if command == "agent-plugins" => {
-            println!(
-                "{}",
-                serde_json::to_string(arrumo_workspaces::agent_plugins())?
-            );
+        [database, command] if command == "agent-plugins" => {
+            let plugins = WorkspaceStore::open(Path::new(database))?.active_agent_plugins()?;
+            println!("{}", serde_json::to_string(&plugins)?);
         }
         [_database, command, provider] if command == "agent-login-status" => {
             let provider = utf8(provider)?;

@@ -55,6 +55,12 @@ pub fn open_agent_setup_guide(provider: String, app: tauri::AppHandle) -> Result
 }
 
 #[tauri::command]
-pub fn list_agent_plugins() -> &'static [AgentPlugin] {
-    arrumo_workspaces::agent_plugins()
+pub fn list_agent_plugins(
+    store: State<'_, Store>,
+) -> Result<Vec<&'static AgentPlugin>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .active_agent_plugins()
+        .map_err(|_| "agent_plugins_failed")
 }

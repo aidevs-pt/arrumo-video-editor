@@ -10,6 +10,13 @@ use crate::{
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ActivationInput {
+    plugin_id: String,
+    active: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PluginInput {
     plugin_id: String,
     workspace_id: Option<i64>,
@@ -97,7 +104,7 @@ struct RemovePackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 19] {
+pub(super) fn definitions() -> [Value; 20] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -140,6 +147,11 @@ pub(super) fn definitions() -> [Value; 19] {
         json!({"name": "list_plugin_catalog", "description": "List bundled and installed plugins with declared capabilities, settings metadata, and package information.",
             "inputSchema": {"type": "object", "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_plugin_active", "description": "Turn an installed plugin on or off for the whole app. A plugin that is off keeps its settings but Arrumo does not run it: it leaves provider orders, actions, hooks and usage. Imported plugins start off. An agent in use by the app, a workspace or an unfinished video can't be turned off.",
+            "inputSchema": {"type": "object", "properties": {
+                "pluginId": id, "active": {"type": "boolean"}
+            }, "required": ["pluginId", "active"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
         json!({"name": "get_provider_usage", "description": "Read how much of each keyed provider's allowance is used and left, with a level of ok, warning (20% or less left), danger (10% or less) or unknown.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": {"type": "integer", "minimum": 1}}, "required": ["workspaceId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true, "openWorldHint": true}}),
@@ -233,6 +245,15 @@ pub(super) fn call(
             .map(|plugins| json!({"plugins": plugins}))
             .map_err(|_| "Could not list plugin catalog"),
         "list_plugin_catalog" => Err("Unexpected plugin catalog arguments"),
+        "set_plugin_active" => parse(arguments).and_then(|args: ActivationInput| {
+            store
+                .set_plugin_active(&args.plugin_id, args.active)
+                .map(|()| json!({"pluginId": args.plugin_id, "active": args.active}))
+                .map_err(|error| {
+                    crate::plugin_activation::activation_refusal(error.as_ref())
+                        .unwrap_or("Could not turn the plugin on or off")
+                })
+        }),
         "get_provider_usage" => serde_json::from_value::<UsageInput>(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid usage arguments")
             .and_then(|args| {

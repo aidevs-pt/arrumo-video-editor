@@ -300,7 +300,7 @@ mod tests {
              INSERT INTO production_results (run_id, stage_index, attempt, result_json)
              VALUES ({run}, 0, 1, '{delivery}');"
         )).unwrap();
-        store.install_plugin_zip(hook_plugin().as_slice()).unwrap();
+        store.install_plugin_zip_on(hook_plugin().as_slice());
 
         assert_eq!(
             store.queue_video_completed_hooks(workspace, run),
@@ -399,9 +399,7 @@ mod tests {
             )
             .unwrap()
             .id;
-        store
-            .install_plugin_zip(hook_plugin_for("generation-failed").as_slice())
-            .unwrap();
+        store.install_plugin_zip_on(hook_plugin_for("generation-failed").as_slice());
         store
             .set_plugin_setting(
                 "fixture-hooks",
@@ -479,9 +477,7 @@ mod tests {
             0,
             "no plugin listens yet"
         );
-        store
-            .install_plugin_zip(hook_plugin_for("publish-date-reached").as_slice())
-            .unwrap();
+        store.install_plugin_zip_on(hook_plugin_for("publish-date-reached").as_slice());
         store
             .set_plugin_setting(
                 "fixture-hooks",

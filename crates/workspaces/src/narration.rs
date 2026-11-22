@@ -30,12 +30,16 @@ pub(crate) fn narration_file_name(name: &str) -> bool {
         })
 }
 
-/// The first text-to-speech provider the run captured.
-fn run_speech_provider(snapshot: &Value) -> Option<&str> {
+/// The text-to-speech providers the run captured, in order.
+fn run_speech_providers(snapshot: &Value) -> Vec<String> {
     snapshot["provider_orders"]["text-to-speech"]["effective"]
-        .as_array()?
-        .first()?
-        .as_str()
+        .as_array()
+        .map(|ids| {
+            ids.iter()
+                .filter_map(|id| id.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 impl WorkspaceStore {
@@ -62,7 +66,8 @@ impl WorkspaceStore {
         if lines.iter().all(|line| line.trim().is_empty()) {
             return Ok(());
         }
-        let Some(plugin) = run_speech_provider(snapshot) else {
+        let providers = self.without_inactive(run_speech_providers(snapshot))?;
+        let Some(plugin) = providers.first().map(String::as_str) else {
             return Ok(());
         };
         let configured = self
@@ -171,7 +176,7 @@ mod tests {
     fn the_first_captured_speech_provider_narrates() {
         let snapshot =
             json!({"provider_orders": {"text-to-speech": {"effective": ["elevenlabs", "x"]}}});
-        assert_eq!(run_speech_provider(&snapshot), Some("elevenlabs"));
-        assert_eq!(run_speech_provider(&json!({})), None);
+        assert_eq!(run_speech_providers(&snapshot), ["elevenlabs", "x"]);
+        assert!(run_speech_providers(&json!({})).is_empty());
     }
 }

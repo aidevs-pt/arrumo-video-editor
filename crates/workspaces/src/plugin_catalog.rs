@@ -446,6 +446,8 @@ impl StructuredRun {
 #[serde(rename_all = "camelCase")]
 pub struct CatalogPlugin {
     pub bundled: bool,
+    /// Whether Arrumo may run it; see `plugin_activation`.
+    pub active: bool,
     pub manifest: PluginManifest,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package: Option<PluginPackageInfo>,
@@ -800,8 +802,14 @@ impl WorkspaceStore {
         }
         let icon_svg =
             archive.and_then(|bytes| crate::plugin_package::package_icon(bytes, &manifest));
+        let active = self
+            .plugin_activation()?
+            .get(&manifest.id)
+            .copied()
+            .unwrap_or(false);
         Ok(CatalogPlugin {
             bundled: false,
+            active,
             manifest,
             package: info.cloned(),
             icon_svg,
@@ -824,6 +832,7 @@ impl WorkspaceStore {
                     .map(str::to_owned);
                 Ok(CatalogPlugin {
                     bundled: true,
+                    active: true,
                     manifest,
                     package,
                     icon_svg,
@@ -873,12 +882,14 @@ impl WorkspaceStore {
                     .and_then(|bytes| crate::plugin_package::package_icon(bytes, &manifest));
                 plugins.push(CatalogPlugin {
                     bundled: false,
+                    active: false,
                     manifest,
                     package,
                     icon_svg,
                 });
             }
         }
+        self.mark_active(&mut plugins)?;
         Ok(plugins)
     }
 
@@ -887,10 +898,14 @@ impl WorkspaceStore {
         id: &str,
         package_sha256: &str,
     ) -> rusqlite::Result<bool> {
-        self.0.execute(
+        let removed = self.0.execute(
             "DELETE FROM installed_plugin_manifests WHERE plugin_id = ?1 AND package_sha256 = ?2",
             [id, package_sha256],
-        ).map(|deleted| deleted != 0)
+        )? != 0;
+        if removed {
+            self.forget_plugin_activation(id)?;
+        }
+        Ok(removed)
     }
 
     pub fn remove_installed_plugin_manifest(&self, id: &str) -> rusqlite::Result<bool> {
@@ -898,6 +913,9 @@ impl WorkspaceStore {
             "DELETE FROM installed_plugin_manifests WHERE plugin_id = ?1",
             [id],
         )?;
+        if removed == 1 {
+            self.forget_plugin_activation(id)?;
+        }
         Ok(removed == 1)
     }
 }

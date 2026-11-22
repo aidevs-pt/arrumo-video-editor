@@ -202,7 +202,7 @@
     "description": "Gestiona los paquetes de complementos de esta instalación de Arrumo.",
     "import": "Importar ZIP",
     "chooseFile": "Elegir archivo ZIP",
-    "warning": "Los complementos de terceros pueden ser inseguros. Revisa quién lo publica y su código fuente antes de elegir un paquete. Los paquetes importados permanecen inactivos.",
+    "warning": "Los complementos de terceros pueden ser inseguros. Revisa quién lo publica y su código fuente antes de elegir un paquete. Los paquetes importados quedan desactivados hasta que los actives desde su página.",
     "cancel": "Cancelar",
     "loading": "Cargando complementos…",
     "loadError": "No se pudieron cargar los complementos. Inténtalo de nuevo.",
@@ -1701,7 +1701,20 @@
     "layerHint": "Estos valores son para toda la app. Un espacio de trabajo puede sobrescribirlos en Ajustes › Servicios y claves.",
     "adds": "Qué añade",
     "agentsCall": "Los agentes pueden llamar",
-    "agentsCallHint": "mediante queue_plugin_action_job, desde la CLI, MCP y A2A."
+    "agentsCallHint": "mediante queue_plugin_action_job, desde la CLI, MCP y A2A.",
+    "turnOn": "Activar {plugin}",
+    "turnOff": "Desactivar {plugin}",
+    "off": "Desactivado",
+    "offHint": "Este complemento está desactivado. Arrumo conserva sus ajustes, pero no lo ejecuta: sale de los órdenes de proveedores, las acciones, los hooks y el uso.",
+    "refusedTitle": "Aún no se puede desactivar {plugin}",
+    "refused": {
+      "plugin_agent_app": "Es el agente de edición de la aplicación. Elige otro agente en Ajustes primero.",
+      "plugin_agent_workspace": "Un espacio de trabajo lo usa como agente de edición. Elige otro agente para ese espacio primero.",
+      "plugin_agent_run": "Un vídeo sin terminar lo usa. Termina o cancela ese vídeo primero.",
+      "plugin_missing": "Este complemento ya no está instalado.",
+      "plugin_activation_failed": "Arrumo no pudo guardar el cambio. Inténtalo de nuevo."
+    },
+    "refusedOk": "Aceptar"
   },
   "systemNotifications": {
     "review_required": "{title} espera tu revisión",

@@ -15,6 +15,23 @@ pub fn list_plugin_catalog(store: State<'_, Store>) -> Result<Vec<CatalogPlugin>
         .map_err(|_| "plugin_catalog_failed")
 }
 
+/// Turns a plugin on or off for the whole app. Errors are codes the interface translates.
+#[tauri::command]
+pub fn set_plugin_active(
+    plugin_id: String,
+    active: bool,
+    store: State<'_, Store>,
+) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_plugin_active(&plugin_id, active)
+        .map_err(|error| {
+            arrumo_workspaces::plugin_activation_refusal_code(error.as_ref())
+                .unwrap_or("plugin_activation_failed")
+        })
+}
+
 #[tauri::command]
 pub fn pending_plugin_tour(
     store: State<'_, Store>,

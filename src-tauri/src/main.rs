@@ -1366,6 +1366,7 @@ fn main() {
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,
+            plugin_settings::set_plugin_active,
             plugin_settings::pending_plugin_tour,
             plugin_settings::plugin_tour,
             plugin_settings::finish_plugin_tour,

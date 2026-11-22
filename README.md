@@ -458,6 +458,8 @@ Use `remove_output_format` with a workspace and format ID to remove that format 
 
 Use `list_brand_assets`, `attach_brand_asset`, and `detach_brand_asset` through MCP or A2A to manage which workspace images serve as identity assets or style references. Removing a role keeps the image in the workspace library.
 
+Turn a plugin on or off for the whole app on its page in **Settings › Plugins**, or with `set_plugin_active` (`pluginId`, `active`) through MCP or A2A. A plugin that is off keeps its settings, but Arrumo does not run it: it leaves provider orders (including orders a run captured earlier), action listings and jobs, hooks, frontend surfaces, usage reads and the agent list. Bundled plugins start on; imported plugins start off, except imports installed before this switch existed. An agent can't be turned off while the app, a workspace or an unfinished video uses it.
+
 Use `remove_reviewed_plugin_package` through MCP or A2A with the plugin ID and its installed package SHA-256. A mismatched digest leaves the installed revision intact. Uninstalling removes that package's stored settings and grants.
 
 Use `get_agent_login_status` through MCP or A2A with the bundled agent plugin ID to check local sign-in readiness. The host returns a status and discards the probe's output.

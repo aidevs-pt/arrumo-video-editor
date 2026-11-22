@@ -1,7 +1,7 @@
 use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
 
-use crate::{WorkspaceStore, agent_plugin};
+use crate::{AgentPlugin, WorkspaceStore, agent_plugin, agent_plugins};
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,6 +48,16 @@ impl WorkspaceStore {
         })
     }
 
+    /// The agent plugins that are turned on.
+    pub fn active_agent_plugins(&self) -> rusqlite::Result<Vec<&'static AgentPlugin>> {
+        let activation = self.plugin_activation()?;
+        Ok(agent_plugins()
+            .iter()
+            .filter(|plugin| activation.get(&plugin.id).copied().unwrap_or(true))
+            .collect())
+    }
+
+    /// Selects the editing agent; an agent that is turned off can't be chosen.
     pub fn set_agent_provider(
         &self,
         workspace_id: Option<i64>,
@@ -55,8 +65,11 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<()> {
         let provider = provider
             .map(|id| {
-                agent_plugin(id)
-                    .map(|plugin| plugin.id.as_str())
+                let plugin = agent_plugin(id).ok_or(rusqlite::Error::InvalidQuery)?;
+                self.active_agent_plugins()?
+                    .iter()
+                    .any(|active| active.id == plugin.id)
+                    .then_some(plugin.id.as_str())
                     .ok_or(rusqlite::Error::InvalidQuery)
             })
             .transpose()?;

@@ -266,6 +266,7 @@ impl WorkspaceStore {
                     .collect()
             })
             .unwrap_or_default();
+        let providers = self.without_inactive(providers)?;
         let budget = MAX_TRANSCRIPT_CHARS / ids.len().max(1);
         let mut footage = Vec::with_capacity(ids.len());
         let mut untranscribed = Vec::new();

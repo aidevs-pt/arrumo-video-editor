@@ -26,7 +26,7 @@ impl WorkspaceStore {
         placement: PluginSurfacePlacement,
     ) -> Result<Vec<InstalledPluginSurface>, Box<dyn std::error::Error>> {
         let mut surfaces = Vec::new();
-        for plugin in self.plugin_catalog()? {
+        for plugin in self.active_plugin_catalog()? {
             let (Some(package), Some(code)) = (plugin.package, plugin.manifest.code) else {
                 continue;
             };
@@ -144,7 +144,7 @@ mod tests {
         archive.start_file("index.html", opts).unwrap();
         archive.write_all(b"<p>Fixture</p>").unwrap();
         let package = archive.finish().unwrap().into_inner();
-        store.install_plugin_zip(package.as_slice()).unwrap();
+        store.install_plugin_zip_on(package.as_slice());
         assert!(
             store
                 .plugin_surfaces(PluginSurfacePlacement::Workspace)
@@ -206,7 +206,7 @@ mod tests {
         archive.start_file("index.html", opts).unwrap();
         archive.write_all(b"<p>Fixture</p>").unwrap();
         let package = archive.finish().unwrap().into_inner();
-        let installed = store.install_plugin_zip(package.as_slice()).unwrap();
+        let installed = store.install_plugin_zip_on(package.as_slice());
         let digest = installed.package.unwrap().sha256;
         let read = |panel, digest, scope| {
             store.plugin_surface_context("fixture-reader", panel, digest, scope)

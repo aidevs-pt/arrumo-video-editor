@@ -40,6 +40,12 @@ impl WorkspaceStore {
             .0
             .unchecked_transaction()
             .map_err(|_| io::Error::other("Could not read plugin invocation state"))?;
+        if !self
+            .plugin_is_active(plugin_id)
+            .map_err(|_| io::Error::other("Could not read plugin invocation state"))?
+        {
+            return Err(io::Error::other("This plugin is turned off"));
+        }
         let package =
             self.resolve_plugin_package(plugin_id, action.and_then(|(_, digest)| digest))?;
         let manifest = package.manifest;
@@ -249,7 +255,7 @@ pub(crate) mod tests {
             .write_all(&wat::parse_str(READ_CONTEXT).unwrap())
             .unwrap();
         let bytes = package.finish().unwrap().into_inner();
-        store.install_plugin_zip(bytes.as_slice()).unwrap();
+        store.install_plugin_zip_on(bytes.as_slice());
         let input = Value::Null;
         let invoke =
             |workspace| store.invoke_plugin_in_workspace("fixture-reader", workspace, &input);
@@ -356,7 +362,7 @@ pub(crate) mod tests {
                 .invoke_plugin_component("fixture-runtime", &input)
                 .is_err()
         );
-        store.install_plugin_zip(bytes.as_slice()).unwrap();
+        store.install_plugin_zip_on(bytes.as_slice());
         assert_eq!(
             store
                 .invoke_plugin_component("fixture-runtime", &input)

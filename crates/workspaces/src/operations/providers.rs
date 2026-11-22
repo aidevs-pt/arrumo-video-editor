@@ -1,7 +1,7 @@
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
-use crate::{WorkspaceStore, agent_plugins, check_agent_login};
+use crate::{WorkspaceStore, check_agent_login};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -56,7 +56,7 @@ pub(super) fn definitions() -> [Value; 9] {
             }, "required": ["capability", "order"], "additionalProperties": false}}),
         json!({"name": "clear_provider_preferences", "description": "Remove the configured order to inherit the parent or bundled defaults.",
             "inputSchema": preference}),
-        json!({"name": "list_agent_plugins", "description": "List bundled plugins eligible to provide the production agent.",
+        json!({"name": "list_agent_plugins", "description": "List the turned-on bundled plugins eligible to provide the production agent.",
             "inputSchema": {"type": "object", "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_agent_login_status", "description": "Run the bundled agent plugin's sign-in probe and return only its readiness status.",
@@ -104,7 +104,10 @@ pub(super) fn call(
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not clear provider order")
         }),
-        "list_agent_plugins" if arguments.is_empty() => Ok(json!({"plugins": agent_plugins()})),
+        "list_agent_plugins" if arguments.is_empty() => store
+            .active_agent_plugins()
+            .map(|plugins| json!({"plugins": plugins}))
+            .map_err(|_| "Could not list agent plugins"),
         "list_agent_plugins" => Err("Unexpected agent listing arguments"),
         "get_agent_login_status" => parse(arguments)
             .map(|args: AgentProbeInput| json!({"status": check_agent_login(&args.plugin_id)})),

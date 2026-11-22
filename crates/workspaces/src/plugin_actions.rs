@@ -17,7 +17,7 @@ pub struct InstalledPluginAction {
 impl WorkspaceStore {
     pub fn plugin_actions(&self) -> Result<Vec<InstalledPluginAction>, Box<dyn Error>> {
         let mut actions = Vec::new();
-        for plugin in self.plugin_catalog()? {
+        for plugin in self.active_plugin_catalog()? {
             let (Some(package), Some(declared)) = (plugin.package, plugin.manifest.actions) else {
                 continue;
             };
