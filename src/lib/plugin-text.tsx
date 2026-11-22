@@ -138,10 +138,10 @@ export function PluginIcon({ pluginId, className, tone = "light" }: {
   if (svg) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`} alt="" aria-hidden="true"
-      title={pluginId ? iconNotice(pluginId) : undefined} className={cn("size-8 shrink-0 rounded-md", className)} />;
+      title={pluginId ? iconNotice(pluginId) : undefined} className={cn("size-8 shrink-0 rounded-[25%] ring-1 ring-foreground/10", className)} />;
   }
   return (
-    <span aria-hidden="true" className={cn("grid size-8 shrink-0 place-items-center rounded-md",
+    <span aria-hidden="true" className={cn("grid size-8 shrink-0 place-items-center rounded-[25%]",
       tone === "dark" ? "bg-white/15 text-white" : "bg-muted text-muted-foreground", className)}>
       <Bot className="size-[55%]" />
     </span>
