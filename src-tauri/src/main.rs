@@ -939,6 +939,7 @@ fn main() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(launch_options())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -1141,4 +1142,16 @@ fn main() {
                 app.state::<desktop_job_workers::DesktopJobWorkers>().stop();
             }
         });
+}
+
+/// `ARRUMO_NO_SPLASH=1` skips the launch face, for quicker debugging launches.
+fn launch_options() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    let builder = tauri::plugin::Builder::new("launch-options");
+    if std::env::var_os("ARRUMO_NO_SPLASH").is_some_and(|value| value != "0") {
+        builder
+            .js_init_script("document.documentElement.dataset.noSplash = '';".to_string())
+            .build()
+    } else {
+        builder.build()
+    }
 }

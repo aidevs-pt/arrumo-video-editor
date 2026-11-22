@@ -1,5 +1,7 @@
 "use client";
 
+import { markAppReady } from "@/components/launch-screen";
+
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
@@ -67,6 +69,7 @@ export function WorkspaceRouter({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (status !== "loading") markAppReady(); }, [status]);
 
   function navigate(target: WorkspaceView, profileId?: number) {
     if (workspace) router.push(workspaceHref(target, workspace.id, profileId));

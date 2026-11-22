@@ -6,6 +6,7 @@ import { AppearanceProvider, appearanceScript } from "@/lib/appearance";
 import { LocaleProvider } from "@/lib/locale-provider";
 import { Anybody, Atkinson_Hyperlegible_Next } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { LaunchScreen } from "@/components/launch-screen";
 
 const anybody = Anybody({ subsets: ["latin"], axes: ["wdth"], variable: "--font-anybody" });
 const atkinson = Atkinson_Hyperlegible_Next({ subsets: ["latin"], adjustFontFallback: false, variable: "--font-atkinson" });
@@ -18,8 +19,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={cn("font-sans", anybody.variable, atkinson.variable)} suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: appearanceScript }} /></head>
-      <body><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}><PluginTextProvider>{children}</PluginTextProvider></LocaleProvider></AppearanceProvider></body>
+      <head><script dangerouslySetInnerHTML={{ __html: `${appearanceScript};setTimeout(function(){document.documentElement.dataset.appReady=""},12000)` }} /></head>
+      <body><LaunchScreen /><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}><PluginTextProvider>{children}</PluginTextProvider></LocaleProvider></AppearanceProvider></body>
     </html>
   );
 }

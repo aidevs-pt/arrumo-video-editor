@@ -179,3 +179,63 @@ div.rte-toolbar {
   justify-content: flex-start;
   padding-inline-end: 8rem;
 }
+
+/* Launch face: the parts arrive one by one, the eyebrows lift, the eyes blink while data loads. */
+#arrumo-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: var(--cobalt);
+  transition: opacity 320ms ease, visibility 0s linear 320ms;
+}
+html[data-app-ready] #arrumo-launch,
+html[data-no-splash] #arrumo-launch {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+html[data-no-splash] #arrumo-launch { transition: none; }
+.arrumo-launch-face {
+  width: clamp(5rem, 14vmin, 8rem);
+  fill: var(--on-cobalt);
+  overflow: visible;
+}
+.arrumo-launch-face rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arrumo-part-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.arrumo-launch-face #long-left-eyebrow { animation-delay: 0ms; }
+.arrumo-launch-face #short-right-eyebrow { animation-delay: 60ms; }
+.arrumo-launch-face #left-eye { animation-delay: 120ms; }
+.arrumo-launch-face #right-eye { animation-delay: 180ms; }
+.arrumo-launch-face #long-nose { animation-delay: 240ms; }
+.arrumo-launch-face #left-cheek { animation-delay: 300ms; }
+.arrumo-launch-face #right-cheek { animation-delay: 360ms; }
+.arrumo-launch-face #long-left-eyebrow,
+.arrumo-launch-face #short-right-eyebrow {
+  animation: arrumo-part-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both, arrumo-brow 700ms ease-in-out 800ms both;
+}
+.arrumo-launch-face #left-eye,
+.arrumo-launch-face #right-eye {
+  animation: arrumo-part-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both, arrumo-blink 2.6s ease-in-out 900ms infinite;
+}
+@keyframes arrumo-part-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes arrumo-brow {
+  0%, 100% { transform: none; }
+  40%, 60% { transform: translateY(-14%); }
+}
+@keyframes arrumo-blink {
+  0%, 8%, 100% { transform: none; }
+  4% { transform: scaleY(0.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arrumo-launch-face rect { animation: none !important; }
+}
+html[data-reduce-motion] .arrumo-launch-face rect { animation: none !important; }
+html:not([data-app-ready]):not([data-no-splash]) { overflow: hidden; }

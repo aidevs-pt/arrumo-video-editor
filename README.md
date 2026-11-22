@@ -23,6 +23,8 @@ pnpm install --frozen-lockfile
 pnpm tauri dev
 ```
 
+While the app starts, a cobalt screen animates the face logo; it fades out once the language and workspaces have loaded, and stays still when reduced motion is on. Set `ARRUMO_NO_SPLASH=1` (for example `ARRUMO_NO_SPLASH=1 pnpm tauri dev`) to skip it when debugging.
+
 The first desktop screen creates and lists workspaces. It uses the system language when it is English, Spanish, or Portuguese, with English as the fallback. The app stores `workspaces.sqlite` in its platform-specific local application data directory. The same workspace store powers the CLI.
 
 `pnpm tauri build --debug --no-bundle` builds a native executable from the static frontend. Installers and signing are tracked separately.
