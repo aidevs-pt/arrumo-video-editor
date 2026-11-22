@@ -217,6 +217,9 @@ fn supplemental_prompt(
     )
 }
 
+/// Described references per format, and the image files attached for the agent.
+type ThumbnailReferences = (BTreeMap<i64, Vec<Value>>, Vec<std::path::PathBuf>);
+
 /// The agent's work for this attempt: text entries and thumbnail prompts with their format.
 struct Draft {
     summary: String,
@@ -512,7 +515,7 @@ impl WorkspaceStore {
         snapshot: &Value,
         requests: &BTreeMap<i64, OutputRequest>,
         show_in: Option<&Path>,
-    ) -> Result<(BTreeMap<i64, Vec<Value>>, Vec<std::path::PathBuf>), Box<dyn Error>> {
+    ) -> Result<ThumbnailReferences, Box<dyn Error>> {
         let root = crate::asset_root(database);
         let mut references = BTreeMap::new();
         let mut attached: BTreeMap<i64, (usize, std::path::PathBuf)> = BTreeMap::new();
