@@ -472,7 +472,9 @@ impl WorkspaceStore {
                     format.scale_preview(preview_max_edge);
                 }
                 if let Some(scenes) = &scenes {
-                    renderer.render_scenes(&root, &scratch, scenes, &narration, &format)?;
+                    let check =
+                        renderer.render_scenes(&root, &scratch, scenes, &narration, &format)?;
+                    checks.insert(format.id.to_string(), check.to_json());
                     if stage == ProductionStage::FinalRender {
                         // Storyboards have no speech to transcribe; caption their on-screen text.
                         fs::write(
@@ -735,7 +737,7 @@ impl ActiveRender<'_> {
         scenes: &[MotionSpec],
         narration: &[NarrationTrack],
         format: &Dimensions,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<RenderCheck, Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
         fs::create_dir(&directory)?;
         let images = |id: i64| asset_path(root, self.workspace_id, id).canonicalize().ok();
@@ -751,6 +753,7 @@ impl ActiveRender<'_> {
             Ok(())
         };
         let mut manifest = String::new();
+        let mut parts = Vec::with_capacity(scenes.len());
         for (index, scene) in scenes.iter().enumerate() {
             let name = format!("scene-{index}.mp4");
             render_spec_with_audio(
@@ -762,6 +765,7 @@ impl ActiveRender<'_> {
                 narration.get(index).and_then(|(audio, _)| audio.as_deref()),
                 &mut check,
             )?;
+            parts.push(probe_duration(&directory.join(&name))?);
             manifest.push_str(&format!("file {name}\n"));
         }
         fs::write(directory.join("scenes.ffconcat"), manifest)?;
@@ -789,7 +793,9 @@ impl ActiveRender<'_> {
         .chain([output.to_string_lossy().into_owned()])
         .collect();
         run_ffmpeg(&directory, &args, &mut check)?;
-        self.master_audio(&output, &scratch.join(format!("{}.mp4", format.id)))
+        let finished = scratch.join(format!("{}.mp4", format.id));
+        self.master_audio(&output, &finished)?;
+        self.check_render(&finished, &parts)
     }
 
     fn inspect_clips(
