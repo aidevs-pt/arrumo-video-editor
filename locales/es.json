@@ -85,7 +85,8 @@
     },
     "cues": "{count} subtítulos",
     "hook": {
-      "video-completed": "También se ejecuta sola al terminar un vídeo, mientras «{setting}» esté activado en los ajustes de este complemento."
+      "video-completed": "También se ejecuta sola al terminar un vídeo, mientras «{setting}» esté activado en los ajustes de este complemento.",
+      "generation-failed": "También se ejecuta sola cuando falla una generación, mientras «{setting}» esté activado en los ajustes de este complemento."
     }
   },
   "pluginGrants": {
@@ -1461,7 +1462,7 @@
     "plugins": "Complementos, {current} de {total}"
   },
   "runHooks": {
-    "title": "Al terminar este vídeo",
-    "description": "Las acciones de complementos activadas en este espacio de trabajo se ejecutan solas. Desactiva una para omitirla solo en este vídeo."
+    "title": "Complementos que se ejecutan solos",
+    "description": "Las acciones de complementos activadas en este espacio de trabajo se ejecutan al terminar este vídeo o si falla su generación. Desactiva una para omitirla solo en este vídeo."
   }
 }

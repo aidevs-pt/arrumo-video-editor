@@ -85,7 +85,8 @@
     },
     "cues": "{count} cues",
     "hook": {
-      "video-completed": "Also runs on its own when a video finishes, while “{setting}” is on in this plugin’s settings."
+      "video-completed": "Also runs on its own when a video finishes, while “{setting}” is on in this plugin’s settings.",
+      "generation-failed": "Also runs on its own when a generation fails, while “{setting}” is on in this plugin’s settings."
     }
   },
   "pluginGrants": {
@@ -1461,7 +1462,7 @@
     "plugins": "Plugins, {current} of {total}"
   },
   "runHooks": {
-    "title": "When this video finishes",
-    "description": "Plugin actions switched on for this workspace run on their own. Turn one off to skip it for this video only."
+    "title": "Plugins that run on their own",
+    "description": "Plugin actions switched on for this workspace run when this video finishes or if its generation fails. Turn one off to skip it for this video only."
   }
 }

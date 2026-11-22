@@ -15,6 +15,62 @@ impl WorkspaceStore {
     /// Queues every switched-on `video-completed` hook for a run that has just completed.
     /// Returns how many hook jobs exist for the run afterwards.
     pub fn queue_video_completed_hooks(&self, workspace_id: i64, run_id: i64) -> usize {
+        self.queue_run_hooks(workspace_id, run_id, HookEvent::VideoCompleted, "", || {
+            self.video_completed_event(workspace_id, run_id)
+        })
+    }
+
+    /// Queues every switched-on `generation-failed` hook for an attempt that has just failed.
+    /// A retried run that fails again is a new event.
+    pub fn queue_generation_failed_hooks(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        problem: &str,
+    ) -> usize {
+        self.queue_run_hooks(
+            workspace_id,
+            run_id,
+            HookEvent::GenerationFailed,
+            &attempt.to_string(),
+            || {
+                let title: Option<String> = self
+                    .0
+                    .query_row(
+                        "SELECT COALESCE(display_title, json_extract(snapshot_json, '$.draft.title'))
+                         FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+                        [workspace_id, run_id],
+                        |row| row.get(0),
+                    )
+                    .ok()?;
+                let profile: Option<String> = self
+                    .0
+                    .query_row(
+                        "SELECT json_extract(snapshot_json, '$.profile.name') FROM generation_runs
+                         WHERE workspace_id = ?1 AND id = ?2",
+                        [workspace_id, run_id],
+                        |row| row.get(0),
+                    )
+                    .ok()?;
+                let problem: String = problem.chars().take(2000).collect();
+                Some(json!({
+                    "event": "generation-failed",
+                    "video": {"runId": run_id, "title": title, "profile": profile,
+                        "attempt": attempt, "problem": problem},
+                }))
+            },
+        )
+    }
+
+    fn queue_run_hooks(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        event: HookEvent,
+        occurrence: &str,
+        input: impl Fn() -> Option<Value>,
+    ) -> usize {
         let Ok(actions) = self.plugin_actions() else {
             return 0;
         };
@@ -30,22 +86,30 @@ impl WorkspaceStore {
             .flatten()
             .and_then(|value| serde_json::from_str(&value).ok())
             .unwrap_or_default();
+        let mut event_input = None;
         let mut queued = 0;
         for entry in actions {
             if skipped.contains(&format!("{}/{}", entry.plugin_id, entry.action.id)) {
                 continue;
             }
             if !entry.action.hooks.iter().any(|hook| {
-                hook.event == HookEvent::VideoCompleted
+                hook.event == event
                     && self.hook_switched_on(&entry.plugin_id, workspace_id, &hook.enabled_by)
             }) {
                 continue;
             }
-            let Some(input) = self.video_completed_event(workspace_id, run_id) else {
+            if event_input.is_none() {
+                event_input = input();
+            }
+            let Some(input) = event_input.clone() else {
                 return queued;
             };
+            let mut key = format!("{}\0{workspace_id}\0{run_id}", event.name());
+            if !occurrence.is_empty() {
+                key = format!("{key}\0{occurrence}");
+            }
             let request = PluginActionJobRequest {
-                id: hook_job_id(workspace_id, run_id, &entry.plugin_id, &entry.action.id),
+                id: hook_job_id(&key, &entry.plugin_id, &entry.action.id),
                 workspace_id: Some(workspace_id),
                 plugin_id: entry.plugin_id,
                 action_id: entry.action.id,
@@ -112,10 +176,8 @@ fn envelope_len(input: &Value) -> usize {
     serde_json::to_vec(input).map_or(usize::MAX, |bytes| bytes.len() + 128)
 }
 
-fn hook_job_id(workspace_id: i64, run_id: i64, plugin_id: &str, action_id: &str) -> String {
-    let digest = Sha256::digest(
-        format!("video-completed\0{workspace_id}\0{run_id}\0{plugin_id}\0{action_id}").as_bytes(),
-    );
+fn hook_job_id(occurrence: &str, plugin_id: &str, action_id: &str) -> String {
+    let digest = Sha256::digest(format!("{occurrence}\0{plugin_id}\0{action_id}").as_bytes());
     let mut bytes: [u8; 16] = digest[..16]
         .try_into()
         .expect("a SHA-256 digest has 32 bytes");
@@ -130,19 +192,23 @@ mod tests {
     use super::*;
 
     fn hook_plugin() -> Vec<u8> {
+        hook_plugin_for("video-completed")
+    }
+
+    fn hook_plugin_for(event: &str) -> Vec<u8> {
         use std::io::{Cursor, Write};
         let mut package = zip::ZipWriter::new(Cursor::new(Vec::new()));
         let options = zip::write::SimpleFileOptions::default();
         package.start_file("manifest.json", options).unwrap();
-        package.write_all(br#"{
+        package.write_all(r#"{
             "schemaVersion": 9, "id": "fixture-hooks", "name": "Fixture", "description": "Fixture",
             "capabilities": {"actions": {"name": "Actions", "description": "Fixture"}},
             "settings": [{"id": "auto-upload", "label": "Upload when ready", "description": "Fixture",
                           "kind": "boolean", "scope": "workspace", "required": false}],
             "code": {"backend": {"component": "backend/echo.wasm"}},
             "actions": [{"id": "upload", "label": "Upload", "description": "Fixture", "scope": "workspace",
-                         "hooks": [{"event": "video-completed", "enabledBy": "auto-upload"}]}]
-        }"#).unwrap();
+                         "hooks": [{"event": "EVENT", "enabledBy": "auto-upload"}]}]
+        }"#.replace("EVENT", event).as_bytes()).unwrap();
         package.start_file("backend/echo.wasm", options).unwrap();
         package
             .write_all(&wat::parse_str(crate::plugin_runtime::tests::ECHO).unwrap())
@@ -260,11 +326,83 @@ mod tests {
     }
 
     #[test]
+    fn each_failed_attempt_runs_failure_hooks_once() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Launch".into(),
+                    intent: "Fixture".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "fixture",
+                &crate::RunOptions::default(),
+            )
+            .unwrap()
+            .id;
+        store
+            .install_plugin_zip(hook_plugin_for("generation-failed").as_slice())
+            .unwrap();
+        store
+            .set_plugin_setting(
+                "fixture-hooks",
+                "auto-upload",
+                Some(workspace),
+                Some(&Value::Bool(true)),
+            )
+            .unwrap();
+        assert_eq!(store.queue_video_completed_hooks(workspace, run), 0);
+        assert_eq!(
+            store.queue_generation_failed_hooks(workspace, run, 1, "Agent stopped"),
+            1
+        );
+        assert_eq!(
+            store.queue_generation_failed_hooks(workspace, run, 1, "Agent stopped"),
+            1
+        );
+        assert_eq!(
+            store.queue_generation_failed_hooks(workspace, run, 2, "Again"),
+            1
+        );
+        assert_eq!(
+            store
+                .list_plugin_action_jobs(Some(workspace))
+                .unwrap()
+                .len(),
+            2
+        );
+        let job = store.process_next_plugin_action_job().unwrap().unwrap();
+        let input = &serde_json::to_value(&job).unwrap()["result"]["input"];
+        assert_eq!(input["event"], "generation-failed");
+        assert_eq!(input["video"]["title"], "Launch");
+        assert_eq!(input["video"]["attempt"], 1);
+        assert_eq!(input["video"]["problem"], "Agent stopped");
+    }
+
+    #[test]
     fn hook_jobs_have_one_stable_id_per_event_and_action() {
-        let id = hook_job_id(1, 3, "pt.aidevs.example", "upload");
-        assert_eq!(id, hook_job_id(1, 3, "pt.aidevs.example", "upload"));
-        assert_ne!(id, hook_job_id(1, 4, "pt.aidevs.example", "upload"));
-        assert_ne!(id, hook_job_id(1, 3, "pt.aidevs.example", "publish"));
+        let id = hook_job_id("video-completed\x001\x003", "pt.aidevs.example", "upload");
+        assert_eq!(
+            id,
+            hook_job_id("video-completed\x001\x003", "pt.aidevs.example", "upload")
+        );
+        assert_ne!(
+            id,
+            hook_job_id("video-completed\x001\x004", "pt.aidevs.example", "upload")
+        );
+        assert_ne!(
+            id,
+            hook_job_id("video-completed\x001\x003", "pt.aidevs.example", "publish")
+        );
         assert_eq!(id.parse::<Uuid>().unwrap().get_version_num(), 5);
     }
 }

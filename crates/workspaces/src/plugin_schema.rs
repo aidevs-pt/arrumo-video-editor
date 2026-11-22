@@ -138,6 +138,18 @@ pub enum HookEvent {
     /// A video finished and its delivery files were verified. The action receives
     /// `{"event": "video-completed", "video": {…}}` instead of form inputs.
     VideoCompleted,
+    /// A generation attempt failed. The action receives `{"event": "generation-failed",
+    /// "video": {"runId", "title", "profile", "attempt", "problem"}}`.
+    GenerationFailed,
+}
+
+impl HookEvent {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::VideoCompleted => "video-completed",
+            Self::GenerationFailed => "generation-failed",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -164,6 +164,7 @@ impl WorkspaceStore {
             params![run_id, detail],
         )?;
         tx.commit()?;
+        self.queue_generation_failed_hooks(workspace_id, run_id, attempt, detail);
         Ok(run)
     }
 
