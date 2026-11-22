@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { Sparkles, WandSparkles } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -107,9 +107,13 @@ export function MotionPromptBar<Item>({ workspaceId, profileId, disabled, onCrea
     return () => { active = false; };
   }, [workspaceId]);
 
+  const [missing, setMissing] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+
   async function generate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!request.trim() || working) return;
+    if (working) return;
+    if (!request.trim()) { setMissing(true); field.current?.focus(); return; }
     setWorking(true);
     setFailure(undefined);
     try {
@@ -124,16 +128,19 @@ export function MotionPromptBar<Item>({ workspaceId, profileId, disabled, onCrea
 
   return (
     <div className="flex flex-col gap-2">
-      <form onSubmit={generate} aria-busy={working}
-        className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-primary/25 bg-card p-2 ps-4 focus-within:border-primary/60">
-        <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
-        <Input value={request} onChange={(event) => setRequest(event.target.value)} maxLength={4000} disabled={disabled || working}
-          aria-label={copy.request} placeholder={copy.barPlaceholder}
-          className="h-10 min-w-48 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent" />
-        <Button type="submit" disabled={disabled || working || !request.trim()} className="max-sm:w-full">
+      <form onSubmit={generate} aria-busy={working} noValidate
+        className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/25 bg-card p-2 focus-within:border-primary/60">
+        <div className="relative min-w-48 flex-1">
+          <Sparkles className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-primary" aria-hidden="true" />
+          <Input ref={field} value={request} onChange={(event) => { setRequest(event.target.value); setMissing(false); }} maxLength={4000} disabled={disabled || working}
+            aria-label={copy.request} placeholder={copy.barPlaceholder} aria-invalid={missing || undefined} aria-describedby={missing ? "motion-request-missing" : undefined}
+            className="h-10 cursor-text bg-background ps-9" />
+        </div>
+        <Button type="submit" disabled={disabled || working} className="max-sm:w-full">
           {working ? copy.generatingShort : agent ? copy.makeWith.replace("{agent}", agent) : copy.generateSubmit}
         </Button>
       </form>
+      {missing && <p id="motion-request-missing" role="alert" className="text-sm font-semibold text-destructive">{copy.requestMissing}</p>}
       {working && <p role="status" className="text-sm text-muted-foreground">{copy.generating}</p>}
       {failure && <Alert variant="destructive"><AlertDescription>{copy.generateErrors[failure]}</AlertDescription></Alert>}
     </div>

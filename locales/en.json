@@ -476,7 +476,8 @@
     "emptyGenerate": "Describe one above, or add a video you already have.",
     "showDetails": "Show details",
     "barPlaceholder": "Describe an animation, like a “like” thumb that bounces in from the bottom right",
-    "makeWith": "Make it with {agent}"
+    "makeWith": "Make it with {agent}",
+    "requestMissing": "Describe the animation first, then make it."
   },
   "assets": {
     "replaceFile": "Replace file",

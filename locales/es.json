@@ -476,7 +476,8 @@
     "emptyGenerate": "Describe una arriba o añade un vídeo que ya tengas.",
     "showDetails": "Ver detalles",
     "barPlaceholder": "Describe una animación, como un pulgar de “me gusta” que entra rebotando por abajo a la derecha",
-    "makeWith": "Hacerla con {agent}"
+    "makeWith": "Hacerla con {agent}",
+    "requestMissing": "Describe primero la animación y luego créala."
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",

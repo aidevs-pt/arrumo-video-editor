@@ -476,7 +476,8 @@
     "emptyGenerate": "Descreve uma acima ou adiciona um vídeo que já tenhas.",
     "showDetails": "Ver detalhes",
     "barPlaceholder": "Descreve uma animação, como um polegar de “gosto” que entra a saltar no canto inferior direito",
-    "makeWith": "Fazer com {agent}"
+    "makeWith": "Fazer com {agent}",
+    "requestMissing": "Descreve primeiro a animação e depois cria-a."
   },
   "assets": {
     "replaceFile": "Substituir ficheiro",
