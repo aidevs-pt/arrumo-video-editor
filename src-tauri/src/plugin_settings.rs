@@ -16,6 +16,38 @@ pub fn list_plugin_catalog(store: State<'_, Store>) -> Result<Vec<CatalogPlugin>
 }
 
 #[tauri::command]
+pub fn pending_plugin_tour(
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::TourStop>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .pending_plugin_tour()
+        .map_err(|_| "plugin_tour_failed")
+}
+
+#[tauri::command]
+pub fn plugin_tour(
+    ids: Vec<String>,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::TourStop>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .plugin_tour(&ids)
+        .map_err(|_| "plugin_tour_failed")
+}
+
+#[tauri::command]
+pub fn finish_plugin_tour(ids: Vec<String>, store: State<'_, Store>) -> Result<(), &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .mark_plugins_introduced(&ids)
+        .map_err(|_| "plugin_tour_failed")
+}
+
+#[tauri::command]
 pub async fn import_plugin_package(
     app: AppHandle,
     picker_title: String,

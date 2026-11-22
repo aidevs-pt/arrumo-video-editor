@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { FileArchive, PackagePlus } from "lucide-react";
+import { FileArchive, PackagePlus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginSurfaces } from "@/components/workspace/plugins/plugin-surfaces";
+import { announcePluginChanges, replayPluginTour } from "@/components/workspace/plugins/plugin-tour";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginRegistryBrowser } from "./plugin-registry-browser";
 import type { PluginSettingsManifest } from "./plugin-preferences";
@@ -27,7 +28,7 @@ type Plugin = {
 };
 
 export function PluginCatalog() {
-  const { messages: { pluginCatalog: copy, workspaces: workspaceCopy } } = useLocale();
+  const { messages: { pluginCatalog: copy, workspaces: workspaceCopy, pluginTour: tourCopy } } = useLocale();
   const [plugins, setPlugins] = useState<Plugin[]>();
   const [error, setError] = useState<"loadError" | "importError" | "removeError">();
   const [notice, setNotice] = useState<"imported" | "removed">();
@@ -53,6 +54,7 @@ export function PluginCatalog() {
       if (plugin) {
         await load();
         setNotice("imported");
+        announcePluginChanges();
       }
     } catch {
       setError("importError");
@@ -84,9 +86,10 @@ export function PluginCatalog() {
           <CardDescription>{copy.description}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="self-start" disabled={pending || !plugins}>
+              <Button variant="outline" disabled={pending || !plugins}>
                 <PackagePlus data-icon="inline-start" />
                 {copy.import}
               </Button>
@@ -102,6 +105,11 @@ export function PluginCatalog() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          <Button variant="ghost" onClick={() => replayPluginTour()} disabled={!plugins}>
+            <Sparkles data-icon="inline-start" />
+            {tourCopy.replay}
+          </Button>
+          </div>
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{copy[error]}</AlertDescription>
@@ -146,7 +154,7 @@ export function PluginCatalog() {
               ))}
             </ul>
           )}
-          {plugins && <PluginRegistryBrowser installedIds={plugins.map(({ manifest }) => manifest.id)} onInstalled={load} />}
+          {plugins && <PluginRegistryBrowser installedIds={plugins.map(({ manifest }) => manifest.id)} onInstalled={async () => { await load(); announcePluginChanges(); }} />}
         </CardContent>
       </Card>
       {plugins && <PluginActions workspaceId={null}

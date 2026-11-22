@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 7] = [1, 2, 3, 4, 5, 6, 7];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -45,6 +45,38 @@ pub struct PluginManifest {
         skip_serializing_if = "Option::is_none"
     )]
     pub agent_provider: Option<ProviderDescriptor>,
+    /// What the plugin adds, shown once in the plugin tour after it arrives (schema 8).
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub introduction: Option<PluginIntroduction>,
+}
+
+/// Text in the app's languages, keyed `en`, `es` and `pt`; English is required and used when a
+/// translation is missing.
+pub type LocalizedText = BTreeMap<String, String>;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PluginIntroduction {
+    pub headline: LocalizedText,
+    pub body: LocalizedText,
+}
+
+impl PluginIntroduction {
+    fn valid(&self) -> bool {
+        let text = |map: &LocalizedText, limit: usize| {
+            map.contains_key("en")
+                && map.iter().all(|(language, value)| {
+                    matches!(language.as_str(), "en" | "es" | "pt")
+                        && !blank(value)
+                        && value.chars().count() <= limit
+                })
+        };
+        text(&self.headline, 80) && text(&self.body, 320)
+    }
 }
 
 pub(crate) fn deserialize_present<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
@@ -336,6 +368,13 @@ impl PluginManifest {
         }
         if !identifier(&manifest.id) || blank(&manifest.name) || blank(&manifest.description) {
             return Err(invalid_manifest("Invalid plugin identity").into());
+        }
+        if manifest
+            .introduction
+            .as_ref()
+            .is_some_and(|introduction| manifest.schema_version < 8 || !introduction.valid())
+        {
+            return Err(invalid_manifest("Invalid plugin introduction").into());
         }
         if manifest.capabilities.is_empty()
             || manifest.capabilities.iter().any(|(id, capability)| {

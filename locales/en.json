@@ -1397,5 +1397,15 @@
       "backup_newer": "This backup needs a newer version of Arrumo. Update Arrumo, then try again.",
       "backup_import_failed": "Could not read the backup. Check there is free space and try again."
     }
+  },
+  "pluginTour": {
+    "newPlugins": "New plugins, {current} of {total}",
+    "newPlugin": "New plugin",
+    "skip": "Skip the tour",
+    "next": "Next: {name}",
+    "done": "Done",
+    "close": "Close the tour",
+    "replay": "Take the plugin tour",
+    "plugins": "Plugins, {current} of {total}"
   }
 }

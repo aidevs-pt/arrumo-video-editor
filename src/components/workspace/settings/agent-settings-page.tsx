@@ -121,8 +121,8 @@ export function AgentSettingsPage() {
               </Button>}
               {tab === "plugins" && !requested && <PluginCatalog />}
               {tab === "services" && (requested === null || workspace) && <ScopedPluginPreferences key={workspace?.id ?? "app"} workspaceId={workspace?.id ?? null} />}
-              {workspace && tab === "plugins" && <PluginGrants key={workspace.id} workspace={workspace} />}
-              {workspace && tab === "plugins" && <PluginActions key={workspace.id} workspaceId={workspace.id} />}
+              {workspace && tab === "plugins" && <PluginGrants key={`grants:${workspace.id}`} workspace={workspace} />}
+              {workspace && tab === "plugins" && <PluginActions key={`actions:${workspace.id}`} workspaceId={workspace.id} />}
             </div>
           )}
       </div>

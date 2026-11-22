@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { PluginTourHost } from "@/components/workspace/plugins/plugin-tour";
 import { CalendarDays, Check, ChevronDown, Film, FolderCog, House, Images, Plus, Puzzle, Settings2, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -30,7 +31,7 @@ export function WorkspaceFrame(props: {
   return (
     <TooltipProvider delayDuration={250}>
       <SidebarProvider style={{ "--sidebar-width": "15.5rem" } as CSSProperties}>
-        <StudioTrailProvider><StudioLayout {...props} /></StudioTrailProvider>
+        <StudioTrailProvider><StudioLayout {...props} /><PluginTourHost /></StudioTrailProvider>
       </SidebarProvider>
     </TooltipProvider>
   );

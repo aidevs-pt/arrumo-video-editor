@@ -1,3 +1,4 @@
+//! App-wide operations: full backups, privacy choices and the plugin tour.
 use std::path::Path;
 
 use serde::Deserialize;
@@ -19,6 +20,21 @@ fn absolute(arguments: &Map<String, Value>) -> Result<String, &'static str> {
     } else {
         Err("Expected an absolute local path")
     }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TourInput {
+    #[serde(deserialize_with = "bounded_ids")]
+    plugin_ids: Vec<String>,
+}
+
+fn bounded_ids<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+    let ids = Vec::<String>::deserialize(deserializer)?;
+    if ids.len() > 64 || ids.iter().any(|id| !(1..=128).contains(&id.len())) {
+        return Err(serde::de::Error::custom("too many or invalid plugin ids"));
+    }
+    Ok(ids)
 }
 
 #[derive(Deserialize)]
@@ -46,6 +62,13 @@ pub(super) fn definitions() -> Vec<Value> {
         json!({"name": "set_privacy_settings", "description": "Allow or stop anonymous usage counts and crash reports.",
             "inputSchema": {"type": "object", "properties": {"usageData": {"type": "boolean"}, "crashReports": {"type": "boolean"}},
                 "required": ["usageData", "crashReports"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "get_plugin_tour", "description": "List the plugin introductions the creator has not seen yet (pending), or every plugin's introduction (all).",
+            "inputSchema": {"type": "object", "properties": {"all": {"type": "boolean"}}, "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "finish_plugin_tour", "description": "Record that the creator has seen these plugins' introductions.",
+            "inputSchema": {"type": "object", "properties": {"pluginIds": {"type": "array", "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 128}}},
+                "required": ["pluginIds"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
         json!({"name": "cancel_backup_import", "description": "Discard a staged backup so nothing is replaced at the next start.",
             "inputSchema": none, "annotations": {"idempotentHint": true}}),
@@ -81,6 +104,25 @@ pub(super) fn call(
         "cancel_backup_import" if arguments.is_empty() => crate::cancel_backup_import(database)
             .map(|()| json!({"pending": false}))
             .map_err(|_| "Could not cancel the staged backup"),
+        "get_plugin_tour" => {
+            let all = match arguments.get("all") {
+                None => false,
+                Some(Value::Bool(all)) if arguments.len() == 1 => *all,
+                _ => return Some(Err("Expected an optional all boolean")),
+            };
+            let stops = if all { store.plugin_tour(&[]) } else { store.pending_plugin_tour() };
+            stops
+                .map(|stops| json!({"plugins": stops}))
+                .map_err(|_| "Could not read the plugin tour")
+        }
+        "finish_plugin_tour" => serde_json::from_value::<TourInput>(Value::Object(arguments.clone()))
+            .map_err(|_| "Expected pluginIds")
+            .and_then(|input| {
+                store
+                    .mark_plugins_introduced(&input.plugin_ids)
+                    .map(|()| json!({"finished": input.plugin_ids.len()}))
+                    .map_err(|_| "Could not save the plugin tour")
+            }),
         "get_privacy_settings" if arguments.is_empty() => store
             .privacy_settings()
             .map(|settings| json!({"privacy": settings}))

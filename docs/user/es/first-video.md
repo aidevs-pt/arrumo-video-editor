@@ -45,3 +45,7 @@ Para restaurar, elige una copia en el mismo sitio. Arrumo comprueba primero cada
 ## Datos y privacidad
 
 Arrumo cuenta qué funciones se usan e informa de los errores, para saber qué mejorar. Ambas opciones están activadas por defecto y se pueden desactivar en **Ajustes › General › Datos y privacidad**. Van ligadas a un identificador aleatorio de esta instalación, nunca a ti, y nunca incluyen tus vídeos, archivos, textos ni claves. Las compilaciones que haces tú no envían nada.
+
+## Complementos nuevos
+
+Cuando llegan complementos, desde un ZIP, el registro o una actualización de Arrumo, Arrumo los presenta en un recorrido breve, una página por complemento. Puedes saltarlo cuando quieras; **Ajustes › Plugins › Ver el recorrido de complementos** vuelve a mostrar la presentación de cada uno.

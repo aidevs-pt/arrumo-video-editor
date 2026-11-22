@@ -69,6 +69,11 @@ newer Arrumo are refused. MCP and A2A expose `export_backup`, `verify_backup`,
 `stage_backup_import`, `get_backup_import_status` and `cancel_backup_import`.
 In the app this is **Settings › Import and export**.
 
+Plugins introduce themselves through the optional `introduction` in their
+manifest (schema 8). Plugins that arrive after the first launch are shown once
+in a shared tour; the first check records everything already present as seen.
+MCP and A2A expose `get_plugin_tour` and `finish_plugin_tour`.
+
 Anonymous usage counts and crash reports are provider-neutral (`crates/workspaces/src/telemetry.rs`)
 and on by default, with switches in **Settings › General › Data and privacy**
 (`get_privacy_settings`/`set_privacy_settings` over MCP and A2A). Builds only

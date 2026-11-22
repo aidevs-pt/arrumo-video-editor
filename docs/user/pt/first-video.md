@@ -45,3 +45,7 @@ Para restaurar, escolhe uma cópia no mesmo sítio. O Arrumo verifica primeiro c
 ## Dados e privacidade
 
 O Arrumo conta que funcionalidades são usadas e reporta erros, para saber o que melhorar. Ambas as opções estão ativas por omissão e podem ser desligadas em **Definições › Geral › Dados e privacidade**. Estão ligadas a um identificador aleatório desta instalação, nunca a ti, e nunca incluem os teus vídeos, ficheiros, textos ou chaves. As compilações que fazes tu não enviam nada.
+
+## Plugins novos
+
+Quando chegam plugins, de um ZIP, do registo ou de uma atualização do Arrumo, o Arrumo apresenta-os numa visita curta, uma página por plugin. Podes saltá-la quando quiseres; **Definições › Plugins › Ver a visita aos plugins** volta a mostrar a apresentação de cada um.

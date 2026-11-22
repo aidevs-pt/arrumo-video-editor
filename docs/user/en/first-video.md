@@ -45,3 +45,7 @@ To restore, choose a backup in the same place. Arrumo checks every file against 
 ## Data and privacy
 
 Arrumo counts which features are used and reports crashes, to learn what to improve. Both are on by default and can be turned off in **Settings › General › Data and privacy**. They are tied to a random ID for this install, never to you, and never include your videos, files, text or keys. Builds you compile yourself send nothing.
+
+## New plugins
+
+When plugins arrive, from a ZIP, the registry or an Arrumo update, Arrumo introduces them in a short tour, one page each. Skip it whenever you like; **Settings › Plugins › Take the plugin tour** shows every plugin's introduction again.

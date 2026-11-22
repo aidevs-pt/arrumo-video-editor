@@ -58,6 +58,7 @@ mod plugin_runtime;
 mod plugin_schema;
 mod plugin_settings;
 mod plugin_surfaces;
+mod plugin_tour;
 mod portrait_cuts;
 mod preview_edit;
 mod preview_review;
@@ -136,6 +137,7 @@ pub use plugin_schema::{
 };
 pub use plugin_settings::ResolvedPluginSetting;
 pub use plugin_surfaces::InstalledPluginSurface;
+pub use plugin_tour::TourStop;
 pub use preview_review::{PreviewFormatDecision, PreviewReplacement, PreviewRevisionRequest};
 pub use preview_settings::PreviewSettings;
 pub use production_progress::{ProductionProgress, ProductionResult, ReviewDecision};
@@ -239,6 +241,7 @@ impl WorkspaceStore {
             include_str!("../migrations/055-generated-assets.sql"),
             include_str!("../migrations/056-footage-assets.sql"),
             include_str!("../migrations/057-privacy-settings.sql"),
+            include_str!("../migrations/058-plugin-tour.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

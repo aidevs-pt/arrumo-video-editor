@@ -1397,5 +1397,15 @@
       "backup_newer": "Esta copia necesita una versión más reciente de Arrumo. Actualiza Arrumo e inténtalo de nuevo.",
       "backup_import_failed": "No se pudo leer la copia. Comprueba que hay espacio libre e inténtalo de nuevo."
     }
+  },
+  "pluginTour": {
+    "newPlugins": "Complementos nuevos, {current} de {total}",
+    "newPlugin": "Complemento nuevo",
+    "skip": "Saltar el recorrido",
+    "next": "Siguiente: {name}",
+    "done": "Hecho",
+    "close": "Cerrar el recorrido",
+    "replay": "Ver el recorrido de complementos",
+    "plugins": "Complementos, {current} de {total}"
   }
 }
