@@ -868,7 +868,6 @@
     "detachAttachmentDescription": "O ficheiro será removido desta entrega e do respetivo ZIP. Continuará nos recursos do espaço de trabalho.",
     "detachAttachmentError": "Não foi possível remover o ficheiro. Tente novamente.",
     "scheduleDate": "Data agendada",
-    "saveDate": "Guardar data",
     "clearDate": "Limpar data",
     "dateSaved": "Data guardada.",
     "dateError": "Não foi possível guardar a data.",

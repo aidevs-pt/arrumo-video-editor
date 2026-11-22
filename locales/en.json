@@ -868,7 +868,6 @@
     "detachAttachmentDescription": "The file will leave this delivery and its ZIP export. It will stay in workspace Assets.",
     "detachAttachmentError": "Could not detach the file. Try again.",
     "scheduleDate": "Schedule date",
-    "saveDate": "Save date",
     "clearDate": "Clear date",
     "dateSaved": "Date saved.",
     "dateError": "Could not save the date.",
