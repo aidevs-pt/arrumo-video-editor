@@ -285,8 +285,9 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                             <span className="truncate" title={asset.name}>{asset.name}</span>
                             {!asset.notes.trim() && <TriangleAlert className="ms-auto size-3.5 shrink-0 text-[oklch(55%_.14_70)]" aria-label={copy.noContext} />}
                           </span>
-                          {(organization?.labels.length ?? 0) > 0 && <span className="truncate px-1">
-                            <span className="rounded-[4px] bg-secondary px-1.5 py-0.5 text-xs font-semibold">{organization?.labels.join(", ")}</span>
+                          {(organization?.labels.length ?? 0) > 0 && <span className="flex flex-wrap gap-1 px-1">
+                            {organization?.labels.map((label) => <span key={label}
+                              className="max-w-full truncate rounded-[4px] bg-secondary px-1.5 py-0.5 text-xs font-semibold">{label}</span>)}
                           </span>}
                         </div>
                       </li>

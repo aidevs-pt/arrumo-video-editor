@@ -8,9 +8,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
+import { TagInput } from "@/components/ui/tag-input";
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { RunProviders } from "@/components/workspace/generation/run-providers";
 import { profileHref, workspaceHref } from "@/components/workspace/home/workspace-links";
@@ -61,6 +61,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
   const [pending, setPending] = useState<"saving" | "generating" | null>(null);
   const [message, setMessage] = useState<"saved" | "saveError" | "generateError" | "needsTitle" | "needsContent" | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<string[]>([]);
   const [queue, setQueue] = useState<SavedDraft[]>([]);
   const plan = useDeliveryPlan(workspaceId, draft.profile_id);
   const profile = profiles.find((entry) => entry.id === draft.profile_id);
@@ -193,7 +194,9 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
                 <FieldLabel htmlFor="run-platform" className="text-base">{copy.publishTo}</FieldLabel>
                 <LayerGauge layer="video" />
               </div>
-              <Input id="run-platform" name="platform" placeholder={copy.publishPlaceholder} />
+              <TagInput id="run-platform" name="platform" value={platforms} onChange={setPlatforms}
+                placeholder={copy.publishPlaceholder} removeLabel={copy.removePlatform}
+                suggestions={["YouTube", "YouTube Shorts", "TikTok", "Instagram Reels", "LinkedIn", "X", "Facebook"]} />
               <FieldDescription>{copy.publishHint}</FieldDescription>
             </Field>
             <Collapsible className="rounded-xl border bg-card">

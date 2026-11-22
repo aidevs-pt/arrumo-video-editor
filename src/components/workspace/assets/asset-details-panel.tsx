@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { useLocale } from "@/lib/locale-provider";
+import { TagInput } from "@/components/ui/tag-input";
 import { cn } from "@/lib/utils";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
 import { AssetThumbnail } from "./asset-thumbnail";
@@ -20,10 +21,6 @@ import type { Asset, AssetOrganization } from "./workspace-assets";
 type Profile = { id: number; name: string };
 type Format = { id: number; name: string; width: number; height: number };
 type Share = { profile_id: number; format_id: number | null };
-
-function splitLabels(value: string) {
-  return value.split(",").map((label) => label.trim()).filter(Boolean);
-}
 
 /** Describes, organizes and shares one asset or several at once; nothing is written until Save. */
 export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose, onSaved, onReplaced, onRemoved }: {
@@ -41,7 +38,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const [notes, setNotes] = useState(single?.notes ?? "");
   const [replaceNotes, setReplaceNotes] = useState(single !== null);
   const [group, setGroup] = useState(single ? organizations[single.id]?.group ?? "" : "");
-  const [labels, setLabels] = useState(single ? (organizations[single.id]?.labels ?? []).join(", ") : "");
+  const [labels, setLabels] = useState<string[]>(single ? organizations[single.id]?.labels ?? [] : []);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileId, setProfileId] = useState("");
   const [formats, setFormats] = useState<Format[]>([]);
@@ -79,7 +76,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
       const organization: Record<number, AssetOrganization> = {};
       for (const asset of assets) {
         const current = organizations[asset.id] ?? { group: null, labels: [] };
-        const entered = splitLabels(labels);
+        const entered = labels;
         const settings = single
           ? { group: group.trim() || null, labels: entered }
           : {
@@ -148,7 +145,9 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
       </Field>
       <Field>
         <FieldLabel htmlFor="asset-labels">{copy.labels}</FieldLabel>
-        <Input id="asset-labels" value={labels} disabled={busy} onChange={(event) => { setLabels(event.target.value); setState("idle"); }} />
+        <TagInput id="asset-labels" value={labels} disabled={busy} removeLabel={copy.removeLabel}
+          suggestions={[...new Set(Object.values(organizations).flatMap((entry) => entry.labels))]}
+          onChange={(next) => { setLabels(next); setState("idle"); }} />
         <FieldDescription>{copy.labelsHint}</FieldDescription>
       </Field>
       <div className="flex flex-col gap-2 border-t pt-4">
