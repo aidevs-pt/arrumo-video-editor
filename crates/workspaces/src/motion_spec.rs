@@ -66,6 +66,37 @@ pub(crate) struct Layer {
     /// A sound effect played as the layer arrives.
     #[serde(default)]
     pub sound: Sound,
+    /// How text lines sit inside the layer's width.
+    #[serde(default, skip_serializing_if = "Align::is_center")]
+    pub align: Align,
+    /// Corner rounding of boxes and images, as a fraction of their shorter side (0 to 0.5).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub radius: f64,
+    /// A second colour a box fades into towards its bottom-right corner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gradient_to: Option<String>,
+    /// A soft shadow under a box or image.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shadow: bool,
+}
+
+fn is_zero(value: &f64) -> bool {
+    *value == 0.0
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Align {
+    Left,
+    #[default]
+    Center,
+    Right,
+}
+
+impl Align {
+    fn is_center(&self) -> bool {
+        *self == Self::Center
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -109,6 +140,9 @@ pub(crate) struct MotionSpec {
     pub usage: String,
     pub duration_seconds: f64,
     pub background: String,
+    /// A second background colour the frame fades into towards its bottom-right corner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_to: Option<String>,
     pub layers: Vec<Layer>,
 }
 
@@ -116,6 +150,8 @@ pub(crate) struct MotionSpec {
 pub(crate) fn spec_schema(assets: &[i64]) -> Value {
     let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right"]});
     let unit = json!({"type": "number", "minimum": 0, "maximum": 1});
+    let optional_color =
+        json!({"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}]});
     let asset = if assets.is_empty() {
         json!({"type": "null"})
     } else {
@@ -124,13 +160,14 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "kind", "usage", "durationSeconds", "background", "layers"],
+        "required": ["title", "kind", "usage", "durationSeconds", "background", "backgroundTo", "layers"],
         "properties": {
             "title": {"type": "string", "maxLength": 80},
             "kind": {"enum": ["animation", "transition"]},
             "usage": {"type": "string", "maxLength": 600},
             "durationSeconds": {"type": "number", "minimum": MIN_SECONDS, "maximum": MAX_SECONDS},
             "background": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+            "backgroundTo": optional_color,
             "layers": {
                 "type": "array",
                 "minItems": 1,
@@ -139,7 +176,8 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
                     "type": "object",
                     "additionalProperties": false,
                     "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
-                        "color", "bold", "opacity", "start", "end", "enter", "exit", "sound"],
+                        "color", "bold", "opacity", "start", "end", "enter", "exit", "sound",
+                        "align", "radius", "gradientTo", "shadow"],
                     "properties": {
                         "type": {"enum": ["text", "box", "image"]},
                         "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
@@ -153,7 +191,11 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
                         "end": {"type": "number", "minimum": 0},
                         "enter": motion,
                         "exit": motion,
-                        "sound": {"enum": ["none", "whoosh", "pop", "click", "chime", "rise"]}
+                        "sound": {"enum": ["none", "whoosh", "pop", "click", "chime", "rise"]},
+                        "align": {"enum": ["left", "center", "right"]},
+                        "radius": {"type": "number", "minimum": 0, "maximum": 0.5},
+                        "gradientTo": optional_color,
+                        "shadow": {"type": "boolean"}
                     }
                 }
             }
@@ -162,7 +204,8 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
 }
 
 /// How a spec is described to the agent, next to the schema.
-pub(crate) const SPEC_GUIDE: &str = "An animation is a timed composition on a solid background. \
+pub(crate) const SPEC_GUIDE: &str = "An animation is a timed composition on a background colour, or a \
+diagonal gradient from background to backgroundTo (null for a solid one). \
 Positions are fractions of the frame: x and y place the layer's centre, width and height its size \
 (for text, width is the widest a line may run before wrapping and height is ignored). Text size is a \
 fraction of the frame height; 0.06 to 0.1 suits titles and 0.035 to 0.05 body text. Boxes are solid \
@@ -175,7 +218,12 @@ reads clearly. A layer can play a short sound as it arrives (a whoosh for slides
 items appearing, a chime for a reveal, a rise for a build-up); use them sparingly, on the beats that \
 matter, and none when the animation will sit under speech. Text is set in a plain sans-serif font that has no emoji, pictographs or arrows, so \
 write only letters, digits and common punctuation, and draw shapes, grids, bars and diagrams with box \
-layers. Leave text null for boxes and images and assetId null for text and boxes.";
+layers. Leave text null for boxes and images and assetId null for text and boxes. \
+For a polished look: align a column of text left (align sets where lines sit within width, so a \
+left-aligned layer starts at x minus width/2), round cards and images slightly (radius 0.08 to 0.2 \
+of their shorter side; 0.5 makes pills and circles), give a box a subtle gradient with gradientTo, and \
+lift cards and images off the background with shadow. Keep generous margins, one clear focal point per \
+moment, a few sizes of text with a strong hierarchy, and consistent spacing between items.";
 
 fn hex_color(value: &str) -> Option<String> {
     let digits = value.strip_prefix('#')?;
@@ -241,6 +289,9 @@ impl MotionSpec {
         // Agents design up to MAX_SECONDS; narration can lengthen a stored scene further.
         spec.duration_seconds = spec.duration_seconds.clamp(MIN_SECONDS, MAX_STORED_SECONDS);
         hex_color(&spec.background).ok_or(invalid)?;
+        spec.background_to = spec
+            .background_to
+            .filter(|color| hex_color(color).is_some());
         let duration = spec.duration_seconds;
         spec.layers.truncate(MAX_LAYERS);
         spec.layers.retain_mut(|layer| {
@@ -271,6 +322,19 @@ impl MotionSpec {
             } else {
                 duration
             };
+            layer.radius = if layer.radius.is_finite() {
+                layer.radius.clamp(0.0, 0.5)
+            } else {
+                0.0
+            };
+            layer.gradient_to = layer
+                .gradient_to
+                .take()
+                .filter(|color| layer.kind == LayerType::Box && hex_color(color).is_some());
+            if layer.kind == LayerType::Text {
+                layer.radius = 0.0;
+                layer.shadow = false;
+            }
             if layer.end - layer.start < 0.1 || hex_color(&layer.color).is_none() {
                 return false;
             }
@@ -475,6 +539,13 @@ impl LayerTarget<'_> {
                     let lines: Vec<&str> = wrapped.lines().collect();
                     let line_height = font_px * 1.25;
                     let top = layer.y * frame_h - line_height * lines.len() as f64 / 2.0;
+                    let anchor = match layer.align {
+                        Align::Left => format!("{:.2}", (layer.x - layer.width / 2.0) * frame_w),
+                        Align::Center => format!("{:.2}-text_w/2", layer.x * frame_w),
+                        Align::Right => {
+                            format!("{:.2}-text_w", (layer.x + layer.width / 2.0) * frame_w)
+                        }
+                    };
                     let mut line_input = current.clone();
                     for (number, line) in lines.iter().enumerate() {
                         let file = format!("{prefix}text-{index}-{number}.txt");
@@ -488,9 +559,8 @@ impl LayerTarget<'_> {
                             graph,
                             "[{line_input}]drawtext=fontfile={font}:textfile={file}:expansion=none:\
                          fontsize={font_px:.0}:fontcolor={color}:\
-                         alpha='{alpha}':x='{:.2}-text_w/2+{dx}':y='{:.2}+{dy}':\
+                         alpha='{alpha}':x='{anchor}+{dx}':y='{:.2}+{dy}':\
                          enable='{enable}'[{output}];",
-                            layer.x * frame_w,
                             top + line_height * number as f64 + font_px * 0.1,
                         )
                         .ok();
@@ -504,31 +574,54 @@ impl LayerTarget<'_> {
                     let box_w = ((layer.width * frame_w).round() as u32).max(2);
                     let box_h = ((layer.height * frame_h).round() as u32).max(2);
                     let source = format!("{prefix}s{index}");
-                    if layer.kind == LayerType::Box {
-                        write!(
-                        graph,
-                        "color=c={color}@{:.3}:s={box_w}x{box_h}:r={FPS}:d={duration:.3},format=rgba[{source}];",
-                        layer.opacity
-                    )
-                    .ok();
+                    let shaped = layer.kind == LayerType::Box || layer.radius > 0.0 || layer.shadow;
+                    let path = if layer.kind == LayerType::Image {
+                        Some(
+                            layer
+                                .asset_id
+                                .and_then(images)
+                                .ok_or_else(|| io::Error::other("An animation image is missing"))?,
+                        )
                     } else {
-                        let path = layer
-                            .asset_id
-                            .and_then(images)
-                            .ok_or_else(|| io::Error::other("An animation image is missing"))?;
-                        args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
-                        args.push(format!("{duration:.3}"));
-                        args.push("-i".into());
-                        args.push(path.to_string_lossy().into_owned());
+                        None
+                    };
+                    let input = if shaped {
+                        let file = format!("{prefix}shape-{index}.png");
+                        let fill = match &path {
+                            Some(path) => Fill::Image(path),
+                            None => Fill::Color {
+                                from: &layer.color,
+                                to: layer.gradient_to.as_deref(),
+                            },
+                        };
+                        let shape = Shape {
+                            width: box_w,
+                            height: box_h,
+                            radius: layer.radius,
+                            opacity: layer.opacity,
+                            shadow: layer.shadow.then_some(frame_h.min(frame_w)),
+                        };
+                        shape_png(directory, &file, &fill, &shape)?;
+                        file
+                    } else {
+                        path.unwrap_or_default().to_string_lossy().into_owned()
+                    };
+                    args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
+                    args.push(format!("{duration:.3}"));
+                    args.push("-i".into());
+                    args.push(input);
+                    if shaped {
+                        write!(graph, "[{next_input}:v]format=rgba[{source}];").ok();
+                    } else {
                         write!(
-                        graph,
-                        "[{next_input}:v]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,\
-                         format=rgba,colorchannelmixer=aa={:.3}[{source}];",
-                        layer.opacity
-                    )
-                    .ok();
-                        next_input += 1;
+                            graph,
+                            "[{next_input}:v]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,\
+                             format=rgba,colorchannelmixer=aa={:.3}[{source}];",
+                            layer.opacity
+                        )
+                        .ok();
                     }
+                    next_input += 1;
                     // Overlay alpha cannot follow an expression, so fade the layer itself.
                     let faded = format!("{prefix}f{index}");
                     let span = (layer.end - layer.start).max(0.1);
@@ -563,6 +656,111 @@ impl LayerTarget<'_> {
             current = label;
         }
         Ok(current)
+    }
+}
+
+/// What fills a pre-rendered shape: a colour, optionally fading diagonally into another, or an
+/// image fitted inside the shape.
+enum Fill<'a> {
+    Color { from: &'a str, to: Option<&'a str> },
+    Image(&'a Path),
+}
+
+struct Shape {
+    width: u32,
+    height: u32,
+    radius: f64,
+    opacity: f64,
+    /// The frame's shorter side when the shape casts a shadow, which sets the shadow's size.
+    shadow: Option<f64>,
+}
+
+fn channels(color: &str) -> io::Result<[u8; 3]> {
+    let digits = hex_color(color).ok_or_else(|| io::Error::other("Bad colour"))?;
+    let value = u32::from_str_radix(&digits[2..], 16).map_err(io::Error::other)?;
+    Ok([(value >> 16) as u8, (value >> 8) as u8, value as u8])
+}
+
+/// Renders one still of a box or image with rounded corners, a gradient and a soft shadow into
+/// `file` inside `directory`. The shadow pads the still evenly, so its centre stays the shape's.
+fn shape_png(directory: &Path, file: &str, fill: &Fill, shape: &Shape) -> io::Result<()> {
+    let (width, height) = (shape.width.max(2), shape.height.max(2));
+    let radius = format!("({:.4}*min(W,H))", shape.radius);
+    let mask = if shape.radius > 0.0 {
+        format!(
+            "*clip({radius}+0.5-hypot(max(max({radius}-X,X-(W-1-{radius})),0),\
+             max(max({radius}-Y,Y-(H-1-{radius})),0)),0,1)"
+        )
+    } else {
+        String::new()
+    };
+    let opacity = shape.opacity.clamp(0.0, 1.0);
+    let mut args: Vec<String> = ["-nostdin", "-v", "error"].map(String::from).to_vec();
+    let mut graph = match fill {
+        Fill::Color { from, to } => {
+            let start = channels(from)?;
+            let end = to.map(channels).transpose()?.unwrap_or(start);
+            let channel = |index: usize| {
+                let (a, b) = (f64::from(start[index]), f64::from(end[index]));
+                format!("{a:.1}+({:.1})*(X/W+Y/H)/2", b - a)
+            };
+            args.extend(["-f", "lavfi", "-i"].map(String::from));
+            args.push(format!("color=c=black:s={width}x{height}:d=0.1"));
+            format!(
+                "[0:v]format=rgba,geq=r='{}':g='{}':b='{}':a='{:.1}{mask}'[shape]",
+                channel(0),
+                channel(1),
+                channel(2),
+                255.0 * opacity,
+            )
+        }
+        Fill::Image(path) => {
+            args.push("-i".into());
+            args.push(path.to_string_lossy().into_owned());
+            format!(
+                "[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,format=rgba,\
+                 geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*{opacity:.3}{mask}'[shape]"
+            )
+        }
+    };
+    let output = match shape.shadow {
+        Some(frame) => {
+            let pad = (frame * 0.04).round().max(4.0) as u32;
+            let drop = pad / 3;
+            write!(
+                graph,
+                ";[shape]split[top][under];\
+                 [under]geq=r=0:g=0:b=0:a='alpha(X,Y)*0.4',pad=iw+{double}:ih+{double}:{pad}:{low}:color=black@0,\
+                 gblur=sigma={sigma:.1}[soft];\
+                 [soft][top]overlay={pad}:{pad}:format=auto[out]",
+                double = pad * 2,
+                low = pad + drop,
+                sigma = f64::from(pad) / 2.5,
+            )
+            .ok();
+            "[out]"
+        }
+        None => "[shape]",
+    };
+    args.extend([
+        "-filter_complex".into(),
+        graph,
+        "-map".into(),
+        output.into(),
+    ]);
+    args.extend(["-frames:v", "1", "-update", "1", "-y"].map(String::from));
+    args.push(file.to_owned());
+    let status = Command::new("ffmpeg")
+        .args(&args)
+        .current_dir(directory)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
+    if status.success() && directory.join(file).is_file() {
+        Ok(())
+    } else {
+        Err(io::Error::other("Could not draw an animation shape"))
     }
 }
 
@@ -618,9 +816,29 @@ fn render_arguments(
     ]
     .map(String::from)
     .to_vec();
-    args.push(format!(
-        "color=c={background}:s={width}x{height}:r={FPS}:d={duration:.3}"
-    ));
+    match &spec.background_to {
+        Some(to) => {
+            let fill = Fill::Color {
+                from: &spec.background,
+                to: Some(to),
+            };
+            let shape = Shape {
+                width,
+                height,
+                radius: 0.0,
+                opacity: 1.0,
+                shadow: None,
+            };
+            shape_png(directory, "background.png", &fill, &shape)?;
+            args.truncate(args.len() - 3);
+            args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
+            args.push(format!("{duration:.3}"));
+            args.extend(["-i".into(), "background.png".into()]);
+        }
+        None => args.push(format!(
+            "color=c={background}:s={width}x{height}:r={FPS}:d={duration:.3}"
+        )),
+    }
     match audio {
         Some(audio) => args.extend(["-i".to_owned(), audio.to_string_lossy().into_owned()]),
         None => args.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"].map(String::from)),
@@ -967,6 +1185,74 @@ mod tests {
         assert_eq!(wrap("one two three four", 9), "one two\nthree\nfour");
         assert_eq!(wrap("abcdefghij", 4), "abcd\nefgh\nij");
         assert_eq!(clean_text("Top ↻ 90° ⬜🟥 ok", 50), "Top 90° ok");
+    }
+
+    #[test]
+    fn rounded_gradient_boxes_and_backgrounds_render() {
+        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let spec = MotionSpec::from_answer(
+            &json!({
+                "title": "Card", "kind": "animation", "usage": "", "durationSeconds": 2,
+                "background": "#000000", "backgroundTo": "#FFFFFF",
+                "layers": [
+                    {"type": "box", "text": null, "assetId": null, "x": 0.5, "y": 0.5, "width": 0.5,
+                     "height": 0.4, "size": 0.05, "color": "#FF0000", "bold": false, "opacity": 1,
+                     "start": 0, "end": 2, "enter": "none", "exit": "none", "sound": "none",
+                     "align": "center", "radius": 0.3, "gradientTo": "#0000FF", "shadow": true},
+                    {"type": "text", "text": "Left", "assetId": null, "x": 0.5, "y": 0.15,
+                     "width": 0.8, "height": 0.1, "size": 0.08, "color": "#00FF00", "bold": true,
+                     "opacity": 1, "start": 0, "end": 2, "enter": "none", "exit": "none",
+                     "sound": "none", "align": "left", "radius": 0.2, "gradientTo": "#123456",
+                     "shadow": true}
+                ]
+            }),
+            |_| true,
+        )
+        .unwrap();
+        assert_eq!(spec.layers[1].radius, 0.0);
+        assert!(spec.layers[1].gradient_to.is_none() && !spec.layers[1].shadow);
+        render_spec(
+            &spec,
+            (640, 360),
+            directory.path(),
+            "out.mp4",
+            &|_| None,
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let frame = Command::new("ffmpeg")
+            .args(["-v", "error", "-ss", "1", "-i"])
+            .arg(directory.path().join("out.mp4"))
+            .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+            .output()
+            .unwrap()
+            .stdout;
+        let pixel = |x: usize, y: usize| {
+            let at = (y * 640 + x) * 3;
+            [frame[at], frame[at + 1], frame[at + 2]]
+        };
+        let near = |value: [u8; 3], expected: [u8; 3]| {
+            value.iter().zip(expected).all(|(a, b)| a.abs_diff(b) < 48)
+        };
+        assert!(near(pixel(3, 357), [10, 10, 10]) || pixel(3, 357)[0] < 140);
+        assert!(pixel(636, 356)[0] > 200, "{:?}", pixel(636, 356));
+        // The box's rounded corner shows the background; its body shows the gradient.
+        let corner = pixel(163, 111);
+        assert!(corner[0] < 100 && corner[2] < 100, "{corner:?}");
+        let body = pixel(320, 180);
+        assert!(body[0] > 80 && body[2] > 80 && body[1] < 60, "{body:?}");
+        // Left-aligned text starts near the layer's left edge.
+        let green = (60..200).any(|x| {
+            (40..80).any(|y| {
+                let [r, g, b] = pixel(x, y);
+                g > 180 && r < 100 && b < 100
+            })
+        });
+        assert!(green);
     }
 
     #[test]
