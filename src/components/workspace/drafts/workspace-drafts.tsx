@@ -3,7 +3,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, ArrowRight, Clapperboard, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clapperboard, Info, Pencil, Trash2, Upload } from "lucide-react";
+import { UsageNotice } from "@/components/workspace/usage/provider-usage";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -72,7 +73,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
   const canSave = Boolean(title.trim() && (sources.length || intent.trim()));
   const composing = tab === "compose" && !startInQueue;
   const sourceStep = composing && step === "source";
-  useStudioTrail(composing ? [{ label: messages.studio.videos, href: workspaceHref("drafts", workspaceId) }, { label: messages.studio.newVideo }] : null);
+  useStudioTrail(composing ? [{ label: messages.studio.videos, href: workspaceHref("drafts", workspaceId) }, { label: mode === "scratch" ? catalog.fromScratch : messages.studio.newVideo }] : null);
 
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
@@ -218,7 +219,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
             <ol className="grid max-w-4xl grid-cols-3 gap-1.5 text-sm text-muted-foreground" aria-label={messages.videoDetails.step2}>
               <li aria-current={sourceStep ? "step" : undefined}
                 className={cn("border-t-[6px] pt-1.5", sourceStep ? "border-primary font-semibold text-primary" : "border-foreground font-semibold text-foreground")}>
-                {mode === "recordings" ? messages.videoDetails.step1 : catalog.scratch}
+                {mode === "recordings" ? messages.videoDetails.step1 : catalog.scratchStep}
               </li>
               <li aria-current={sourceStep ? undefined : "step"}
                 className={cn("border-t-[6px] pt-1.5", !sourceStep ? "border-primary font-semibold text-primary" : "border-border")}>{messages.videoDetails.step2}</li>
@@ -229,7 +230,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
             <h1 ref={heading} tabIndex={-1}>{sourceStep
               ? mode === "recordings" ? catalog.recordingsHeading : catalog.scratchHeading
               : editing === null ? catalog.details : copy.edit}</h1>
-            {sourceStep && <p>{mode === "recordings" ? (editing === null ? messages.batch.intro : copy.sourcesHint) : copy.intentHint}</p>}
+            {sourceStep && <p>{mode === "recordings" ? (editing === null ? messages.batch.intro : copy.sourcesHint) : catalog.scratchIntro}</p>}
           </WorkspaceHeading>}
         </>
       ) : <VideoCatalogHeader workspaceId={workspaceId} active={startInQueue ? "generations" : "drafts"} count={startInQueue ? undefined : drafts?.length} />}
@@ -289,17 +290,50 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                     importing={pending === "importing"} onImport={() => void importClips()} onChange={setSources} />
                 </>
               ) : (
-                <Field>
-                  <FieldLabel htmlFor="draft-scratch-intent">{copy.intent}</FieldLabel>
-                  <MarkdownEditor id="draft-scratch-intent" label={copy.intent} value={intent}
-                    disabled={pending !== null} onChange={setIntent} />
-                  <Button type="button" variant="outline" className="self-start" disabled={pending !== null}
-                    onClick={() => setMode("recordings")}>{catalog.source}</Button>
-                </Field>
+                <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_19rem]">
+                  <div className="flex min-w-0 flex-col gap-6">
+                    <Field>
+                      <FieldLabel htmlFor="draft-scratch-intent">{catalog.aimLabel}</FieldLabel>
+                      <MarkdownEditor id="draft-scratch-intent" label={catalog.aimLabel} value={intent}
+                        disabled={pending !== null} onChange={setIntent} />
+                      <p className="text-sm text-muted-foreground">{catalog.aimHint}</p>
+                    </Field>
+                    {profiles.length > 0 && <fieldset className="flex flex-col gap-2.5">
+                      <legend className="mb-2.5 font-semibold">{catalog.profile}</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {[{ id: null, name: catalog.noProfile, color: null } as const, ...profiles].map((entry) => (
+                          <label key={entry.id ?? "none"} className={cn("flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:border-line-strong has-focus-visible:outline-2 has-focus-visible:outline-ring",
+                            profile === entry.id && "border-primary")}>
+                            <input type="radio" name="scratch-profile" className="size-4 accent-primary" checked={profile === entry.id}
+                              disabled={pending !== null} onChange={() => setProfile(entry.id)} />
+                            {entry.color && <span aria-hidden="true" className="size-2.5 rounded-xs" style={{ backgroundColor: entry.color }} />}
+                            {entry.name}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>}
+                    <Button type="button" variant="ghost" className="self-start" disabled={pending !== null}
+                      onClick={() => setMode("recordings")}><Upload data-icon="inline-start" />{catalog.useFootage}</Button>
+                  </div>
+                  <aside className="flex flex-col gap-3 lg:sticky lg:top-4">
+                    <div className="flex flex-col gap-2 rounded-xl bg-secondary p-4 text-sm">
+                      <p className="flex items-center gap-2 font-semibold"><Info className="size-4" aria-hidden="true" />{catalog.beforeContinue}</p>
+                      <p className="text-muted-foreground">{catalog.beforeContinueBody}</p>
+                    </div>
+                    <UsageNotice workspaceId={workspaceId} />
+                    <Button type="button" size="lg" disabled={pending !== null || !intent.trim()} onClick={() => {
+                      setStep("details");
+                      window.requestAnimationFrame(() => titleInput.current?.focus());
+                    }}>{catalog.detailsNext}<ArrowRight data-icon="inline-end" /></Button>
+                    <Button type="button" variant="ghost" disabled={pending !== null} onClick={() => { reset(); setTab("saved"); }}>
+                      <ArrowLeft data-icon="inline-start" />{catalog.back}
+                    </Button>
+                  </aside>
+                </div>
               )
             ) : null}
             {error && <Alert variant="destructive"><AlertDescription>{copy[error]}</AlertDescription></Alert>}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+            {!(sourceStep && mode === "scratch") && <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
               <Button type="button" variant="ghost" disabled={pending !== null} onClick={() => {
                 if (sourceStep) { reset(); setTab("saved"); }
                 else setStep("source");
@@ -313,7 +347,7 @@ export function WorkspaceDrafts({ workspace, initialProfile, startInQueue = fals
                 }}>
                 {catalog.detailsNext}<ArrowRight data-icon="inline-end" />
               </Button> : null}
-            </div>
+            </div>}
           </form>
         ) : (
           <section className="grid gap-3">

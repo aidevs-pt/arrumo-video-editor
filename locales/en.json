@@ -19,7 +19,17 @@
     "back": "Back to videos",
     "detailsNext": "Continue to details",
     "source": "Source footage",
-    "enqueue": "Generate"
+    "enqueue": "Generate",
+    "scratchStep": "What it’s about",
+    "scratchIntro": "No footage needed. The agent builds it from generated clips, your assets and plugins, then it follows the normal review steps.",
+    "aimLabel": "What are you aiming for?",
+    "aimHint": "Write it like you would brief an editor. You can add more detail on the next step.",
+    "profile": "Profile",
+    "noProfile": "No profile",
+    "useFootage": "Use footage instead",
+    "beforeContinue": "Before you continue",
+    "beforeContinueBody": "Generated clips, images and voices use your providers’ credits. The agent plans around what is left and tells you if it can’t.",
+    "fromScratch": "From scratch"
   },
   "calendar": {
     "today": "Today",

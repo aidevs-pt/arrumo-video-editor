@@ -19,7 +19,17 @@
     "back": "Volver a vídeos",
     "detailsNext": "Continuar a los detalles",
     "source": "Material de origen",
-    "enqueue": "Generar"
+    "enqueue": "Generar",
+    "scratchStep": "De qué trata",
+    "scratchIntro": "No hace falta material grabado. El agente lo crea con clips generados, tus recursos y complementos, y luego sigue los pasos de revisión habituales.",
+    "aimLabel": "¿Qué quieres conseguir?",
+    "aimHint": "Escríbelo como si le dieras indicaciones a un editor. Puedes añadir más detalle en el siguiente paso.",
+    "profile": "Perfil",
+    "noProfile": "Sin perfil",
+    "useFootage": "Usar material grabado",
+    "beforeContinue": "Antes de continuar",
+    "beforeContinueBody": "Los clips, imágenes y voces generados gastan créditos de tus proveedores. El agente planifica con lo que queda y te avisa si no le alcanza.",
+    "fromScratch": "Desde cero"
   },
   "calendar": {
     "today": "Hoy",

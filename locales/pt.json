@@ -19,7 +19,17 @@
     "back": "Voltar aos vídeos",
     "detailsNext": "Continuar para os detalhes",
     "source": "Gravações",
-    "enqueue": "Gerar"
+    "enqueue": "Gerar",
+    "scratchStep": "Sobre o que é",
+    "scratchIntro": "Não precisas de gravações. O agente cria-o com clips gerados, os teus recursos e plugins, e depois segue os passos de revisão habituais.",
+    "aimLabel": "O que queres alcançar?",
+    "aimHint": "Escreve como se estivesses a dar indicações a um editor. Podes acrescentar mais detalhe no passo seguinte.",
+    "profile": "Perfil",
+    "noProfile": "Sem perfil",
+    "useFootage": "Usar gravações",
+    "beforeContinue": "Antes de continuares",
+    "beforeContinueBody": "Os clips, imagens e vozes gerados gastam créditos dos teus fornecedores. O agente planeia com o que resta e avisa-te se não chegar.",
+    "fromScratch": "Do zero"
   },
   "calendar": {
     "today": "Hoje",
