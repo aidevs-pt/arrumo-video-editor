@@ -1076,7 +1076,8 @@
     "download": "Descargar",
     "downloading": "Guardando…",
     "downloaded": "Subtítulos guardados.",
-    "downloadError": "No se pudieron guardar los subtítulos. Revisa la carpeta e inténtalo de nuevo."
+    "downloadError": "No se pudieron guardar los subtítulos. Revisa la carpeta e inténtalo de nuevo.",
+    "completedAt": "Terminado el {date}"
   },
   "productionPlan": {
     "addItemNote": "Añadir nota",

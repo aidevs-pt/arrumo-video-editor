@@ -11,7 +11,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -59,7 +58,7 @@ type CompletedVideo = {
     id: number;
     snapshot: {
       draft: { title: string; source_ids?: number[] };
-      profile?: { name: string } | null;
+      profile?: { name: string; color?: string | null } | null;
       formats?: { format: Format }[];
     };
   };
@@ -136,6 +135,8 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const [error, setError] = useState<"renameError" | "exportError">();
   const [notice, setNotice] = useState<"saved" | "exported">();
   const [outputDates, setOutputDates] = useState(video.output_dates);
+  const finished = [...video.activity].reverse().find((entry) => entry.state === "completed");
+  const completedAt = finished ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(finished.created_at * 1000)) : null;
   const crumbOutput = video.delivery.verified_outputs.find((output) => output.format_id === initialFormatId) ?? video.delivery.verified_outputs[0];
   const fileCrumb = file === "subtitles" ? crumbOutput?.subtitles : undefined;
   useStudioTrail([
@@ -288,12 +289,22 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-        <WorkspaceHeading className="mb-0 flex-1 border-0 pb-0">
-          <h1>{savedTitle}</h1>
-          <p>{copy.files}</p>
-        </WorkspaceHeading>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold">
+            {snapshot.profile && <span className="flex items-center gap-2">
+              <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: snapshot.profile.color ?? "var(--border)" }} />
+              {snapshot.profile.name}
+            </span>}
+            <span className="flex items-center gap-1.5 text-approval">
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+              {completedAt ? copy.completedAt.replace("{date}", completedAt) : queue.completed}
+            </span>
+          </p>
+          <WorkspaceHeading className="mb-0 border-0 pb-0">
+            <h1>{savedTitle}</h1>
+          </WorkspaceHeading>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary"><CheckCircle2 aria-hidden="true" />{queue.completed}</Badge>
           <Button disabled={Boolean(action)} onClick={() => void exportZip()}>
             <Archive data-icon="inline-start" />{action === "export" ? copy.exporting : copy.exportZip}
           </Button>

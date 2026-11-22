@@ -1076,7 +1076,8 @@
     "download": "Transferir",
     "downloading": "A guardar…",
     "downloaded": "Legendas guardadas.",
-    "downloadError": "Não foi possível guardar as legendas. Verifique a pasta e tente novamente."
+    "downloadError": "Não foi possível guardar as legendas. Verifique a pasta e tente novamente.",
+    "completedAt": "Concluído a {date}"
   },
   "productionPlan": {
     "addItemNote": "Adicionar nota",

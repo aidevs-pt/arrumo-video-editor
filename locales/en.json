@@ -1076,7 +1076,8 @@
     "download": "Download",
     "downloading": "Saving…",
     "downloaded": "Subtitles saved.",
-    "downloadError": "Could not save the subtitles. Check the folder and try again."
+    "downloadError": "Could not save the subtitles. Check the folder and try again.",
+    "completedAt": "Completed {date}"
   },
   "productionPlan": {
     "addItemNote": "Add note",
