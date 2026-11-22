@@ -1329,6 +1329,7 @@
     "producing": "A produzir: {stage}",
     "hostWork": "O Arrumo está a renderizar e a verificar o resultado",
     "reading": "A ler o briefing e a planear",
-    "searching": "Pesquisou na web"
+    "searching": "Pesquisou na web",
+    "lookingAtMaterial": "A analisar o material do espaço de trabalho que pediu"
   }
 }
