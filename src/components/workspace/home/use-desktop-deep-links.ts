@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent } from "react";
 import { calendarHref, completedFile, completedVideoHref, profileHref, workspaceHref, type WorkspaceView } from "./workspace-links";
 
 const workspaceSections: readonly WorkspaceView[] = [
-  "profiles", "context", "brand", "assets", "motion-library", "outputs", "drafts", "generations", "videos", "calendar",
+  "profiles", "context", "brand", "assets", "motion-library", "outputs", "appearance", "drafts", "generations", "videos", "calendar",
 ];
 
 const settingsSections = ["general", "agent", "services", "plugins", "quality", "backup"] as const;

@@ -915,7 +915,9 @@
     "cancel": "Cancelar",
     "save": "Guardar",
     "saving": "A guardar…",
-    "appearanceSaved": "Guardado. O seletor já mostra o novo aspeto."
+    "appearanceSaved": "Guardado. O seletor já mostra o novo aspeto.",
+    "appearance": "Aspeto",
+    "appearanceNotGeneration": "Só muda o aspeto deste espaço no Arrumo, no seletor e na lista de espaços. Os vídeos nunca o usam; as cores deles vêm de Marca."
   },
   "brand": {
     "title": "Marca",

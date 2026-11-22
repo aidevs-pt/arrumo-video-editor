@@ -915,7 +915,9 @@
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving…",
-    "appearanceSaved": "Saved. The switcher shows the new look."
+    "appearanceSaved": "Saved. The switcher shows the new look.",
+    "appearance": "Appearance",
+    "appearanceNotGeneration": "Only changes how this workspace looks in Arrumo, in the switcher and the workspace list. Videos never use it; their colors come from Brand."
   },
   "brand": {
     "title": "Brand",

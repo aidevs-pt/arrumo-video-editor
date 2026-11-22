@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open as pickFile } from "@tauri-apps/plugin-dialog";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Info } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { ColorPicker, SWATCHES } from "../color-picker";
 import type { Workspace } from "../home/workspace-links";
 import { useWorkspaceCatalog } from "../home/workspace-router";
+import { WorkspaceShell } from "@/components/workspace/layout";
+import { WorkspaceSettingsHeading } from "../settings/workspace-settings-heading";
 import { WORKSPACE_ICONS, WorkspaceMark, useWorkspaceImage } from "./workspace-mark";
 
 type ImageAsset = { id: number; name: string; kind: string };
@@ -32,8 +34,19 @@ function ImageChoice({ workspaceId, asset, selected, onSelect }: {
   </button>;
 }
 
-/** Workspace settings › Brand: name, color and icon (or image), so the workspace is recognisable in the switcher. */
-export function WorkspaceAppearance({ workspace }: { workspace: Workspace }) {
+/** Workspace settings › Appearance. Only how the workspace looks in Arrumo; videos never use it. */
+export function WorkspaceAppearancePage({ workspace }: { workspace: Workspace }) {
+  const { messages: { workspaces: copy } } = useLocale();
+  return <WorkspaceShell className="max-w-6xl">
+    <WorkspaceSettingsHeading workspace={workspace} current="appearance" />
+    <p className="mb-6 flex max-w-[70ch] items-start gap-2.5 rounded-lg border bg-card px-4 py-3 text-sm">
+      <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{copy.customizeHint} {copy.appearanceNotGeneration}</span>
+    </p>
+    <WorkspaceAppearance workspace={workspace} />
+  </WorkspaceShell>;
+}
+
+function WorkspaceAppearance({ workspace }: { workspace: Workspace }) {
   const { messages: { workspaces: copy, profileHub } } = useLocale();
   const { update } = useWorkspaceCatalog();
   const [name, setName] = useState(workspace.name);
@@ -87,11 +100,7 @@ export function WorkspaceAppearance({ workspace }: { workspace: Workspace }) {
   }
 
   const preview = { id: workspace.id, color, icon, imageAssetId };
-  return <section id="appearance" aria-labelledby="workspace-appearance" className="scroll-mt-6">
-    <div className="mb-4">
-      <h2 id="workspace-appearance" className="text-[1.75rem]">{copy.customize}</h2>
-      <p className="mt-1 text-muted-foreground">{copy.customizeHint}</p>
-    </div>
+  return <section aria-label={copy.appearance}>
     <form onSubmit={save} className="rounded-xl border bg-card p-5">
       <div className="grid gap-6 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <FieldGroup>

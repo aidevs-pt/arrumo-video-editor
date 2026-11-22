@@ -113,7 +113,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
     <div className="flex items-start justify-between gap-3">
       <WorkspaceMark workspace={workspace} className="size-12" />
       <Button asChild size="icon-sm" variant="ghost" className="relative z-[1]">
-        <Link href={`${workspaceHref("brand", workspace.id)}#appearance`} aria-label={`${copy.customize} · ${workspace.name}`} title={copy.customize}><Paintbrush /></Link>
+        <Link href={workspaceHref("appearance", workspace.id)} aria-label={`${copy.customize} · ${workspace.name}`} title={copy.customize}><Paintbrush /></Link>
       </Button>
     </div>
     <h2 className="mt-4 text-[1.375rem] leading-tight font-[850] wrap-anywhere [font-variation-settings:'wdth'_125]">

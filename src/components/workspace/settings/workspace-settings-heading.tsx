@@ -18,6 +18,7 @@ export function WorkspaceSettingsHeading({ workspace, current, headingRef }: {
     ["assets", messages.assets.title],
     ["outputs", messages.outputs.title],
     ["motion-library", messages.profileHub.animations],
+    ["appearance", messages.workspaces.appearance],
   ] as const;
   return <header className="mb-8">
     <h1 tabIndex={-1} ref={headingRef} className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] outline-none [font-variation-settings:'wdth'_135]">{messages.studio.workspaceSettings}</h1>

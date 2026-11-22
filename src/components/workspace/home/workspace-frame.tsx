@@ -69,7 +69,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
   const trail = useStudioTrailItems();
   const reviewCount = inbox?.inbox?.reviews.length ?? 0;
   const videoSection = view === "drafts" || view === "generations" || view === "videos";
-  const workspaceSection = view === "context" || view === "brand" || view === "outputs";
+  const workspaceSection = view === "context" || view === "brand" || view === "outputs" || view === "appearance";
   const onProfile = pathname === "/profile";
   const sectionLabel = pathname === "" ? copy.home
     : pathname === "/settings" ? (query.get("section") === "plugins" ? messages.pluginCatalog.title : messages.agentSettings.title)
