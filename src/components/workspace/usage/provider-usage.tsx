@@ -13,11 +13,13 @@ import { cn } from "@/lib/utils";
 
 export type ProviderUsage = {
   pluginId: string;
-  unit: "characters" | "credits" | "requests" | "seconds";
+  unit: "characters" | "credits" | "requests" | "seconds" | "percent";
   used: number | null;
   limit: number | null;
   remainingPercent: number | null;
   resetsAt: number | null;
+  /** For an agent plan's percent allowance: the window length, such as 10080 for a week. */
+  windowMinutes: number | null;
   level: "ok" | "warning" | "danger" | "unknown";
   problem: string | null;
 };
@@ -144,6 +146,9 @@ export function UsagePanel({ workspaceId, keysHref }: { workspaceId: number; key
         {usage.providers.map((entry) => {
           const name = pluginText.name(entry.pluginId, usage.names[entry.pluginId] ?? entry.pluginId);
           const left = entry.remainingPercent;
+          const agent = entry.unit === "percent";
+          const windowName = entry.windowMinutes === 10080 ? copy.weekly
+            : entry.windowMinutes && entry.windowMinutes % 60 === 0 ? copy.hourly.replace("{hours}", String(entry.windowMinutes / 60)) : copy.planLimit;
           const tone = entry.level === "danger" ? "text-destructive" : entry.level === "warning" ? "text-[oklch(52%_.13_65)]" : "text-[oklch(50%_.13_150)]";
           return (
             <li key={entry.pluginId} className="grid items-center gap-x-5 gap-y-2 p-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,11rem)_minmax(0,1fr)_auto]">
@@ -160,11 +165,11 @@ export function UsagePanel({ workspaceId, keysHref }: { workspaceId: number; key
               </span> : <span className="text-sm text-muted-foreground">{copy.unreadable}</span>}
               <span className={cn("text-sm", left !== null && entry.level !== "ok" ? tone : "text-muted-foreground")}>
                 {left !== null
-                  ? <>{copy.usedOf.replace("{used}", count.format(entry.used ?? 0)).replace("{limit}", count.format(entry.limit ?? 0)).replace("{unit}", copy.units[entry.unit])}
+                  ? <>{agent ? windowName : copy.usedOf.replace("{used}", count.format(entry.used ?? 0)).replace("{limit}", count.format(entry.limit ?? 0)).replace("{unit}", copy.units[entry.unit])}
                     {entry.resetsAt ? `, ${copy.resets.replace("{date}", day.format(new Date(entry.resetsAt * 1000)))}` : ""}</>
-                  : copy.unknown.replace("{reason}", entry.problem ?? "")}
+                  : (agent ? copy.unknownAgent : copy.unknown).replace("{reason}", entry.problem ?? "")}
               </span>
-              <Button asChild size="sm" variant="outline" className="justify-self-start sm:justify-self-end"><Link href={keysHref}>{copy.manageKey}</Link></Button>
+              {agent ? <span aria-hidden="true" /> : <Button asChild size="sm" variant="outline" className="justify-self-start sm:justify-self-end"><Link href={keysHref}>{copy.manageKey}</Link></Button>}
             </li>
           );
         })}

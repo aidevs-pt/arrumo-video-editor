@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 11] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -130,6 +130,55 @@ pub(crate) struct AgentCli {
     pub structured_run: Option<StructuredRun>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_run: Option<ImageRun>,
+    /// Schema 11: how to read the agent's remaining allowance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_run: Option<UsageRun>,
+}
+
+/// Reads the agent's allowance without using it: the CLI is started with `args`, each `input`
+/// value is written to its stdin as one JSON line, and the first printed JSON line whose `id`
+/// equals `responseId` is read. Each window names JSON pointers to the share used, in percent,
+/// and optionally its reset time (Unix seconds) and length in minutes.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct UsageRun {
+    pub args: Vec<String>,
+    pub input: Vec<serde_json::Value>,
+    pub response_id: serde_json::Value,
+    pub windows: Vec<UsageWindow>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct UsageWindow {
+    pub used_percent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<String>,
+}
+
+impl UsageRun {
+    fn valid(&self) -> bool {
+        let pointer = |value: &str| value.starts_with('/') && value.len() <= 128;
+        (1..=4).contains(&self.args.len())
+            && self.args.iter().all(|arg| identifier(arg))
+            && (1..=8).contains(&self.input.len())
+            && self.input.iter().all(|line| {
+                line.is_object() && serde_json::to_vec(line).is_ok_and(|bytes| bytes.len() <= 1024)
+            })
+            && (self.response_id.is_u64()
+                || self
+                    .response_id
+                    .as_str()
+                    .is_some_and(|id| (1..=64).contains(&id.len())))
+            && (1..=4).contains(&self.windows.len())
+            && self.windows.iter().all(|window| {
+                pointer(&window.used_percent)
+                    && window.resets_at.as_deref().is_none_or(pointer)
+                    && window.minutes.as_deref().is_none_or(pointer)
+            })
+    }
 }
 
 /// An agent run that makes one image with the agent's own image tool. The prompt goes to stdin;
@@ -565,6 +614,11 @@ impl PluginManifest {
                     .structured_run
                     .as_ref()
                     .is_some_and(|run| manifest.schema_version < 7 || !run.valid())
+                || provider
+                    .cli
+                    .usage_run
+                    .as_ref()
+                    .is_some_and(|run| manifest.schema_version < 11 || !run.valid())
                 || provider.cli.image_run.as_ref().is_some_and(|run| {
                     manifest.schema_version < 7
                         || !run.valid()

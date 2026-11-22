@@ -44,6 +44,8 @@ pub struct ProviderUsage {
     pub limit: Option<f64>,
     pub remaining_percent: Option<f64>,
     pub resets_at: Option<i64>,
+    /// For `percent` usage: the length of the allowance window in minutes, such as a week.
+    pub window_minutes: Option<i64>,
     /// `ok`, `warning` (20% or less left), `danger` (10% or less) or `unknown`.
     pub level: &'static str,
     pub problem: Option<String>,
@@ -188,6 +190,7 @@ fn summarize(
                 limit: Some(limit),
                 remaining_percent: Some((remaining * 10.0).round() / 10.0),
                 resets_at,
+                window_minutes: None,
                 level: usage_level(remaining),
                 problem: None,
             }
@@ -199,6 +202,7 @@ fn summarize(
             limit: None,
             remaining_percent: None,
             resets_at: None,
+            window_minutes: None,
             level: "unknown",
             problem: Some(error.to_string()),
         },
@@ -232,6 +236,25 @@ impl WorkspaceStore {
                 &adapter.unit,
                 read_usage(&adapter, &secret),
             ));
+        }
+        for manifest in bundled_manifests() {
+            let Some(plugin) = installed
+                .contains(&manifest.id)
+                .then(|| crate::agent_plugin(&manifest.id))
+                .flatten()
+            else {
+                continue;
+            };
+            let Some(read) = crate::agent_cli::read_agent_usage(plugin) else {
+                continue;
+            };
+            usage.push(match read {
+                Ok((used, resets_at, window_minutes)) => ProviderUsage {
+                    window_minutes,
+                    ..summarize(&manifest.id, "percent", Ok((used, 100.0, resets_at)))
+                },
+                Err(error) => summarize(&manifest.id, "percent", Err(error)),
+            });
         }
         Ok(usage)
     }
@@ -274,6 +297,15 @@ mod tests {
         assert_eq!(number(Some(&serde_json::json!("42"))), Some(42.0));
         assert_eq!(number(Some(&serde_json::json!(-1))), None);
         assert_eq!(number(Some(&serde_json::json!("unlimited"))), None);
+    }
+
+    #[test]
+    fn codex_describes_a_usage_read_with_reset_times() {
+        let run = crate::agent_plugin("codex")
+            .and_then(|plugin| plugin.cli.usage_run.as_ref())
+            .expect("Codex reads its plan usage");
+        assert_eq!(run.args, ["app-server"]);
+        assert!(run.windows.iter().all(|window| window.resets_at.is_some()));
     }
 
     #[test]

@@ -91,3 +91,83 @@ pub(crate) fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
             }
         })
 }
+
+/// Used percent, reset time in Unix seconds and window length in minutes.
+pub(crate) type AgentUsage = (f64, Option<i64>, Option<i64>);
+
+/// The share used of an agent's tightest allowance window, read through its `usageRun`:
+/// `(used percent, reset time in Unix seconds, window length in minutes)`. `None` when the plugin
+/// describes no usage read or its CLI is not installed.
+pub(crate) fn read_agent_usage(plugin: &AgentPlugin) -> Option<std::io::Result<AgentUsage>> {
+    use std::io::{BufRead, BufReader, Read, Write};
+
+    let run = plugin.cli.usage_run.as_ref()?;
+    let executable = find_agent_cli(plugin)?;
+    Some((|| {
+        let failed = |what: &str| {
+            std::io::Error::other(format!("The agent's usage could not be read: {what}"))
+        };
+        let directory = tempfile::tempdir()?;
+        let mut command = Command::new(executable);
+        command
+            .args(&run.args)
+            .current_dir(directory.path())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+        let mut process = command.spawn().map_err(|_| failed("it did not start"))?;
+        let stdout = process.stdout.take().ok_or_else(|| failed("no output"))?;
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let wanted = run.response_id.clone();
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stdout).take(4 * 1024 * 1024);
+            let mut line = String::new();
+            while reader.read_line(&mut line).is_ok_and(|read| read > 0) {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line)
+                    && value.get("id") == Some(&wanted)
+                {
+                    let _ = sender.send(value);
+                    return;
+                }
+                line.clear();
+            }
+        });
+        // Kept open until the answer arrives: some agents stop once their input closes.
+        let mut stdin = process.stdin.take();
+        if let Some(stdin) = stdin.as_mut() {
+            for message in &run.input {
+                let _ = writeln!(stdin, "{message}");
+            }
+            let _ = stdin.flush();
+        }
+        let reply = receiver.recv_timeout(Duration::from_secs(20));
+        drop(stdin);
+        let _ = process.kill();
+        let _ = process.wait();
+        let reply = reply.map_err(|_| failed("no answer in time"))?;
+        let number = |pointer: &str| reply.pointer(pointer).and_then(serde_json::Value::as_f64);
+        run.windows
+            .iter()
+            .filter_map(|window| {
+                let used = number(&window.used_percent).filter(|used| used.is_finite())?;
+                Some((
+                    used.clamp(0.0, 100.0),
+                    window
+                        .resets_at
+                        .as_deref()
+                        .and_then(|at| reply.pointer(at)?.as_i64()),
+                    window
+                        .minutes
+                        .as_deref()
+                        .and_then(|at| reply.pointer(at)?.as_i64()),
+                ))
+            })
+            .max_by(|first, second| first.0.total_cmp(&second.0))
+            .ok_or_else(|| failed("the answer has no usage"))
+    })())
+}

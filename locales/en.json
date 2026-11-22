@@ -1675,12 +1675,17 @@
       "characters": "characters",
       "credits": "credits",
       "requests": "requests",
-      "seconds": "seconds"
+      "seconds": "seconds",
+      "percent": "plan allowance"
     },
     "beforeGenerating": "This video might stop partway if a provider it uses runs out. Top it up or move it down in Settings › Services and keys.",
     "unreadable": "Not readable",
     "manageKey": "Manage key",
-    "vault": "Keys sit in an encrypted vault: agents use them through Arrumo and can never read them."
+    "vault": "Keys sit in an encrypted vault: agents use them through Arrumo and can never read them.",
+    "weekly": "Weekly limit",
+    "hourly": "{hours}-hour limit",
+    "planLimit": "Plan limit",
+    "unknownAgent": "Could not read the plan’s usage ({reason})."
   },
   "pluginDetail": {
     "back": "All plugins",

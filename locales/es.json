@@ -1675,12 +1675,17 @@
       "characters": "caracteres",
       "credits": "créditos",
       "requests": "peticiones",
-      "seconds": "segundos"
+      "seconds": "segundos",
+      "percent": "límites de uso"
     },
     "beforeGenerating": "Este vídeo podría detenerse a medias si se agota un proveedor que usa. Recárgalo o bájalo en Ajustes › Servicios y claves.",
     "unreadable": "No se puede leer",
     "manageKey": "Gestionar clave",
-    "vault": "Las claves se guardan cifradas: los agentes las usan a través de Arrumo y nunca pueden leerlas."
+    "vault": "Las claves se guardan cifradas: los agentes las usan a través de Arrumo y nunca pueden leerlas.",
+    "weekly": "Límite semanal",
+    "hourly": "Límite de {hours} horas",
+    "planLimit": "Límite del plan",
+    "unknownAgent": "No se pudo leer el uso del plan ({reason})."
   },
   "pluginDetail": {
     "back": "Todos los complementos",
