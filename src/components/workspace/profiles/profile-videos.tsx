@@ -24,8 +24,16 @@ type Scheduled = { run_id: number; format_id: number; title: string; scheduled_d
 type Filter = "all" | "progress" | "drafts";
 type Row = { kind: "draft"; draft: Draft } | { kind: "run"; run: Run };
 
+/** How many portrait cuts a run made the way `profileId` makes its videos. */
+function cutsFor(run: Run, profileId: number) {
+  return (run.snapshot.formats ?? []).filter((entry) => entry.portrait_source?.profile_id === profileId)
+    .reduce((total, entry) => total + (entry.delivery?.supplemental?.portrait_derivatives?.count ?? 0), 0);
+}
+
 type Data = {
   drafts: Draft[];
+  /** Finished videos of other profiles whose portrait cuts followed this one. */
+  cuts: { run: Run; count: number }[];
   runs: Run[];
   formats: ProfileFormat[];
   feedback: Feedback[];
@@ -66,6 +74,8 @@ export function ProfileVideos({ workspaceId, profile }: { workspaceId: number; p
       setData({
         drafts: drafts.filter((draft) => draft.profile_id === profile.id && !submitted.has(draft.id)),
         runs: runs.filter((run) => run.snapshot.profile?.id === profile.id).reverse(),
+        cuts: runs.filter((run) => run.state === "completed" && run.snapshot.profile?.id !== profile.id)
+          .map((run) => ({ run, count: cutsFor(run, profile.id) })).filter(({ count }) => count > 0).reverse(),
         formats, feedback, schedule, agent,
       });
     }, () => { if (active) setFailed(true); });
@@ -126,6 +136,26 @@ export function ProfileVideos({ workspaceId, profile }: { workspaceId: number; p
         )}
       </section>
       <aside className="flex flex-col gap-8">
+        {data.cuts.length > 0 && <section>
+          <h2 className="mb-2 text-[1.3125rem]">{copy.portraitCuts}</h2>
+          <ul className="flex flex-col gap-2">
+            {data.cuts.map(({ run, count }) => (
+              <li key={run.id}>
+                <Link href={completedVideoHref(workspaceId, run.id)} className="group flex items-start gap-2.5 rounded-md py-1 hover:text-primary">
+                  <RectangleVertical className="mt-0.5 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
+                  <span className="min-w-0">
+                    <span className="block font-semibold wrap-anywhere">{runTitle(run)}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {run.snapshot.profile
+                        ? (count === 1 ? copy.portraitCutFrom : copy.portraitCutsFrom.replace("{count}", String(count))).replace("{profile}", run.snapshot.profile.name)
+                        : count === 1 ? copy.portraitCutOne : copy.portraitCutsCount.replace("{count}", String(count))}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>}
         <section>
           <h2 className="mb-2 text-[1.3125rem]">{copy.formats}</h2>
           <ul className="divide-y border-y">

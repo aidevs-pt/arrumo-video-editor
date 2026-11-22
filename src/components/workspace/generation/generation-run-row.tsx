@@ -31,7 +31,7 @@ export type Run = {
   pending_review_id: number | null;
   display_title: string | null;
   progress?: { stage_index: number; stage_count: number; stage: string | null };
-  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; profile?: { id: number; name: string; color: string | null } | null; formats?: { format: DeliveryFormat }[]; options?: { save_motion_to_library?: boolean; autopilot?: boolean }; agent_settings?: { effective_provider?: string | null } };
+  snapshot: { draft: { id: number; title: string; source_ids?: number[] }; profile?: { id: number; name: string; color: string | null } | null; formats?: { format: DeliveryFormat; portrait_source?: { profile_id?: number }; delivery?: { supplemental?: { portrait_derivatives?: { count?: number } } } }[]; options?: { save_motion_to_library?: boolean; autopilot?: boolean }; agent_settings?: { effective_provider?: string | null } };
 };
 
 export type RunAction = "pause" | "resume" | "retry" | "cancel" | "stop";

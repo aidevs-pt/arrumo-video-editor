@@ -1112,7 +1112,12 @@
     "addSelected": "Add {count} to {profile}",
     "missingNotes": "No usage notes yet",
     "loadError": "This section couldn't be loaded.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "portraitCuts": "Portrait cuts",
+    "portraitCutsFrom": "{count} cuts · from {profile}",
+    "portraitCutFrom": "1 cut · from {profile}",
+    "portraitCutsCount": "{count} cuts",
+    "portraitCutOne": "1 cut"
   },
   "batch": {
     "intro": "One video can come from several takes. Select the clips that belong together and group them.",

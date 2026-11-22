@@ -1112,7 +1112,12 @@
     "addSelected": "Adicionar {count} a {profile}",
     "missingNotes": "Ainda sem notas de utilização",
     "loadError": "Não foi possível carregar esta secção.",
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "portraitCuts": "Cortes verticais",
+    "portraitCutsFrom": "{count} cortes · de {profile}",
+    "portraitCutFrom": "1 corte · de {profile}",
+    "portraitCutsCount": "{count} cortes",
+    "portraitCutOne": "1 corte"
   },
   "batch": {
     "intro": "Um vídeo pode vir de várias tomas. Selecione os clips que pertencem juntos e agrupe-os.",
