@@ -13,6 +13,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { ThumbnailReferences, type ReferenceImage } from "@/components/workspace/outputs/thumbnail-references";
 import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
+import { CaptionStyleDialog, DEFAULT_CAPTION_STYLE, type CaptionStyle } from "@/components/workspace/outputs/caption-style-dialog";
 
 /** Reference images previewed in a format's summary; the rest are counted. */
 const REFERENCE_PREVIEWS = 4;
@@ -23,6 +24,7 @@ type Supplemental = {
   thumbnail_guidance?: string; specifications?: string; thumbnail_reference_ids?: number[];
   portrait_derivatives: { count: number; source?: { guidance?: string } };
   burned_captions?: boolean;
+  caption_style?: CaptionStyle;
 };
 export type OutputPlan = { format: Format; supplemental: Supplemental };
 
@@ -30,7 +32,7 @@ export type OutputPlan = { format: Format; supplemental: Supplemental };
 export type FormatOverride = {
   thumbnails?: number; titles?: number; descriptions?: number; tags?: boolean;
   thumbnail_guidance?: string; specifications?: string; portrait_count?: number; portrait_guidance?: string;
-  thumbnail_reference_ids?: number[]; burned_captions?: boolean;
+  thumbnail_reference_ids?: number[]; burned_captions?: boolean; caption_style?: CaptionStyle;
 };
 export type OutputChoice = { skipped: number[]; overrides: Record<string, FormatOverride> };
 
@@ -157,6 +159,14 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
                     <Switch checked={value.captioned} disabled={disabled}
                       onCheckedChange={(burned_captions) => update(format.id, { burned_captions })} />
                   </label>
+                  {value.captioned && <div className="flex items-center justify-between gap-3">
+                    <span className={cn("text-sm", !change.caption_style && "text-muted-foreground")}>
+                      {change.caption_style ? copy.captionStyleChanged : copy.captionStyleInherited}
+                    </span>
+                    <CaptionStyleDialog format={format} disabled={disabled}
+                      value={change.caption_style ?? supplemental.caption_style ?? DEFAULT_CAPTION_STYLE}
+                      onChange={(caption_style) => update(format.id, { caption_style })} />
+                  </div>}
                   <Guidance label={copy.thumbnailGuidance} inherited={supplemental.thumbnail_guidance ?? ""} value={change.thumbnail_guidance}
                     disabled={disabled} onChange={(text) => update(format.id, { thumbnail_guidance: text || undefined })} />
                   {value.portrait > 0 && <Guidance label={copy.portraitGuidance} inherited={supplemental.portrait_derivatives.source?.guidance ?? ""}

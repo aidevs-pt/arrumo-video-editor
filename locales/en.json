@@ -674,7 +674,8 @@
     "summaryVideoSubtitles": "Video + subtitles",
     "summarySize": "Size",
     "summaryTitles": "Titles, descriptions",
-    "summaryHint": "Merged from App, Workspace and this profile. You can still change any of it per video."
+    "summaryHint": "Merged from App, Workspace and this profile. You can still change any of it per video.",
+    "caption_style": "Subtitle style"
   },
   "drafts": {
     "deleteDraft": "Delete draft",
@@ -1519,7 +1520,9 @@
     "specifications": "Extra specifications",
     "resetFormat": "Use the inherited settings",
     "referenceCount": "Following {count} reference images",
-    "referenceOne": "Following 1 reference image"
+    "referenceOne": "Following 1 reference image",
+    "captionStyleChanged": "Subtitle style changed for this video",
+    "captionStyleInherited": "Subtitle style from the format settings"
   },
   "scriptReview": {
     "selectAll": "Select all",
@@ -1809,5 +1812,42 @@
     "later": "Remind me later",
     "never": "No, thanks",
     "bodyMany": "You’ve finished {count} videos with Arrumo. If it helps, a star on GitHub helps other creators find it. It takes a second and it’s free."
+  },
+  "captionStyle": {
+    "open": "Subtitle style",
+    "title": "Subtitle style for {format}",
+    "description": "How subtitles drawn into this format’s captioned copy look. The preview uses the same renderer as the export. Apply, then save the format.",
+    "previewAlt": "Preview of the subtitle style",
+    "loading": "Drawing the preview…",
+    "previewError": "Couldn’t draw the preview. Check that FFmpeg is installed.",
+    "sampleLabel": "Sample text",
+    "sample": "The quickest way to solve the cube\nis to plan two moves ahead",
+    "copyFrom": "Copy from another format",
+    "copyChoose": "Choose a format",
+    "font": "Font",
+    "fonts": {
+      "sans": "Sans",
+      "serif": "Serif",
+      "mono": "Monospace"
+    },
+    "bold": "Bold",
+    "size": "Size: {value}% of the shorter side",
+    "color": "Text colour",
+    "outlineColor": "Outline colour",
+    "boxColor": "Box colour",
+    "background": "Box behind the text",
+    "outline": "Outline: {value}% of the text height",
+    "position": "Position",
+    "positions": {
+      "bottom": "Bottom",
+      "middle": "Middle",
+      "top": "Top"
+    },
+    "margin": "Distance from the edge: {value}% of the height",
+    "marginAuto": "Distance from the edge: automatic",
+    "reset": "Reset to default",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "summary": "Style"
   }
 }

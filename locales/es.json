@@ -674,7 +674,8 @@
     "summaryVideoSubtitles": "Vídeo + subtítulos",
     "summarySize": "Tamaño",
     "summaryTitles": "Títulos, descripciones",
-    "summaryHint": "Combinado de la app, el espacio de trabajo y este perfil. Puedes cambiar cualquier cosa en cada vídeo."
+    "summaryHint": "Combinado de la app, el espacio de trabajo y este perfil. Puedes cambiar cualquier cosa en cada vídeo.",
+    "caption_style": "Estilo de subtítulos"
   },
   "drafts": {
     "deleteDraft": "Eliminar borrador",
@@ -1519,7 +1520,9 @@
     "specifications": "Especificaciones adicionales",
     "resetFormat": "Usar los ajustes heredados",
     "referenceCount": "Siguiendo {count} imágenes de referencia",
-    "referenceOne": "Siguiendo 1 imagen de referencia"
+    "referenceOne": "Siguiendo 1 imagen de referencia",
+    "captionStyleChanged": "Estilo de subtítulos cambiado para este vídeo",
+    "captionStyleInherited": "Estilo de subtítulos de los ajustes del formato"
   },
   "scriptReview": {
     "selectAll": "Seleccionar todo",
@@ -1809,5 +1812,42 @@
     "later": "Recordármelo más tarde",
     "never": "No, gracias",
     "bodyMany": "Has terminado {count} vídeos con Arrumo. Si te ayuda, una estrella en GitHub ayuda a que otros creadores lo encuentren. Es gratis y lleva un segundo."
+  },
+  "captionStyle": {
+    "open": "Estilo de subtítulos",
+    "title": "Estilo de subtítulos para {format}",
+    "description": "Cómo se ven los subtítulos dibujados en la copia subtitulada de este formato. La vista previa usa el mismo renderizador que la exportación. Aplica y después guarda el formato.",
+    "previewAlt": "Vista previa del estilo de subtítulos",
+    "loading": "Dibujando la vista previa…",
+    "previewError": "No se pudo dibujar la vista previa. Comprueba que FFmpeg está instalado.",
+    "sampleLabel": "Texto de ejemplo",
+    "sample": "La forma más rápida de resolver el cubo\nes pensar dos movimientos por delante",
+    "copyFrom": "Copiar de otro formato",
+    "copyChoose": "Elige un formato",
+    "font": "Fuente",
+    "fonts": {
+      "sans": "Sans",
+      "serif": "Serif",
+      "mono": "Monoespaciada"
+    },
+    "bold": "Negrita",
+    "size": "Tamaño: {value} % del lado más corto",
+    "color": "Color del texto",
+    "outlineColor": "Color del contorno",
+    "boxColor": "Color de la caja",
+    "background": "Caja detrás del texto",
+    "outline": "Contorno: {value} % de la altura del texto",
+    "position": "Posición",
+    "positions": {
+      "bottom": "Abajo",
+      "middle": "Centro",
+      "top": "Arriba"
+    },
+    "margin": "Distancia al borde: {value} % de la altura",
+    "marginAuto": "Distancia al borde: automática",
+    "reset": "Restablecer",
+    "cancel": "Cancelar",
+    "apply": "Aplicar",
+    "summary": "Estilo"
   }
 }

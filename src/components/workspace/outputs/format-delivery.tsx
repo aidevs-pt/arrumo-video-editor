@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CaptionStyleDialog, DEFAULT_CAPTION_STYLE, useCaptionSummary, type CaptionStyle } from "./caption-style-dialog";
 import { PortraitFields, type PortraitDerivatives, type SourceProfile } from "./portrait-fields";
 import { ThumbnailReferences, type ReferenceImage } from "./thumbnail-references";
 
@@ -30,6 +31,7 @@ type Supplemental = {
   specifications: string;
   portrait_derivatives: PortraitDerivatives;
   burned_captions: boolean;
+  caption_style: CaptionStyle;
 };
 
 type Delivery = {
@@ -68,6 +70,9 @@ export function FormatDelivery({
   const [references, setReferences] = useState<number[]>([]);
   const [profiles, setProfiles] = useState<SourceProfile[]>([]);
   const [portrait, setPortrait] = useState<PortraitDerivatives>();
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(DEFAULT_CAPTION_STYLE);
+  const [otherFormats, setOtherFormats] = useState<{ id: number; name: string }[]>([]);
+  const captionSummary = useCaptionSummary();
   const showPortrait = format.width > format.height;
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -95,6 +100,7 @@ export function FormatDelivery({
           if (!active) return;
           setReferences(value.supplemental.thumbnail_reference_ids);
           setPortrait(value.supplemental.portrait_derivatives);
+          setCaptionStyle(value.supplemental.caption_style ?? DEFAULT_CAPTION_STYLE);
           setDelivery(value);
         } else {
           const value = await invoke<ProfileDelivery>("get_profile_delivery", { workspaceId, profileId, formatId: format.id });
@@ -102,6 +108,7 @@ export function FormatDelivery({
           setProfileDelivery(value);
           setReferences(value.effective.supplemental.thumbnail_reference_ids);
           setPortrait(value.effective.supplemental.portrait_derivatives);
+          setCaptionStyle(value.effective.supplemental.caption_style ?? DEFAULT_CAPTION_STYLE);
           setDelivery(value.effective);
         }
       } catch {
@@ -111,6 +118,22 @@ export function FormatDelivery({
     void load();
     return () => { active = false; };
   }, [workspaceId, profileId, format.id, attempt, showPortrait]);
+
+  useEffect(() => {
+    let active = true;
+    invoke<{ id: number; name: string; enabled?: boolean }[]>("list_output_formats", { workspaceId })
+      .then((rows) => { if (active) setOtherFormats(rows.filter((row) => row.id !== format.id && row.enabled !== false)); }, () => {});
+    return () => { active = false; };
+  }, [workspaceId, format.id]);
+
+  async function styleOf(formatId: number): Promise<CaptionStyle> {
+    if (isProfile) {
+      const other = await invoke<ProfileDelivery>("get_profile_delivery", { workspaceId, profileId, formatId });
+      return other.effective.supplemental.caption_style ?? DEFAULT_CAPTION_STYLE;
+    }
+    const other = await invoke<Delivery>("get_format_delivery", { workspaceId, formatId });
+    return other.supplemental.caption_style ?? DEFAULT_CAPTION_STYLE;
+  }
 
   function overridden(field: keyof Supplemental) {
     return overrides[field] ?? (profileDelivery?.overrides[field] != null);
@@ -130,6 +153,7 @@ export function FormatDelivery({
       thumbnail_reference_ids: references,
       portrait_derivatives: portrait,
       burned_captions: fields.has("burned_captions"),
+      caption_style: captionStyle,
     };
     setPending(true);
     setResult(null);
@@ -187,7 +211,7 @@ export function FormatDelivery({
     const value = profileDelivery.workspace[field];
     const display = typeof value === "boolean" ? (value ? copy.on : copy.off)
       : Array.isArray(value) ? value.map((id) => images.find((image) => image.id === id)?.name ?? id).join(", ") || copy.empty
-      : typeof value === "object" ? String(value.count)
+      : typeof value === "object" ? ("count" in value ? String(value.count) : captionSummary(value))
       : String(value) || copy.empty;
     return (
       <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2">
@@ -260,9 +284,13 @@ export function FormatDelivery({
             </label>
           </div>)}
           {row(copy.rowCaptions, copy.rowCaptionsHint,
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox name="burned_captions" defaultChecked={delivery.supplemental.burned_captions} />{copy.burned_captions}
-            </label>)}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox name="burned_captions" defaultChecked={delivery.supplemental.burned_captions} />{copy.burned_captions}
+              </label>
+              <CaptionStyleDialog value={captionStyle} onChange={setCaptionStyle} format={format} copySources={otherFormats} loadStyle={styleOf} />
+              <span className="text-sm text-muted-foreground">{captionSummary(captionStyle)}</span>
+            </div>)}
           {row(copy.rowSpecs, copy.rowSpecsHint,
             <Textarea name="specifications" aria-label={copy.specifications} defaultValue={delivery.supplemental.specifications} className="min-h-20" />)}
           <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-4 sm:px-5">
@@ -322,10 +350,15 @@ export function FormatDelivery({
             <Checkbox name="tags" defaultChecked={delivery.supplemental.tags} disabled={!overridden("tags")} />{copy.tagsShort}
           </label>
         </div> },
-      { key: "captions", title: copy.rowCaptions, fields: ["burned_captions"], workspaceValue: workspace.burned_captions ? copy.on : copy.off, body:
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox name="burned_captions" defaultChecked={delivery.supplemental.burned_captions} disabled={!overridden("burned_captions")} />{copy.burned_captions}
-        </label> },
+      { key: "captions", title: copy.rowCaptions, fields: ["burned_captions", "caption_style"], workspaceValue: workspace.burned_captions ? copy.on : copy.off, body:
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox name="burned_captions" defaultChecked={delivery.supplemental.burned_captions} disabled={!overridden("burned_captions")} />{copy.burned_captions}
+          </label>
+          <CaptionStyleDialog value={captionStyle} onChange={setCaptionStyle} format={format} disabled={!overridden("caption_style")}
+            copySources={otherFormats} loadStyle={styleOf} />
+          <span className="text-sm text-muted-foreground">{captionSummary(captionStyle)}</span>
+        </div> },
       { key: "specs", title: copy.rowSpecs, fields: ["specifications"], workspaceValue: workspace.specifications.trim() ? copy.written : copy.empty, body:
         <Textarea name="specifications" aria-label={copy.specifications} defaultValue={delivery.supplemental.specifications}
           disabled={!overridden("specifications")} className="min-h-20" /> },

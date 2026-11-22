@@ -674,7 +674,8 @@
     "summaryVideoSubtitles": "Vídeo + legendas",
     "summarySize": "Tamanho",
     "summaryTitles": "Títulos, descrições",
-    "summaryHint": "Junta a app, o espaço de trabalho e este perfil. Podes mudar qualquer coisa em cada vídeo."
+    "summaryHint": "Junta a app, o espaço de trabalho e este perfil. Podes mudar qualquer coisa em cada vídeo.",
+    "caption_style": "Estilo das legendas"
   },
   "drafts": {
     "deleteDraft": "Eliminar rascunho",
@@ -1519,7 +1520,9 @@
     "specifications": "Especificações adicionais",
     "resetFormat": "Usar as definições herdadas",
     "referenceCount": "Seguindo {count} imagens de referência",
-    "referenceOne": "Seguindo 1 imagem de referência"
+    "referenceOne": "Seguindo 1 imagem de referência",
+    "captionStyleChanged": "Estilo das legendas alterado para este vídeo",
+    "captionStyleInherited": "Estilo das legendas das definições do formato"
   },
   "scriptReview": {
     "selectAll": "Selecionar tudo",
@@ -1809,5 +1812,42 @@
     "later": "Lembrar-me mais tarde",
     "never": "Não, obrigado",
     "bodyMany": "Terminaste {count} vídeos com o Arrumo. Se te ajuda, uma estrela no GitHub ajuda outros criadores a encontrá-lo. É grátis e demora um segundo."
+  },
+  "captionStyle": {
+    "open": "Estilo das legendas",
+    "title": "Estilo das legendas para {format}",
+    "description": "Como ficam as legendas desenhadas na cópia legendada deste formato. A pré-visualização usa o mesmo renderizador da exportação. Aplica e depois guarda o formato.",
+    "previewAlt": "Pré-visualização do estilo das legendas",
+    "loading": "A desenhar a pré-visualização…",
+    "previewError": "Não foi possível desenhar a pré-visualização. Verifica se o FFmpeg está instalado.",
+    "sampleLabel": "Texto de exemplo",
+    "sample": "A forma mais rápida de resolver o cubo\né pensar duas jogadas à frente",
+    "copyFrom": "Copiar de outro formato",
+    "copyChoose": "Escolhe um formato",
+    "font": "Tipo de letra",
+    "fonts": {
+      "sans": "Sans",
+      "serif": "Serif",
+      "mono": "Monoespaçado"
+    },
+    "bold": "Negrito",
+    "size": "Tamanho: {value} % do lado mais curto",
+    "color": "Cor do texto",
+    "outlineColor": "Cor do contorno",
+    "boxColor": "Cor da caixa",
+    "background": "Caixa atrás do texto",
+    "outline": "Contorno: {value} % da altura do texto",
+    "position": "Posição",
+    "positions": {
+      "bottom": "Em baixo",
+      "middle": "Ao centro",
+      "top": "Em cima"
+    },
+    "margin": "Distância à margem: {value} % da altura",
+    "marginAuto": "Distância à margem: automática",
+    "reset": "Repor a predefinição",
+    "cancel": "Cancelar",
+    "apply": "Aplicar",
+    "summary": "Estilo"
   }
 }
