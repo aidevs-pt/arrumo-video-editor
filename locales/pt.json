@@ -123,11 +123,14 @@
     "inherit": "Usar valor predefinido",
     "clear": "Limpar valor",
     "invalid": "Introduza um valor válido para esta definição.",
-    "saveError": "Não foi possível guardar esta definição. Verifique o valor e tente novamente.",
-    "saved": "Definição guardada.",
+    "saveError": "Não foi possível guardar as definições. Verifique os valores e tente novamente.",
+    "saved": "Definições guardadas.",
     "pluginDefault": "A usar a predefinição do plugin",
     "agentTitle": "O que o agente pode fazer",
-    "agentIntro": "Estas definições vêm do plugin do agente. Trabalha sempre só em leitura e não pode executar comandos; ative a pesquisa na web ou os seus próprios plugins apenas se quiser que os use."
+    "agentIntro": "Estas definições vêm do plugin do agente. Trabalha sempre só em leitura e não pode executar comandos; ative a pesquisa na web ou os seus próprios plugins apenas se quiser que os use.",
+    "saving": "A guardar…",
+    "discard": "Descartar alterações",
+    "unsaved": "Por guardar"
   },
   "pluginRegistry": {
     "update": "Atualizar",

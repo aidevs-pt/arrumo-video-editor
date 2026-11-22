@@ -123,11 +123,14 @@
     "inherit": "Usar valor predeterminado",
     "clear": "Borrar valor",
     "invalid": "Introduce un valor válido para este ajuste.",
-    "saveError": "No se pudo guardar este ajuste. Comprueba el valor e inténtalo de nuevo.",
-    "saved": "Ajuste guardado.",
+    "saveError": "No se pudieron guardar los ajustes. Revisa los valores e inténtalo de nuevo.",
+    "saved": "Ajustes guardados.",
     "pluginDefault": "Usando el valor predeterminado del plugin",
     "agentTitle": "Lo que puede hacer el agente",
-    "agentIntro": "Estos ajustes vienen del plugin del agente. Siempre trabaja en solo lectura y no puede ejecutar comandos; activa la búsqueda web o tus propios plugins solo si quieres que los use."
+    "agentIntro": "Estos ajustes vienen del plugin del agente. Siempre trabaja en solo lectura y no puede ejecutar comandos; activa la búsqueda web o tus propios plugins solo si quieres que los use.",
+    "saving": "Guardando…",
+    "discard": "Descartar cambios",
+    "unsaved": "Sin guardar"
   },
   "pluginRegistry": {
     "update": "Actualizar",

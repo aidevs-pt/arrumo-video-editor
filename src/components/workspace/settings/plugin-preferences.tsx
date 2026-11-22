@@ -11,6 +11,8 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useLocale } from "@/lib/locale-provider";
 import { PluginCredentialField } from "./plugin-credential-field";
 
@@ -138,6 +140,10 @@ function PluginFields({ pluginId, fields, workspaceId }: {
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Changes waiting for Save: a JSON value, or null to go back to the inherited one.
+  const [drafts, setDrafts] = useState<Record<string, string | null>>({});
+  const [feedback, setFeedback] = useState<"saved" | "saveError" | "invalid">();
+  const workspace = workspaceId !== null;
 
   useEffect(() => {
     let active = true;
@@ -148,12 +154,33 @@ function PluginFields({ pluginId, fields, workspaceId }: {
     return () => { active = false; };
   }, [pluginId, workspaceId, attempt]);
 
-  async function write(settingId: string, valueJson: string | null) {
+  function change(id: string, value: string | null) {
+    setFeedback(undefined);
+    setDrafts((current) => ({ ...current, [id]: value }));
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const pending = Object.entries(drafts);
+    if (pending.some(([id, value]) => fields.find((field) => field.id === id)?.kind === "integer"
+      && value !== null && !/^-?(0|[1-9][0-9]*)$/.test(value))) {
+      setFeedback("invalid");
+      return;
+    }
     setSaving(true);
+    setFeedback(undefined);
     try {
-      await invoke("write_plugin_setting", { pluginId, settingId, workspaceId, valueJson });
-      setValues(await invoke<Record<string, Values>>("read_plugin_settings", { pluginId, workspaceId }));
+      for (const [settingId, value] of pending) {
+        const field = fields.find((entry) => entry.id === settingId);
+        const valueJson = value === null ? null : field?.kind === "string" ? JSON.stringify(value) : value;
+        await invoke("write_plugin_setting", { pluginId, settingId, workspaceId, valueJson });
+      }
+      setDrafts({});
+      setFeedback("saved");
+    } catch {
+      setFeedback("saveError");
     } finally {
+      setValues(await invoke<Record<string, Values>>("read_plugin_settings", { pluginId, workspaceId }).catch(() => values));
       setSaving(false);
     }
   }
@@ -164,81 +191,74 @@ function PluginFields({ pluginId, fields, workspaceId }: {
   </Alert>;
   if (!values) return <Skeleton className="h-24" aria-label={copy.loading} />;
 
-  return <div className="flex flex-col divide-y">
-    {fields.map((field) => values[field.id] && (
-      <PreferenceField key={field.id} field={field} values={values[field.id]} workspace={workspaceId !== null}
-        saving={saving} write={(value) => write(field.id, value)} />
-    ))}
-  </div>;
+  const changed = Object.keys(drafts).length > 0;
+  return <form className="flex flex-col gap-4" onSubmit={save}>
+    <div className="flex flex-col divide-y">
+      {fields.map((field) => values[field.id] && (
+        <PreferenceField key={field.id} field={field} values={values[field.id]} workspace={workspace}
+          draft={field.id in drafts ? drafts[field.id] : undefined} disabled={saving}
+          onChange={(value) => change(field.id, value)} />
+      ))}
+    </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button type="submit" size="sm" disabled={saving || !changed}>{saving ? copy.saving : copy.save}</Button>
+      {changed && !saving && <Button type="button" size="sm" variant="ghost" onClick={() => { setDrafts({}); setFeedback(undefined); }}>{copy.discard}</Button>}
+      {feedback && <p role={feedback === "saved" ? "status" : "alert"}
+        className={feedback === "saved" ? "text-sm text-muted-foreground" : "text-sm text-destructive"}>{copy[feedback]}</p>}
+    </div>
+  </form>;
 }
 
-function PreferenceField({ field, values, workspace, saving, write }: {
+function PreferenceField({ field, values, workspace, draft, disabled, onChange }: {
   field: PluginSettingDeclaration;
   values: Values;
   workspace: boolean;
-  saving: boolean;
-  write: (value: string | null) => Promise<void>;
+  /** A pending JSON value, null to inherit, or undefined when unchanged. */
+  draft: string | null | undefined;
+  disabled: boolean;
+  onChange: (value: string | null) => void;
 }) {
   const { messages: { pluginPreferences: copy } } = useLocale();
   const id = useId();
   const own = workspace ? values.workspaceOverride : values.app;
-  const present = field.kind === "string" && values.effective !== null
+  const saved = field.kind === "string" && values.effective !== null
     ? JSON.parse(values.effective) as string
     : values.effective ?? "";
-  const [draft, setDraft] = useState<string>();
   const fallback = field.default === undefined ? undefined
-    : typeof field.default === "boolean" ? (field.default ? copy.yes : copy.no) : String(field.default);
-  const [feedback, setFeedback] = useState<"invalid" | "saveError" | "saved">();
+    : typeof field.default === "boolean" ? String(field.default) : String(field.default);
+  const shown = draft === undefined ? saved : draft === null ? "" : draft;
+  const effective = shown === "" ? fallback ?? "" : shown;
+  const resetting = draft === null;
+  const source = draft !== undefined ? copy.unsaved
+    : values.source ? copy[values.source] : fallback !== undefined ? copy.pluginDefault : copy.unset;
+  const canReset = !resetting && (own !== null || (draft !== undefined && draft !== null));
 
-  async function save(value: string | null) {
-    setFeedback(undefined);
-    try {
-      await write(value);
-      setDraft(undefined);
-      setFeedback("saved");
-    } catch {
-      setFeedback("saveError");
-    }
-  }
+  const control = field.kind === "boolean" ? (
+    <Switch id={id} aria-describedby={id + "-description"} disabled={disabled}
+      checked={effective === "true"} onCheckedChange={(checked) => onChange(String(checked))} />
+  ) : field.choices ? (
+    <Select value={shown} onValueChange={(value) => onChange(value)} disabled={disabled}>
+      <SelectTrigger id={id} aria-describedby={id + "-description"} className="w-44"><SelectValue placeholder={fallback ?? copy.unset} /></SelectTrigger>
+      <SelectContent><SelectGroup>
+        {field.choices.map((choice) => <SelectItem key={choice} value={choice}>{choice}</SelectItem>)}
+      </SelectGroup></SelectContent>
+    </Select>
+  ) : (
+    <Input id={id} aria-describedby={id + "-description"} className="w-44" placeholder={fallback}
+      inputMode={field.kind === "integer" ? "numeric" : undefined}
+      value={shown} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+  );
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const value = draft ?? present;
-    if (field.kind === "integer" && !/^-?(0|[1-9][0-9]*)$/.test(value)) {
-      setFeedback("invalid");
-      return;
-    }
-    if (field.kind === "boolean" && value === "") {
-      setFeedback("invalid");
-      return;
-    }
-    void save(field.kind === "string" ? JSON.stringify(value) : value);
-  }
-
-  return <form className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0" onSubmit={submit}>
-    <Field>
-      <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
-      <FieldDescription id={id + "-description"}>{field.description}</FieldDescription>
-      {field.kind === "boolean" || field.choices ? (
-        <Select value={draft ?? present} onValueChange={setDraft} disabled={saving}>
-          <SelectTrigger id={id} aria-describedby={id + "-description"}><SelectValue placeholder={fallback ?? copy.unset} /></SelectTrigger>
-          <SelectContent><SelectGroup>
-            {field.choices ? field.choices.map((choice) => <SelectItem key={choice} value={choice}>{choice}</SelectItem>) : <>
-              <SelectItem value="true">{copy.yes}</SelectItem>
-              <SelectItem value="false">{copy.no}</SelectItem>
-            </>}
-          </SelectGroup></SelectContent>
-        </Select>
-      ) : <Input placeholder={fallback} id={id} aria-describedby={id + "-description"} inputMode={field.kind === "integer" ? "numeric" : undefined}
-        value={draft ?? present} onChange={(event) => setDraft(event.target.value)} disabled={saving} />}
-      <FieldDescription>{values.source ? copy[values.source] : fallback ? copy.pluginDefault : copy.unset}</FieldDescription>
-    </Field>
-    <div className="flex flex-wrap gap-2">
-      <Button type="submit" size="sm" disabled={saving || draft === undefined}>{copy.save}</Button>
-      {own !== null && <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void save(null)}>
-        {workspace ? copy.inherit : copy.clear}
-      </Button>}
+  return <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0">
+    <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+      <Label htmlFor={id} className="font-semibold">{field.label}</Label>
+      <p id={id + "-description"} className="text-sm text-muted-foreground">{field.description}</p>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>{source}</span>
+        {canReset && <button type="button" className="underline underline-offset-2 hover:text-foreground" disabled={disabled}
+          onClick={() => onChange(null)}>{workspace ? copy.inherit : copy.clear}</button>}
+      </p>
     </div>
-    {feedback && <p role={feedback === "saved" ? "status" : "alert"} className={feedback === "saved" ? "text-sm text-muted-foreground" : "text-sm text-destructive"}>{copy[feedback]}</p>}
-  </form>;
+    <div className="shrink-0 pt-0.5">{control}</div>
+  </div>;
 }

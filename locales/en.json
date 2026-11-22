@@ -123,11 +123,14 @@
     "inherit": "Use app default",
     "clear": "Clear value",
     "invalid": "Enter a valid value for this setting.",
-    "saveError": "Could not save this setting. Check the value and try again.",
-    "saved": "Setting saved.",
+    "saveError": "Could not save these settings. Check the values and try again.",
+    "saved": "Settings saved.",
     "pluginDefault": "Using the plugin's default",
     "agentTitle": "What the agent can do",
-    "agentIntro": "These settings come from the agent's plugin. It always works read-only and cannot run commands; turn on web search or your own plugins only if you want it to use them."
+    "agentIntro": "These settings come from the agent's plugin. It always works read-only and cannot run commands; turn on web search or your own plugins only if you want it to use them.",
+    "saving": "Saving…",
+    "discard": "Discard changes",
+    "unsaved": "Not saved yet"
   },
   "pluginRegistry": {
     "update": "Update",
