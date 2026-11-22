@@ -6,6 +6,8 @@
 
 Cria um espaço de trabalho e escolhe o agente de edição disponível no teu computador. Se pretendes gerar legendas a partir do áudio, configura um fornecedor de transcrição que devolva marcas temporais. Cada fornecedor precisa das suas próprias credenciais.
 
+Cada espaço de trabalho começa com o seu próprio ícone e cor. Para os mudar, ou para mostrar uma imagem como o avatar do teu canal, escolhe **Personalizar espaço de trabalho** no menu do espaço de trabalho.
+
 Abre **Saídas** e verifica os formatos ativos. Para a entrega ser verificada, cada formato ativo precisa do seu próprio MP4 final e ficheiro SRT.
 
 ## Guarda um rascunho e coloca-o na fila

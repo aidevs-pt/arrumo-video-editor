@@ -6,6 +6,8 @@
 
 Create a workspace and choose the editing agent available on your machine. If you plan to generate subtitles from audio, configure a transcription provider that supplies timestamps. A credential for one provider does not give access to another.
 
+Each workspace starts with its own icon and color. To change them, or to show an image such as your channel avatar, choose **Customize workspace** in the workspace menu.
+
 Open **Outputs** and check which formats are enabled. Each enabled format needs its own final MP4 and SRT for the delivery to pass verification.
 
 ## Save and queue a draft
