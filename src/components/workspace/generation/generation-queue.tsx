@@ -20,6 +20,7 @@ import { RunHooks } from "./run-hooks";
 import { RunProviders } from "./run-providers";
 import { VideoCatalogHeader } from "../videos/video-catalog-header";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
+import { cn } from "@/lib/utils";
 
 type Draft = { id: number; title: string };
 export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogView = false, onBack }: {
@@ -39,6 +40,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
   const [pending, setPending] = useState(false);
   const [deleting, setDeleting] = useState<number>();
   const [submitError, setSubmitError] = useState(false);
+  const [profileFilter, setProfileFilter] = useState<number | null>(null);
   const { messages } = useLocale();
   const copy = messages.queue;
   const selected = drafts.find((draft) => draft.id === selectedId);
@@ -97,7 +99,9 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
     }
   }
 
-  const activeRuns = runs?.filter((run) => run.state !== "completed");
+  const unfiltered = runs?.filter((run) => run.state !== "completed");
+  const runProfiles = [...new Map((unfiltered ?? []).flatMap((run) => run.snapshot.profile ? [[run.snapshot.profile.id, run.snapshot.profile] as const] : [])).values()];
+  const activeRuns = profileFilter === null ? unfiltered : unfiltered?.filter((run) => run.snapshot.profile?.id === profileFilter);
   const groups = activeRuns ? [
     { id: "all", label: copy.runs, runs: [...activeRuns].reverse() },
     { id: "review", label: copy.reviewFilter, runs: activeRuns.filter(runNeedsReview).reverse() },
@@ -171,6 +175,19 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
               </form>
             </CardContent>
           </Card>
+        )}
+        {runs && (catalogView || !selected) && runProfiles.length > 0 && (
+          <div role="group" aria-label={copy.profileFilter} className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="me-1 text-muted-foreground">{copy.profileFilter}</span>
+            {[{ id: null, name: copy.allProfiles, color: null }, ...runProfiles].map((entry) => (
+              <Button key={entry.id ?? "all"} type="button" size="sm" variant="outline" aria-pressed={profileFilter === entry.id}
+                className={cn("font-semibold", profileFilter === entry.id ? "border-foreground bg-card" : "border-border text-muted-foreground hover:text-foreground")}
+                onClick={() => setProfileFilter(entry.id)}>
+                {entry.color && <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ backgroundColor: entry.color }} />}
+                {entry.name}
+              </Button>
+            ))}
+          </div>
         )}
         {runs && (catalogView || !selected) ? (
           <Tabs defaultValue="all" className="min-w-0 gap-4">

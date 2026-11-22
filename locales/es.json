@@ -832,7 +832,9 @@
     "stop": "Detener",
     "stopTitle": "¿Detener y volver al paso anterior?",
     "stopDescription": "El trabajo actual se detiene. El último resultado que aprobaste se vuelve a abrir para que puedas cambiarlo; tu decisión anterior queda en el historial.",
-    "keepGoing": "Continuar"
+    "keepGoing": "Continuar",
+    "profileFilter": "Perfil",
+    "allProfiles": "Todos"
   },
   "onboarding": {
     "tagline": "De material en bruto a vídeos brillantes.",

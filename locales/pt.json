@@ -832,7 +832,9 @@
     "stop": "Parar",
     "stopTitle": "Parar e voltar ao passo anterior?",
     "stopDescription": "O trabalho atual para. O último resultado que aprovou volta a abrir para o poder alterar; a sua decisão anterior fica no histórico.",
-    "keepGoing": "Continuar"
+    "keepGoing": "Continuar",
+    "profileFilter": "Perfil",
+    "allProfiles": "Todos"
   },
   "onboarding": {
     "tagline": "De filmagens em bruto a vídeos brilhantes.",

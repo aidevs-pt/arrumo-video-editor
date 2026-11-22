@@ -832,7 +832,9 @@
     "stop": "Stop",
     "stopTitle": "Stop and go back to the previous step?",
     "stopDescription": "The current work stops. The last result you approved opens again so you can change it; your earlier decision stays in the history.",
-    "keepGoing": "Keep going"
+    "keepGoing": "Keep going",
+    "profileFilter": "Profile",
+    "allProfiles": "All"
   },
   "onboarding": {
     "tagline": "Messy footage in. Brilliant video out.",
