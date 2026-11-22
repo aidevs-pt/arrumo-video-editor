@@ -92,11 +92,12 @@ impl WorkspaceStore {
                 .ok()?;
             asset_path(&root, workspace_id, id).canonicalize().ok()
         };
+        let fonts = self.current_font_set(&root, workspace_id)?;
         let mut artifacts = Vec::with_capacity(specs.len());
         for (index, spec) in specs.iter().enumerate() {
             let video = format!("animation-{index}.mp4");
             let still = format!("animation-{index}.png");
-            render_spec(spec, size, scratch, &video, &images, check)?;
+            render_spec(spec, size, scratch, &video, &images, &fonts, check)?;
             render_thumbnail(scratch, &video, spec.duration_seconds, &still)?;
             let directory = scratch.canonicalize()?;
             artifacts.push(MotionArtifact {
@@ -158,6 +159,7 @@ impl WorkspaceStore {
             "request": request,
             "workspaceContext": self.workspace_context(workspace_id)?,
             "brandColors": self.video_brand_colors(workspace_id)?,
+            "brandFonts": crate::brand_fonts::families(&serde_json::to_value(self.brand_fonts(workspace_id)?)?),
             "profile": profile,
             "images": images.iter().map(|image| json!({"assetId": image.id, "name": image.name, "notes": image.notes})).collect::<Vec<_>>(),
             "animationToChange": base,

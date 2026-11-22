@@ -976,7 +976,46 @@
     "forVideosCount": "{count} de {total} se usan en los vídeos",
     "forVideos": "Usar {color} en los vídeos",
     "namePlaceholder": "Ponle nombre",
-    "nameLabel": "Nombre de {color}"
+    "nameLabel": "Nombre de {color}",
+    "fonts": {
+      "title": "Fuentes",
+      "description": "Las animaciones ponen los títulos y las cifras grandes en la fuente de títulos y el resto del texto en la fuente de texto. Usa archivos TrueType u OpenType estáticos que incluyan letras con tilde.",
+      "loading": "Cargando fuentes…",
+      "roles": {
+        "heading": "Títulos",
+        "body": "Texto"
+      },
+      "uses": {
+        "heading": "Títulos, cifras grandes y avisos cortos",
+        "body": "Etiquetas, listas y rótulos"
+      },
+      "weights": {
+        "regular": "Normal",
+        "bold": "Negrita"
+      },
+      "notSet": "Sin definir",
+      "usesBody": "Usa la fuente de texto hasta que añadas una.",
+      "usesSystem": "Usa una sans-serif sencilla hasta que añadas una.",
+      "specimenTitle": "Ideas brillantes, listas",
+      "specimenBody": "Ágil, clara e única: 1234 € ¿Sí?",
+      "add": "Añadir fuente",
+      "replace": "Sustituir",
+      "saving": "Guardando…",
+      "remove": "Quitar fuente",
+      "choose": "Elige un archivo de fuente",
+      "fileType": "Archivos de fuente",
+      "errors": {
+        "font_not_font_file": "Elige un archivo de fuente TrueType (.ttf) u OpenType (.otf).",
+        "font_damaged": "Ese archivo está dañado o no es una fuente.",
+        "font_variable": "Es una fuente variable. Elige un archivo estático, como el Regular o el Bold.",
+        "font_missing_characters": "A esa fuente le faltan letras con tilde o símbolos que necesitan los vídeos, como á, ç, ñ, ¿ o €.",
+        "font_unusual_width": "Las letras de esa fuente son demasiado estrechas o anchas para maquetarlas.",
+        "font_too_large": "Los archivos de fuente pueden ocupar como máximo 20 MB.",
+        "brand_font_save_failed": "No se ha podido guardar la fuente.",
+        "brand_font_remove_failed": "No se ha podido quitar la fuente.",
+        "brand_fonts_load_failed": "No se han podido cargar las fuentes."
+      }
+    }
   },
   "brandImages": {
     "manage": "De la biblioteca",

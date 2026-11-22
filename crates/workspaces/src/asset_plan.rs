@@ -106,6 +106,7 @@ fn plan_prompt(
         "learnedFeedback": snapshot["feedback"],
         "profile": snapshot["profile"],
         "brandColors": snapshot["brand_colors"],
+        "brandFonts": crate::brand_fonts::families(&snapshot["brand_fonts"]),
         "library": entries,
         "images": images,
     });

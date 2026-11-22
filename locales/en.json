@@ -976,7 +976,46 @@
     "forVideosCount": "{count} of {total} used in videos",
     "forVideos": "Use {color} in videos",
     "namePlaceholder": "Name it",
-    "nameLabel": "Name for {color}"
+    "nameLabel": "Name for {color}",
+    "fonts": {
+      "title": "Fonts",
+      "description": "Animations set titles and big numbers in the heading font and other text in the body font. Use static TrueType or OpenType files that include accented letters.",
+      "loading": "Loading fonts…",
+      "roles": {
+        "heading": "Headings",
+        "body": "Body text"
+      },
+      "uses": {
+        "heading": "Titles, big numbers and short callouts",
+        "body": "Labels, lists and lower thirds"
+      },
+      "weights": {
+        "regular": "Regular",
+        "bold": "Bold"
+      },
+      "notSet": "Not set",
+      "usesBody": "Uses the body font until you add one.",
+      "usesSystem": "Uses a plain sans-serif until you add one.",
+      "specimenTitle": "Brilliant ideas, ready",
+      "specimenBody": "Ágil, clara e única: 1234 € ¿Sí?",
+      "add": "Add font",
+      "replace": "Replace",
+      "saving": "Saving…",
+      "remove": "Remove font",
+      "choose": "Choose a font file",
+      "fileType": "Font files",
+      "errors": {
+        "font_not_font_file": "Choose a TrueType (.ttf) or OpenType (.otf) font file.",
+        "font_damaged": "That file is damaged or isn’t a font.",
+        "font_variable": "That’s a variable font. Choose a static file, such as the Regular or Bold one.",
+        "font_missing_characters": "That font is missing accented letters or symbols videos need, such as á, ç, ñ, ¿ or €.",
+        "font_unusual_width": "That font’s letters are too narrow or too wide to lay out.",
+        "font_too_large": "Font files can be at most 20 MB.",
+        "brand_font_save_failed": "The font couldn’t be saved.",
+        "brand_font_remove_failed": "The font couldn’t be removed.",
+        "brand_fonts_load_failed": "Fonts couldn’t be loaded."
+      }
+    }
   },
   "brandImages": {
     "manage": "From library",

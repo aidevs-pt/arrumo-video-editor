@@ -1092,6 +1092,83 @@ async fn set_brand_colors(
         .map_err(|_| "brand_colors_save_failed")
 }
 
+fn media_root(app: &AppHandle) -> Result<PathBuf, &'static str> {
+    Ok(asset_root(
+        &app.path()
+            .app_local_data_dir()
+            .map_err(|_| "asset_storage_unavailable")?
+            .join("workspaces.sqlite"),
+    ))
+}
+
+#[tauri::command]
+async fn get_brand_fonts(
+    workspace_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::BrandFont>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .brand_fonts(workspace_id)
+        .map_err(|_| "brand_fonts_load_failed")
+}
+
+#[tauri::command]
+async fn import_brand_font(
+    workspace_id: i64,
+    role: arrumo_workspaces::FontRole,
+    weight: arrumo_workspaces::FontWeight,
+    source: PathBuf,
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::BrandFont, &'static str> {
+    let root = media_root(&app)?;
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .import_brand_font(&root, workspace_id, role, weight, &source)
+        .map_err(|error| {
+            error
+                .downcast_ref::<arrumo_workspaces::UnusableFont>()
+                .map_or("brand_font_save_failed", |problem| problem.code)
+        })
+}
+
+#[tauri::command]
+async fn remove_brand_font(
+    workspace_id: i64,
+    role: arrumo_workspaces::FontRole,
+    weight: arrumo_workspaces::FontWeight,
+    store: State<'_, Store>,
+) -> Result<bool, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .remove_brand_font(workspace_id, role, weight)
+        .map_err(|_| "brand_font_remove_failed")
+}
+
+/// A saved brand font as a data URL the page can load to show a specimen.
+#[tauri::command]
+async fn brand_font_data(
+    workspace_id: i64,
+    sha256: String,
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<String, &'static str> {
+    use base64::Engine as _;
+    let root = media_root(&app)?;
+    let bytes = store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .brand_font_bytes(&root, workspace_id, &sha256)
+        .map_err(|_| "brand_fonts_load_failed")?;
+    Ok(format!(
+        "data:font/ttf;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
 #[tauri::command]
 async fn get_brand_palette(
     workspace_id: i64,
@@ -1692,6 +1769,10 @@ fn main() {
             remove_workspace_feedback,
             get_brand_colors,
             set_brand_colors,
+            get_brand_fonts,
+            import_brand_font,
+            remove_brand_font,
+            brand_font_data,
             get_brand_palette,
             set_brand_color_details,
             list_brand_assets,

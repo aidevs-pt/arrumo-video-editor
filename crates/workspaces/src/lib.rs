@@ -21,6 +21,7 @@ mod audio_generation;
 mod automatic_subtitles;
 mod backup;
 mod brand_assets;
+mod brand_fonts;
 mod clip_render;
 mod completed_video;
 mod completed_video_feedback;
@@ -119,6 +120,7 @@ pub use backup::{
     pending_backup_import, stage_backup_import, verify_backup,
 };
 pub use brand_assets::{BrandAsset, BrandAssetRole};
+pub use brand_fonts::{BrandFont, FontRole, FontWeight, UnusableFont};
 pub use caption_style::{
     CaptionFont, CaptionPosition, CaptionStyle, CaptionStyleOverrides, caption_preview,
 };
@@ -323,6 +325,7 @@ impl WorkspaceStore {
             include_str!("../migrations/063-system-notifications.sql"),
             include_str!("../migrations/064-plugin-activation.sql"),
             include_str!("../migrations/065-agent-usage-observations.sql"),
+            include_str!("../migrations/066-brand-fonts.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

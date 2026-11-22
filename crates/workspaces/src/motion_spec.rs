@@ -16,7 +16,10 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::MotionKind;
+use crate::{
+    MotionKind,
+    brand_fonts::{FontRole, FontSet, FontWeight},
+};
 
 pub(crate) const MAX_LAYERS: usize = 12;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
@@ -78,6 +81,13 @@ pub(crate) struct Layer {
     /// A soft shadow under a box or image.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub shadow: bool,
+    /// Which brand font text is set in.
+    #[serde(default, skip_serializing_if = "is_body")]
+    pub font: FontRole,
+}
+
+fn is_body(role: &FontRole) -> bool {
+    *role == FontRole::Body
 }
 
 fn is_zero(value: &f64) -> bool {
@@ -157,6 +167,33 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
     } else {
         json!({"anyOf": [{"type": "null"}, {"enum": assets}]})
     };
+    let layer = json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
+            "color", "bold", "opacity", "start", "end", "enter", "exit", "sound",
+            "align", "radius", "gradientTo", "shadow", "font"],
+        "properties": {
+            "type": {"enum": ["text", "box", "image"]},
+            "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
+            "assetId": asset,
+            "x": unit, "y": unit, "width": unit, "height": unit,
+            "size": {"type": "number", "minimum": 0.02, "maximum": 0.25},
+            "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+            "bold": {"type": "boolean"},
+            "opacity": unit,
+            "start": {"type": "number", "minimum": 0},
+            "end": {"type": "number", "minimum": 0},
+            "enter": motion,
+            "exit": motion,
+            "sound": {"enum": ["none", "whoosh", "pop", "click", "chime", "rise"]},
+            "align": {"enum": ["left", "center", "right"]},
+            "radius": {"type": "number", "minimum": 0, "maximum": 0.5},
+            "gradientTo": optional_color,
+            "shadow": {"type": "boolean"},
+            "font": {"enum": ["heading", "body"]}
+        }
+    });
     json!({
         "type": "object",
         "additionalProperties": false,
@@ -172,32 +209,7 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
                 "type": "array",
                 "minItems": 1,
                 "maxItems": MAX_LAYERS,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
-                        "color", "bold", "opacity", "start", "end", "enter", "exit", "sound",
-                        "align", "radius", "gradientTo", "shadow"],
-                    "properties": {
-                        "type": {"enum": ["text", "box", "image"]},
-                        "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
-                        "assetId": asset,
-                        "x": unit, "y": unit, "width": unit, "height": unit,
-                        "size": {"type": "number", "minimum": 0.02, "maximum": 0.25},
-                        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
-                        "bold": {"type": "boolean"},
-                        "opacity": unit,
-                        "start": {"type": "number", "minimum": 0},
-                        "end": {"type": "number", "minimum": 0},
-                        "enter": motion,
-                        "exit": motion,
-                        "sound": {"enum": ["none", "whoosh", "pop", "click", "chime", "rise"]},
-                        "align": {"enum": ["left", "center", "right"]},
-                        "radius": {"type": "number", "minimum": 0, "maximum": 0.5},
-                        "gradientTo": optional_color,
-                        "shadow": {"type": "boolean"}
-                    }
-                }
+                "items": layer
             }
         }
     })
@@ -216,8 +228,9 @@ and leaves. Use the brand colours, keep strong contrast between text and what is
 text short and inside the frame with a safe margin of 0.06, and stagger entrances so the motion \
 reads clearly. A layer can play a short sound as it arrives (a whoosh for slides, a pop or click for \
 items appearing, a chime for a reveal, a rise for a build-up); use them sparingly, on the beats that \
-matter, and none when the animation will sit under speech. Text is set in a plain sans-serif font that has no emoji, pictographs or arrows, so \
-write only letters, digits and common punctuation, and draw shapes, grids, bars and diagrams with box \
+matter, and none when the animation will sit under speech. Text is set in the brand's heading or body \
+font (font; a plain sans-serif when the brand has none), with no emoji, pictographs or arrows, so \
+write only letters, digits and common punctuation; use the heading font for titles and big numbers, and draw shapes, grids, bars and diagrams with box \
 layers. Leave text null for boxes and images and assetId null for text and boxes. \
 For a polished look: align a column of text left (align sets where lines sit within width, so a \
 left-aligned layer starts at x minus width/2), round cards and images slightly (radius 0.08 to 0.2 \
@@ -432,21 +445,25 @@ fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String
     )
 }
 
-pub(crate) fn ensure_fonts(directory: &Path) -> io::Result<()> {
-    if directory.join("font-bold").is_file() {
-        return Ok(());
-    }
-    install_fonts(directory)
-}
-
-/// Fonts drawtext uses, copied into the job directory so filter arguments need no path escaping.
-fn install_fonts(directory: &Path) -> io::Result<()> {
-    for (name, weight) in [("font-regular", "regular"), ("font-bold", "bold")] {
-        let source = system_font(weight)
-            .ok_or_else(|| io::Error::other("No system font was found for animation text"))?;
-        fs::copy(source, directory.join(name))?;
+/// Copies the fonts drawtext uses into the job directory as `font-<role>-<weight>`, so filter
+/// arguments need no path escaping: the brand's files where there are some, else the system font.
+pub(crate) fn ensure_fonts(directory: &Path, fonts: &FontSet) -> io::Result<()> {
+    for role in [FontRole::Heading, FontRole::Body] {
+        for weight in [FontWeight::Regular, FontWeight::Bold] {
+            let source = match fonts.file(role, weight) {
+                Some(path) => path.to_path_buf(),
+                None => system_font(weight.as_str()).ok_or_else(|| {
+                    io::Error::other("No system font was found for animation text")
+                })?,
+            };
+            fs::copy(source, directory.join(font_name(role, weight)))?;
+        }
     }
     Ok(())
+}
+
+fn font_name(role: FontRole, weight: FontWeight) -> String {
+    format!("font-{}-{}", role.as_str(), weight.as_str())
 }
 
 fn system_font(weight: &str) -> Option<PathBuf> {
@@ -491,6 +508,7 @@ struct LayerTarget<'a> {
     shift: f64,
     /// How long image and box sources last, in seconds of the base video.
     length: f64,
+    fonts: &'a FontSet,
 }
 
 impl LayerTarget<'_> {
@@ -527,13 +545,15 @@ impl LayerTarget<'_> {
             match layer.kind {
                 LayerType::Text => {
                     let font_px = (layer.size * frame_h).round().max(8.0);
-                    let columns = (layer.width * frame_w / (font_px * 0.52)).floor() as usize;
-                    let wrapped = wrap(layer.text.as_deref().unwrap_or_default(), columns);
-                    let font = if layer.bold {
-                        "font-bold"
+                    let weight = if layer.bold {
+                        FontWeight::Bold
                     } else {
-                        "font-regular"
+                        FontWeight::Regular
                     };
+                    let advance = self.fonts.advance(layer.font, weight);
+                    let columns = (layer.width * frame_w / (font_px * advance)).floor() as usize;
+                    let wrapped = wrap(layer.text.as_deref().unwrap_or_default(), columns);
+                    let font = font_name(layer.font, weight);
                     // FFmpeg 8's drawtext draws a missing-glyph box at each line break, so
                     // every line is its own centred drawtext.
                     let lines: Vec<&str> = wrapped.lines().collect();
@@ -778,8 +798,9 @@ pub(crate) fn overlay_graph(
     graph: &mut String,
     args: &mut Vec<String>,
     images: &dyn Fn(i64) -> Option<PathBuf>,
+    fonts: &FontSet,
 ) -> io::Result<String> {
-    ensure_fonts(directory)?;
+    ensure_fonts(directory, fonts)?;
     LayerTarget {
         width,
         height,
@@ -787,12 +808,14 @@ pub(crate) fn overlay_graph(
         prefix,
         shift: at,
         length: at + spec.duration_seconds,
+        fonts,
     }
     .draw(spec, base, first_input, graph, args, images)
 }
 
 /// Builds the FFmpeg arguments that render `spec` at `width`×`height` into `output` (a name inside
 /// `directory`). Text files are written next to it. `images` resolves asset IDs to files.
+#[allow(clippy::too_many_arguments)]
 fn render_arguments(
     spec: &MotionSpec,
     width: u32,
@@ -800,6 +823,7 @@ fn render_arguments(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
+    fonts: &FontSet,
     audio: Option<&Path>,
 ) -> io::Result<Vec<String>> {
     let duration = spec.duration_seconds;
@@ -851,6 +875,7 @@ fn render_arguments(
         prefix: "",
         shift: 0.0,
         length: duration,
+        fonts,
     };
     let current = layers.draw(spec, "0:v", 2, &mut graph, &mut args, images)?;
     let pixel_format = if width.is_multiple_of(2) && height.is_multiple_of(2) {
@@ -999,23 +1024,26 @@ pub(crate) fn render_spec(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
+    fonts: &FontSet,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
-    render_spec_with_audio(spec, size, directory, output, images, None, check)
+    render_spec_with_audio(spec, size, directory, output, images, fonts, None, check)
 }
 
 /// Renders `spec` with `audio` as its soundtrack, padded with silence to the spec's duration.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_spec_with_audio(
     spec: &MotionSpec,
     (width, height): (u32, u32),
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
+    fonts: &FontSet,
     audio: Option<&Path>,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
-    ensure_fonts(directory)?;
-    let args = render_arguments(spec, width, height, directory, output, images, audio)?;
+    ensure_fonts(directory, fonts)?;
+    let args = render_arguments(spec, width, height, directory, output, images, fonts, audio)?;
     run_ffmpeg(directory, &args, check)
 }
 
@@ -1221,6 +1249,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &|_| None,
+            &FontSet::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -1290,6 +1319,7 @@ mod tests {
                 &mut graph,
                 &mut inputs,
                 &|_| None,
+                &FontSet::default(),
             )
             .unwrap();
         }
@@ -1360,6 +1390,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &resolve,
+            &FontSet::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -1390,6 +1421,7 @@ mod tests {
                 directory.path(),
                 &name,
                 &resolve,
+                &FontSet::default(),
                 &mut || Ok(()),
             )
             .unwrap();

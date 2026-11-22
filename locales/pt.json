@@ -976,7 +976,46 @@
     "forVideosCount": "{count} de {total} usadas nos vídeos",
     "forVideos": "Usar {color} nos vídeos",
     "namePlaceholder": "Dar um nome",
-    "nameLabel": "Nome de {color}"
+    "nameLabel": "Nome de {color}",
+    "fonts": {
+      "title": "Tipos de letra",
+      "description": "As animações põem os títulos e os números grandes no tipo de letra dos títulos e o resto do texto no tipo de letra do texto. Usa ficheiros TrueType ou OpenType estáticos que incluam letras acentuadas.",
+      "loading": "A carregar tipos de letra…",
+      "roles": {
+        "heading": "Títulos",
+        "body": "Texto"
+      },
+      "uses": {
+        "heading": "Títulos, números grandes e destaques curtos",
+        "body": "Etiquetas, listas e oráculos"
+      },
+      "weights": {
+        "regular": "Normal",
+        "bold": "Negrito"
+      },
+      "notSet": "Não definido",
+      "usesBody": "Usa o tipo de letra do texto até adicionares um.",
+      "usesSystem": "Usa uma sans-serif simples até adicionares um.",
+      "specimenTitle": "Ideias brilhantes, prontas",
+      "specimenBody": "Ágil, clara e única: 1234 € ¿Sí?",
+      "add": "Adicionar tipo de letra",
+      "replace": "Substituir",
+      "saving": "A guardar…",
+      "remove": "Remover tipo de letra",
+      "choose": "Escolhe um ficheiro de tipo de letra",
+      "fileType": "Ficheiros de tipo de letra",
+      "errors": {
+        "font_not_font_file": "Escolhe um ficheiro TrueType (.ttf) ou OpenType (.otf).",
+        "font_damaged": "Esse ficheiro está danificado ou não é um tipo de letra.",
+        "font_variable": "É um tipo de letra variável. Escolhe um ficheiro estático, como o Regular ou o Bold.",
+        "font_missing_characters": "Faltam a esse tipo de letra letras acentuadas ou símbolos de que os vídeos precisam, como á, ç, ñ, ¿ ou €.",
+        "font_unusual_width": "As letras desse tipo de letra são demasiado estreitas ou largas para paginar.",
+        "font_too_large": "Os ficheiros de tipo de letra podem ter no máximo 20 MB.",
+        "brand_font_save_failed": "Não foi possível guardar o tipo de letra.",
+        "brand_font_remove_failed": "Não foi possível remover o tipo de letra.",
+        "brand_fonts_load_failed": "Não foi possível carregar os tipos de letra."
+      }
+    }
   },
   "brandImages": {
     "manage": "Da biblioteca",

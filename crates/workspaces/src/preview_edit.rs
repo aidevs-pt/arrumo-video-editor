@@ -492,6 +492,7 @@ impl WorkspaceStore {
             "learnedFeedback": snapshot["feedback"],
             "profile": snapshot["profile"],
             "brandColors": snapshot["brand_colors"],
+            "brandFonts": crate::brand_fonts::families(&snapshot["brand_fonts"]),
             "formats": snapshot["formats"].as_array().map(|formats| formats.iter().map(|entry| json!({
                 "width": entry["format"]["width"], "height": entry["format"]["height"],
             })).collect::<Vec<_>>()),

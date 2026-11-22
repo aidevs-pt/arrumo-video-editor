@@ -808,6 +808,9 @@ impl ActiveRender<'_> {
         let directory = scratch.join(format!("scenes-{}", format.id));
         fs::create_dir(&directory)?;
         let images = |id: i64| asset_path(root, self.workspace_id, id).canonicalize().ok();
+        let fonts = self
+            .store
+            .run_font_set(root, self.workspace_id, self.run_id)?;
         let mut heartbeat = Instant::now();
         let mut check = || -> Result<(), Box<dyn Error>> {
             if heartbeat.elapsed() >= Duration::from_secs(10) {
@@ -829,6 +832,7 @@ impl ActiveRender<'_> {
                 &directory,
                 &name,
                 &images,
+                &fonts,
                 narration.get(index).and_then(|(audio, _)| audio.as_deref()),
                 &mut check,
             )?;
@@ -1086,6 +1090,9 @@ impl ActiveRender<'_> {
                 .canonicalize()
                 .ok()
         };
+        let fonts = self
+            .store
+            .run_font_set(root, self.workspace_id, self.run_id)?;
         let mut check = || -> Result<(), Box<dyn Error>> { Ok(self.confirm_lease()?) };
         let mut parts = Vec::new();
         let mut insert = |cut: usize,
@@ -1094,7 +1101,15 @@ impl ActiveRender<'_> {
          -> Result<(), Box<dyn Error>> {
             for (number, spec) in motion.inserts_before(cut).enumerate() {
                 let name = format!("insert-{id}-{cut}-{number}.mp4");
-                render_spec(spec, (*width, *height), scratch, &name, &images, &mut check)?;
+                render_spec(
+                    spec,
+                    (*width, *height),
+                    scratch,
+                    &name,
+                    &images,
+                    &fonts,
+                    &mut check,
+                )?;
                 parts.push(probe_duration(&scratch.join(&name))?);
                 manifest.push_str(&format!("file {name}\n"));
             }
@@ -1146,6 +1161,7 @@ impl ActiveRender<'_> {
                     &mut graph,
                     &mut inputs,
                     &images,
+                    &fonts,
                 )?;
             }
             graph.push_str(&format!("[{video}]null[video]"));

@@ -123,6 +123,22 @@ struct TransformAudioInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkspaceOnly {
+    workspace_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrandFontInput {
+    workspace_id: i64,
+    role: crate::FontRole,
+    weight: crate::FontWeight,
+    #[serde(default)]
+    source: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ImportInput {
     workspace_id: i64,
     source: String,
@@ -228,7 +244,7 @@ fn default_frames() -> u32 {
     8
 }
 
-pub(super) fn definitions() -> [Value; 32] {
+pub(super) fn definitions() -> [Value; 35] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -357,6 +373,19 @@ pub(super) fn definitions() -> [Value; 32] {
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "provider": {"type": "string", "minLength": 1, "maxLength": 64}},
                 "required": ["workspaceId", "provider"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_brand_fonts", "description": "Read the workspace's brand fonts: for the heading and body roles, the regular and bold files with their family names. Animation text uses them; a missing bold uses the regular file, a missing heading font uses the body font, and a missing body font uses a plain system sans-serif.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id}, "required": ["workspaceId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "import_brand_font", "description": "Save a static TrueType or OpenType font file at an absolute local path as the workspace's heading or body font in regular or bold, replacing the one there. The file must draw accented Latin letters and common symbols. Runs that already used the old file keep it.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "role": {"enum": ["heading", "body"]}, "weight": {"enum": ["regular", "bold"]},
+                "source": {"type": "string", "minLength": 1}
+            }, "required": ["workspaceId", "role", "weight", "source"], "additionalProperties": false}}),
+        json!({"name": "remove_brand_font", "description": "Stop using the workspace's heading or body font in regular or bold.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "role": {"enum": ["heading", "body"]}, "weight": {"enum": ["regular", "bold"]}
+            }, "required": ["workspaceId", "role", "weight"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "import_workspace_asset", "description": "Copy an existing media file at an absolute path on the local machine into managed workspace storage.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "source": {"type": "string", "minLength": 1}
@@ -640,6 +669,46 @@ pub(super) fn call(
                     .map(|status| json!({"status": status}))
                     .map_err(|_| "Could not check the speech provider")
             }),
+        "get_brand_fonts" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid brand font arguments")
+            .and_then(|args: WorkspaceOnly| {
+                store
+                    .brand_fonts(args.workspace_id)
+                    .map(|fonts| json!({"fonts": fonts}))
+                    .map_err(|_| "Could not read brand fonts")
+            }),
+        "import_brand_font" | "remove_brand_font" => {
+            serde_json::from_value(Value::Object(arguments.clone()))
+                .map_err(|_| "Invalid brand font arguments")
+                .and_then(|args: BrandFontInput| {
+                    if name == "remove_brand_font" {
+                        if args.source.is_some() {
+                            return Err("Invalid brand font arguments");
+                        }
+                        return store
+                            .remove_brand_font(args.workspace_id, args.role, args.weight)
+                            .map(|removed| json!({"removed": removed}))
+                            .map_err(|_| "Could not remove the brand font");
+                    }
+                    let source = args.source.as_deref().map(Path::new);
+                    let Some(source) = source.filter(|source| source.is_absolute()) else {
+                        return Err("Font source must be an absolute local path");
+                    };
+                    store
+                        .import_brand_font(
+                            &asset_root(database),
+                            args.workspace_id,
+                            args.role,
+                            args.weight,
+                            source,
+                        )
+                        .map(|font| json!({"font": font}))
+                        .map_err(|error| match error.downcast_ref::<crate::UnusableFont>() {
+                            Some(problem) => problem.message,
+                            None => "Could not save the font. Check the workspace and font file",
+                        })
+                })
+        }
         "import_workspace_asset" | "import_thumbnail_reference" => {
             serde_json::from_value(Value::Object(arguments.clone()))
                 .map_err(|_| "Invalid workspace asset arguments")

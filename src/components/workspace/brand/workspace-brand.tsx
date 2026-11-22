@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Check, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { WorkspaceBrandFonts } from "./workspace-brand-fonts";
 import { WorkspaceBrandImages } from "./workspace-brand-images";
 import type { Workspace } from "../home/workspace-links";
 
@@ -113,6 +114,7 @@ export function WorkspaceBrand({ workspace }: { workspace: Workspace }) {
           {result === "saveError" && <p role="alert" className="mt-3 text-destructive">{copy.saveError}</p>}
         </section>
       )}
+      <WorkspaceBrandFonts workspaceId={workspace.id} />
       <WorkspaceBrandImages workspaceId={workspace.id} />
     </WorkspaceShell>
   );

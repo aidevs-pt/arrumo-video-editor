@@ -503,6 +503,7 @@ impl WorkspaceStore {
             "provider_orders": provider_orders,
             "workspace_context": self.workspace_context(workspace_id)?,
             "brand_colors": self.video_brand_colors(workspace_id)?,
+            "brand_fonts": self.brand_fonts(workspace_id)?,
             "brand_assets": self.list_brand_assets(workspace_id)?,
             "feedback": self.list_workspace_feedback(workspace_id)?,
             "delivery_feedback": self.draft_delivery_feedback(workspace_id, draft_id)?,

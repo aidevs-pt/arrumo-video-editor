@@ -856,6 +856,37 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .set_brand_colors(utf8(workspace)?.parse()?, &colors)?;
             println!("{}", serde_json::to_string(&stored)?);
         }
+        [database, command, workspace] if command == "brand-fonts" => {
+            let fonts = WorkspaceStore::open(Path::new(database))?
+                .brand_fonts(utf8(workspace)?.parse()?)?;
+            println!("{}", serde_json::to_string(&fonts)?);
+        }
+        [database, command, workspace, role, weight, source] if command == "import-brand-font" => {
+            let role: arrumo_workspaces::FontRole =
+                serde_json::from_value(serde_json::json!(utf8(role)?))?;
+            let weight: arrumo_workspaces::FontWeight =
+                serde_json::from_value(serde_json::json!(utf8(weight)?))?;
+            let font = WorkspaceStore::open(Path::new(database))?.import_brand_font(
+                &asset_root(Path::new(database)),
+                utf8(workspace)?.parse()?,
+                role,
+                weight,
+                Path::new(source),
+            )?;
+            println!("{}", serde_json::to_string(&font)?);
+        }
+        [database, command, workspace, role, weight] if command == "remove-brand-font" => {
+            let role: arrumo_workspaces::FontRole =
+                serde_json::from_value(serde_json::json!(utf8(role)?))?;
+            let weight: arrumo_workspaces::FontWeight =
+                serde_json::from_value(serde_json::json!(utf8(weight)?))?;
+            let removed = WorkspaceStore::open(Path::new(database))?.remove_brand_font(
+                utf8(workspace)?.parse()?,
+                role,
+                weight,
+            )?;
+            println!("{}", serde_json::json!({"removed": removed}));
+        }
         [database, command, workspace] if command == "brand-assets" => {
             let assets = WorkspaceStore::open(Path::new(database))?
                 .list_brand_assets(utf8(workspace)?.parse()?)?;
@@ -1685,6 +1716,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "update-feedback <workspace-id> <feedback-id> <title> <markdown> | ",
                 "remove-feedback <workspace-id> <feedback-id> | ",
                 "brand-colors <workspace-id> | set-brand-colors <workspace-id> <colors-json> | ",
+                "brand-fonts <workspace-id> | import-brand-font <workspace-id> <heading|body> <regular|bold> <font-file> | ",
+                "remove-brand-font <workspace-id> <heading|body> <regular|bold> | ",
                 "brand-assets <workspace-id> | ",
                 "attach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
                 "detach-brand-asset <workspace-id> <asset-id> <identity|style> | ",
