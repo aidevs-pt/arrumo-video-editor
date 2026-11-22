@@ -140,7 +140,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
       <Button variant="outline" disabled={disabled}><Sparkles data-icon="inline-start" />
         {imagesOnly && inOrder[0] ? copy.openWith.replace("{provider}", name(inOrder[0])) : copy.open}</Button>
     </DialogTrigger>
-    <DialogContent className="sm:max-w-xl">
+    <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>{imagesOnly ? copy.styleTitle : copy.title}</DialogTitle>
         <DialogDescription>{imagesOnly ? copy.styleDescription : copy.description}</DialogDescription>
@@ -199,8 +199,9 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
               {choices.map((asset) => {
                 const selected = chosen.includes(asset.id);
                 return <button key={asset.id} type="button" aria-pressed={selected} disabled={pending} title={asset.name} onClick={() => toggleReference(asset)}
-                  className={cn("relative rounded-thumb text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50", selected && "ring-2 ring-primary")}>
-                  <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind} />
+                  className="group/reference relative rounded-thumb text-left outline-none">
+                  <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind}
+                    className={cn("group-focus-visible/reference:ring-3 group-focus-visible/reference:ring-ring/50", selected && "ring-2 ring-primary")} />
                   <span className="mt-1 block truncate text-xs text-muted-foreground">{asset.name}</span>
                   {selected && <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3.5" aria-hidden="true" /></span>}
                 </button>;
