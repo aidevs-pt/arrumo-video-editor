@@ -315,7 +315,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
                 return <button key={asset.id} type="button" aria-pressed={selected} disabled={pending} title={asset.name} onClick={() => toggleReference(asset)}
                   className="group/reference relative rounded-thumb text-left outline-none">
                   <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind}
-                    className={cn("group-focus-visible/reference:ring-3 group-focus-visible/reference:ring-ring/50", selected && "ring-2 ring-primary")} />
+                    className={cn("aspect-square [&>img]:object-contain group-focus-visible/reference:ring-3 group-focus-visible/reference:ring-ring/50", selected && "ring-2 ring-primary")} />
                   <span className="mt-1 block truncate text-xs text-muted-foreground">{asset.name}</span>
                   {selected && <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3.5" aria-hidden="true" /></span>}
                 </button>;

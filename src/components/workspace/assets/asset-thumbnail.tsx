@@ -33,11 +33,11 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className }: {
   }, [assetId, kind, workspaceId]);
 
   return (
-    <div ref={element} aria-hidden="true" className={cn("grid aspect-video place-items-center overflow-hidden rounded-thumb bg-muted", className)}>
+    <div ref={element} aria-hidden="true" className={cn("relative grid aspect-video place-items-center overflow-hidden rounded-thumb bg-muted", className)}>
       {url ? (
         // Managed local preview provided by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="size-full object-cover" onError={() => setUrl(undefined)} />
+        <img src={url} alt="" className="absolute inset-0 size-full object-cover" onError={() => setUrl(undefined)} />
       ) : <Icon className="size-6 text-muted-foreground" />}
     </div>
   );
