@@ -322,6 +322,10 @@ struct SceneMusic<'a> {
     featured: bool,
 }
 
+/// Removes silence from both ends of a track, keeping 50 ms before and after the sound.
+const TRIM_SILENCE: &str = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05,areverse,\
+     silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05,areverse";
+
 /// Seconds two music tracks overlap where the music changes.
 const MUSIC_CROSSFADE: f64 = 2.0;
 
@@ -1448,6 +1452,26 @@ impl ActiveRender<'_> {
 
     /// Like `lay_music`, changing to each further track at its start time (in seconds) with a
     /// crossfade. Each track is levelled on its own so the changes keep one loudness.
+    fn trim_silence(&self, track: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
+        self.run(
+            Command::new("ffmpeg")
+                .args([
+                    "-nostdin",
+                    "-v",
+                    "error",
+                    "-protocol_whitelist",
+                    "file",
+                    "-i",
+                ])
+                .arg(track)
+                .args(["-map", "0:a:0", "-af"])
+                .arg(TRIM_SILENCE)
+                .args(["-c:a", "pcm_s16le", "-y"])
+                .arg(output),
+            "trimming silence from a music track",
+        )
+    }
+
     fn lay_music_tracks(
         &self,
         input: &Path,
@@ -1469,8 +1493,12 @@ impl ActiveRender<'_> {
                 "-i",
             ])
             .arg(input);
-        for (track, _) in tracks {
-            command.args(["-stream_loop", "-1", "-i"]).arg(track);
+        // Generated tracks often end in silence, which would leave gaps where they loop or hand over.
+        let trimmed = tempfile::tempdir()?;
+        for (index, (track, _)) in tracks.iter().enumerate() {
+            let sound = trimmed.path().join(format!("{index}.wav"));
+            self.trim_silence(track, &sound)?;
+            command.args(["-stream_loop", "-1", "-i"]).arg(sound);
         }
         let bed = music_bed(
             tracks.iter().map(|(_, start)| *start).collect(),
@@ -1544,6 +1572,30 @@ fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn music_loses_the_silence_at_both_ends() {
+        if std::process::Command::new("ffmpeg")
+            .arg("-version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let output = directory.path().join("trimmed.wav");
+        let made = std::process::Command::new("ffmpeg")
+            .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
+            .arg("anullsrc=r=48000:cl=stereo:d=1[a];sine=f=440:d=2,aformat=channel_layouts=stereo[b];anullsrc=r=48000:cl=stereo:d=1.5[c];[a][b][c]concat=n=3:v=0:a=1")
+            .arg("-af")
+            .arg(super::TRIM_SILENCE)
+            .arg(&output)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let seconds = crate::source_transcripts::media_duration(&output).unwrap();
+        assert!((seconds - 2.1).abs() < 0.08, "{seconds}");
+    }
+
     #[test]
     fn music_changes_crossfade_at_their_scenes() {
         if std::process::Command::new("ffmpeg")
