@@ -1,0 +1,131 @@
+# Builds, signs and publishes a release. Run it by hand from the Actions tab; only the accounts in
+# the RELEASE_ACTORS variable can, and the `release` environment can add required approval.
+# Secrets and variables it needs are listed in docs/releasing.md.
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "patch, minor, major, or an exact version such as 0.2.0"
+        required: true
+        default: patch
+concurrency: release
+permissions:
+  contents: write
+env:
+  CARGO_INCREMENTAL: "0"
+jobs:
+  prepare:
+    if: contains(format(',{0},', vars.RELEASE_ACTORS), format(',{0},', github.actor))
+    runs-on: ubuntu-latest
+    environment: release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: video-editor
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - id: version
+        working-directory: video-editor
+        run: |
+          version=$(node scripts/set-version.mjs "${{ inputs.version }}")
+          cargo update --workspace
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git commit -am "chore(release): v$version"
+          git tag "v$version"
+          git push origin HEAD "v$version"
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${{ steps.version.outputs.version }}" --repo "${{ github.repository }}" --draft --generate-notes --title "Arrumo ${{ steps.version.outputs.version }}"
+
+  build:
+    needs: prepare
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            args: ""
+          - os: windows-latest
+            args: ""
+          - os: macos-latest
+            args: --target universal-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: video-editor
+          ref: v${{ needs.prepare.outputs.version }}
+      # The default plugins are bundled from their published, digest-checked registry releases.
+      - uses: actions/checkout@v4
+        with:
+          repository: aidevs-pt/arrumo-plugin-registry
+          path: plugin-registry
+          token: ${{ secrets.ARRUMO_REPOS_TOKEN }}
+      - name: Fetch the default plugins
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN }}
+        run: |
+          mkdir -p plugin-releases plugins
+          for id in $(jq -r '.plugins[] | select(.default) | .id' plugin-registry/catalog.json); do
+            repository=$(jq -r --arg id "$id" '.plugins[] | select(.id == $id) | .repository' plugin-registry/catalog.json)
+            url=$(jq -r --arg id "$id" '.plugins[] | select(.id == $id) | (.releases // []) | last | .packageUrl // empty' plugin-registry/catalog.json)
+            if [ -z "$url" ]; then echo "::error::$id has no registry release; publish it first"; exit 1; fi
+            tag=$(jq -r --arg id "$id" '.plugins[] | select(.id == $id) | .releases | last | .version' plugin-registry/catalog.json)
+            gh repo clone "${repository#https://github.com/}" "plugins/$id" -- --depth 1 --branch "v$tag"
+            gh release download "v$tag" --repo "${repository#https://github.com/}" --pattern "*.zip" --output "plugin-releases/$id.zip"
+          done
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: video-editor/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: video-editor/pnpm-lock.yaml
+      - if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - working-directory: video-editor
+        run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARRUMO_PLUGIN_RELEASE_ROOT: ${{ github.workspace }}/plugin-releases
+          ARRUMO_UPDATER_PUBKEY: ${{ vars.ARRUMO_UPDATER_PUBKEY }}
+          ARRUMO_CRASH_DSN: ${{ secrets.ARRUMO_CRASH_DSN }}
+          ARRUMO_USAGE_KEY: ${{ secrets.ARRUMO_USAGE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: video-editor
+          tagName: v${{ needs.prepare.outputs.version }}
+          releaseDraft: true
+          includeUpdaterJson: true
+          args: ${{ matrix.args }} --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "v${{ needs.prepare.outputs.version }}" --repo "${{ github.repository }}" --draft=false --latest

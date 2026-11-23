@@ -1,0 +1,48 @@
+# Releasing Arrumo
+
+Releases are built by the **Release** workflow (`.github/workflows/release.yml`). Run it by hand from the repository's Actions tab. It:
+
+1. sets the new version with `scripts/set-version.mjs` (`patch`, `minor`, `major`, or an exact version), commits `chore(release): vX.Y.Z` as the person who ran it, tags `vX.Y.Z` and drafts a GitHub release;
+2. builds and signs Linux (`.deb`, `.rpm`, AppImage), Windows (NSIS and MSI) and macOS (universal `.dmg`) on GitHub's runners;
+3. bundles the default plugins from their published registry releases, after checking each ZIP's digest against `plugin-registry/catalog.json`;
+4. uploads the installers, the signed updater packages and `latest.json`, then publishes the release.
+
+Installed copies of Arrumo read `latest.json` from the latest release, check its signature against the public key built into the app, and offer the update.
+
+## One-time setup
+
+1. **Enable Actions** for `aidevs-pt/arrumo-video-editor` (Settings › Actions › General).
+2. **Create the updater signing key on your own computer.** Keep the private key and its password in your password manager, and keep an offline backup. If they are lost, installed copies can never be updated again.
+
+   ```sh
+   pnpm tauri signer generate -w ~/.tauri/arrumo-updater.key
+   ```
+
+3. **Create the `release` environment** (Settings › Environments). Add yourself as a required reviewer if every release should wait for your approval.
+4. **Add the variables** (Settings › Secrets and variables › Actions › Variables):
+   - `RELEASE_ACTORS`: the GitHub accounts allowed to release, separated by commas (for example `IAntonioDev`).
+   - `ARRUMO_UPDATER_PUBKEY`: the contents of `~/.tauri/arrumo-updater.key.pub`. The public key is not secret.
+5. **Add the secrets**:
+
+   | Secret | What it is |
+   | --- | --- |
+   | `TAURI_SIGNING_PRIVATE_KEY` | The contents of `~/.tauri/arrumo-updater.key` |
+   | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password |
+   | `ARRUMO_CRASH_DSN` | The Sentry project DSN |
+   | `ARRUMO_USAGE_KEY` | The Aptabase app key |
+   | `ARRUMO_REPOS_TOKEN` | A fine-grained token with read access to the plugin and registry repositories. Remove it once they are public. |
+   | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` | The Developer ID Application certificate (base64 `.p12`), its password and its identity name |
+   | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | For notarization; `APPLE_PASSWORD` is an app-specific password |
+
+   Windows installers are not code-signed yet. Add Azure Trusted Signing or a certificate when one is available, otherwise SmartScreen warns on first launch.
+
+## Before each release
+
+- Publish a registry release for any default plugin that changed. The build stops if a plugin has no release, or if a release ZIP differs from its catalog digest.
+- Run the local checks: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `pnpm build`.
+
+## When a release breaks
+
+Publish a fixed release as usual. Arrumo marks each launch, and removes the mark after a minute of running or on a normal quit. If a launch ends before then, the next one checks for an update first and installs it without asking, so a release that crashes on start can still be replaced.
+
+Builds made without `ARRUMO_UPDATER_PUBKEY` (contributor builds), or with `ARRUMO_STORE_BUILD` set (store builds), never check for updates. Builds without `ARRUMO_CRASH_DSN` or `ARRUMO_USAGE_KEY` send nothing.
