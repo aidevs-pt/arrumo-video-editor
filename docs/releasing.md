@@ -48,7 +48,11 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
 
 ## Before each release
 
-- Publish a registry release for any default plugin that changed. The build stops if a plugin has no release, or if a release ZIP differs from its catalog digest.
+- Publish a release of every default plugin that changed, in two clicks:
+  1. In the plugin's repository, run **Actions › Release** with the new version. It packages the plugin with the Plugin SDK and publishes `<plugin>-<version>.zip` as a GitHub release.
+  2. In `arrumo-plugin-registry`, run **Actions › Add plugin release** with the plugin and version. It downloads that exact ZIP, records its version, schema and SHA-256 in `catalog.json`, verifies it and commits.
+
+  The editor build bundles the latest catalog release of each default plugin. It stops if a plugin has no release, or if a ZIP differs from its catalog digest or from the plugin's manifest at that tag.
 - Run the local checks: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `pnpm build`.
 
 ## When a release breaks
