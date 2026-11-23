@@ -24,12 +24,12 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "c
   const Icon = icons[kind];
 
   useEffect(() => {
-    if (kind !== "image" || !element.current) return;
+    if (kind === "audio" || !element.current) return;
     let active = true;
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
       observer.disconnect();
-      invoke<string | null>("preview_workspace_image", { workspaceId, assetId }).then(
+      invoke<string | null>(kind === "image" ? "preview_workspace_image" : "preview_workspace_video_frame", { workspaceId, assetId }).then(
         (value) => { if (active && value) setUrl(value); },
         () => {},
       );
@@ -48,4 +48,33 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "c
       ) : <Icon className="size-6 text-muted-foreground" />}
     </div>
   );
+}
+
+/** Plays a video or audio asset, with the video's still as its poster until it plays. */
+export function AssetPlayer({ workspaceId, assetId, kind, label }: {
+  workspaceId: number;
+  assetId: number;
+  kind: "audio" | "video";
+  label: string;
+}) {
+  const [url, setUrl] = useState<string>();
+  const [poster, setPoster] = useState<string>();
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    invoke<string>("preview_workspace_media", { workspaceId, assetId, kind })
+      .then((value) => { if (active) setUrl(value); }, () => { if (active) setFailed(true); });
+    if (kind === "video") {
+      invoke<string>("preview_workspace_video_frame", { workspaceId, assetId })
+        .then((value) => { if (active) setPoster(value); }, () => {});
+    }
+    return () => { active = false; };
+  }, [assetId, kind, workspaceId]);
+
+  if (failed || !url) return <AssetThumbnail workspaceId={workspaceId} assetId={assetId} kind={kind} className="aspect-video w-full" />;
+  return kind === "video"
+    ? <video src={url} poster={poster} aria-label={label} controls playsInline preload="metadata"
+        className="aspect-video w-full rounded-thumb bg-ink object-contain" onError={() => setFailed(true)} />
+    : <audio src={url} aria-label={label} controls preload="metadata" className="w-full" onError={() => setFailed(true)} />;
 }

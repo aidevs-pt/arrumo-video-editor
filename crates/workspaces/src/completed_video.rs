@@ -58,14 +58,19 @@ impl WorkspaceStore {
         database: &std::path::Path,
         workspace_id: i64,
         run_id: i64,
-    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    ) -> Result<(std::path::PathBuf, &'static str), Box<dyn std::error::Error>> {
         let video = self.completed_video(workspace_id, run_id)?;
-        if let Some(thumbnail) = video
+        let thumbnail = video
             .supplemental_media
             .iter()
-            .find(|media| media.kind == "image")
-            .and_then(|media| media.managed_file(database, workspace_id).ok())
-        {
+            .filter(|media| media.kind == "image")
+            .find_map(|media| {
+                let file = media.managed_file(database, workspace_id).ok()?;
+                let mut head = [0u8; 16];
+                std::io::Read::read_exact(&mut std::fs::File::open(&file).ok()?, &mut head).ok()?;
+                Some((file, crate::image_type(&head)?))
+            });
+        if let Some(thumbnail) = thumbnail {
             return Ok(thumbnail);
         }
         let output = video
@@ -104,7 +109,7 @@ impl WorkspaceStore {
             }
             std::fs::rename(&pending, &poster)?;
         }
-        Ok(poster)
+        Ok((poster, "image/jpeg"))
     }
 
     pub fn rename_completed_video(

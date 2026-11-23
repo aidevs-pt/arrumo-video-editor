@@ -15,7 +15,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { TagInput } from "@/components/ui/tag-input";
 import { cn } from "@/lib/utils";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
-import { AssetThumbnail } from "./asset-thumbnail";
+import { AssetPlayer, AssetThumbnail } from "./asset-thumbnail";
 import { AudioTransformDialog, type AudioTransformProvider } from "./audio-transform-dialog";
 import { DubDialog, type DubbingProvider } from "./dub-dialog";
 import type { Asset, AssetOrganization } from "./workspace-assets";
@@ -130,7 +130,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const busy = state === "saving";
 
   return (
-    <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 xl:sticky xl:top-20" aria-labelledby="asset-panel-title">
+    <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain" aria-labelledby="asset-panel-title">
       <div className="flex items-start justify-between gap-3">
         <h2 id="asset-panel-title" className="font-sans min-w-0 text-[1.125rem] leading-snug font-bold wrap-anywhere">
           {single ? copy.panelOne.replace("{name}", single.name) : copy.panelMany.replace("{count}", String(assets.length))}
@@ -140,7 +140,9 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
       <ul className="flex flex-wrap gap-2">
         {assets.slice(0, 6).map((asset) => (
           <li key={asset.id} className={single ? "w-full" : undefined}>
-            <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind} className={single ? "aspect-video w-full" : "aspect-[4/3] w-16"} />
+            {single && asset.kind !== "image"
+              ? <AssetPlayer workspaceId={workspaceId} assetId={asset.id} kind={asset.kind} label={asset.name} />
+              : <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind} className={single ? "aspect-video w-full" : "aspect-[4/3] w-16"} />}
           </li>
         ))}
         {assets.length > 6 && <li className="grid aspect-[4/3] w-16 place-items-center rounded-thumb bg-secondary text-sm font-bold">+{assets.length - 6}</li>}

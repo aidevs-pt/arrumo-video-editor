@@ -105,16 +105,53 @@ impl WorkspaceStore {
         if bytes.len() as u64 > MAX_BYTES {
             return Ok(None);
         }
-        let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
-            "image/png"
-        } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
-            "image/jpeg"
-        } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
-            "image/webp"
-        } else {
+        let Some(mime) = image_type(&bytes) else {
             return Ok(None);
         };
         Ok(Some(ImagePreview { mime, bytes }))
+    }
+
+    /// A still from a video asset, taken once and kept in `cache`. FFmpeg picks the most
+    /// representative of the first frames, so a fade from black still gives a picture.
+    pub fn video_frame(
+        &self,
+        media_root: &Path,
+        cache: &Path,
+        workspace_id: i64,
+        asset_id: i64,
+    ) -> Result<ImagePreview, Box<dyn Error>> {
+        self.managed_asset_name(workspace_id, asset_id, "video")?;
+        let source = asset_path(media_root, workspace_id, asset_id);
+        if !source.symlink_metadata()?.is_file() || source.canonicalize()? != source {
+            return Err(io::Error::other("Video frame source is unavailable").into());
+        }
+        let directory = cache.join(workspace_id.to_string());
+        let frame = directory.join(format!("{asset_id}.jpg"));
+        if !frame.is_file() {
+            fs::create_dir_all(&directory)?;
+            let pending = directory.join(format!("{asset_id}-pending.jpg"));
+            let made = std::process::Command::new("ffmpeg")
+                .args([
+                    "-nostdin",
+                    "-v",
+                    "error",
+                    "-protocol_whitelist",
+                    "file",
+                    "-i",
+                ])
+                .arg(&source)
+                .args(["-vf", "thumbnail=24,scale=480:-2", "-frames:v", "1", "-y"])
+                .arg(&pending)
+                .status()?;
+            if !made.success() {
+                return Err(io::Error::other("Could not take a frame of the video").into());
+            }
+            fs::rename(&pending, &frame)?;
+        }
+        Ok(ImagePreview {
+            mime: "image/jpeg",
+            bytes: fs::read(frame)?,
+        })
     }
 
     pub fn set_asset_notes(
@@ -382,6 +419,20 @@ pub(crate) fn read_asset(row: &Row<'_>) -> rusqlite::Result<WorkspaceAsset> {
         byte_size: row.get(4)?,
         notes: row.get(5)?,
     })
+}
+
+/// The media type of a PNG, JPEG or WebP image from its first bytes; managed files carry no
+/// extension.
+pub fn image_type(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("image/png")
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("image/jpeg")
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        Some("image/webp")
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

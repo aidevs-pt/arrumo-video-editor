@@ -358,6 +358,79 @@ async fn preview_workspace_image(
 }
 
 #[tauri::command]
+async fn preview_workspace_video_frame(
+    workspace_id: i64,
+    asset_id: i64,
+    app: AppHandle,
+) -> Result<String, &'static str> {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    let failed = "asset_preview_failed";
+    let cache = app
+        .path()
+        .app_cache_dir()
+        .map_err(|_| failed)?
+        .join("asset-frames");
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| failed)?
+            .join("workspaces.sqlite")
+            .canonicalize()
+            .map_err(|_| failed)?;
+        let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
+        let frame = store
+            .video_frame(&asset_root(&database), &cache, workspace_id, asset_id)
+            .map_err(|_| failed)?;
+        Ok(format!(
+            "data:{};base64,{}",
+            frame.mime,
+            STANDARD.encode(frame.bytes)
+        ))
+    })
+    .await
+    .map_err(|_| failed)?
+}
+
+/// A local stream of a video or audio asset for the asset details player.
+#[tauri::command]
+async fn preview_workspace_media(
+    workspace_id: i64,
+    asset_id: i64,
+    kind: String,
+    app: AppHandle,
+    stream: State<'_, delivery_stream::DeliveryStream>,
+) -> Result<String, &'static str> {
+    let failed = "asset_preview_failed";
+    if kind != "video" && kind != "audio" {
+        return Err(failed);
+    }
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite")
+        .canonicalize()
+        .map_err(|_| failed)?;
+    let name = tauri::async_runtime::spawn_blocking({
+        let database = database.clone();
+        move || {
+            WorkspaceStore::open(&database)
+                .and_then(|store| store.managed_asset_name(workspace_id, asset_id, &kind))
+                .map_err(|_| failed)
+        }
+    })
+    .await
+    .map_err(|_| failed)??;
+    let mime = delivery_stream::managed_media_type(&name).ok_or(failed)?;
+    let file = arrumo_workspaces::asset_path(&asset_root(&database), workspace_id, asset_id)
+        .canonicalize()
+        .map_err(|_| failed)?;
+    stream.open_media(file, mime).map_err(|_| failed)
+}
+
+#[tauri::command]
 async fn list_asset_organization(
     workspace_id: i64,
     store: State<'_, Store>,
@@ -1736,6 +1809,8 @@ fn main() {
             import_asset,
             list_footage,
             preview_workspace_image,
+            preview_workspace_video_frame,
+            preview_workspace_media,
             set_asset_notes,
             set_batch_asset_notes,
             list_asset_organization,

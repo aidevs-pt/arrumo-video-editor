@@ -57,6 +57,13 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, su
   const languageNames = useMemo(() => new Intl.DisplayNames([locale], { type: "language" }), [locale]);
   const displayed = track?.historical ?? track?.latest;
   const [query, setQuery] = useState("");
+  const [poster, setPoster] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    invoke<string>("completed_video_poster", { workspaceId, runId })
+      .then((url) => { if (active) setPoster(url); }, () => {});
+    return () => { active = false; };
+  }, [workspaceId, runId]);
   const cues = useMemo(() => showTranscript && displayed ? readCues(displayed.subtitles) : [], [displayed, showTranscript]);
 
   const filter = query.trim().toLocaleLowerCase();
@@ -149,7 +156,7 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, su
       ) : (
         <div className="min-w-0">
           <video ref={video} aria-label={label} className="aspect-video w-full rounded-thumb bg-ink object-contain"
-            controls playsInline preload="metadata" src={preview.video_url}
+            controls playsInline preload="metadata" src={preview.video_url} poster={poster}
             onLoadedMetadata={() => { setSeekable(true); setTime(0); }}
             onTimeUpdate={showTranscript ? (event) => setTime(event.currentTarget.currentTime) : undefined}
             onError={() => { setSeekable(false); setTime(-1); setError("playbackError"); }} />
