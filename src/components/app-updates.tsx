@@ -14,6 +14,8 @@ type UpdateStatus = { enabled: boolean; version: string; store: boolean };
 
 /** The settings page offers an update it found through the same prompt. */
 const OFFERED = "arrumo:update-offered";
+/** How long the interface must stay up before the launch counts as working. */
+const LAUNCH_SETTLED_MS = 30_000;
 
 /** Asks whether to install an update the desktop host found, now or when Arrumo quits. */
 export function UpdatePrompt() {
@@ -27,10 +29,12 @@ export function UpdatePrompt() {
     const offer = (next: AvailableUpdate) => { if (active) { setUpdate(next); setState("idle"); } };
     const onOffered = (event: Event) => offer((event as CustomEvent<AvailableUpdate>).detail);
     window.addEventListener(OFFERED, onOffered);
+    void invoke("launch_ready", { settled: false }).catch(() => {});
+    const settled = setTimeout(() => void invoke("launch_ready", { settled: true }).catch(() => {}), LAUNCH_SETTLED_MS);
     void listen<AvailableUpdate>("update-available", (event) => offer(event.payload))
       .then((unlisten) => { if (active) unsubscribe = unlisten; else unlisten(); })
       .catch(() => {});
-    return () => { active = false; unsubscribe?.(); window.removeEventListener(OFFERED, onOffered); };
+    return () => { active = false; clearTimeout(settled); unsubscribe?.(); window.removeEventListener(OFFERED, onOffered); };
   }, []);
 
   async function install(now: boolean) {

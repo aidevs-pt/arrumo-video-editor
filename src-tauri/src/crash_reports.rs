@@ -1,6 +1,9 @@
-//! Crash and error reports through Sentry, for the Rust backend, native crashes (minidumps) and
-//! the web frontend. Builds without `ARRUMO_CRASH_DSN` start nothing. Every report is dropped
-//! while the creator has crash reports turned off, and reports carry no personal data.
+//! Crash and error reports through Sentry, for Rust panics and errors and for the web frontend.
+//! Builds without `ARRUMO_CRASH_DSN` start nothing. Every report is dropped while the creator has
+//! crash reports turned off, and reports carry no personal data. Native crash dumps are not
+//! collected: they hold raw memory that could include the creator's content.
+
+use std::path::Path;
 
 use std::borrow::Cow;
 
@@ -30,9 +33,6 @@ pub fn start() -> (CrashReports, Option<tauri_plugin_sentry::Sentry>) {
         Some(event)
     }));
     let options = options.add_integration(plugin.clone());
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-    let options =
-        options.add_integration(sentry::integrations::minidump::MinidumpIntegration::new());
     let guard = sentry::init((dsn, options));
     (CrashReports(Some(guard)), Some(plugin))
 }
@@ -42,6 +42,9 @@ pub fn start() -> (CrashReports, Option<tauri_plugin_sentry::Sentry>) {
 fn scrub(event: &mut sentry::protocol::Event<'static>) {
     event.user = None;
     event.server_name = None;
+    // Breadcrumbs can quote console text and page addresses with titles in them.
+    event.breadcrumbs = Default::default();
+    event.request = None;
     if let Some(message) = &mut event.message {
         *message = arrumo_workspaces::redact_report_text(message);
     }
@@ -55,6 +58,23 @@ fn scrub(event: &mut sentry::protocol::Event<'static>) {
             image.name = file_name(&image.name);
         }
     }
+}
+
+/// The crash report choice is also kept in a small file beside the data, so failures before the
+/// data opens follow it too.
+const CHOICE_FILE: &str = "crash-reports-on";
+
+pub fn restore_choice(data_dir: &Path) {
+    arrumo_workspaces::allow_crash_reports(data_dir.join(CHOICE_FILE).exists());
+}
+
+pub fn remember_choice(data_dir: &Path, allowed: bool) {
+    let file = data_dir.join(CHOICE_FILE);
+    let _ = if allowed {
+        std::fs::write(file, b"")
+    } else {
+        std::fs::remove_file(file)
+    };
 }
 
 fn file_name(path: &str) -> String {

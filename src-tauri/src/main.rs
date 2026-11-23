@@ -1400,12 +1400,17 @@ fn write_privacy_settings(
     usage_data: bool,
     crash_reports: bool,
     store: State<'_, Store>,
+    app: AppHandle,
 ) -> Result<arrumo_workspaces::PrivacySettings, &'static str> {
-    store
+    let settings = store
         .lock()
         .map_err(|_| "store_unavailable")?
         .set_privacy_settings(usage_data, crash_reports)
-        .map_err(|_| "privacy_settings_failed")
+        .map_err(|_| "privacy_settings_failed")?;
+    if let Ok(data_dir) = app.path().app_local_data_dir() {
+        crash_reports::remember_choice(&data_dir, settings.crash_reports);
+    }
+    Ok(settings)
 }
 
 #[tauri::command]
@@ -1661,9 +1666,16 @@ fn main() {
         // SAFETY: runs first in main, before any thread exists.
         unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
     }
-    // Starts first: with native crash reports on, this binary also runs as their reporter.
+    // Starts first, so panics anywhere after this can be reported.
     let (_crash_reports, crash_plugin) = crash_reports::start();
-    let mut builder = tauri::Builder::default();
+    // Single instance goes first, so a second launch hands over before other plugins start.
+    let mut builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }));
     if let Some(plugin) = crash_plugin {
         builder = builder.plugin(plugin);
     }
@@ -1675,12 +1687,6 @@ fn main() {
         builder = builder.plugin(tauri_plugin_aptabase::Builder::new(key).build());
     }
     builder
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
-        }))
         .plugin(launch_options())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
@@ -1692,6 +1698,9 @@ fn main() {
         .manage(updates::Updates::default())
         .on_window_event(close_guard::on_window_event)
         .setup(|app| {
+            if let Ok(data_dir) = app.path().app_local_data_dir() {
+                crash_reports::restore_choice(&data_dir);
+            }
             updates::start(app.handle());
             #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
             {
@@ -1712,7 +1721,9 @@ fn main() {
             }
             let store = WorkspaceStore::open(&database)?;
             // Loads the crash report choice the crash reporter checks before sending.
-            let _ = store.privacy_settings();
+            if let Ok(privacy) = store.privacy_settings() {
+                crash_reports::remember_choice(&data_dir, privacy.crash_reports);
+            }
             if arrumo_workspaces::usage_key().is_some() {
                 use tauri_plugin_aptabase::EventTracker;
                 let handle = app.handle().clone();
@@ -1933,6 +1944,7 @@ fn main() {
             media_worker::import_delivery_subtitles,
             close_guard::answer_close_request,
             updates::update_status,
+            updates::launch_ready,
             updates::check_for_update,
             updates::install_update
         ])

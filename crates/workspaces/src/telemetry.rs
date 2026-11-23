@@ -55,6 +55,11 @@ pub fn crash_reports_allowed() -> bool {
     CRASH_ALLOWED.load(Ordering::Relaxed)
 }
 
+/// Sets the crash report choice before the store is open, from the copy kept beside it.
+pub fn allow_crash_reports(allowed: bool) {
+    CRASH_ALLOWED.store(allowed, Ordering::Relaxed);
+}
+
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrivacySettings {

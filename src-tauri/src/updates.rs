@@ -1,12 +1,19 @@
 //! App updates from the signed GitHub releases. Builds without `ARRUMO_UPDATER_PUBKEY` (contributor
 //! builds) or with `ARRUMO_STORE_BUILD` (stores update the app themselves) never check.
 //!
-//! A launch marker guards against a release that crashes: it is written when Arrumo starts and
-//! removed once the app has run for a minute or quit normally. When the previous launch left it
-//! behind, Arrumo checks first and installs any newer release straight away, before the rest of
-//! the app can fail again.
+//! A launch marker guards against a release that breaks on start. It is written before anything
+//! else runs and removed once the interface has stayed up for a while. When a launch finds it
+//! left behind, Arrumo checks for a newer release before opening any data, and installs it
+//! straight away, so a release that fails during startup can still be replaced.
 
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+use std::{
+    path::PathBuf,
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -14,8 +21,8 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 const PUBKEY: Option<&str> = option_env!("ARRUMO_UPDATER_PUBKEY");
 const STORE_BUILD: Option<&str> = option_env!("ARRUMO_STORE_BUILD");
-/// How long Arrumo must run before a launch counts as healthy.
-const HEALTHY_AFTER: Duration = Duration::from_secs(60);
+/// How long a check and download may hold up a launch after a failed one.
+const RECOVERY_LIMIT: Duration = Duration::from_secs(90);
 /// The delay before the routine check, so it never slows the first screen.
 const FIRST_CHECK: Duration = Duration::from_secs(15);
 
@@ -24,6 +31,8 @@ const FIRST_CHECK: Duration = Duration::from_secs(15);
 pub struct Updates {
     offered: Mutex<Option<Update>>,
     on_quit: Mutex<Option<(Update, Vec<u8>)>>,
+    /// Set once the interface has rendered, so quitting counts as a normal launch.
+    shown: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -65,34 +74,36 @@ fn marker(app: &AppHandle) -> Option<PathBuf> {
     )
 }
 
-/// Starts the launch marker and the update checks. Call first in setup.
+/// Writes the launch marker and starts the update checks. Call first in setup: after a failed
+/// launch this blocks while it looks for, and installs, a newer release.
 pub fn start(app: &AppHandle) {
     let Some(marker) = marker(app) else {
         return;
     };
-    let crashed = marker.exists();
+    let failed_before = marker.exists();
     let _ = std::fs::create_dir_all(marker.parent().unwrap_or(&marker));
     let _ = std::fs::write(&marker, b"");
-    let healthy = marker.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio_sleep(HEALTHY_AFTER).await;
-        let _ = std::fs::remove_file(healthy);
-    });
     if !enabled() {
         return;
     }
+    if failed_before {
+        let installed = tauri::async_runtime::block_on(async {
+            tokio::time::timeout(RECOVERY_LIMIT, async {
+                let update = check(app).await.ok().flatten()?;
+                update.download_and_install(|_, _| {}, || {}).await.ok()
+            })
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+        });
+        if installed {
+            app.restart();
+        }
+    }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        if crashed {
-            // The last launch never got going: a newer release may be the fix.
-            if let Ok(Some(update)) = check(&app).await
-                && update.download_and_install(|_, _| {}, || {}).await.is_ok()
-            {
-                app.restart();
-            }
-            return;
-        }
-        tokio_sleep(FIRST_CHECK).await;
+        tokio::time::sleep(FIRST_CHECK).await;
         if let Ok(Some(update)) = check(&app).await {
             let _ = app.emit("update-available", describe(&update));
             *app.state::<Updates>()
@@ -103,9 +114,22 @@ pub fn start(app: &AppHandle) {
     });
 }
 
-/// Clears the launch marker and installs an update the creator chose to install on quit.
+/// The interface reports it rendered (`settled` false), then that it stayed up (`settled` true),
+/// which ends the launch's guard.
+#[tauri::command]
+pub fn launch_ready(settled: bool, app: AppHandle, updates: tauri::State<'_, Updates>) {
+    updates.shown.store(true, Ordering::Relaxed);
+    if settled && let Some(marker) = marker(&app) {
+        let _ = std::fs::remove_file(marker);
+    }
+}
+
+/// Clears the launch marker when the interface came up, and installs an update the creator chose to install on quit.
 pub fn on_exit(app: &AppHandle) {
-    if let Some(marker) = marker(app) {
+    let shown = app
+        .try_state::<Updates>()
+        .is_some_and(|updates| updates.shown.load(Ordering::Relaxed));
+    if shown && let Some(marker) = marker(app) {
         let _ = std::fs::remove_file(marker);
     }
     let pending = app
@@ -118,10 +142,6 @@ pub fn on_exit(app: &AppHandle) {
 
 async fn check(app: &AppHandle) -> Result<Option<Update>, tauri_plugin_updater::Error> {
     app.updater()?.check().await
-}
-
-async fn tokio_sleep(duration: Duration) {
-    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(duration)).await;
 }
 
 fn describe(update: &Update) -> AvailableUpdate {
