@@ -63,7 +63,7 @@ Most AI video tools give you a clip and hope you like it. Arrumo works like an e
 
 ## Drive it from your agent
 
-Everything in the app is part of one application API, available to the desktop UI, a command line, **MCP** and **A2A**, with the same rules and approvals. Add Arrumo to Claude Code, Codex or any MCP client:
+Everything in the app is part of one application API, available to the desktop UI, a command line, **MCP** and **A2A**, with the same rules and approvals. Build the `arrumo-workspaces` binary (`cargo build --locked -p arrumo-workspaces`) and add it to Claude Code, Codex or any MCP client:
 
 ```json
 {
@@ -97,7 +97,7 @@ The docs source lives in [arrumo-docs](https://github.com/aidevs-pt/arrumo-docs)
 
 | | |
 | --- | --- |
-| [![Arrumo + Higgsfield: what it can do](https://img.youtube.com/vi/a8z9Aql6qPg/mqdefault.jpg)](https://youtu.be/a8z9Aql6qPg)<br>Arrumo + Higgsfield: what it can do | [![From brief to finished video](https://img.youtube.com/vi/ldBiG89NOvA/mqdefault.jpg)](https://youtu.be/ldBiG89NOvA)<br>From brief to finished video |
+| [![Arrumo + Higgsfield: a launch film made entirely in Arrumo](https://img.youtube.com/vi/a8z9Aql6qPg/mqdefault.jpg)](https://youtu.be/a8z9Aql6qPg)<br>Arrumo + Higgsfield: a launch film made entirely in Arrumo | [![From brief to finished video](https://img.youtube.com/vi/ldBiG89NOvA/mqdefault.jpg)](https://youtu.be/ldBiG89NOvA)<br>From brief to finished video |
 | [![Your brand in Arrumo](https://img.youtube.com/vi/wBL2fZAUA2k/mqdefault.jpg)](https://youtu.be/wBL2fZAUA2k)<br>Your brand in Arrumo | [![DEVS AI in a minute](https://img.youtube.com/vi/Z3V6pxL29kw/mqdefault.jpg)](https://youtu.be/Z3V6pxL29kw)<br>DEVS AI in a minute |
 
 ## Develop
