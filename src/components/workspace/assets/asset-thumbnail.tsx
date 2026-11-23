@@ -7,11 +7,13 @@ type MediaKind = "image" | "audio" | "video";
 
 const icons = { image: ImageIcon, audio: AudioLines, video: Film };
 
-export function AssetThumbnail({ workspaceId, assetId, kind, className }: {
+export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "cover" }: {
   workspaceId: number;
   assetId: number;
   kind: MediaKind;
   className?: string;
+  /** `contain` shows the whole image, for logos and marks that must never be cropped. */
+  fit?: "cover" | "contain";
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string>();
@@ -37,7 +39,7 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className }: {
       {url ? (
         // Managed local preview provided by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="absolute inset-0 size-full object-cover" onError={() => setUrl(undefined)} />
+        <img src={url} alt="" className={cn("absolute inset-0 size-full", fit === "contain" ? "object-contain" : "object-cover")} onError={() => setUrl(undefined)} />
       ) : <Icon className="size-6 text-muted-foreground" />}
     </div>
   );
