@@ -761,10 +761,20 @@ impl WorkspaceStore {
             .into_iter()
             .map(|image| image.id)
             .collect();
+        let is_clip = |id: i64| {
+            self.0
+                .query_row(
+                    "SELECT 1 FROM workspace_assets
+                     WHERE workspace_id = ?1 AND id = ?2 AND kind = 'video' AND superseded = 0",
+                    params![workspace_id, id],
+                    |_| Ok(()),
+                )
+                .is_ok()
+        };
         scenes
             .iter()
             .map(|scene| {
-                MotionSpec::from_answer(scene, |id| images.contains(&id))
+                MotionSpec::from_answer_with_clips(scene, |id| images.contains(&id), is_clip)
                     .map_err(|reason| io::Error::other(reason).into())
             })
             .collect::<Result<Vec<_>, Box<dyn Error>>>()

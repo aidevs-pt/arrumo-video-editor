@@ -1,5 +1,5 @@
-//! Animations the agent designs as data: timed text, boxes and workspace images with entrance and
-//! exit motion. Arrumo validates the spec and renders it with FFmpeg at any frame size, so the same
+//! Animations the agent designs as data: timed text, boxes, workspace images and clips with
+//! entrance and exit motion. Arrumo validates the spec and renders it with FFmpeg at any frame size, so the same
 //! animation serves low-resolution previews, final renders and library previews without running
 //! agent-written code.
 
@@ -22,6 +22,9 @@ use crate::{
 };
 
 pub(crate) const MAX_LAYERS: usize = 12;
+/// The most camera moves one clip layer has.
+const MAX_ZOOM_KEYS: usize = 8;
+const MAX_ZOOM: f64 = 3.0;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
 pub(crate) const MAX_SECONDS: f64 = 20.0;
 const MAX_STORED_SECONDS: f64 = 60.0;
@@ -34,6 +37,7 @@ pub(crate) enum LayerType {
     Text,
     Box,
     Image,
+    Video,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -84,6 +88,22 @@ pub(crate) struct Layer {
     /// Which brand font text is set in.
     #[serde(default, skip_serializing_if = "is_body")]
     pub font: FontRole,
+    /// Where a clip layer starts playing its clip, in seconds into the clip.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub clip_start: f64,
+    /// Camera moves over a clip layer: the view eases from one key to the next.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zoom: Vec<ZoomKey>,
+}
+
+/// A point the view over a clip layer passes through: at `at` seconds into the animation it shows
+/// the clip `scale` times larger, centred on (`x`, `y`) as fractions of the clip.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+pub(crate) struct ZoomKey {
+    pub at: f64,
+    pub x: f64,
+    pub y: f64,
+    pub scale: f64,
 }
 
 fn is_body(role: &FontRole) -> bool {
@@ -158,6 +178,12 @@ pub(crate) struct MotionSpec {
 
 /// The JSON schema agents answer with for one animation. `assets` are the image IDs it may use.
 pub(crate) fn spec_schema(assets: &[i64]) -> Value {
+    spec_schema_with_clips(assets, &[])
+}
+
+/// Like `spec_schema`, also offering clip layers that play the workspace videos in `clips`.
+pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
+    let assets: Vec<i64> = images.iter().chain(clips).copied().collect();
     let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right"]});
     let unit = json!({"type": "number", "minimum": 0, "maximum": 1});
     let optional_color =
@@ -167,7 +193,7 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
     } else {
         json!({"anyOf": [{"type": "null"}, {"enum": assets}]})
     };
-    let layer = json!({
+    let mut layer = json!({
         "type": "object",
         "additionalProperties": false,
         "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
@@ -194,6 +220,27 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
             "font": {"enum": ["heading", "body"]}
         }
     });
+    if !clips.is_empty() {
+        layer["properties"]["type"] = json!({"enum": ["text", "box", "image", "video"]});
+        layer["properties"]["clipStart"] = json!({"type": "number", "minimum": 0});
+        layer["properties"]["zoom"] = json!({
+            "type": "array",
+            "maxItems": MAX_ZOOM_KEYS,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["at", "x", "y", "scale"],
+                "properties": {
+                    "at": {"type": "number", "minimum": 0},
+                    "x": unit, "y": unit,
+                    "scale": {"type": "number", "minimum": 1, "maximum": MAX_ZOOM}
+                }
+            }
+        });
+        if let Some(required) = layer["required"].as_array_mut() {
+            required.extend([json!("clipStart"), json!("zoom")]);
+        }
+    }
     json!({
         "type": "object",
         "additionalProperties": false,
@@ -237,6 +284,18 @@ left-aligned layer starts at x minus width/2), round cards and images slightly (
 of their shorter side; 0.5 makes pills and circles), give a box a subtle gradient with gradientTo, and \
 lift cards and images off the background with shadow. Keep generous margins, one clear focal point per \
 moment, a few sizes of text with a strong hierarchy, and consistent spacing between items.";
+
+/// How clip layers are described to the agent, added to `SPEC_GUIDE` when it may use them.
+pub(crate) const CLIP_GUIDE: &str = "Video layers play a workspace clip (assetId) fitted inside their box, \
+starting clipStart seconds into the clip and playing for the layer's span; if the clip runs out, its last \
+frame holds. Use them for screen recordings and product footage: float the clip on the background with a \
+radius of about 0.03 and a shadow, and keep it large (width 0.7 to 0.9) so the interface stays readable. \
+zoom moves the camera over the clip: each key says at which second of the animation the view is scale \
+times larger (1 to 3) and centred on x and y as fractions of the clip; the view eases from key to key. \
+Start at scale 1, punch in to about 1.6 to 2.2 on the control or text the narration talks about a moment \
+before it happens, hold, then ease back out; an empty list keeps the whole clip in view. Each clip's \
+notes say what happens at which second, so pick clipStart and the zoom keys from them. Set text null, \
+and color to the background's colour; it only shows under the clip's rounded corners.";
 
 fn hex_color(value: &str) -> Option<String> {
     let digits = value.strip_prefix('#')?;
@@ -288,6 +347,15 @@ impl MotionSpec {
     pub(crate) fn from_answer(
         answer: &Value,
         image_allowed: impl Fn(i64) -> bool,
+    ) -> Result<Self, &'static str> {
+        Self::from_answer_with_clips(answer, image_allowed, |_| false)
+    }
+
+    /// Like `from_answer`, also accepting clip layers whose asset ID `clip_allowed` approves.
+    pub(crate) fn from_answer_with_clips(
+        answer: &Value,
+        image_allowed: impl Fn(i64) -> bool,
+        clip_allowed: impl Fn(i64) -> bool,
     ) -> Result<Self, &'static str> {
         let invalid = "The agent's animation did not follow the expected structure";
         let mut spec: MotionSpec = serde_json::from_value(answer.clone()).map_err(|_| invalid)?;
@@ -348,6 +416,29 @@ impl MotionSpec {
                 layer.radius = 0.0;
                 layer.shadow = false;
             }
+            if layer.kind == LayerType::Video {
+                layer.clip_start = if layer.clip_start.is_finite() {
+                    layer.clip_start.clamp(0.0, 3600.0)
+                } else {
+                    0.0
+                };
+                layer.zoom.retain(|key| {
+                    [key.at, key.x, key.y, key.scale]
+                        .iter()
+                        .all(|value| value.is_finite())
+                });
+                layer.zoom.truncate(MAX_ZOOM_KEYS);
+                for key in &mut layer.zoom {
+                    key.at = key.at.clamp(0.0, duration);
+                    key.x = key.x.clamp(0.0, 1.0);
+                    key.y = key.y.clamp(0.0, 1.0);
+                    key.scale = key.scale.clamp(1.0, MAX_ZOOM);
+                }
+                layer.zoom.sort_by(|a, b| a.at.total_cmp(&b.at));
+            } else {
+                layer.clip_start = 0.0;
+                layer.zoom.clear();
+            }
             if layer.end - layer.start < 0.1 || hex_color(&layer.color).is_none() {
                 return false;
             }
@@ -366,6 +457,10 @@ impl MotionSpec {
                 LayerType::Image => {
                     layer.text = None;
                     layer.asset_id.is_some_and(&image_allowed)
+                }
+                LayerType::Video => {
+                    layer.text = None;
+                    layer.asset_id.is_some_and(&clip_allowed)
                 }
             }
         });
@@ -672,11 +767,202 @@ impl LayerTarget<'_> {
                 )
                 .ok();
                 }
+                LayerType::Video => {
+                    let path = layer
+                        .asset_id
+                        .and_then(images)
+                        .ok_or_else(|| io::Error::other("An animation clip is missing"))?;
+                    let (clip_w, clip_h) = clip_size(&path)?;
+                    let fit = (layer.width * frame_w / clip_w).min(layer.height * frame_h / clip_h);
+                    let even = |value: f64| ((value / 2.0).round() as u32).max(1) * 2;
+                    let (view_w, view_h) = (even(clip_w * fit), even(clip_h * fit));
+                    let span = (layer.end - layer.start).max(0.1);
+                    let ease = (span / 3.0).min(0.6);
+                    let mut fades = Vec::new();
+                    if layer.enter != Motion::None {
+                        fades.push(format!(
+                            "fade=t=in:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.start
+                        ));
+                    }
+                    if layer.exit != Motion::None {
+                        fades.push(format!(
+                            "fade=t=out:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.end - ease
+                        ));
+                    }
+                    if layer.opacity < 1.0 {
+                        fades.push(format!("colorchannelmixer=aa={:.3}", layer.opacity));
+                    }
+                    if fades.is_empty() {
+                        fades.push("null".into());
+                    }
+                    let fades = fades.join(",");
+                    let place = format!(
+                        "x='{:.2}-overlay_w/2+{dx}':y='{:.2}-overlay_h/2+{dy}':enable='{enable}':eof_action=pass",
+                        layer.x * frame_w,
+                        layer.y * frame_h,
+                    );
+                    let mut still = |file: &str| -> usize {
+                        args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
+                        args.push(format!("{duration:.3}"));
+                        args.extend(["-i".to_owned(), file.to_owned()]);
+                        next_input += 1;
+                        next_input - 1
+                    };
+                    // A card in the background colour casts the shadow; the clip covers it.
+                    if layer.shadow {
+                        let file = format!("{prefix}card-{index}.png");
+                        let shape = Shape {
+                            width: view_w,
+                            height: view_h,
+                            radius: layer.radius,
+                            opacity: 1.0,
+                            shadow: Some(frame_h.min(frame_w)),
+                        };
+                        let fill = Fill::Color {
+                            from: &layer.color,
+                            to: None,
+                        };
+                        shape_png(directory, &file, &fill, &shape)?;
+                        let input = still(&file);
+                        write!(
+                            graph,
+                            "[{input}:v]format=rgba,{fades}[{prefix}c{index}];\
+                             [{current}][{prefix}c{index}]overlay={place}[{label}c];"
+                        )
+                        .ok();
+                        current = format!("{label}c");
+                    }
+                    let mask = if layer.radius > 0.0 {
+                        let file = format!("{prefix}mask-{index}.png");
+                        let shape = Shape {
+                            width: view_w,
+                            height: view_h,
+                            radius: layer.radius,
+                            opacity: 1.0,
+                            shadow: None,
+                        };
+                        let fill = Fill::Color {
+                            from: "#FFFFFF",
+                            to: None,
+                        };
+                        shape_png(directory, &file, &fill, &shape)?;
+                        Some(still(&file))
+                    } else {
+                        None
+                    };
+                    args.extend([
+                        "-ss".to_owned(),
+                        format!("{:.3}", layer.clip_start),
+                        "-t".to_owned(),
+                        format!("{:.3}", span + 1.0),
+                        "-i".to_owned(),
+                        path.to_string_lossy().into_owned(),
+                    ]);
+                    let clip = next_input;
+                    next_input += 1;
+                    let keys: Vec<ZoomKey> = layer
+                        .zoom
+                        .iter()
+                        .map(|key| ZoomKey {
+                            at: key.at + self.shift,
+                            ..*key
+                        })
+                        .collect();
+                    let camera = if keys.is_empty() {
+                        format!("scale={view_w}:{view_h}")
+                    } else {
+                        // Zooming from twice the size keeps the camera's pixel steps at half a pixel.
+                        let scale = keyed(&keys, |key| key.scale);
+                        let x = keyed(&keys, |key| key.x);
+                        let y = keyed(&keys, |key| key.y);
+                        format!(
+                            "scale={}:{},zoompan=z='{scale}':\
+                             x='max(0,min(iw-iw/zoom,({x})*iw-iw/zoom/2))':\
+                             y='max(0,min(ih-ih/zoom,({y})*ih-ih/zoom/2))':\
+                             d=1:s={view_w}x{view_h}:fps={FPS}",
+                            view_w * 2,
+                            view_h * 2,
+                        )
+                    };
+                    write!(
+                        graph,
+                        "[{clip}:v]fps={FPS},setpts=PTS-STARTPTS,\
+                         tpad=stop_mode=clone:stop_duration={span:.3},trim=duration={span:.3},\
+                         setpts=PTS+{:.3}/TB,{camera},setsar=1,format=rgba[{prefix}p{index}];",
+                        layer.start,
+                    )
+                    .ok();
+                    let mut picture = format!("{prefix}p{index}");
+                    if let Some(mask) = mask {
+                        write!(
+                            graph,
+                            "[{mask}:v]format=rgba,alphaextract[{prefix}m{index}];\
+                             [{picture}][{prefix}m{index}]alphamerge[{prefix}r{index}];"
+                        )
+                        .ok();
+                        picture = format!("{prefix}r{index}");
+                    }
+                    write!(
+                        graph,
+                        "[{picture}]{fades}[{prefix}f{index}];\
+                         [{current}][{prefix}f{index}]overlay={place}[{label}];"
+                    )
+                    .ok();
+                }
             }
             current = label;
         }
         Ok(current)
     }
+}
+
+/// An FFmpeg expression of the stream time `it` that eases a value through `keys`: it holds the
+/// first key's value before it, eases between neighbouring keys and holds the last value after.
+fn keyed(keys: &[ZoomKey], value: impl Fn(&ZoomKey) -> f64) -> String {
+    let Some(last) = keys.last() else {
+        return "1".into();
+    };
+    let mut expression = format!("{:.4}", value(last));
+    for pair in keys.windows(2).rev() {
+        let (from, to) = (&pair[0], &pair[1]);
+        let (a, b) = (value(from), value(to));
+        let gap = to.at - from.at;
+        let between = if gap < 0.01 {
+            format!("{b:.4}")
+        } else {
+            format!(
+                "{a:.4}+({:.4})*(1-cos(PI*(it-{:.3})/{gap:.3}))/2",
+                b - a,
+                from.at
+            )
+        };
+        expression = format!("if(lt(it,{:.3}),{between},{expression})", to.at);
+    }
+    format!(
+        "if(lt(it,{:.3}),{:.4},{expression})",
+        keys[0].at,
+        value(&keys[0])
+    )
+}
+
+/// The width and height of a clip's first video stream.
+fn clip_size(path: &Path) -> io::Result<(f64, f64)> {
+    let output = Command::new("ffprobe")
+        .args(["-v", "error", "-select_streams", "v:0", "-show_entries"])
+        .args(["stream=width,height", "-of", "csv=p=0:s=x"])
+        .arg(path)
+        .stdin(Stdio::null())
+        .output()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let (width, height) = text
+        .trim()
+        .split_once('x')
+        .and_then(|(w, h)| Some((w.parse::<f64>().ok()?, h.parse::<f64>().ok()?)))
+        .filter(|(w, h)| *w >= 2.0 && *h >= 2.0)
+        .ok_or_else(|| io::Error::other("An animation clip has no picture"))?;
+    Ok((width, height))
 }
 
 /// What fills a pre-rendered shape: a colour, optionally fading diagonally into another, or an
@@ -1213,6 +1499,154 @@ mod tests {
         assert_eq!(wrap("one two three four", 9), "one two\nthree\nfour");
         assert_eq!(wrap("abcdefghij", 4), "abcd\nefgh\nij");
         assert_eq!(clean_text("Top ↻ 90° ⬜🟥 ok", 50), "Top 90° ok");
+    }
+
+    fn clip_layer() -> Value {
+        json!({"type": "video", "text": null, "assetId": 7, "x": 0.5, "y": 0.5, "width": 0.8,
+               "height": 0.8, "size": 0.05, "color": "#2337B4", "bold": false, "opacity": 1,
+               "start": 0.5, "end": 3, "enter": "fade", "exit": "none", "sound": "none",
+               "align": "center", "radius": 0.05, "gradientTo": null, "shadow": true,
+               "font": "body", "clipStart": 1,
+               "zoom": [{"at": 2.2, "x": 0.9, "y": 0.1, "scale": 9},
+                        {"at": 1.5, "x": 0.5, "y": 0.5, "scale": 1}]})
+    }
+
+    #[test]
+    fn clip_layers_are_offered_only_with_clips() {
+        let plain = spec_schema(&[1]);
+        let layer = &plain["properties"]["layers"]["items"];
+        assert!(layer["properties"].get("zoom").is_none());
+        assert!(!layer["properties"]["type"].to_string().contains("video"));
+        let offered = spec_schema_with_clips(&[1], &[7]);
+        let layer = &offered["properties"]["layers"]["items"];
+        assert!(layer["properties"]["type"].to_string().contains("video"));
+        assert!(layer["properties"]["assetId"].to_string().contains('7'));
+        let required = layer["required"].to_string();
+        assert!(required.contains("clipStart") && required.contains("zoom"));
+    }
+
+    #[test]
+    fn clip_layers_need_an_approved_clip_and_keep_tidy_camera_keys() {
+        let mut value = answer();
+        value["layers"] = json!([clip_layer()]);
+        assert!(
+            MotionSpec::from_answer(&value, |_| true).is_err(),
+            "plain animations never play clips"
+        );
+        let spec = MotionSpec::from_answer_with_clips(&value, |_| false, |id| id == 7).unwrap();
+        let layer = &spec.layers[0];
+        assert_eq!(layer.kind, LayerType::Video);
+        assert_eq!(layer.clip_start, 1.0);
+        assert_eq!(layer.zoom.len(), 2);
+        assert_eq!(layer.zoom[0].at, 1.5, "keys are sorted by time");
+        assert_eq!(layer.zoom[1].scale, MAX_ZOOM, "zoom is capped");
+        assert!(MotionSpec::from_answer_with_clips(&value, |_| true, |id| id == 8).is_err());
+        let mut boxed = answer();
+        boxed["layers"][0]["zoom"] = json!([{"at": 0, "x": 0, "y": 0, "scale": 2}]);
+        boxed["layers"][0]["clipStart"] = json!(4);
+        let spec = MotionSpec::from_answer_with_clips(&boxed, |_| true, |_| true).unwrap();
+        assert!(spec.layers[0].zoom.is_empty() && spec.layers[0].clip_start == 0.0);
+    }
+
+    #[test]
+    fn camera_keys_ease_between_values() {
+        let keys = [
+            ZoomKey {
+                at: 1.0,
+                x: 0.5,
+                y: 0.5,
+                scale: 1.0,
+            },
+            ZoomKey {
+                at: 2.0,
+                x: 0.5,
+                y: 0.5,
+                scale: 2.0,
+            },
+        ];
+        assert_eq!(
+            keyed(&keys, |key| key.scale),
+            "if(lt(it,1.000),1.0000,if(lt(it,2.000),1.0000+(1.0000)*(1-cos(PI*(it-1.000)/1.000))/2,2.0000))"
+        );
+        assert_eq!(
+            keyed(&keys[..1], |key| key.x),
+            "if(lt(it,1.000),0.5000,0.5000)"
+        );
+    }
+
+    #[test]
+    fn clip_layers_render_rounded_and_zoomed() {
+        if Command::new("ffmpeg").arg("-version").output().is_err() {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        // A clip whose top-right quarter is red and the rest green, so zooming in shows red.
+        let clip = directory.path().join("clip.mp4");
+        let made = Command::new("ffmpeg")
+            .args([
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=green:s=320x200:r=30:d=4",
+                "-vf",
+            ])
+            .arg("drawbox=x=160:y=0:w=160:h=100:color=red:t=fill")
+            .args(["-pix_fmt", "yuv420p", "-y"])
+            .arg(&clip)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let mut value = answer();
+        value["durationSeconds"] = json!(3);
+        value["layers"] = json!([clip_layer()]);
+        let spec = MotionSpec::from_answer_with_clips(&value, |_| false, |_| true).unwrap();
+        let resolve = |id: i64| (id == 7).then(|| clip.clone());
+        render_spec(
+            &spec,
+            (640, 360),
+            directory.path(),
+            "out.mp4",
+            &resolve,
+            &FontSet::default(),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let frame_at = |at: &str| {
+            Command::new("ffmpeg")
+                .args(["-v", "error", "-ss", at, "-i"])
+                .arg(directory.path().join("out.mp4"))
+                .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+                .output()
+                .unwrap()
+                .stdout
+        };
+        let pixel = |frame: &[u8], x: usize, y: usize| {
+            let at = (y * 640 + x) * 3;
+            [frame[at], frame[at + 1], frame[at + 2]]
+        };
+        let before = frame_at("0.2");
+        let empty = pixel(&before, 320, 180);
+        assert!(
+            empty[0] < 60 && empty[1] < 60,
+            "the clip has not entered yet: {empty:?}"
+        );
+        let fitted = frame_at("1.2");
+        // Fitted inside 512x288, the 16:10 clip is 460x288: green bottom-left, red top-right.
+        let green = pixel(&fitted, 250, 250);
+        assert!(green[1] > 90 && green[0] < 80, "{green:?}");
+        let red = pixel(&fitted, 450, 100);
+        assert!(red[0] > 150 && red[1] < 80, "{red:?}");
+        // The rounded corner shows the background, not the clip.
+        let corner = pixel(&fitted, 91, 37);
+        assert!(corner[0] < 60 && corner[1] < 60, "{corner:?}");
+        let zoomed = frame_at("2.5");
+        let centre = pixel(&zoomed, 320, 180);
+        assert!(
+            centre[0] > 150 && centre[1] < 80,
+            "zoomed into the red corner: {centre:?}"
+        );
     }
 
     #[test]

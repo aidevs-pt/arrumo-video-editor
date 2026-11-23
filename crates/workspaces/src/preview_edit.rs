@@ -324,7 +324,12 @@ fn with_narration(mut scene: Value) -> Value {
 
 const MAX_NARRATION: usize = 600;
 
-fn storyboard(answer: &Value, images: &[i64], agent: &str) -> Result<Value, &'static str> {
+fn storyboard(
+    answer: &Value,
+    images: &[i64],
+    clips: &[i64],
+    agent: &str,
+) -> Result<Value, &'static str> {
     let (scenes, narration): (Vec<crate::motion_spec::MotionSpec>, Vec<String>) = answer
         .get("scenes")
         .and_then(Value::as_array)
@@ -332,9 +337,12 @@ fn storyboard(answer: &Value, images: &[i64], agent: &str) -> Result<Value, &'st
         .iter()
         .take(MAX_SCENES)
         .filter_map(|scene| {
-            let spec =
-                crate::motion_spec::MotionSpec::from_answer(scene, |id| images.contains(&id))
-                    .ok()?;
+            let spec = crate::motion_spec::MotionSpec::from_answer_with_clips(
+                scene,
+                |id| images.contains(&id),
+                |id| clips.contains(&id),
+            )
+            .ok()?;
             let words: String = scene["narration"]
                 .as_str()
                 .unwrap_or("")
@@ -455,6 +463,8 @@ impl WorkspaceStore {
     ) -> Result<i64, Box<dyn Error>> {
         let images = self.workspace_images(workspace_id)?;
         let image_ids: Vec<i64> = images.iter().map(|image| image.id).collect();
+        let clips = self.workspace_clips(database, workspace_id)?;
+        let clip_ids: Vec<i64> = clips.iter().map(|clip| clip.id).collect();
         let script = self.approved_stage_result(run_id, "script")?;
         let script = script
             .as_ref()
@@ -501,6 +511,17 @@ impl WorkspaceStore {
         if !earlier.is_empty() {
             brief["earlierStoryboards"] = json!(earlier);
         }
+        if !clips.is_empty() {
+            brief["clips"] = json!(
+                clips
+                    .iter()
+                    .map(|clip| json!({
+                        "assetId": clip.id, "name": clip.name, "notes": clip.notes,
+                        "seconds": clip.seconds.map(|seconds| (seconds * 10.0).round() / 10.0),
+                    }))
+                    .collect::<Vec<_>>()
+            );
+        }
         let prompt = format!(
             "You storyboard one video in Arrumo that has no recorded footage. It is built from animated scenes \
              played one after another.\n\
@@ -510,7 +531,7 @@ impl WorkspaceStore {
              animation fits a beat, use it as that scene unchanged. Keep a consistent visual style across scenes.\n\
              Give each scene the narration a voice reads over it: the script's spoken words for that beat, in the \
              script's language, short enough to say within the scene. Leave it empty where nothing is said.\n\
-             Each scene is an animation: {guide}\n\
+             Each scene is an animation: {guide}{clip_guide}\n\
              {revision}\
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
@@ -533,6 +554,11 @@ impl WorkspaceStore {
                 )
             },
             guide = crate::motion_spec::SPEC_GUIDE,
+            clip_guide = if clips.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", crate::motion_spec::CLIP_GUIDE)
+            },
             revision = if earlier.is_empty() {
                 ""
             } else {
@@ -551,7 +577,7 @@ impl WorkspaceStore {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": MAX_SCENES,
-                    "items": with_narration(crate::motion_spec::spec_schema(&image_ids))
+                    "items": with_narration(crate::motion_spec::spec_schema_with_clips(&image_ids, &clip_ids))
                 }
             }
         });
@@ -572,7 +598,8 @@ impl WorkspaceStore {
                     .map_err(Into::into)
             },
         )?;
-        let mut edit = storyboard(&answer, &image_ids, &provider.id).map_err(io::Error::other)?;
+        let mut edit =
+            storyboard(&answer, &image_ids, &clip_ids, &provider.id).map_err(io::Error::other)?;
         place_music(&mut edit, &answer, &track_ids);
         self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)?;
         self.renew_generation_lease(workspace_id, run_id, attempt)?;

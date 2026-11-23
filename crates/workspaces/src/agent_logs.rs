@@ -577,7 +577,10 @@ mod tests {
         assert_eq!(shorten("short", 200), "short");
         let long = "word ".repeat(60);
         let cut = shorten(long.trim(), 200);
-        assert!(cut.chars().count() <= 200 && cut.ends_with("word…"), "{cut}");
+        assert!(
+            cut.chars().count() <= 200 && cut.ends_with("word…"),
+            "{cut}"
+        );
     }
 
     #[test]

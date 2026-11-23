@@ -21,6 +21,17 @@ pub(crate) const MAX_RUN_ANIMATIONS: usize = 4;
 const LIBRARY_PREVIEW: (u32, u32) = (1280, 720);
 const MAX_IMAGES: i64 = 200;
 
+/// A workspace video a storyboard may play inside a scene, such as a screen recording.
+pub(crate) struct WorkspaceClip {
+    pub id: i64,
+    pub name: String,
+    pub notes: String,
+    pub seconds: Option<f64>,
+}
+
+/// The most clips a storyboard is offered.
+const MAX_CLIPS: i64 = 40;
+
 /// A workspace image the agent may place in animations.
 pub(crate) struct WorkspaceImage {
     pub id: i64,
@@ -68,6 +79,40 @@ impl WorkspaceStore {
                     notes: row.get(2)?,
                 })
             })?
+            .collect()
+    }
+
+    /// The workspace's own videos (not footage of a draft, nor files Arrumo generated), newest
+    /// first, with their length when it can be read.
+    pub(crate) fn workspace_clips(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+    ) -> rusqlite::Result<Vec<WorkspaceClip>> {
+        let root = asset_root(database);
+        self.0
+            .prepare(
+                "SELECT id, name, notes FROM workspace_assets
+                 WHERE workspace_id = ?1 AND kind = 'video' AND superseded = 0 AND generated = 0
+                   AND footage = 0
+                 ORDER BY id DESC LIMIT ?2",
+            )?
+            .query_map(params![workspace_id, MAX_CLIPS], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .map(|row| {
+                row.map(|(id, name, notes)| WorkspaceClip {
+                    id,
+                    name,
+                    notes,
+                    seconds: crate::source_transcripts::media_duration(&asset_path(
+                        &root,
+                        workspace_id,
+                        id,
+                    ))
+                    .ok(),
+                })
+            })
             .collect()
     }
 
