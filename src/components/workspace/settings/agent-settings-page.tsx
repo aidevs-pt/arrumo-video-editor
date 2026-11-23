@@ -26,6 +26,7 @@ import { PluginDetail } from "@/components/workspace/plugins/plugin-detail";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
 import { PluginGrants } from "@/components/workspace/plugins/plugin-grants";
 import { AgentCapabilities, ScopedPluginPreferences } from "./plugin-preferences";
+import { UpdateSettings } from "@/components/app-updates";
 import { UsagePanel } from "@/components/workspace/usage/provider-usage";
 import { BackupSettings } from "./backup-settings";
 
@@ -108,6 +109,7 @@ export function AgentSettingsPage() {
               {tab === "general" && <NotificationSettings />}
               {tab === "general" && <AgentSummary workspaceId={studioWorkspace ? Number(studioWorkspace) : undefined} href={settingsHref("agent")} />}
               {tab === "general" && <PrivacySettings />}
+              {tab === "general" && <UpdateSettings />}
               {tab === "quality" && <QualitySettings />}
               {tab === "backup" && <BackupSettings />}
               {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}

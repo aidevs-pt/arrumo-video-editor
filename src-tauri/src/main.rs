@@ -23,6 +23,7 @@ mod media_worker;
 mod motion_library;
 mod plugin_settings;
 mod profiles;
+mod updates;
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -1666,6 +1667,9 @@ fn main() {
     if let Some(plugin) = crash_plugin {
         builder = builder.plugin(plugin);
     }
+    if let Some(plugin) = updates::plugin() {
+        builder = builder.plugin(plugin).plugin(tauri_plugin_process::init());
+    }
     if let Some(key) = arrumo_workspaces::usage_key() {
         // Usage only: errors and crashes go to the crash reporter.
         builder = builder.plugin(tauri_plugin_aptabase::Builder::new(key).build());
@@ -1685,8 +1689,10 @@ fn main() {
         .register_uri_scheme_protocol("arrumo-panel", plugin_settings::serve_plugin_surface)
         .manage(delivery_stream::DeliveryStream::default())
         .manage(close_guard::CloseGuard::default())
+        .manage(updates::Updates::default())
         .on_window_event(close_guard::on_window_event)
         .setup(|app| {
+            updates::start(app.handle());
             #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -1925,7 +1931,10 @@ fn main() {
             media_worker::render_desktop_run_motion,
             media_worker::generate_delivery_subtitles,
             media_worker::import_delivery_subtitles,
-            close_guard::answer_close_request
+            close_guard::answer_close_request,
+            updates::update_status,
+            updates::check_for_update,
+            updates::install_update
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Arrumo")
@@ -1937,6 +1946,7 @@ fn main() {
             }
             if matches!(event, tauri::RunEvent::Exit) {
                 app.state::<desktop_job_workers::DesktopJobWorkers>().stop();
+                updates::on_exit(app);
                 if arrumo_workspaces::usage_key().is_some() {
                     use tauri_plugin_aptabase::EventTracker;
                     app.flush_events_blocking();

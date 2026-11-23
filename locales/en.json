@@ -1905,5 +1905,25 @@
     "description": "{count} videos are generating. Closing Arrumo pauses them, and they continue from the same step the next time you open Arrumo.",
     "keepOpen": "Keep Arrumo open",
     "close": "Close and pause"
+  },
+  "updates": {
+    "heading": "Updates",
+    "version": "Arrumo {version}",
+    "automatic": "Arrumo checks for new versions when it starts and asks before installing one.",
+    "current": "You have the latest version.",
+    "checkFailed": "Arrumo couldn't reach the update server. Check your connection and try again.",
+    "check": "Check for updates",
+    "checking": "Checking…",
+    "store": "Your app store keeps Arrumo up to date.",
+    "notInThisBuild": "This build doesn't update itself. Download new versions from the Arrumo website.",
+    "title": "Arrumo {version} is available",
+    "description": "You have {current}. Install it now and Arrumo restarts, or install it when you quit. Videos being generated pause and continue after the restart.",
+    "now": "Install and restart",
+    "onQuit": "Install when I quit",
+    "later": "Later",
+    "installing": "Downloading…",
+    "scheduled": "The update is downloaded and installs when you quit Arrumo.",
+    "done": "OK",
+    "failed": "The update couldn't be downloaded or installed. Try again later."
   }
 }

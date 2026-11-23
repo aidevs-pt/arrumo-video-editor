@@ -1905,5 +1905,25 @@
     "description": "Se están generando {count} vídeos. Si cierras Arrumo, se pausan y continúan desde el mismo paso la próxima vez que abras Arrumo.",
     "keepOpen": "Mantener Arrumo abierto",
     "close": "Cerrar y pausar"
+  },
+  "updates": {
+    "heading": "Actualizaciones",
+    "version": "Arrumo {version}",
+    "automatic": "Arrumo busca versiones nuevas al abrirse y te pregunta antes de instalar una.",
+    "current": "Tienes la última versión.",
+    "checkFailed": "Arrumo no pudo conectar con el servidor de actualizaciones. Revisa tu conexión y vuelve a intentarlo.",
+    "check": "Buscar actualizaciones",
+    "checking": "Buscando…",
+    "store": "Tu tienda de aplicaciones mantiene Arrumo actualizado.",
+    "notInThisBuild": "Esta versión no se actualiza sola. Descarga las versiones nuevas desde la web de Arrumo.",
+    "title": "Ya está disponible Arrumo {version}",
+    "description": "Tienes la {current}. Instálala ahora y Arrumo se reinicia, o instálala al cerrar. Los vídeos que se están generando se pausan y continúan tras el reinicio.",
+    "now": "Instalar y reiniciar",
+    "onQuit": "Instalar al cerrar",
+    "later": "Más tarde",
+    "installing": "Descargando…",
+    "scheduled": "La actualización está descargada y se instala cuando cierres Arrumo.",
+    "done": "Aceptar",
+    "failed": "No se pudo descargar o instalar la actualización. Inténtalo más tarde."
   }
 }
