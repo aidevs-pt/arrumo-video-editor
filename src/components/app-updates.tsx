@@ -46,7 +46,7 @@ export function UpdatePrompt() {
   const busy = state === "installing";
   return (
     <AlertDialog open={update !== undefined} onOpenChange={(open) => { if (!open && !busy) setUpdate(undefined); }}>
-      <AlertDialogContent>
+      <AlertDialogContent className="data-[size=default]:max-w-[calc(100vw-2rem)] data-[size=default]:sm:max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title.replace("{version}", update?.version ?? "")}</AlertDialogTitle>
           <AlertDialogDescription>
@@ -55,9 +55,9 @@ export function UpdatePrompt() {
         </AlertDialogHeader>
         {update?.notes && state !== "scheduled" && <div className="max-h-48 overflow-y-auto rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap">{update.notes}</div>}
         {state === "failed" && <Alert variant="destructive"><AlertDescription>{copy.failed}</AlertDescription></Alert>}
-        <AlertDialogFooter>
+        <AlertDialogFooter className="sm:flex-wrap">
           {state === "scheduled" ? <AlertDialogAction>{copy.done}</AlertDialogAction> : <>
-            <AlertDialogCancel disabled={busy}>{copy.later}</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy} className="sm:me-auto">{copy.later}</AlertDialogCancel>
             <Button variant="outline" disabled={busy} onClick={() => void install(false)}>{copy.onQuit}</Button>
             <Button disabled={busy} onClick={() => void install(true)}>{busy ? copy.installing : copy.now}</Button>
           </>}
