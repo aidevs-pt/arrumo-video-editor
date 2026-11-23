@@ -37,7 +37,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    | `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | The Azure app registration allowed to sign (Windows) |
 
 6. **Set up Windows signing** with [Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/), which is open to organisations in the EU. Without it the Windows build is unsigned, and SmartScreen warns on first install.
-   1. In the Azure portal, create an **Artifact Signing account**. Note its region's endpoint, for example `https://weu.codesigning.azure.net` for West Europe.
+   1. In the Azure portal, create an **Artifact Signing account**. Note its region's endpoint: `https://neu.codesigning.azure.net` for North Europe, which DEVS AI uses (West Europe wasn't accepting new customers in November 2026). The endpoint must match the account's region, or signing fails with 403.
    2. In the account, complete **Identity validation** for DEVS AI Unipessoal LDA as a public organisation. Microsoft checks the company's official records; this can take a few days.
    3. Create a **Public Trust** certificate profile on the validated identity.
    4. In Microsoft Entra ID, create an **App registration** and a client secret under Certificates & secrets.
