@@ -21,7 +21,7 @@ uuid = { version = "1", features = ["v4"] }
 url = "2"
 zip = { version = "9.7.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 zeroize = "1"
-wasmtime = { version = "50.0.3", default-features = false, features = ["runtime", "std", "component-model", "cranelift"] }
+wasmtime = { version = "51.0.0", default-features = false, features = ["runtime", "std", "component-model", "cranelift"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
