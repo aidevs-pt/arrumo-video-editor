@@ -1704,7 +1704,7 @@
     "reading": "Reading the brief and planning",
     "searching": "Searched the web",
     "lookingAtMaterial": "Looking at the workspace material it asked for",
-    "stageAttempt": "{stage}, attempt {attempt}"
+    "stageAttempt": "{stage}, round {attempt}"
   },
   "providerOrder": {
     "title": "Which plugin does what, in order",

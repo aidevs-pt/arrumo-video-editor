@@ -59,11 +59,12 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
   }, [workspaceId, runId]);
 
   const running = logs.at(-1)?.status === "running" ? logs.at(-1) : undefined;
-  const groups = logs.reduce<{ key: string; stage: string; attempt: number | null; logs: Log[] }[]>((all, log) => {
+  // `attempt` counts the run's claims, not revisions, so a stage's rounds are numbered here.
+  const groups = logs.reduce<{ key: string; stage: string; round: number; logs: Log[] }[]>((all, log) => {
     const key = `${log.stage}:${log.attempt ?? ""}`;
     const last = all.at(-1);
     if (last?.key === key) last.logs.push(log);
-    else all.push({ key, stage: log.stage, attempt: log.attempt, logs: [log] });
+    else all.push({ key, stage: log.stage, round: all.filter((group) => group.stage === log.stage).length + 1, logs: [log] });
     return all;
   }, []);
   const stepCount = logs.reduce((total, log) => total + log.steps.length, 0);
@@ -85,8 +86,8 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
             {groups.map((group, groupIndex) => (
               <div key={group.key} className="flex flex-col gap-3 pb-4 last:pb-0">
                 <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
-                  {group.attempt && group.attempt > 1
-                    ? copy.stageAttempt.replace("{stage}", stageLabel(group.stage)).replace("{attempt}", String(group.attempt))
+                  {group.round > 1
+                    ? copy.stageAttempt.replace("{stage}", stageLabel(group.stage)).replace("{attempt}", String(group.round))
                     : stageLabel(group.stage)}
                 </p>
                 {group.logs.map((log, round) => {
