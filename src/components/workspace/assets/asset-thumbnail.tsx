@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 type MediaKind = "image" | "audio" | "video";
 
 const icons = { image: ImageIcon, audio: AudioLines, video: Film };
+const TRANSPARENCY =
+  "repeating-conic-gradient(color-mix(in oklab, var(--muted), var(--foreground) 38%) 0% 25%, color-mix(in oklab, var(--muted), var(--foreground) 50%) 0% 50%) 50% / 16px 16px";
 
 export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "cover" }: {
   workspaceId: number;
@@ -35,7 +37,9 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "c
   }, [assetId, kind, workspaceId]);
 
   return (
-    <div ref={element} aria-hidden="true" className={cn("relative grid aspect-video place-items-center overflow-hidden rounded-thumb bg-muted", className)}>
+    <div ref={element} aria-hidden="true" className={cn("relative grid aspect-video place-items-center overflow-hidden rounded-thumb bg-muted", className)}
+      // A checkerboard behind whole images shows transparency, so white marks stay visible.
+      style={url && fit === "contain" ? { background: TRANSPARENCY } : undefined}>
       {url ? (
         // Managed local preview provided by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
