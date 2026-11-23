@@ -1116,9 +1116,15 @@ impl LayerTarget<'_> {
                             Ok((still(&file), shifted))
                         })
                         .collect::<io::Result<_>>()?;
+                    // Seeking past the end yields no frames to hold, so the layer would be blank;
+                    // start on the clip's last frame instead.
+                    let seek = match crate::source_transcripts::media_duration(&path) {
+                        Ok(length) => layer.clip_start.min((length - 2.0 / FPS as f64).max(0.0)),
+                        Err(_) => layer.clip_start,
+                    };
                     args.extend([
                         "-ss".to_owned(),
-                        format!("{:.3}", layer.clip_start),
+                        format!("{seek:.3}"),
                         "-t".to_owned(),
                         format!("{:.3}", span + 1.0),
                         "-i".to_owned(),
@@ -2163,6 +2169,62 @@ mod tests {
         // The 460 x 288 clip starts at x 90; the spotlight covers x 113 to 297.
         assert!(green(205, 180) > 150, "lit: {}", green(205, 180));
         assert!(green(450, 180) < 100, "dimmed: {}", green(450, 180));
+    }
+
+    #[test]
+    fn a_clip_started_past_its_end_holds_its_last_frame() {
+        if Command::new("ffmpeg").arg("-version").output().is_err() {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let clip = directory.path().join("clip.mp4");
+        let made = Command::new("ffmpeg")
+            .args([
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=0x40C040:s=320x200:r=30:d=2",
+            ])
+            .args(["-pix_fmt", "yuv420p", "-y"])
+            .arg(&clip)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let mut layer = clip_layer();
+        layer["zoom"] = json!([]);
+        let mut value = answer();
+        value["durationSeconds"] = json!(2);
+        value["layers"] = json!([layer]);
+        let mut spec = MotionSpec::from_answer_with_clips(&value, |_| false, |_| true).unwrap();
+        spec.layers[0].clip_start = 5.0;
+        spec.layers[0].start = 0.0;
+        spec.layers[0].end = 2.0;
+        let resolve = |id: i64| (id == 7).then(|| clip.clone());
+        render_spec(
+            &spec,
+            (640, 360),
+            directory.path(),
+            "out.mp4",
+            &resolve,
+            &FontSet::default(),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let frame = Command::new("ffmpeg")
+            .args(["-v", "error", "-ss", "1.0", "-i"])
+            .arg(directory.path().join("out.mp4"))
+            .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+            .output()
+            .unwrap()
+            .stdout;
+        let at = (180 * 640 + 320) * 3;
+        assert!(
+            frame[at + 1] > 150 && frame[at] < 120,
+            "the clip's last frame is held: {:?}",
+            &frame[at..at + 3]
+        );
     }
 
     #[test]
