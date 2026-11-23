@@ -329,7 +329,9 @@ repeats. Most clips need no camera move at all. To point at a control, a panel o
 talks about, use a spotlight: from and to are seconds of the animation, and x, y, width and height place \
 a rounded area as fractions of the clip (x and y its centre) that stays bright while the rest of the clip \
 dims. Make the area a little larger than its subject, start it a moment before the narration names it \
-and keep it at least a second and a half. zoom moves the camera over the clip, cropping it inside its \
+and keep it at least a second and a half. A spotlight marks a fixed place on the screen, so end it before \
+the clip scrolls or changes page and start the next one after the movement, at least 0.6 s later: \
+spotlights closer than that are joined into one handover. zoom moves the camera over the clip, cropping it inside its \
 box: each key says at which second of the animation the view is scale times larger (1 to 3) and centred \
 on x and y as fractions of the clip; the view eases from key to key. Keep zoom for text too small to read \
 at full size, at most once or twice in a video, and ease back out; an empty list keeps the whole clip in \
