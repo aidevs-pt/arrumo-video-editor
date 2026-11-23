@@ -370,12 +370,12 @@ pub(super) fn definitions() -> [Value; 42] {
                 "workspaceId": id, "profileId": id, "start": date, "end": date
             }, "required": ["workspaceId", "start", "end"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
-        json!({"name": "delete_generation", "description": "Stop and delete a generation run and its managed files after confirming the exact display title. Runs referenced by replays are protected.",
+        json!({"name": "delete_generation", "description": "Stop and delete a generation run and its managed files after confirming the exact display title. Replays of it are kept and stop pointing to it.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "confirmedTitle"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
-        json!({"name": "delete_completed_video", "description": "Delete a completed run and its managed delivery files after confirming the exact display title. Runs referenced by replays are protected.",
+        json!({"name": "delete_completed_video", "description": "Delete a completed run and its managed delivery files after confirming the exact display title. Replays of it are kept and stop pointing to it.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "runId": id, "confirmedTitle": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "runId", "confirmedTitle"], "additionalProperties": false},

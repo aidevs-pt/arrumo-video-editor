@@ -54,11 +54,16 @@ impl WorkspaceStore {
             .optional()?
             .is_some();
         if !already_pending {
+            // Replays keep their own snapshot, so they outlive the run they replayed.
+            transaction.execute(
+                "UPDATE generation_runs SET replay_of_run_id = NULL, replay_mode = NULL
+                 WHERE workspace_id = ?1 AND replay_of_run_id = ?2",
+                params![workspace_id, run_id],
+            )?;
             let deleted = transaction.execute(
                 "DELETE FROM generation_runs
                  WHERE workspace_id = ?1 AND id = ?2 AND (NOT ?4 OR state = 'completed')
-                   AND COALESCE(display_title, json_extract(snapshot_json, '$.draft.title')) = ?3
-                   AND NOT EXISTS (SELECT 1 FROM generation_runs WHERE replay_of_run_id = ?2)",
+                   AND COALESCE(display_title, json_extract(snapshot_json, '$.draft.title')) = ?3",
                 params![workspace_id, run_id, confirmed_title, completed_only],
             )?;
             if deleted == 0 {
@@ -215,5 +220,63 @@ mod tests {
         );
         assert!(store.generation_run(workspace, run.id).unwrap().is_none());
         assert_eq!(store.list_video_drafts(workspace).unwrap(), vec![draft]);
+    }
+
+    #[test]
+    fn deleting_a_replayed_video_keeps_its_replay() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspaces.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "First cut".into(),
+                    intent: "An example".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let first = store
+            .enqueue_video_draft(workspace, draft.id, "first", &RunOptions::default())
+            .unwrap();
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET state = 'completed' WHERE id = ?1",
+                [first.id],
+            )
+            .unwrap();
+        let replay = store
+            .replay_generation(workspace, first.id, "again", crate::ReplayMode::Current)
+            .unwrap();
+        assert!(
+            !store
+                .delete_completed_generation(&database, workspace, first.id, "Wrong title")
+                .unwrap()
+        );
+        let source: Option<i64> = store
+            .0
+            .query_row(
+                "SELECT replay_of_run_id FROM generation_runs WHERE id = ?1",
+                [replay.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(source, Some(first.id), "a refused deletion keeps the link");
+        assert!(
+            store
+                .delete_completed_generation(&database, workspace, first.id, "First cut")
+                .unwrap()
+        );
+        assert!(store.generation_run(workspace, first.id).unwrap().is_none());
+        assert!(
+            store
+                .generation_run(workspace, replay.id)
+                .unwrap()
+                .is_some()
+        );
     }
 }
