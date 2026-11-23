@@ -497,6 +497,15 @@ impl MotionSpec {
                 });
                 layer.spotlight.truncate(MAX_SPOTLIGHTS);
                 layer.spotlight.sort_by(|a, b| a.from.total_cmp(&b.from));
+                // A spotlight that follows soon after another takes over from it without the
+                // clip brightening in between.
+                for next in 1..layer.spotlight.len() {
+                    let from = layer.spotlight[next].from;
+                    let previous = &mut layer.spotlight[next - 1];
+                    if from - previous.to < 2.0 * SPOTLIGHT_EASE {
+                        previous.to = previous.to.max(from + SPOTLIGHT_EASE).min(duration);
+                    }
+                }
             } else {
                 layer.clip_start = 0.0;
                 layer.zoom.clear();
@@ -1869,6 +1878,24 @@ mod tests {
         value["layers"] = json!([layer]);
         let spec = MotionSpec::from_answer_with_clips(&value, |_| false, |_| true).unwrap();
         assert_eq!(spec.layers[0].spotlight.len(), 1);
+        let mut handover = clip_layer();
+        handover["spotlight"] = json!([
+            {"from": 2.0, "to": 2.9, "x": 0.8, "y": 0.5, "width": 0.2, "height": 0.2},
+            {"from": 0.5, "to": 1.9, "x": 0.2, "y": 0.5, "width": 0.2, "height": 0.2}]);
+        let mut handed = answer();
+        handed["durationSeconds"] = json!(3);
+        handed["layers"] = json!([handover]);
+        let lights = MotionSpec::from_answer_with_clips(&handed, |_| false, |_| true)
+            .unwrap()
+            .layers[0]
+            .spotlight
+            .clone();
+        assert_eq!(
+            (lights[0].from, lights[0].to),
+            (0.5, 2.0 + SPOTLIGHT_EASE),
+            "fades overlap"
+        );
+        assert_eq!((lights[1].from, lights[1].to), (2.0, 2.9));
         let resolve = |id: i64| (id == 7).then(|| clip.clone());
         render_spec(
             &spec,
