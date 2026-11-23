@@ -371,10 +371,12 @@ fn replace_live_references(
         ] {
             tx.execute(
                 &format!(
-                    "UPDATE {table} SET settings_json = json_set(settings_json, ?4, (
+                    // json() keeps the array an array: SQLite drops the JSON subtype of a
+                    // subquery's result, and json_set would store it as text.
+                    "UPDATE {table} SET settings_json = json_set(settings_json, ?4, json((
                        SELECT json_group_array(CASE WHEN value = ?2 THEN ?3 ELSE value END ORDER BY key)
                        FROM json_each(settings_json, ?4)
-                     ))
+                     )))
                      WHERE {scope} AND EXISTS (SELECT 1 FROM json_each(settings_json, ?4) WHERE value = ?2)"
                 ),
                 params![workspace_id, previous, replacement, path],
