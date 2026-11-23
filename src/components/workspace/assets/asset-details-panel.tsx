@@ -130,7 +130,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const busy = state === "saving";
 
   return (
-    <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain" aria-labelledby="asset-panel-title">
+    <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" aria-labelledby="asset-panel-title">
       <div className="flex items-start justify-between gap-3">
         <h2 id="asset-panel-title" className="font-sans min-w-0 text-[1.125rem] leading-snug font-bold wrap-anywhere">
           {single ? copy.panelOne.replace("{name}", single.name) : copy.panelMany.replace("{count}", String(assets.length))}

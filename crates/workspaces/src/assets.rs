@@ -111,7 +111,7 @@ impl WorkspaceStore {
         Ok(Some(ImagePreview { mime, bytes }))
     }
 
-    /// A still from a video asset, taken once and kept in `cache`. FFmpeg picks the most
+    /// A still from a video asset, taken once and kept in `cache` (see [`frame_cache`]). FFmpeg picks the most
     /// representative of the first frames, so a fade from black still gives a picture.
     pub fn video_frame(
         &self,
@@ -125,8 +125,15 @@ impl WorkspaceStore {
         if !source.symlink_metadata()?.is_file() || source.canonicalize()? != source {
             return Err(io::Error::other("Video frame source is unavailable").into());
         }
+        // The name follows the file, so a restored backup or replaced asset never reuses a frame.
+        let metadata = source.metadata()?;
+        let modified = metadata
+            .modified()?
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|time| time.as_secs())
+            .unwrap_or_default();
         let directory = cache.join(workspace_id.to_string());
-        let frame = directory.join(format!("{asset_id}.jpg"));
+        let frame = directory.join(format!("{asset_id}-{}-{modified}.jpg", metadata.len()));
         if !frame.is_file() {
             fs::create_dir_all(&directory)?;
             let pending = directory.join(format!("{asset_id}-pending.jpg"));
@@ -387,6 +394,14 @@ pub fn asset_root(database: &Path) -> PathBuf {
     PathBuf::from(root)
 }
 
+/// Where stills of video assets are kept: beside the database, outside the media folder that
+/// backups archive.
+pub fn frame_cache(database: &Path) -> PathBuf {
+    let mut root = database.as_os_str().to_owned();
+    root.push(".frames");
+    PathBuf::from(root)
+}
+
 pub fn asset_path(media_root: &Path, workspace_id: i64, asset_id: i64) -> PathBuf {
     media_root
         .join(workspace_id.to_string())
@@ -607,5 +622,49 @@ mod replacement_tests {
             .map(|asset| asset.id)
             .collect();
         assert_eq!(footage, [take.id]);
+    }
+}
+
+#[cfg(test)]
+mod frame_tests {
+    use super::*;
+
+    #[test]
+    fn video_assets_get_a_cached_still_and_images_do_not() {
+        if std::process::Command::new("ffmpeg")
+            .arg("-version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("studio.sqlite");
+        let root = asset_root(&database);
+        let cache = frame_cache(&database);
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let clip = temp.path().join("clip.mp4");
+        let made = std::process::Command::new("ffmpeg")
+            .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
+            .args(["color=c=red:s=160x90:r=10:d=1", "-pix_fmt", "yuv420p"])
+            .arg(&clip)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let video = store.import_asset(&root, workspace, &clip).unwrap();
+
+        let still = store.video_frame(&root, &cache, workspace, video.id).unwrap();
+        assert_eq!(image_type(&still.bytes), Some("image/jpeg"));
+        let cached: Vec<_> = fs::read_dir(cache.join(workspace.to_string()))
+            .unwrap()
+            .collect();
+        assert_eq!(cached.len(), 1);
+        assert!(!cache.starts_with(&root));
+
+        let picture = temp.path().join("picture.png");
+        fs::write(&picture, b"\x89PNG\r\n\x1a\nrest").unwrap();
+        let image = store.import_asset(&root, workspace, &picture).unwrap();
+        assert!(store.video_frame(&root, &cache, workspace, image.id).is_err());
     }
 }

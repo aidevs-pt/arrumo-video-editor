@@ -367,11 +367,6 @@ async fn preview_workspace_video_frame(
     use base64::{Engine, engine::general_purpose::STANDARD};
 
     let failed = "asset_preview_failed";
-    let cache = app
-        .path()
-        .app_cache_dir()
-        .map_err(|_| failed)?
-        .join("asset-frames");
     tauri::async_runtime::spawn_blocking(move || {
         let database = app
             .path()
@@ -382,7 +377,12 @@ async fn preview_workspace_video_frame(
             .map_err(|_| failed)?;
         let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
         let frame = store
-            .video_frame(&asset_root(&database), &cache, workspace_id, asset_id)
+            .video_frame(
+                &asset_root(&database),
+                &arrumo_workspaces::frame_cache(&database),
+                workspace_id,
+                asset_id,
+            )
             .map_err(|_| failed)?;
         Ok(format!(
             "data:{};base64,{}",

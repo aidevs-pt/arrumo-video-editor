@@ -113,7 +113,7 @@ pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};
 pub use agent_run::AgentRunError;
 pub use agent_settings::{AgentProviderSource, AgentSettings};
 pub use asset_organization::AssetOrganization;
-pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root, image_type};
+pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root, frame_cache, image_type};
 pub use audio_generation::AudioKind;
 pub use audio_transform::{AudioTransform, AudioTransformProvider};
 pub use backup::{
