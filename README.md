@@ -113,6 +113,10 @@ Run the backend tests with `cargo test --locked`. In the Arrumo workspace layout
 
 The code follows domain boundaries: `crates/workspaces` holds the business rules and the application API shared by the UI, CLI, MCP and A2A, `src-tauri` is the desktop host, and `src` is the Next.js interface (shadcn, Motion), in English, Spanish and Portuguese.
 
+## Contributing
+
+Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md). Report security problems privately as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 Copyright © 2026 DEVS AI Unipessoal LDA. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
