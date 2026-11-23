@@ -213,29 +213,61 @@ fn with_motion_schema(mut schema: Value, animations: usize) -> Value {
 }
 
 /// Lets the agent lay one of the run's approved audio tracks under the whole video.
-fn with_music_schema(mut schema: Value, tracks: &[i64]) -> Value {
+/// Adds the music choice to an answer schema. Storyboards (`scenes`) may change track at a scene.
+fn with_music_schema(mut schema: Value, tracks: &[i64], scenes: bool) -> Value {
     if tracks.is_empty() {
         return schema;
     }
-    schema["properties"]["music"] = json!({"type": "array", "maxItems": 1, "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["assetId"], "properties": {"assetId": {"enum": tracks}},
-    }});
+    schema["properties"]["music"] = if scenes {
+        json!({"type": "array", "maxItems": MAX_MUSIC_TRACKS, "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["assetId", "fromScene"], "properties": {
+                "assetId": {"enum": tracks},
+                "fromScene": {"type": "integer", "minimum": 0, "maximum": MAX_SCENES},
+            },
+        }})
+    } else {
+        json!({"type": "array", "maxItems": 1, "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["assetId"], "properties": {"assetId": {"enum": tracks}},
+        }})
+    };
     if let Some(required) = schema["required"].as_array_mut() {
         required.push(json!("music"));
     }
     schema
 }
 
-/// Records the background track the agent chose, if it is one it was offered.
+/// The most music tracks one video changes between.
+const MAX_MUSIC_TRACKS: usize = 4;
+
+/// Records the background tracks the agent chose, if they are ones it was offered: the first
+/// plays from the start and each later one takes over from its scene.
 fn place_music(edit: &mut Value, answer: &Value, tracks: &[i64]) {
-    if let Some(id) = answer["music"]
+    let mut chosen: Vec<(u64, i64)> = answer["music"]
         .as_array()
-        .and_then(|music| music.first())
-        .and_then(|track| track["assetId"].as_i64())
-        .filter(|id| tracks.contains(id))
-    {
-        edit["music"] = json!({"asset_id": id});
+        .into_iter()
+        .flatten()
+        .take(MAX_MUSIC_TRACKS)
+        .filter_map(|track| {
+            let id = track["assetId"].as_i64().filter(|id| tracks.contains(id))?;
+            Some((track["fromScene"].as_u64().unwrap_or(0), id))
+        })
+        .collect();
+    chosen.sort_by_key(|(scene, _)| *scene);
+    chosen.dedup_by_key(|(scene, _)| *scene);
+    let Some(&(_, first)) = chosen.first() else {
+        return;
+    };
+    edit["music"] = json!({"asset_id": first});
+    let changes: Vec<Value> = chosen
+        .iter()
+        .skip(1)
+        .filter(|(scene, _)| *scene > 0)
+        .map(|(scene, id)| json!({"asset_id": id, "scene": scene}))
+        .collect();
+    if !changes.is_empty() {
+        edit["music_changes"] = json!(changes);
     }
 }
 
@@ -606,8 +638,9 @@ impl WorkspaceStore {
             } else {
                 format!(
                     "The creator approved these audio tracks. If one is meant as background music, return it in \
-                     music and Arrumo plays it under every scene, quieter while the narration speaks. Return an \
-                     empty list when none is music for the whole video.\nAPPROVED AUDIO (JSON):\n{}\n",
+                     music with fromScene 0 and Arrumo plays it under every scene, quieter while the narration \
+                     speaks. To change the music at a new chapter, add another track with the index of the scene \
+                     it starts on; Arrumo crossfades between them. Return an empty list when none is background music.\nAPPROVED AUDIO (JSON):\n{}\n",
                     serde_json::to_string(
                         &tracks
                             .iter()
@@ -662,7 +695,7 @@ impl WorkspaceStore {
             },
             provider,
             &prompt,
-            &with_music_schema(schema, &track_ids),
+            &with_music_schema(schema, &track_ids, true),
             AGENT_TIMEOUT,
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
@@ -819,6 +852,7 @@ impl WorkspaceStore {
         let mut schema = with_music_schema(
             with_motion_schema(answer_schema(&sources), animations.len()),
             &track_ids,
+            false,
         );
         if !frames.is_empty() {
             schema = with_grade_schema(schema);
@@ -941,10 +975,10 @@ mod tests {
         let ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
         assert_eq!(ids, vec![14]);
         let schema =
-            super::with_music_schema(json!({"properties": {}, "required": ["cuts"]}), &ids);
+            super::with_music_schema(json!({"properties": {}, "required": ["cuts"]}), &ids, false);
         assert_eq!(schema["required"], json!(["cuts", "music"]));
         assert!(
-            super::with_music_schema(json!({"required": []}), &[])
+            super::with_music_schema(json!({"required": []}), &[], true)
                 .get("properties")
                 .is_none()
         );
@@ -956,6 +990,27 @@ mod tests {
         assert!(edit.get("music").is_none());
         super::place_music(&mut edit, &json!({"music": [{"assetId": 14}]}), &ids);
         assert_eq!(edit["music"], json!({"asset_id": 14}));
+        assert!(edit.get("music_changes").is_none());
+    }
+
+    #[test]
+    fn storyboards_change_music_at_the_scenes_the_agent_names() {
+        let mut edit = json!({});
+        let answer = json!({"music": [
+            {"assetId": 21, "fromScene": 4},
+            {"assetId": 20, "fromScene": 0},
+            {"assetId": 99, "fromScene": 2},
+            {"assetId": 22, "fromScene": 4}
+        ]});
+        super::place_music(&mut edit, &answer, &[20, 21, 22]);
+        assert_eq!(edit["music"], json!({"asset_id": 20}));
+        assert_eq!(edit["music_changes"], json!([{"asset_id": 21, "scene": 4}]));
+        let schema =
+            super::with_music_schema(json!({"properties": {}, "required": []}), &[20], true);
+        assert_eq!(
+            schema["properties"]["music"]["items"]["required"],
+            json!(["assetId", "fromScene"])
+        );
     }
 
     #[test]

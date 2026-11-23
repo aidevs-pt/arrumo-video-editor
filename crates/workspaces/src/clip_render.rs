@@ -314,6 +314,51 @@ impl RenderCheck {
     }
 }
 
+/// Seconds two music tracks overlap where the music changes.
+const MUSIC_CROSSFADE: f64 = 2.0;
+
+/// The filters that make the `[bed]` music stream for a `length`-second video from inputs
+/// `1..=starts.len()`, each looped, levelled, and starting at its start time with a crossfade.
+fn music_bed(starts: Vec<f64>, length: f64, stereo: &str) -> String {
+    let level = "loudnorm=I=-30:TP=-9:LRA=7";
+    if starts.len() <= 1 {
+        return format!("[1:a:0]{stereo},{level}[bed];");
+    }
+    // Each track plays from its own start until the next one has faded in.
+    let mut ends: Vec<f64> = starts[1..].to_vec();
+    ends.push(length + 1.0);
+    let shortest = starts
+        .iter()
+        .zip(&ends)
+        .map(|(start, end)| end - start)
+        .fold(f64::INFINITY, f64::min);
+    let fade = MUSIC_CROSSFADE.min(shortest / 2.0).max(0.1);
+    let mut graph = String::new();
+    let last = starts.len() - 1;
+    for (index, (start, end)) in starts.iter().zip(&ends).enumerate() {
+        let before = if index == 0 { 0.0 } else { fade / 2.0 };
+        let after = if index == last { 0.0 } else { fade / 2.0 };
+        let seconds = end - start + before + after;
+        graph.push_str(&format!(
+            "[{input}:a:0]{stereo},atrim=duration={seconds:.3},asetpts=PTS-STARTPTS,{level}[m{index}];",
+            input = index + 1
+        ));
+    }
+    let mut current = "m0".to_owned();
+    for index in 1..starts.len() {
+        let label = if index == last {
+            "bed".to_owned()
+        } else {
+            format!("x{index}")
+        };
+        graph.push_str(&format!(
+            "[{current}][m{index}]acrossfade=d={fade:.3}:c1=qsin:c2=qsin[{label}];"
+        ));
+        current = label;
+    }
+    graph
+}
+
 /// Every concatenated part may gain or lose an audio frame, so allow a little per part.
 fn duration_matches(seconds: f64, parts: &[f64]) -> bool {
     let expected: f64 = parts.iter().sum();
@@ -468,6 +513,7 @@ impl WorkspaceStore {
         }
         let motion = self.edit_motion(workspace_id, &edit)?;
         let music = self.edit_music(&asset_root(database), workspace_id, &edit)?;
+        let music_changes = self.edit_music_changes(&asset_root(database), workspace_id, &edit)?;
 
         let revision = if stage == ProductionStage::Preview {
             crate::preview_review::preview_revision(&self.0, run_id, index)?
@@ -531,6 +577,7 @@ impl WorkspaceStore {
                         &narration,
                         &format,
                         music.as_deref(),
+                        &music_changes,
                     )?;
                     checks.insert(format.id.to_string(), check.to_json());
                     if stage == ProductionStage::FinalRender {
@@ -663,6 +710,7 @@ impl WorkspaceStore {
         if let Some(scenes) = self.storyboard_scenes(workspace_id, &edit)? {
             let narration = narration_tracks(database, workspace_id, run_id, &edit, scenes.len())?;
             let music = self.edit_music(&root, workspace_id, &edit)?;
+            let changes = self.edit_music_changes(&root, workspace_id, &edit)?;
             renderer.render_scenes(
                 &root,
                 directory,
@@ -670,6 +718,7 @@ impl WorkspaceStore {
                 &narration,
                 &format,
                 music.as_deref(),
+                &changes,
             )?;
         } else {
             let source_ids = &inputs.draft.source_ids;
@@ -729,6 +778,16 @@ impl WorkspaceStore {
         let Some(music) = edit.get("music") else {
             return Ok(None);
         };
+        self.music_track(root, workspace_id, music).map(Some)
+    }
+
+    /// The workspace audio file a music entry (`{"asset_id": …}`) names.
+    fn music_track(
+        &self,
+        root: &Path,
+        workspace_id: i64,
+        music: &Value,
+    ) -> Result<PathBuf, Box<dyn Error>> {
         let invalid =
             || io::Error::other("The edit's music is not an audio file in this workspace");
         let id = music["asset_id"].as_i64().ok_or_else(invalid)?;
@@ -740,7 +799,26 @@ impl WorkspaceStore {
                 |_| Ok(()),
             )
             .map_err(|_| invalid())?;
-        Ok(Some(asset_path(root, workspace_id, id).canonicalize()?))
+        Ok(asset_path(root, workspace_id, id).canonicalize()?)
+    }
+
+    /// The tracks a storyboard edit changes its music to, each with the scene it starts on.
+    fn edit_music_changes(
+        &self,
+        root: &Path,
+        workspace_id: i64,
+        edit: &Value,
+    ) -> Result<Vec<(PathBuf, usize)>, Box<dyn Error>> {
+        let Some(changes) = edit.get("music_changes").and_then(Value::as_array) else {
+            return Ok(Vec::new());
+        };
+        changes
+            .iter()
+            .map(|change| {
+                let scene = change["scene"].as_u64().unwrap_or(0) as usize;
+                Ok((self.music_track(root, workspace_id, change)?, scene))
+            })
+            .collect()
     }
 
     /// The validated scenes of a storyboard edit, or `None` for an edit of recorded footage.
@@ -824,6 +902,7 @@ impl WorkspaceStore {
 
 impl ActiveRender<'_> {
     /// Renders each scene at the format's size and joins them into `<format id>.mp4`.
+    #[allow(clippy::too_many_arguments)]
     fn render_scenes(
         &self,
         root: &Path,
@@ -832,6 +911,7 @@ impl ActiveRender<'_> {
         narration: &[NarrationTrack],
         format: &Dimensions,
         music: Option<&Path>,
+        music_changes: &[(PathBuf, usize)],
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
         fs::create_dir(&directory)?;
@@ -952,20 +1032,39 @@ impl ActiveRender<'_> {
         run_ffmpeg(&directory, &args, &mut check)?;
         let finished = scratch.join(format!("{}.mp4", format.id));
         let staged = scratch.join(format!("{}-staged.mp4", format.id));
-        match music {
+        // Each music track starts where its scene starts.
+        let starts: Vec<f64> = parts
+            .iter()
+            .scan(0.0, |elapsed, length| {
+                let start = *elapsed;
+                *elapsed += length;
+                Some(start)
+            })
+            .collect();
+        let tracks: Vec<(&Path, f64)> = music
+            .map(|music| (music, 0.0))
+            .into_iter()
+            .chain(music_changes.iter().filter_map(|(path, scene)| {
+                starts
+                    .get(*scene)
+                    .filter(|_| *scene > 0)
+                    .map(|start| (path.as_path(), *start))
+            }))
+            .collect();
+        match tracks.is_empty() {
             // With a voice, the music sits under the mastered narration as it does under speech.
-            Some(music) if narration.iter().any(|(audio, _)| audio.is_some()) => {
+            false if narration.iter().any(|(audio, _)| audio.is_some()) => {
                 self.master_audio(&output, &staged)?;
-                self.lay_music(&staged, music, &finished)?;
+                self.lay_music_tracks(&staged, &tracks, &finished)?;
                 fs::remove_file(staged)?;
             }
             // Without one, the music is the whole soundtrack, so it is mastered to full level.
-            Some(music) => {
-                self.lay_music(&output, music, &staged)?;
+            false => {
+                self.lay_music_tracks(&output, &tracks, &staged)?;
                 self.master_audio(&staged, &finished)?;
                 fs::remove_file(staged)?;
             }
-            None => self.master_audio(&output, &finished)?,
+            true => self.master_audio(&output, &finished)?,
         }
         self.check_render(&finished, &parts)
     }
@@ -1327,17 +1426,44 @@ impl ActiveRender<'_> {
     /// Loops `music` under the mastered speech at a background level, lowered about 10 dB while
     /// anyone speaks and faded out over the last 1.5 seconds, then limited to the delivery peak.
     fn lay_music(&self, input: &Path, music: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
-        let fade_at = (probe_duration(input)? - 1.5).max(0.0);
+        self.lay_music_tracks(input, &[(music, 0.0)], output)
+    }
+
+    /// Like `lay_music`, changing to each further track at its start time (in seconds) with a
+    /// crossfade. Each track is levelled on its own so the changes keep one loudness.
+    fn lay_music_tracks(
+        &self,
+        input: &Path,
+        tracks: &[(&Path, f64)],
+        output: &Path,
+    ) -> Result<(), Box<dyn Error>> {
+        let length = probe_duration(input)?;
+        let fade_at = (length - 1.5).max(0.0);
         let stereo = "aformat=sample_rates=48000:channel_layouts=stereo";
+        let mut command = Command::new("ffmpeg");
+        command
+            .args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "file",
+                "-i",
+            ])
+            .arg(input);
+        for (track, _) in tracks {
+            command.args(["-stream_loop", "-1", "-i"]).arg(track);
+        }
+        let bed = music_bed(
+            tracks.iter().map(|(_, start)| *start).collect(),
+            length,
+            stereo,
+        );
         self.run(
-            Command::new("ffmpeg")
-                .args(["-nostdin", "-v", "error", "-protocol_whitelist", "file", "-i"])
-                .arg(input)
-                .args(["-stream_loop", "-1", "-i"])
-                .arg(music)
+            command
                 .arg("-filter_complex")
                 .arg(format!(
-                    "[1:a:0]{stereo},loudnorm=I=-30:TP=-9:LRA=7[bed];\
+                    "{bed}\
                      [0:a:0]{stereo},asplit=2[speech][key];\
                      [bed][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=400[ducked];\
                      [speech][ducked]amix=inputs=2:normalize=0:duration=first,\
@@ -1393,6 +1519,92 @@ fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn music_changes_crossfade_at_their_scenes() {
+        if std::process::Command::new("ffmpeg")
+            .arg("-version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let mut args: Vec<String> = [
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=48000:cl=stereo:d=9",
+        ]
+        .map(String::from)
+        .to_vec();
+        for frequency in [220, 440, 880] {
+            let path = directory.path().join(format!("{frequency}.wav"));
+            let made = std::process::Command::new("ffmpeg")
+                .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
+                .arg(format!("sine=f={frequency}:d=2"))
+                .arg(&path)
+                .status()
+                .unwrap();
+            assert!(made.success());
+            args.extend([
+                "-stream_loop".into(),
+                "-1".into(),
+                "-i".into(),
+                path.to_string_lossy().into(),
+            ]);
+        }
+        let stereo = "aformat=sample_rates=48000:channel_layouts=stereo";
+        let bed = super::music_bed(vec![0.0, 3.0, 6.0], 9.0, stereo);
+        let output = directory.path().join("bed.wav");
+        args.extend([
+            "-filter_complex".into(),
+            format!("{bed}[0:a][bed]amix=inputs=2:duration=first[out]"),
+        ]);
+        args.extend([
+            "-map".into(),
+            "[out]".into(),
+            "-y".into(),
+            output.to_string_lossy().into(),
+        ]);
+        assert!(
+            std::process::Command::new("ffmpeg")
+                .args(&args)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let seconds = crate::source_transcripts::media_duration(&output).unwrap();
+        assert!((seconds - 9.0).abs() < 0.05, "{seconds}");
+        // Each track is heard in its own stretch.
+        let pitch_at = |from: f64| {
+            let report = std::process::Command::new("ffmpeg")
+                .args([
+                    "-nostdin",
+                    "-v",
+                    "info",
+                    "-ss",
+                    &from.to_string(),
+                    "-t",
+                    "0.5",
+                    "-i",
+                ])
+                .arg(&output)
+                .args(["-af", "aresample=8000,astats=metadata=0", "-f", "null", "-"])
+                .output()
+                .unwrap();
+            let text = String::from_utf8_lossy(&report.stderr).into_owned();
+            text.lines()
+                .find_map(|line| line.split("Zero crossings rate: ").nth(1))
+                .and_then(|value| value.trim().parse::<f64>().ok())
+                .unwrap()
+        };
+        let (first, second, third) = (pitch_at(1.0), pitch_at(4.5), pitch_at(7.5));
+        assert!(first < second && second < third, "{first} {second} {third}");
+    }
+
     use super::{cut_audio_filter, duration_matches};
 
     #[test]
