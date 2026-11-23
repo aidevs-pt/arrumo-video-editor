@@ -38,6 +38,10 @@ Add a stdio MCP server that runs `arrumo-workspaces <absolute-database-path> mcp
 
 Generate images, speech or video clips for the library with `generate_library_images`, `generate_library_speech` and `generate_library_video`. `list_video_models` shows each video provider's models and how many reference images or videos each one takes; pass workspace asset IDs as `references`. Generated media lands in the asset library with notes saying which provider and model made it. `list_speech_models` lists voice models, `transform_audio_asset` changes a voice or isolates it from noise, and `dub_asset` dubs an asset's speech into another language (`list_audio_transforms` and `list_dubbing_providers` show what the installed plugins offer).
 
+## Brand
+
+`set_brand_colors` and `set_brand_color_details` set the palette videos use. `import_brand_font` saves a static .ttf or .otf as the `heading` or `body` font in `regular` or `bold`; animation titles use the heading font and other text the body font. Take fonts from the brand's official sources, not from files a website happens to serve, and check their licence allows use in videos. `get_brand_fonts` shows what is set.
+
 ## Subtitles in the picture
 
 A format whose delivery sets `burned_captions` also ships a copy with subtitles drawn in. Its `caption_style` (font, size, colours, outline or box, position, margin) is set per format with `set_format_delivery`; a profile (`set_profile_delivery`) or one video (`format_overrides`) changes only the fields it names. `preview_caption_style` draws a style on a sample frame so you can check it before a run.
