@@ -1040,11 +1040,36 @@ pub(crate) fn continue_clips(scenes: &mut [MotionSpec]) {
                 continue;
             };
             if let Some(&(_, end)) = reached.iter().find(|(clip, _)| *clip == id) {
-                layer.clip_start = layer.clip_start.max(end);
+                let shift = end - layer.clip_start;
+                if shift > 0.0 {
+                    layer.clip_start = end;
+                    follow_clip(layer, shift);
+                }
             }
             next.push((id, layer.clip_start + (layer.end - layer.start)));
         }
         reached = next;
+    }
+}
+
+/// Keeps a layer's spotlights and zoom keys on the clip moments they were placed for after its
+/// clip starts `shift` seconds later: they move earlier, and those left too short are dropped.
+fn follow_clip(layer: &mut Layer, shift: f64) {
+    for light in &mut layer.spotlight {
+        light.from = (light.from - shift).max(layer.start);
+        light.to -= shift;
+    }
+    layer
+        .spotlight
+        .retain(|light| light.to - light.from >= 2.0 * SPOTLIGHT_EASE);
+    if !layer.zoom.is_empty() {
+        for key in &mut layer.zoom {
+            key.at -= shift;
+        }
+        let before = layer.zoom.iter().rposition(|key| key.at <= layer.start);
+        if let Some(first) = before {
+            layer.zoom.drain(..first);
+        }
     }
 }
 
@@ -1773,6 +1798,37 @@ mod tests {
             .map(|scene| scene.layers[0].clip_start)
             .collect();
         assert_eq!(starts, [10.0, 17.5, 30.0, 32.0]);
+    }
+
+    #[test]
+    fn continued_clips_keep_spotlights_on_their_moments() {
+        let spec = |clip_start: f64, lights: Value| {
+            let mut layer = clip_layer();
+            layer["start"] = json!(0.0);
+            layer["end"] = json!(8.0);
+            layer["spotlight"] = lights;
+            let mut spec = MotionSpec::from_answer_with_clips(
+                &json!({"title": "Clip", "kind": "animation", "usage": "", "durationSeconds": 8.0,
+                    "background": "#FFFFFF", "backgroundTo": null, "layers": [layer]}),
+                |_| false,
+                |id| id == 7,
+            )
+            .unwrap();
+            spec.layers[0].clip_start = clip_start;
+            spec.layers[0].start = 0.0;
+            spec.layers[0].end = 8.0;
+            spec
+        };
+        let light = |from: f64, to: f64| json!({"from": from, "to": to, "x": 0.5, "y": 0.5, "width": 0.4, "height": 0.3});
+        let mut scenes = vec![
+            spec(0.0, json!([])),
+            spec(5.0, json!([light(1.0, 2.5), light(4.0, 7.0)])),
+        ];
+        continue_clips(&mut scenes);
+        let layer = &scenes[1].layers[0];
+        assert_eq!(layer.clip_start, 8.0);
+        let lights: Vec<(f64, f64)> = layer.spotlight.iter().map(|l| (l.from, l.to)).collect();
+        assert_eq!(lights, [(1.0, 4.0)]);
     }
 
     #[test]
