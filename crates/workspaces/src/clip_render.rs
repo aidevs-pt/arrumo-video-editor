@@ -314,13 +314,25 @@ impl RenderCheck {
     }
 }
 
+/// The music a storyboard lays under its scenes: a first track, the tracks it changes to at
+/// scenes, and whether the music is featured rather than kept in the background.
+struct SceneMusic<'a> {
+    first: Option<&'a Path>,
+    changes: &'a [(PathBuf, usize)],
+    featured: bool,
+}
+
 /// Seconds two music tracks overlap where the music changes.
 const MUSIC_CROSSFADE: f64 = 2.0;
 
 /// The filters that make the `[bed]` music stream for a `length`-second video from inputs
 /// `1..=starts.len()`, each looped, levelled, and starting at its start time with a crossfade.
-fn music_bed(starts: Vec<f64>, length: f64, stereo: &str) -> String {
-    let level = "loudnorm=I=-30:TP=-9:LRA=7";
+fn music_bed(starts: Vec<f64>, length: f64, stereo: &str, featured: bool) -> String {
+    let level = if featured {
+        "loudnorm=I=-19:TP=-3:LRA=9"
+    } else {
+        "loudnorm=I=-30:TP=-9:LRA=7"
+    };
     if starts.len() <= 1 {
         return format!("[1:a:0]{stereo},{level}[bed];");
     }
@@ -576,8 +588,11 @@ impl WorkspaceStore {
                         scenes,
                         &narration,
                         &format,
-                        music.as_deref(),
-                        &music_changes,
+                        SceneMusic {
+                            first: music.as_deref(),
+                            changes: &music_changes,
+                            featured: edit["music_level"] == "featured",
+                        },
                     )?;
                     checks.insert(format.id.to_string(), check.to_json());
                     if stage == ProductionStage::FinalRender {
@@ -717,8 +732,11 @@ impl WorkspaceStore {
                 &scenes,
                 &narration,
                 &format,
-                music.as_deref(),
-                &changes,
+                SceneMusic {
+                    first: music.as_deref(),
+                    changes: &changes,
+                    featured: edit["music_level"] == "featured",
+                },
             )?;
         } else {
             let source_ids = &inputs.draft.source_ids;
@@ -902,7 +920,6 @@ impl WorkspaceStore {
 
 impl ActiveRender<'_> {
     /// Renders each scene at the format's size and joins them into `<format id>.mp4`.
-    #[allow(clippy::too_many_arguments)]
     fn render_scenes(
         &self,
         root: &Path,
@@ -910,8 +927,7 @@ impl ActiveRender<'_> {
         scenes: &[MotionSpec],
         narration: &[NarrationTrack],
         format: &Dimensions,
-        music: Option<&Path>,
-        music_changes: &[(PathBuf, usize)],
+        music: SceneMusic<'_>,
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
         fs::create_dir(&directory)?;
@@ -1042,9 +1058,10 @@ impl ActiveRender<'_> {
             })
             .collect();
         let tracks: Vec<(&Path, f64)> = music
-            .map(|music| (music, 0.0))
+            .first
+            .map(|first| (first, 0.0))
             .into_iter()
-            .chain(music_changes.iter().filter_map(|(path, scene)| {
+            .chain(music.changes.iter().filter_map(|(path, scene)| {
                 starts
                     .get(*scene)
                     .filter(|_| *scene > 0)
@@ -1055,12 +1072,12 @@ impl ActiveRender<'_> {
             // With a voice, the music sits under the mastered narration as it does under speech.
             false if narration.iter().any(|(audio, _)| audio.is_some()) => {
                 self.master_audio(&output, &staged)?;
-                self.lay_music_tracks(&staged, &tracks, &finished)?;
+                self.lay_music_tracks(&staged, &tracks, music.featured, &finished)?;
                 fs::remove_file(staged)?;
             }
             // Without one, the music is the whole soundtrack, so it is mastered to full level.
             false => {
-                self.lay_music_tracks(&output, &tracks, &staged)?;
+                self.lay_music_tracks(&output, &tracks, music.featured, &staged)?;
                 self.master_audio(&staged, &finished)?;
                 fs::remove_file(staged)?;
             }
@@ -1426,7 +1443,7 @@ impl ActiveRender<'_> {
     /// Loops `music` under the mastered speech at a background level, lowered about 10 dB while
     /// anyone speaks and faded out over the last 1.5 seconds, then limited to the delivery peak.
     fn lay_music(&self, input: &Path, music: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
-        self.lay_music_tracks(input, &[(music, 0.0)], output)
+        self.lay_music_tracks(input, &[(music, 0.0)], false, output)
     }
 
     /// Like `lay_music`, changing to each further track at its start time (in seconds) with a
@@ -1435,6 +1452,7 @@ impl ActiveRender<'_> {
         &self,
         input: &Path,
         tracks: &[(&Path, f64)],
+        featured: bool,
         output: &Path,
     ) -> Result<(), Box<dyn Error>> {
         let length = probe_duration(input)?;
@@ -1458,14 +1476,21 @@ impl ActiveRender<'_> {
             tracks.iter().map(|(_, start)| *start).collect(),
             length,
             stereo,
+            featured,
         );
+        // Featured music sits nearer the voice's level and gives way further while anyone speaks.
+        let duck = if featured {
+            "threshold=0.015:ratio=20:attack=15:release=350"
+        } else {
+            "threshold=0.02:ratio=8:attack=20:release=400"
+        };
         self.run(
             command
                 .arg("-filter_complex")
                 .arg(format!(
                     "{bed}\
                      [0:a:0]{stereo},asplit=2[speech][key];\
-                     [bed][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=400[ducked];\
+                     [bed][key]sidechaincompress={duck}[ducked];\
                      [speech][ducked]amix=inputs=2:normalize=0:duration=first,\
                      afade=t=out:st={fade_at:.3}:d=1.5,alimiter=limit=0.84:level=false,aresample=48000[audio]"
                 ))
@@ -1557,7 +1582,7 @@ mod tests {
             ]);
         }
         let stereo = "aformat=sample_rates=48000:channel_layouts=stereo";
-        let bed = super::music_bed(vec![0.0, 3.0, 6.0], 9.0, stereo);
+        let bed = super::music_bed(vec![0.0, 3.0, 6.0], 9.0, stereo, false);
         let output = directory.path().join("bed.wav");
         args.extend([
             "-filter_complex".into(),

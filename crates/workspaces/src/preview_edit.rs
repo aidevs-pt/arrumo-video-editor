@@ -218,6 +218,12 @@ fn with_music_schema(mut schema: Value, tracks: &[i64], scenes: bool) -> Value {
     if tracks.is_empty() {
         return schema;
     }
+    if scenes {
+        schema["properties"]["musicLevel"] = json!({"enum": ["background", "featured"]});
+        if let Some(required) = schema["required"].as_array_mut() {
+            required.push(json!("musicLevel"));
+        }
+    }
     schema["properties"]["music"] = if scenes {
         json!({"type": "array", "maxItems": MAX_MUSIC_TRACKS, "items": {
             "type": "object", "additionalProperties": false,
@@ -260,6 +266,9 @@ fn place_music(edit: &mut Value, answer: &Value, tracks: &[i64]) {
         return;
     };
     edit["music"] = json!({"asset_id": first});
+    if answer["musicLevel"] == "featured" {
+        edit["music_level"] = json!("featured");
+    }
     let changes: Vec<Value> = chosen
         .iter()
         .skip(1)
@@ -640,7 +649,10 @@ impl WorkspaceStore {
                     "The creator approved these audio tracks. If one is meant as background music, return it in \
                      music with fromScene 0 and Arrumo plays it under every scene, quieter while the narration \
                      speaks. To change the music at a new chapter, add another track with the index of the scene \
-                     it starts on; Arrumo crossfades between them. Return an empty list when none is background music.\nAPPROVED AUDIO (JSON):\n{}\n",
+                     it starts on; Arrumo crossfades between them. Set musicLevel to featured when the music carries the \
+                     video (a launch film or montage with little narration) so it plays near full level between lines, \
+                     or background to keep it low under a mostly spoken video. Return an empty list when none is \
+                     background music.\nAPPROVED AUDIO (JSON):\n{}\n",
                     serde_json::to_string(
                         &tracks
                             .iter()
@@ -1005,6 +1017,14 @@ mod tests {
         super::place_music(&mut edit, &answer, &[20, 21, 22]);
         assert_eq!(edit["music"], json!({"asset_id": 20}));
         assert_eq!(edit["music_changes"], json!([{"asset_id": 21, "scene": 4}]));
+        assert!(edit.get("music_level").is_none());
+        let mut featured = json!({});
+        super::place_music(
+            &mut featured,
+            &json!({"musicLevel": "featured", "music": [{"assetId": 20, "fromScene": 0}]}),
+            &[20],
+        );
+        assert_eq!(featured["music_level"], "featured");
         let schema =
             super::with_music_schema(json!({"properties": {}, "required": []}), &[20], true);
         assert_eq!(
