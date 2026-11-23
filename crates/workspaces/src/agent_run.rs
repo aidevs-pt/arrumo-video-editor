@@ -472,6 +472,23 @@ pub(crate) fn accepts_images(plugin: &AgentPlugin) -> bool {
     })
 }
 
+/// The largest image sent inside a message; agents reject bigger ones.
+const MAX_INLINE_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+
+fn image_media_type(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG") {
+        Some("image/png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("image/jpeg")
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("image/gif")
+    } else if bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        Some("image/webp")
+    } else {
+        None
+    }
+}
+
 /// The one JSON line a plugin's `imageInput` template makes from the prompt and the images.
 fn image_stdin(
     input: &crate::plugin_catalog::ImageInput,
@@ -519,22 +536,20 @@ fn image_stdin(
             other => other.clone(),
         }
     }
-    let attached = images
+    // Images the agent cannot read, such as SVG logos or very large photos, are left out
+    // rather than failing the run.
+    let attached: Vec<Value> = images
         .iter()
-        .take(MAX_IMAGES)
-        .map(|path| {
-            let bytes = fs::read(path)?;
-            let media_type = if bytes.starts_with(b"\x89PNG") {
-                "image/png"
-            } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-                "image/jpeg"
-            } else {
-                return Err(io::Error::other("Only PNG and JPEG images can be attached"));
-            };
+        .filter_map(|path| {
+            let bytes = fs::read(path)
+                .ok()
+                .filter(|bytes| bytes.len() <= MAX_INLINE_IMAGE_BYTES)?;
+            let media_type = image_media_type(&bytes)?;
             let data = base64::engine::general_purpose::STANDARD.encode(bytes);
-            Ok(image(&input.image, &data, media_type))
+            Some(image(&input.image, &data, media_type))
         })
-        .collect::<io::Result<Vec<_>>>()?;
+        .take(MAX_IMAGES)
+        .collect();
     let mut line = serde_json::to_string(&fill(&input.stdin, prompt, &attached))?;
     line.push('\n');
     Ok(line)
@@ -620,9 +635,15 @@ mod tests {
         assert_eq!(content[1]["source"]["media_type"], "image/jpeg");
         assert_eq!(content[1]["source"]["data"], "/9j/4A==");
         assert_eq!(content[2]["text"], "Check the joins");
-        let text = work.path().join("c.png");
-        std::fs::write(&text, b"not an image").unwrap();
-        assert!(super::image_stdin(&input, "x", &[text]).is_err());
+        let text = work.path().join("c.svg");
+        std::fs::write(&text, b"<svg/>").unwrap();
+        let webp = work.path().join("d.webp");
+        std::fs::write(&webp, b"RIFF\x10\0\0\0WEBPVP8 rest").unwrap();
+        let line = super::image_stdin(&input, "x", &[text, webp]).unwrap();
+        let value: Value = serde_json::from_str(line.trim()).unwrap();
+        let content = value["message"]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 2, "the SVG is left out");
+        assert_eq!(content[0]["source"]["media_type"], "image/webp");
     }
     use super::*;
     use crate::plugin_catalog::StructuredResult;
