@@ -286,6 +286,22 @@ impl WorkspaceStore {
             )
             .ok();
         let options = self.run_agent_options(scope, &provider.id);
+        let work_folder = provider
+            .cli
+            .structured_run
+            .as_ref()
+            .and_then(|run| run.work_folder_setting.as_deref())
+            .filter(|setting| options.get(*setting) == Some(&Value::Bool(true)))
+            .and(scope.run_id)
+            .and_then(|run_id| self.agent_work_folder(scope.workspace_id, run_id));
+        let prompt = match &work_folder {
+            Some(_) => std::borrow::Cow::Owned(format!(
+                "{prompt}\n\n{}",
+                crate::agent_work::WORK_FOLDER_NOTE
+            )),
+            None => std::borrow::Cow::Borrowed(prompt),
+        };
+        let prompt = prompt.as_ref();
         let transcript = AgentTranscript::default();
         let mode = session.clone();
         let started = Instant::now();
@@ -297,6 +313,7 @@ impl WorkspaceStore {
             timeout,
             &options,
             images,
+            work_folder.as_deref(),
             &transcript,
             session,
             || {
@@ -527,9 +544,84 @@ mod tests {
             crate::agent_run::setting_arguments(codex, &store.agent_options(workspace, "codex"));
         assert!(args.contains(&"web_search=\"live\"".to_owned()), "{args:?}");
         assert!(
-            args.contains(&"--ignore-user-config".to_owned()),
-            "user config stays off by default"
+            args.contains(&"sandbox_mode=\"workspace-write\"".to_owned())
+                && !args.contains(&"--ignore-user-config".to_owned()),
+            "agents may write files and use their own setup by default: {args:?}"
         );
+        for id in ["codex", "claude-code"] {
+            store
+                .set_plugin_setting(
+                    id,
+                    "local-tools",
+                    Some(workspace),
+                    Some(&Value::Bool(false)),
+                )
+                .unwrap();
+        }
+        let args =
+            crate::agent_run::setting_arguments(codex, &store.agent_options(workspace, "codex"));
+        for expected in [
+            "sandbox_mode=\"read-only\"",
+            "shell_tool",
+            "--ignore-user-config",
+        ] {
+            assert!(args.contains(&expected.to_owned()), "{expected}: {args:?}");
+        }
+        let claude = crate::agent_plugin("claude-code")
+            .unwrap()
+            .cli
+            .structured_run
+            .as_ref()
+            .unwrap();
+        let read_only = crate::agent_run::setting_arguments(
+            claude,
+            &store.agent_options(workspace, "claude-code"),
+        );
+        assert_eq!(
+            read_only[..5],
+            [
+                "--restricted",
+                "--settings",
+                "{\"disableAllHooks\":true}",
+                "--tools",
+                ""
+            ]
+        );
+        assert!(read_only.contains(&"--strict-mcp-config".to_owned()));
+        store
+            .set_plugin_setting("claude-code", "local-tools", Some(workspace), None)
+            .unwrap();
+        let writing = crate::agent_run::setting_arguments(
+            claude,
+            &store.agent_options(workspace, "claude-code"),
+        );
+        assert_eq!(
+            writing[..6],
+            [
+                "--permission-mode",
+                "acceptEdits",
+                "--allowedTools",
+                "Read,Write,Edit,Glob,Grep,Bash",
+                "--disallowedTools",
+                "WebSearch,WebFetch"
+            ]
+        );
+        assert!(
+            !writing
+                .iter()
+                .any(|arg| arg == "--restricted" || arg == "--strict-mcp-config")
+        );
+        assert_eq!(run_work_folder("claude-code"), Some("local-tools"));
+        assert_eq!(run_work_folder("codex"), Some("local-tools"));
+    }
+
+    fn run_work_folder(id: &str) -> Option<&'static str> {
+        crate::agent_plugin(id)?
+            .cli
+            .structured_run
+            .as_ref()?
+            .work_folder_setting
+            .as_deref()
     }
 
     #[test]

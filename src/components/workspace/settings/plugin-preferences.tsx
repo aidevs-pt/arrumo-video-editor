@@ -2,6 +2,7 @@
 
 import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
+import { TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -29,6 +30,10 @@ export type PluginSettingDeclaration = {
   default?: string | boolean | number;
   /** A page explaining where to get the value, opened by the host from the installed manifest. */
   helpUrl?: string;
+  /** A caution shown while the switch is on. */
+  warning?: string;
+  /** Another switch that, while on, makes this setting irrelevant. */
+  hiddenWhen?: string;
 };
 export type PluginSettingsManifest = { id: string; name: string; settings?: PluginSettingDeclaration[] };
 type CatalogEntry = { bundled: boolean; manifest: PluginSettingsManifest };
@@ -204,9 +209,17 @@ export function PluginFields({ pluginId, fields, workspaceId }: {
   if (!values) return <Skeleton className="h-24" aria-label={copy.loading} />;
 
   const changed = Object.keys(drafts).length > 0;
+  /** A switch's value as shown, counting unsaved changes and the plugin's default. */
+  function switchedOn(id: string) {
+    const field = fields.find((entry) => entry.id === id);
+    const draft = drafts[id];
+    const value = draft !== undefined && draft !== null ? draft
+      : draft === null ? null : values?.[id]?.effective ?? null;
+    return (value ?? (field?.default === undefined ? "" : String(field.default))) === "true";
+  }
   return <form className="flex flex-col gap-4" onSubmit={save}>
     <div className="flex flex-col divide-y">
-      {fields.map((field) => values[field.id] && (
+      {fields.filter((field) => !field.hiddenWhen || !switchedOn(field.hiddenWhen)).map((field) => values[field.id] && (
         <PreferenceField key={field.id} field={pluginText.field(pluginId, field)} values={values[field.id]} workspace={workspace} pluginId={pluginId}
           draft={field.id in drafts ? drafts[field.id] : undefined} disabled={saving}
           onChange={(value) => change(field.id, value)} />
@@ -279,6 +292,9 @@ function PreferenceField({ field, values, workspace, pluginId, draft, disabled, 
     <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
       <Label htmlFor={id} className="font-semibold">{field.label}</Label>
       <p id={id + "-description"} className="text-sm text-muted-foreground">{field.description}</p>
+      {field.warning && effective === "true" && <p role="note" className="flex items-start gap-1.5 text-sm text-[oklch(45%_.12_60)] dark:text-[oklch(80%_.12_80)]">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{field.warning}
+      </p>}
       {status}
       <SettingHelpLink pluginId={pluginId} settingId={field.id} helpUrl={field.helpUrl} />
     </div>

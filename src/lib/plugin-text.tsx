@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 type Named = { name: string; description: string };
 type Labelled = { label: string; description: string };
-type SettingText = { label?: string; description?: string; choices?: Record<string, string> };
+type SettingText = { label?: string; description?: string; choices?: Record<string, string>; warning?: string };
 type Translation = {
   name?: string;
   description?: string;
@@ -44,7 +44,7 @@ type PluginText = {
   actionInput: <T extends SettingDeclaration>(pluginId: string, actionId: string, input: T) => T & { choiceLabels: Record<string, string> };
 };
 
-type SettingDeclaration = { id: string; label: string; description: string; choices?: string[] };
+type SettingDeclaration = { id: string; label: string; description: string; choices?: string[]; warning?: string };
 
 const PluginTextContext = createContext<PluginText | null>(null);
 
@@ -97,6 +97,7 @@ export function PluginTextProvider({ children }: { children: ReactNode }) {
         ...field,
         label: entry(id)?.settings?.[field.id]?.label ?? field.label,
         description: entry(id)?.settings?.[field.id]?.description ?? field.description,
+        warning: field.warning === undefined ? undefined : entry(id)?.settings?.[field.id]?.warning ?? field.warning,
         choiceLabels: Object.fromEntries((field.choices ?? []).map((choice) => [choice,
           entry(id)?.settings?.[field.id]?.choices?.[choice] ?? entry(id, "en")?.settings?.[field.id]?.choices?.[choice] ?? choice])),
       }),

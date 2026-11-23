@@ -139,6 +139,7 @@ pub(crate) fn run_structured_session(
     timeout: Duration,
     settings: &BTreeMap<String, Value>,
     images: &[std::path::PathBuf],
+    work_folder: Option<&std::path::Path>,
     transcript: &AgentTranscript,
     session: &mut AgentSession,
     tick: impl FnMut() -> Result<(), Box<dyn Error>>,
@@ -197,7 +198,7 @@ pub(crate) fn run_structured_session(
     run_agent_process(
         executable,
         args,
-        directory.path(),
+        work_folder.unwrap_or(directory.path()),
         &stdin,
         timeout,
         transcript,
@@ -401,8 +402,14 @@ pub(crate) fn setting_arguments(
                 byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
             })
     };
+    let on = |id: &str| settings.get(id) == Some(&Value::Bool(true));
     let mut arguments = Vec::new();
     for entry in &run.setting_args {
+        if entry.when.as_deref().is_some_and(|id| !on(id))
+            || entry.unless.as_deref().is_some_and(on)
+        {
+            continue;
+        }
         match settings.get(&entry.setting) {
             Some(Value::Bool(true)) => arguments.extend(entry.args.iter().cloned()),
             Some(Value::Bool(false)) | None | Some(Value::Null) => {
@@ -652,6 +659,7 @@ mod tests {
         StructuredRun {
             args: vec!["{schema}".into(), "{outputPath}".into()],
             setting_args: Vec::new(),
+            work_folder_setting: None,
             image_args: None,
             image_input: None,
             progress: Vec::new(),
@@ -709,6 +717,7 @@ mod tests {
                 "{outputPath}".into(),
             ],
             setting_args: Vec::new(),
+            work_folder_setting: None,
             image_args: None,
             image_input: None,
             progress: Vec::new(),
@@ -749,13 +758,18 @@ mod tests {
                     setting: "web-search".into(),
                     args: vec!["-c".into(), "web_search=\"live\"".into()],
                     otherwise: Some(vec!["-c".into(), "web_search=\"disabled\"".into()]),
+                    when: None,
+                    unless: None,
                 },
                 SettingArgs {
                     setting: "model".into(),
                     args: vec!["-m".into(), "{value}".into()],
                     otherwise: None,
+                    when: None,
+                    unless: None,
                 },
             ],
+            work_folder_setting: None,
             image_args: None,
             image_input: None,
             progress: Vec::new(),
@@ -785,6 +799,56 @@ mod tests {
             declared_args(&declared, &places, &unsafe_model, &[]),
             ["exec", "-c", "web_search=\"disabled\"", "-"]
         );
+    }
+
+    #[test]
+    fn setting_arguments_can_depend_on_another_setting() {
+        use crate::plugin_catalog::SettingArgs;
+        let entry = |setting: &str, args: &[&str], otherwise: &[&str]| SettingArgs {
+            setting: setting.into(),
+            args: args.iter().map(|arg| arg.to_string()).collect(),
+            otherwise: Some(otherwise.iter().map(|arg| arg.to_string()).collect()),
+            when: None,
+            unless: None,
+        };
+        let declared = StructuredRun {
+            args: vec!["{settings}".into(), "{schema}".into()],
+            setting_args: vec![
+                entry("tools", &["--write"], &["--read-only"]),
+                SettingArgs {
+                    unless: Some("tools".into()),
+                    ..entry("web", &["--tools", "web"], &["--tools", ""])
+                },
+                SettingArgs {
+                    when: Some("tools".into()),
+                    ..entry("web", &[], &["--deny", "web"])
+                },
+            ],
+            work_folder_setting: Some("tools".into()),
+            image_args: None,
+            image_input: None,
+            progress: Vec::new(),
+            result: StructuredResult {
+                source: StructuredSource::Stdout,
+                pointer: None,
+                error_pointer: None,
+            },
+            ephemeral_args: None,
+            resume: None,
+        };
+        let arguments = |tools: bool, web: bool| {
+            setting_arguments(
+                &declared,
+                &BTreeMap::from([
+                    ("tools".to_owned(), serde_json::json!(tools)),
+                    ("web".to_owned(), serde_json::json!(web)),
+                ]),
+            )
+        };
+        assert_eq!(arguments(false, false), ["--read-only", "--tools", ""]);
+        assert_eq!(arguments(false, true), ["--read-only", "--tools", "web"]);
+        assert_eq!(arguments(true, false), ["--write", "--deny", "web"]);
+        assert_eq!(arguments(true, true), ["--write"]);
     }
 
     #[test]

@@ -34,6 +34,16 @@ pub struct PluginSetting {
     /// An https page explaining where to get the value, such as a provider's API key page (schema 10).
     #[serde(default, rename = "helpUrl", skip_serializing_if = "Option::is_none")]
     pub help_url: Option<String>,
+    /// A caution shown while a boolean setting is on (schema 14).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+    /// A boolean setting that, while on, makes this one irrelevant, so it is hidden (schema 14).
+    #[serde(
+        default,
+        rename = "hiddenWhen",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub hidden_when: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

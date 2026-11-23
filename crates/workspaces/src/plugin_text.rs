@@ -66,6 +66,8 @@ pub struct SettingText {
     /// Labels for the setting's choices, keyed by the choice value.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub choices: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
 }
 
 fn text(value: &str, limit: usize) -> bool {
@@ -148,6 +150,9 @@ pub(crate) fn valid_translations(manifest: &PluginManifest) -> bool {
                                     .flatten()
                                     .any(|known| known == choice)
                                     && text(label, 80)
+                            })
+                            && value.warning.as_deref().is_none_or(|warning| {
+                                setting.warning.is_some() && text(warning, 300)
                             })
                     })
             })
@@ -261,6 +266,7 @@ mod tests {
                         label: Some("x".into()),
                         description: None,
                         choices: BTreeMap::new(),
+                        warning: None,
                     },
                 );
             assert!(!valid_translations(&broken));

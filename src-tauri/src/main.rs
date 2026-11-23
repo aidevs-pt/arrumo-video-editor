@@ -1709,6 +1709,9 @@ fn main() {
                 if arrumo_workspaces::recover_motion_scratch(&database).is_err() {
                     eprintln!("Arrumo could not retry pending motion scratch cleanup.");
                 }
+                if store.remove_finished_agent_work(&database).is_err() {
+                    eprintln!("Arrumo could not remove the work folders of finished runs.");
+                }
                 match store.recover_all_delivery_cleanup(&database) {
                     Ok(report) if report.pending_run_ids.is_empty() => {}
                     Ok(report) => eprintln!(

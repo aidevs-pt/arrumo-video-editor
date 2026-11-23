@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 13] =
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 14] =
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -337,6 +337,10 @@ pub(crate) struct StructuredRun {
     /// Arguments chosen by the plugin's settings, inserted at `{settings}`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setting_args: Vec<SettingArgs>,
+    /// Schema 14: a boolean setting that, while on, lets the agent write files and run commands.
+    /// The host then gives it a work folder kept for the whole video run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_folder_setting: Option<String>,
     /// Arguments attaching one image, repeated per image at `{images}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_args: Option<Vec<String>>,
@@ -460,6 +464,12 @@ pub(crate) struct SettingArgs {
     pub args: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub otherwise: Option<Vec<String>>,
+    /// Schema 14: a boolean setting that must be on for this entry to apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<String>,
+    /// Schema 14: a boolean setting that must be off for this entry to apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unless: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -482,6 +492,20 @@ pub(crate) enum StructuredSource {
 }
 
 impl StructuredRun {
+    /// Conditions and the work-folder setting name boolean settings the plugin declares, and
+    /// need schema 14.
+    fn valid_conditions(&self, manifest: &PluginManifest) -> bool {
+        let named = self
+            .setting_args
+            .iter()
+            .flat_map(|entry| [entry.when.as_deref(), entry.unless.as_deref()])
+            .chain([self.work_folder_setting.as_deref()])
+            .flatten()
+            .collect::<Vec<_>>();
+        named.is_empty()
+            || manifest.schema_version >= 14 && named.iter().all(|id| boolean_setting(manifest, id))
+    }
+
     fn valid(&self) -> bool {
         let has = |placeholder: &str| self.args.iter().any(|arg| arg == placeholder);
         let pointer = |value: &str, allow_root: bool| {
@@ -654,6 +678,17 @@ impl PluginManifest {
                             .help_url
                             .as_deref()
                             .is_some_and(|url| manifest.schema_version < 10 || !valid_help_url(url))
+                        || setting.warning.as_deref().is_some_and(|warning| {
+                            manifest.schema_version < 14
+                                || setting.kind != crate::PluginSettingKind::Boolean
+                                || blank(warning)
+                                || warning.chars().count() > 300
+                        })
+                        || setting.hidden_when.as_deref().is_some_and(|other| {
+                            manifest.schema_version < 14
+                                || other == setting.id
+                                || !boolean_setting(&manifest, other)
+                        })
                 }))
         {
             return Err(invalid_manifest("Invalid or duplicate plugin setting declaration").into());
@@ -728,6 +763,7 @@ impl PluginManifest {
                     manifest.schema_version < 7
                         || !run.valid()
                         || run.image_input.is_some() && manifest.schema_version < 13
+                        || !run.valid_conditions(&manifest)
                 })
                 || provider
                     .cli
@@ -1108,4 +1144,13 @@ mod help_url_tests {
             assert!(manifest(schema, url).is_err(), "{schema} {url}");
         }
     }
+}
+
+/// Whether the manifest declares `id` as a boolean setting.
+fn boolean_setting(manifest: &PluginManifest, id: &str) -> bool {
+    manifest
+        .settings
+        .iter()
+        .flatten()
+        .any(|setting| setting.id == id && setting.kind == crate::PluginSettingKind::Boolean)
 }
