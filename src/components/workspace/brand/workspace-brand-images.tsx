@@ -160,7 +160,7 @@ export function WorkspaceBrandImages({ workspaceId }: {
           {assigned("identity").length ? <ul className="divide-y rounded-xl border bg-card">
             {assigned("identity").map((image) => (
               <li key={image.id} className="flex items-center gap-4 px-4 py-3">
-                <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" fit="contain" className="aspect-square w-12 shrink-0" />
+                <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" fit="contain" transparency className="aspect-square w-12 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{image.name}</p>
                   {image.notes.trim() ? <p className="truncate text-sm text-muted-foreground">{image.notes}</p>

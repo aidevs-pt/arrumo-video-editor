@@ -9,13 +9,15 @@ const icons = { image: ImageIcon, audio: AudioLines, video: Film };
 const TRANSPARENCY =
   "repeating-conic-gradient(color-mix(in oklab, var(--muted), var(--foreground) 38%) 0% 25%, color-mix(in oklab, var(--muted), var(--foreground) 50%) 0% 50%) 50% / 16px 16px";
 
-export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "cover" }: {
+export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "cover", transparency = false }: {
   workspaceId: number;
   assetId: number;
   kind: MediaKind;
   className?: string;
   /** `contain` shows the whole image, for logos and marks that must never be cropped. */
   fit?: "cover" | "contain";
+  /** A checkerboard behind the image, so white marks on transparent backgrounds stay visible. */
+  transparency?: boolean;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string>();
@@ -38,8 +40,7 @@ export function AssetThumbnail({ workspaceId, assetId, kind, className, fit = "c
 
   return (
     <div ref={element} aria-hidden="true" className={cn("relative grid aspect-video place-items-center overflow-hidden rounded-thumb bg-muted", className)}
-      // A checkerboard behind whole images shows transparency, so white marks stay visible.
-      style={url && fit === "contain" ? { background: TRANSPARENCY } : undefined}>
+      style={url && transparency ? { background: TRANSPARENCY } : undefined}>
       {url ? (
         // Managed local preview provided by the desktop host.
         // eslint-disable-next-line @next/next/no-img-element
