@@ -168,7 +168,7 @@
     "saved": "Ajustes guardados.",
     "pluginDefault": "Usando el valor predeterminado del complemento",
     "agentTitle": "Lo que puede hacer el agente",
-    "agentIntro": "Estos ajustes vienen del complemento del agente. Siempre trabaja en solo lectura y no puede ejecutar comandos; activa la búsqueda web o tus propios complementos solo si quieres que los use.",
+    "agentIntro": "Estos ajustes vienen del complemento del agente. Elige si puede escribir archivos y ejecutar comandos, y si puede buscar en la web.",
     "saving": "Guardando…",
     "discard": "Descartar cambios",
     "unsaved": "Sin guardar",

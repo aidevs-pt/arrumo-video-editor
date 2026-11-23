@@ -168,7 +168,7 @@
     "saved": "Definições guardadas.",
     "pluginDefault": "A usar a predefinição do plugin",
     "agentTitle": "O que o agente pode fazer",
-    "agentIntro": "Estas definições vêm do plugin do agente. Trabalha sempre só em leitura e não pode executar comandos; ativa a pesquisa na web ou os teus próprios plugins apenas se quiseres que os use.",
+    "agentIntro": "Estas definições vêm do plugin do agente. Escolhe se pode escrever ficheiros e executar comandos, e se pode pesquisar na web.",
     "saving": "A guardar…",
     "discard": "Descartar alterações",
     "unsaved": "Por guardar",
