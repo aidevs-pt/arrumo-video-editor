@@ -60,6 +60,5 @@ pnpm build
 
 ## License
 
-This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) and owned by
-DEVS AI Unipessoal LDA. The [CLA](CLA.md) lets DEVS AI distribute your contribution under this
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) and owned by DEVS.AI UNIPESSOAL LDA. The [CLA](CLA.md) lets DEVS AI distribute your contribution under this
 license and under other terms in the future; you keep the copyright to your work.
