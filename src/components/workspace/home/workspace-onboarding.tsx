@@ -21,9 +21,8 @@ type Plugin = { bundled: boolean; manifest: PluginSettingsManifest & { descripti
 type SetupData = { agents: Agent[]; plugins: Plugin[]; effective: string | null };
 type Step = 0 | 1 | 2;
 
-export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
+export function WorkspaceOnboarding({ desktop, onCreate }: {
   desktop: boolean;
-  loading: boolean;
   onCreate: (name: string, sources: string[]) => Promise<void>;
 }) {
   const pluginText = usePluginText();
@@ -155,7 +154,7 @@ export function WorkspaceOnboarding({ desktop, loading, onCreate }: {
               </RadioGroup>
               {!setup.agents.length && <Alert><Info /><AlertDescription>{copy.noAgents}</AlertDescription></Alert>}
             </FieldSet>
-          ) : loading || desktop ? <Skeleton className="h-32" role="status" aria-label={agentSettings.loading} />
+          ) : desktop ? <Skeleton className="h-32" role="status" aria-label={agentSettings.loading} />
             : <Alert><Info /><AlertDescription>{workspaces.desktop}</AlertDescription></Alert>}
           {setup?.agents.length ? <Alert className="mt-5 border-transparent bg-accent">
             <Info aria-hidden="true" />

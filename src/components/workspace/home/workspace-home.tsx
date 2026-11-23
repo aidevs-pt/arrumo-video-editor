@@ -51,8 +51,10 @@ export function WorkspaceHome() {
     }
   }
 
+  // Onboarding only once the catalog is known to be empty, so it never flashes before workspaces load.
+  if (status === "loading" && !workspaces.length) return null;
   if (!workspaces.length && status !== "error") {
-    return <WorkspaceOnboarding desktop={status === "ready"} loading={status === "loading"} onCreate={createWorkspace} />;
+    return <WorkspaceOnboarding desktop={status === "ready"} onCreate={createWorkspace} />;
   }
 
   return (
