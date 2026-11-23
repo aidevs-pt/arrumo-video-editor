@@ -146,7 +146,7 @@ fn script_prompt(
             ""
         } else {
             "This video has no footage of its own, but its animated scenes can play the workspace clips in the \
-             brief, such as screen recordings, framed and zoomed. Their notes say what happens at which second. \
+             brief, such as screen recordings, framed, with spotlights on what matters. Their notes say what happens at which second. \
              Where a clip shows what a section talks about, plan that section around it, name the clip and the \
              moment in its editing idea, and time the words to what the clip shows. Don't ask for new recordings.\n"
         },

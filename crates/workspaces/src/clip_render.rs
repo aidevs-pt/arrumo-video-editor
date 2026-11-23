@@ -778,7 +778,10 @@ impl WorkspaceStore {
                     .map_err(|reason| io::Error::other(reason).into())
             })
             .collect::<Result<Vec<_>, Box<dyn Error>>>()
-            .map(Some)
+            .map(|mut scenes| {
+                crate::motion_spec::continue_clips(&mut scenes);
+                Some(scenes)
+            })
     }
 
     pub(crate) fn accepted_preview(

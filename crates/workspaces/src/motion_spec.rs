@@ -25,6 +25,11 @@ pub(crate) const MAX_LAYERS: usize = 12;
 /// The most camera moves one clip layer has.
 const MAX_ZOOM_KEYS: usize = 8;
 const MAX_ZOOM: f64 = 3.0;
+/// The most spotlights one clip layer has.
+const MAX_SPOTLIGHTS: usize = 6;
+/// How long a spotlight takes to dim the rest of the clip, and how dark it gets.
+const SPOTLIGHT_EASE: f64 = 0.3;
+const SPOTLIGHT_DIM: f64 = 0.62;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
 pub(crate) const MAX_SECONDS: f64 = 20.0;
 const MAX_STORED_SECONDS: f64 = 60.0;
@@ -94,6 +99,21 @@ pub(crate) struct Layer {
     /// Camera moves over a clip layer: the view eases from one key to the next.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub zoom: Vec<ZoomKey>,
+    /// Moments when a clip layer dims all but one area of the clip.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spotlight: Vec<Spotlight>,
+}
+
+/// From `from` to `to` seconds into the animation, everything in the clip outside a rounded area
+/// darkens; the area is centred on (`x`, `y`) and `width` by `height`, all fractions of the clip.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+pub(crate) struct Spotlight {
+    pub from: f64,
+    pub to: f64,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
 }
 
 /// A point the view over a clip layer passes through: at `at` seconds into the animation it shows
@@ -237,8 +257,22 @@ pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
                 }
             }
         });
+        layer["properties"]["spotlight"] = json!({
+            "type": "array",
+            "maxItems": MAX_SPOTLIGHTS,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "to", "x", "y", "width", "height"],
+                "properties": {
+                    "from": {"type": "number", "minimum": 0},
+                    "to": {"type": "number", "minimum": 0},
+                    "x": unit, "y": unit, "width": unit, "height": unit
+                }
+            }
+        });
         if let Some(required) = layer["required"].as_array_mut() {
-            required.extend([json!("clipStart"), json!("zoom")]);
+            required.extend([json!("clipStart"), json!("zoom"), json!("spotlight")]);
         }
     }
     json!({
@@ -290,12 +324,18 @@ pub(crate) const CLIP_GUIDE: &str = "Video layers play a workspace clip (assetId
 starting clipStart seconds into the clip and playing for the layer's span; if the clip runs out, its last \
 frame holds. Use them for screen recordings and product footage: float the clip on the background with a \
 radius of about 0.03 and a shadow, and keep it large (width 0.7 to 0.9) so the interface stays readable. \
-zoom moves the camera over the clip: each key says at which second of the animation the view is scale \
-times larger (1 to 3) and centred on x and y as fractions of the clip; the view eases from key to key. \
-Start at scale 1, punch in to about 1.6 to 2.2 on the control or text the narration talks about a moment \
-before it happens, hold, then ease back out; an empty list keeps the whole clip in view. Each clip's \
-notes say what happens at which second, so pick clipStart and the zoom keys from them. Set text null, \
-and color to the background's colour; it only shows under the clip's rounded corners.";
+When the same clip plays in consecutive scenes, start each where the previous one stopped, so no moment \
+repeats. Most clips need no camera move at all. To point at a control, a panel or text the narration \
+talks about, use a spotlight: from and to are seconds of the animation, and x, y, width and height place \
+a rounded area as fractions of the clip (x and y its centre) that stays bright while the rest of the clip \
+dims. Make the area a little larger than its subject, start it a moment before the narration names it \
+and keep it at least a second and a half. zoom moves the camera over the clip, cropping it inside its \
+box: each key says at which second of the animation the view is scale times larger (1 to 3) and centred \
+on x and y as fractions of the clip; the view eases from key to key. Keep zoom for text too small to read \
+at full size, at most once or twice in a video, and ease back out; an empty list keeps the whole clip in \
+view. Each clip's notes say what happens at which second and where, so pick clipStart, spotlights and \
+zoom keys from them. Set text null, and color to the background's colour; it only shows under the clip's \
+rounded corners.";
 
 fn hex_color(value: &str) -> Option<String> {
     let digits = value.strip_prefix('#')?;
@@ -435,9 +475,32 @@ impl MotionSpec {
                     key.scale = key.scale.clamp(1.0, MAX_ZOOM);
                 }
                 layer.zoom.sort_by(|a, b| a.at.total_cmp(&b.at));
+                layer.spotlight.retain_mut(|light| {
+                    let values = [
+                        light.from,
+                        light.to,
+                        light.x,
+                        light.y,
+                        light.width,
+                        light.height,
+                    ];
+                    if !values.iter().all(|value| value.is_finite()) {
+                        return false;
+                    }
+                    light.from = light.from.clamp(0.0, duration);
+                    light.to = light.to.clamp(0.0, duration);
+                    light.x = light.x.clamp(0.0, 1.0);
+                    light.y = light.y.clamp(0.0, 1.0);
+                    light.width = light.width.clamp(0.02, 1.0);
+                    light.height = light.height.clamp(0.02, 1.0);
+                    light.to - light.from >= 2.0 * SPOTLIGHT_EASE
+                });
+                layer.spotlight.truncate(MAX_SPOTLIGHTS);
+                layer.spotlight.sort_by(|a, b| a.from.total_cmp(&b.from));
             } else {
                 layer.clip_start = 0.0;
                 layer.zoom.clear();
+                layer.spotlight.clear();
             }
             if layer.end - layer.start < 0.1 || hex_color(&layer.color).is_none() {
                 return false;
@@ -852,6 +915,21 @@ impl LayerTarget<'_> {
                     } else {
                         None
                     };
+                    let lights: Vec<(usize, Spotlight)> = layer
+                        .spotlight
+                        .iter()
+                        .enumerate()
+                        .map(|(number, light)| {
+                            let file = format!("{prefix}light-{index}-{number}.png");
+                            spotlight_png(directory, &file, (clip_w, clip_h), light)?;
+                            let shifted = Spotlight {
+                                from: light.from + self.shift,
+                                to: light.to + self.shift,
+                                ..*light
+                            };
+                            Ok((still(&file), shifted))
+                        })
+                        .collect::<io::Result<_>>()?;
                     args.extend([
                         "-ss".to_owned(),
                         format!("{:.3}", layer.clip_start),
@@ -890,8 +968,30 @@ impl LayerTarget<'_> {
                         graph,
                         "[{clip}:v]fps={FPS},setpts=PTS-STARTPTS,\
                          tpad=stop_mode=clone:stop_duration={span:.3},trim=duration={span:.3},\
-                         setpts=PTS+{:.3}/TB,{camera},setsar=1,format=rgba[{prefix}p{index}];",
+                         setpts=PTS+{:.3}/TB,format=rgba[{prefix}lit{index}x];",
                         layer.start,
+                    )
+                    .ok();
+                    // Spotlights go on the clip before the camera, so they follow any zoom.
+                    let mut lit = format!("{prefix}lit{index}x");
+                    for (number, (input, light)) in lights.iter().enumerate() {
+                        write!(
+                            graph,
+                            "[{input}:v]format=rgba,\
+                             fade=t=in:st={from:.3}:d={SPOTLIGHT_EASE}:alpha=1,\
+                             fade=t=out:st={out:.3}:d={SPOTLIGHT_EASE}:alpha=1[{prefix}dim{index}x{number}];\
+                             [{lit}][{prefix}dim{index}x{number}]overlay=0:0:\
+                             enable='between(t,{from:.3},{to:.3})':eof_action=pass[{prefix}lit{index}x{number}];",
+                            from = light.from,
+                            to = light.to,
+                            out = light.to - SPOTLIGHT_EASE,
+                        )
+                        .ok();
+                        lit = format!("{prefix}lit{index}x{number}");
+                    }
+                    write!(
+                        graph,
+                        "[{lit}]{camera},setsar=1,format=rgba[{prefix}p{index}];"
                     )
                     .ok();
                     let mut picture = format!("{prefix}p{index}");
@@ -915,6 +1015,25 @@ impl LayerTarget<'_> {
             current = label;
         }
         Ok(current)
+    }
+}
+
+/// Keeps a clip moving forward when consecutive scenes play it: a scene that would start the clip
+/// before the previous scene stopped it starts where the previous one stopped, so no moment repeats.
+pub(crate) fn continue_clips(scenes: &mut [MotionSpec]) {
+    let mut reached: Vec<(i64, f64)> = Vec::new();
+    for scene in scenes {
+        let mut next = Vec::new();
+        for layer in &mut scene.layers {
+            let (LayerType::Video, Some(id)) = (layer.kind, layer.asset_id) else {
+                continue;
+            };
+            if let Some(&(_, end)) = reached.iter().find(|(clip, _)| *clip == id) {
+                layer.clip_start = layer.clip_start.max(end);
+            }
+            next.push((id, layer.clip_start + (layer.end - layer.start)));
+        }
+        reached = next;
     }
 }
 
@@ -989,6 +1108,46 @@ fn channels(color: &str) -> io::Result<[u8; 3]> {
 
 /// Renders one still of a box or image with rounded corners, a gradient and a soft shadow into
 /// `file` inside `directory`. The shadow pads the still evenly, so its centre stays the shape's.
+/// A clip-sized dark veil with a clear, rounded, softly edged window where the spotlight falls.
+fn spotlight_png(
+    directory: &Path,
+    file: &str,
+    (clip_w, clip_h): (f64, f64),
+    light: &Spotlight,
+) -> io::Result<()> {
+    let (width, height) = (
+        clip_w.round().max(2.0) as u32,
+        clip_h.round().max(2.0) as u32,
+    );
+    let (half_w, half_h) = (light.width * clip_w / 2.0, light.height * clip_h / 2.0);
+    let radius = (half_w.min(half_h) * 0.5).min(clip_w.min(clip_h) * 0.02);
+    let feather = (clip_w.min(clip_h) * 0.008).max(2.0);
+    let outside = format!(
+        "(hypot(max(abs(X-{cx:.1})-{inner_w:.1},0),max(abs(Y-{cy:.1})-{inner_h:.1},0))-{radius:.1})",
+        cx = light.x * clip_w,
+        cy = light.y * clip_h,
+        inner_w = half_w - radius,
+        inner_h = half_h - radius,
+    );
+    let status = Command::new("ffmpeg")
+        .args(["-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i"])
+        .arg(format!("color=c=black:s={width}x{height}:d=0.1"))
+        .arg("-vf")
+        .arg(format!(
+            "format=rgba,geq=r=0:g=0:b=0:a='{:.1}*clip({outside}/{feather:.1}+0.5,0,1)'",
+            255.0 * SPOTLIGHT_DIM
+        ))
+        .args(["-frames:v", "1"])
+        .arg(directory.join(file))
+        .stdin(Stdio::null())
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other("Could not draw a spotlight"))
+    }
+}
+
 fn shape_png(directory: &Path, file: &str, fill: &Fill, shape: &Shape) -> io::Result<()> {
     let (width, height) = (shape.width.max(2), shape.height.max(2));
     let radius = format!("({:.4}*min(W,H))", shape.radius);
@@ -1575,6 +1734,37 @@ mod tests {
     }
 
     #[test]
+    fn consecutive_scenes_never_replay_a_clip() {
+        let scene = |clip_start: f64, seconds: f64| {
+            MotionSpec::from_answer_with_clips(
+                &json!({"title": "Clip", "kind": "animation", "usage": "", "durationSeconds": seconds,
+                    "background": "#FFFFFF", "backgroundTo": null, "layers": [clip_layer()]}),
+                |_| false,
+                |id| id == 7,
+            )
+            .map(|mut spec| {
+                spec.layers[0].clip_start = clip_start;
+                spec.layers[0].start = 0.0;
+                spec.layers[0].end = seconds;
+                spec
+            })
+            .unwrap()
+        };
+        let mut scenes = vec![
+            scene(10.0, 7.5),
+            scene(15.5, 9.0),
+            scene(30.0, 2.0),
+            scene(0.0, 2.0),
+        ];
+        continue_clips(&mut scenes);
+        let starts: Vec<f64> = scenes
+            .iter()
+            .map(|scene| scene.layers[0].clip_start)
+            .collect();
+        assert_eq!(starts, [10.0, 17.5, 30.0, 32.0]);
+    }
+
+    #[test]
     fn clip_layers_render_rounded_and_zoomed() {
         if Command::new("ffmpeg").arg("-version").output().is_err() {
             return;
@@ -1647,6 +1837,60 @@ mod tests {
             centre[0] > 150 && centre[1] < 80,
             "zoomed into the red corner: {centre:?}"
         );
+    }
+
+    #[test]
+    fn spotlights_dim_all_but_their_area() {
+        if Command::new("ffmpeg").arg("-version").output().is_err() {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let clip = directory.path().join("clip.mp4");
+        let made = Command::new("ffmpeg")
+            .args([
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=0x40C040:s=320x200:r=30:d=4",
+            ])
+            .args(["-pix_fmt", "yuv420p", "-y"])
+            .arg(&clip)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let mut layer = clip_layer();
+        layer["zoom"] = json!([]);
+        layer["spotlight"] =
+            json!([{"from": 0.8, "to": 2.8, "x": 0.25, "y": 0.5, "width": 0.4, "height": 0.8}]);
+        let mut value = answer();
+        value["durationSeconds"] = json!(3);
+        value["layers"] = json!([layer]);
+        let spec = MotionSpec::from_answer_with_clips(&value, |_| false, |_| true).unwrap();
+        assert_eq!(spec.layers[0].spotlight.len(), 1);
+        let resolve = |id: i64| (id == 7).then(|| clip.clone());
+        render_spec(
+            &spec,
+            (640, 360),
+            directory.path(),
+            "out.mp4",
+            &resolve,
+            &FontSet::default(),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let frame = Command::new("ffmpeg")
+            .args(["-v", "error", "-ss", "2.0", "-i"])
+            .arg(directory.path().join("out.mp4"))
+            .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+            .output()
+            .unwrap()
+            .stdout;
+        let green = |x: usize, y: usize| frame[(y * 640 + x) * 3 + 1];
+        // The 460 x 288 clip starts at x 90; the spotlight covers x 113 to 297.
+        assert!(green(205, 180) > 150, "lit: {}", green(205, 180));
+        assert!(green(450, 180) < 100, "dimmed: {}", green(450, 180));
     }
 
     #[test]
