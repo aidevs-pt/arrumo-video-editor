@@ -93,7 +93,7 @@ pub(crate) fn agent_steps(provider: &str, text: &str) -> Vec<AgentStep> {
                 .map(|group| group.as_str().trim().to_owned())
                 .or_else(|| entry.label.clone())
                 .unwrap_or_default();
-            let text: String = text.chars().take(200).collect();
+            let text = shorten(&text, 200);
             if !text.is_empty() && steps.last().is_none_or(|last| last.text != text) {
                 steps.push(AgentStep {
                     kind: entry.kind.clone(),
@@ -107,6 +107,16 @@ pub(crate) fn agent_steps(provider: &str, text: &str) -> Vec<AgentStep> {
         }
     }
     steps
+}
+
+/// `text` cut to at most `limit` characters, at a word break with an ellipsis when it is longer.
+fn shorten(text: &str, limit: usize) -> String {
+    if text.chars().count() <= limit {
+        return text.to_owned();
+    }
+    let cut: String = text.chars().take(limit - 1).collect();
+    let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head);
+    format!("{}…", cut.trim_end_matches([',', ';', ':', ' ']))
 }
 
 #[derive(Debug, Serialize)]
@@ -523,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn claude_code_events_become_thinking_and_search_steps() {
+    fn claude_code_events_become_thinking_search_and_answer_steps() {
         let printed = concat!(
             r#"{"type":"system","subtype":"init"}"#,
             "\n",
@@ -532,6 +542,10 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":""}]}}"#,
             "\n",
             r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Checking the record\nmore"}]}}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"StructuredOutput","input":{"needs":[],"answer":{"summary":"I cut the intro to five seconds.\nDetails"}}}]}}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"StructuredOutput","input":{"summary":"Five scenes, one per tip."}}]}}"#,
             "\n",
             r#"{"type":"result","structured_output":{}}"#,
         );
@@ -546,8 +560,24 @@ mod tests {
                     kind: "thinking".into(),
                     text: "Checking the record".into()
                 },
+                AgentStep {
+                    kind: "step".into(),
+                    text: "I cut the intro to five seconds.".into()
+                },
+                AgentStep {
+                    kind: "step".into(),
+                    text: "Five scenes, one per tip.".into()
+                },
             ]
         );
+    }
+
+    #[test]
+    fn long_steps_end_at_a_word_break() {
+        assert_eq!(shorten("short", 200), "short");
+        let long = "word ".repeat(60);
+        let cut = shorten(long.trim(), 200);
+        assert!(cut.chars().count() <= 200 && cut.ends_with("word…"), "{cut}");
     }
 
     #[test]

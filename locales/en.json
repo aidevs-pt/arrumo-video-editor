@@ -1703,7 +1703,8 @@
     "hostWork": "Arrumo is rendering and checking the result",
     "reading": "Reading the brief and planning",
     "searching": "Searched the web",
-    "lookingAtMaterial": "Looking at the workspace material it asked for"
+    "lookingAtMaterial": "Looking at the workspace material it asked for",
+    "stageAttempt": "{stage}, attempt {attempt}"
   },
   "providerOrder": {
     "title": "Which plugin does what, in order",

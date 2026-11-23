@@ -205,7 +205,8 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
         <div className="grid items-start gap-5 @min-[52rem]:grid-cols-[minmax(0,1fr)_17rem]">
           <div className="flex min-w-0 flex-col gap-4">
             {runState === "running" && currentStage && !awaiting && (
-              <AgentProgress workspaceId={workspaceId} runId={runId} agent={agent ?? copy.agentFallback} stage={stageName(currentStage)} />
+              <AgentProgress workspaceId={workspaceId} runId={runId} agent={agent ?? copy.agentFallback} stage={stageName(currentStage)}
+                stageLabel={(stage) => (stage in copy ? copy[stage as Stage] : stage)} />
             )}
             {runState === "completed" && (
               <Card size="sm">
