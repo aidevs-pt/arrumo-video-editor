@@ -1108,6 +1108,15 @@ fn valid_help_url(url: &str) -> bool {
         })
 }
 
+/// Whether the manifest declares `id` as a boolean setting.
+fn boolean_setting(manifest: &PluginManifest, id: &str) -> bool {
+    manifest
+        .settings
+        .iter()
+        .flatten()
+        .any(|setting| setting.id == id && setting.kind == crate::PluginSettingKind::Boolean)
+}
+
 #[cfg(test)]
 mod help_url_tests {
     use super::*;
@@ -1144,13 +1153,4 @@ mod help_url_tests {
             assert!(manifest(schema, url).is_err(), "{schema} {url}");
         }
     }
-}
-
-/// Whether the manifest declares `id` as a boolean setting.
-fn boolean_setting(manifest: &PluginManifest, id: &str) -> bool {
-    manifest
-        .settings
-        .iter()
-        .flatten()
-        .any(|setting| setting.id == id && setting.kind == crate::PluginSettingKind::Boolean)
 }
