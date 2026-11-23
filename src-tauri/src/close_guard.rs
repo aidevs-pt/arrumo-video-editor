@@ -5,7 +5,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use arrumo_workspaces::WorkspaceStore;
-use tauri::{Emitter, Manager, Window, WindowEvent};
+use tauri::{AppHandle, Emitter, ExitRequestApi, Manager, Window, WindowEvent};
 
 #[derive(Default)]
 pub struct CloseGuard {
@@ -14,37 +14,50 @@ pub struct CloseGuard {
 }
 
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
-    let WindowEvent::CloseRequested { api, .. } = event else {
-        return;
-    };
-    let guard = window.state::<CloseGuard>();
-    if guard.confirmed.load(Ordering::SeqCst) || guard.asking.swap(true, Ordering::SeqCst) {
-        return;
+    if let WindowEvent::CloseRequested { api, .. } = event
+        && hold(window.app_handle())
+    {
+        api.prevent_close();
     }
-    let generating = window
-        .app_handle()
+}
+
+/// Quitting from the app menu or Cmd+Q asks the same question as closing the window.
+pub fn on_exit_requested(app: &AppHandle, api: &ExitRequestApi) {
+    if hold(app) {
+        api.prevent_exit();
+    }
+}
+
+/// Whether to keep Arrumo open and ask first. Returns false when the creator already chose to
+/// close, when the question is already open, or when nothing is generating.
+fn hold(app: &AppHandle) -> bool {
+    let guard = app.state::<CloseGuard>();
+    if guard.confirmed.load(Ordering::SeqCst) || guard.asking.swap(true, Ordering::SeqCst) {
+        return false;
+    }
+    let generating = app
         .path()
         .app_local_data_dir()
         .ok()
         .and_then(|directory| WorkspaceStore::open(directory.join("workspaces.sqlite")).ok())
         .and_then(|store| store.active_generation_count().ok())
         .unwrap_or(0);
-    if generating == 0
-        || window
-            .emit_to(window.label(), "close-requested", generating)
-            .is_err()
-    {
+    if generating == 0 || app.emit_to("main", "close-requested", generating).is_err() {
         guard.asking.store(false, Ordering::SeqCst);
-        return;
+        return false;
     }
-    api.prevent_close();
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    true
 }
 
 #[tauri::command]
 pub fn answer_close_request(close: bool, window: Window, guard: tauri::State<'_, CloseGuard>) {
     if close {
         guard.confirmed.store(true, Ordering::SeqCst);
-        let _ = window.close();
+        window.app_handle().exit(0);
     } else {
         guard.asking.store(false, Ordering::SeqCst);
     }

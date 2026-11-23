@@ -654,7 +654,9 @@ mod frame_tests {
         assert!(made.success());
         let video = store.import_asset(&root, workspace, &clip).unwrap();
 
-        let still = store.video_frame(&root, &cache, workspace, video.id).unwrap();
+        let still = store
+            .video_frame(&root, &cache, workspace, video.id)
+            .unwrap();
         assert_eq!(image_type(&still.bytes), Some("image/jpeg"));
         let cached: Vec<_> = fs::read_dir(cache.join(workspace.to_string()))
             .unwrap()
@@ -665,6 +667,10 @@ mod frame_tests {
         let picture = temp.path().join("picture.png");
         fs::write(&picture, b"\x89PNG\r\n\x1a\nrest").unwrap();
         let image = store.import_asset(&root, workspace, &picture).unwrap();
-        assert!(store.video_frame(&root, &cache, workspace, image.id).is_err());
+        assert!(
+            store
+                .video_frame(&root, &cache, workspace, image.id)
+                .is_err()
+        );
     }
 }

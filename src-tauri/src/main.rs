@@ -1908,6 +1908,11 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("failed to start Arrumo")
         .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = &event
+                && code.is_none()
+            {
+                close_guard::on_exit_requested(app, api);
+            }
             if matches!(event, tauri::RunEvent::Exit) {
                 app.state::<desktop_job_workers::DesktopJobWorkers>().stop();
             }
