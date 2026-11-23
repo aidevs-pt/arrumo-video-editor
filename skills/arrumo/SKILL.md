@@ -5,7 +5,7 @@ description: Make and edit videos with the Arrumo desktop editor through its loc
 
 # Arrumo
 
-Arrumo is a local video editor. A *run* takes a draft (a brief plus optional footage) through stages: **script → assets → previews → final render → delivery check**. Its own agent produces each stage; in guided mode every stage waits for a review. You drive the run and review it like a careful editor would.
+Arrumo (Arrumo AI Video Editor) is a local, AI-driven video editor. A *run* takes a draft (a brief plus optional footage) through stages: **script → assets → previews → final render → delivery check**. Its own agent produces each stage; in guided mode every stage waits for a review. You drive the run and review it like a careful editor would.
 
 ## Connect
 

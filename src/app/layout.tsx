@@ -16,7 +16,7 @@ const anybody = Anybody({ subsets: ["latin"], axes: ["wdth"], variable: "--font-
 const atkinson = Atkinson_Hyperlegible_Next({ subsets: ["latin"], adjustFontFallback: false, variable: "--font-atkinson" });
 
 export const metadata: Metadata = {
-  title: "Arrumo Video Editor",
+  title: "Arrumo AI Video Editor",
   icons: "/arrumo-icon.svg",
 };
 

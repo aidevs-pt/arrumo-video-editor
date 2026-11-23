@@ -212,7 +212,7 @@ fn header<'a>(request: &'a Request, name: &'static str) -> Option<&'a str> {
 
 fn card(endpoint: &str) -> Value {
     json!({
-        "name": "Arrumo Video Editor", "description": "Local workspace and video production operations.",
+        "name": "Arrumo AI Video Editor", "description": "Local workspace and video production operations.",
         "version": env!("CARGO_PKG_VERSION"),
         "supportedInterfaces": [{"url": endpoint, "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}],
         "capabilities": {"streaming": true, "pushNotifications": false},

@@ -1,6 +1,6 @@
 # Arrumo — DESIGN.md (Azulejo)
 
-Visual system for Arrumo Video Editor (Tauri + Next.js + shadcn, themed per Impeccable). Canvas, page "Azulejo": https://claude.ai/artifact/Lb9j2eyiiR4TgJxyMA7GiT
+Visual system for Arrumo AI Video Editor (Tauri + Next.js + shadcn, themed per Impeccable). Canvas, page "Azulejo": https://claude.ai/artifact/Lb9j2eyiiR4TgJxyMA7GiT
 Replaces the first dark/coral direction, which was rejected for reading as AI-generated.
 
 ## Idea

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Arrumo Video Editor",
+  "productName": "Arrumo AI Video Editor",
   "identifier": "pt.aidevs.arrumo",
   "version": "0.1.0",
   "build": {
@@ -11,7 +11,7 @@
   },
   "app": {
     "windows": [
-      { "label": "main", "title": "Arrumo Video Editor", "width": 1280, "height": 800, "minWidth": 480, "minHeight": 420, "backgroundColor": "#2337b4" }
+      { "label": "main", "title": "Arrumo AI Video Editor", "width": 1280, "height": 800, "minWidth": 480, "minHeight": 420, "backgroundColor": "#2337b4" }
     ],
     "security": {
       "csp": "default-src 'self'; frame-src arrumo-panel: http://arrumo-panel.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data: http://127.0.0.1:*; media-src http://127.0.0.1:*"
