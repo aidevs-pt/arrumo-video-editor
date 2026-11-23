@@ -15,6 +15,7 @@ mod agent_settings;
 mod backup;
 mod close_guard;
 mod completed_video;
+mod crash_reports;
 mod delivery_stream;
 mod desktop_job_workers;
 mod guided_preview;
@@ -1659,7 +1660,17 @@ fn main() {
         // SAFETY: runs first in main, before any thread exists.
         unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
     }
-    tauri::Builder::default()
+    // Starts first: with native crash reports on, this binary also runs as their reporter.
+    let (_crash_reports, crash_plugin) = crash_reports::start();
+    let mut builder = tauri::Builder::default();
+    if let Some(plugin) = crash_plugin {
+        builder = builder.plugin(plugin);
+    }
+    if let Some(key) = arrumo_workspaces::usage_key() {
+        // Usage only: errors and crashes go to the crash reporter.
+        builder = builder.plugin(tauri_plugin_aptabase::Builder::new(key).build());
+    }
+    builder
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -1693,8 +1704,16 @@ fn main() {
             if let Err(error) = arrumo_workspaces::apply_pending_import(&database) {
                 eprintln!("Arrumo could not restore the staged backup: {error}");
             }
-            arrumo_workspaces::install_crash_reporter(database.clone());
             let store = WorkspaceStore::open(&database)?;
+            // Loads the crash report choice the crash reporter checks before sending.
+            let _ = store.privacy_settings();
+            if arrumo_workspaces::usage_key().is_some() {
+                use tauri_plugin_aptabase::EventTracker;
+                let handle = app.handle().clone();
+                arrumo_workspaces::set_usage_sink(move |event, props| {
+                    let _ = handle.track_event(event, Some(props));
+                });
+            }
             store.track_usage("app_started", &[]);
             app.manage(Mutex::new(store));
             app.manage(desktop_job_workers::DesktopJobWorkers::start(
@@ -1918,6 +1937,10 @@ fn main() {
             }
             if matches!(event, tauri::RunEvent::Exit) {
                 app.state::<desktop_job_workers::DesktopJobWorkers>().stop();
+                if arrumo_workspaces::usage_key().is_some() {
+                    use tauri_plugin_aptabase::EventTracker;
+                    app.flush_events_blocking();
+                }
             }
         });
 }

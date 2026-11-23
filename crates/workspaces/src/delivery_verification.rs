@@ -166,6 +166,7 @@ impl WorkspaceStore {
             return Err(io::Error::other("No delivery formats are configured").into());
         }
         let directory = delivery_directory(database, workspace_id, run_id);
+        let formats = snapshot.formats.len();
         let outputs = snapshot
             .formats
             .into_iter()
@@ -192,6 +193,18 @@ impl WorkspaceStore {
         )?;
         tx.commit()?;
         self.queue_video_completed_hooks(workspace_id, run_id);
+        let snapshot = &completed.snapshot;
+        self.track_usage(
+            "video_generated",
+            &[
+                (
+                    "agent",
+                    snapshot["agent_settings"]["effective_provider"].clone(),
+                ),
+                ("autopilot", snapshot["options"]["autopilot"].clone()),
+                ("formats", serde_json::json!(formats)),
+            ],
+        );
         Ok(completed)
     }
 }

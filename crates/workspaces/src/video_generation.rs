@@ -601,12 +601,47 @@ impl WorkspaceStore {
         Ok(listed)
     }
 
+    /// Generates a clip like `generate_library_video_untracked` and counts it in usage data.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_library_video(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        prompt: &str,
+        aspect_ratio: &str,
+        duration: Option<u32>,
+        notes: &str,
+        provider: Option<&str>,
+        model: Option<&str>,
+        references: &[i64],
+    ) -> Result<(i64, String), Box<dyn Error>> {
+        let generated = self.generate_library_video_untracked(
+            database,
+            workspace_id,
+            prompt,
+            aspect_ratio,
+            duration,
+            notes,
+            provider,
+            model,
+            references,
+        )?;
+        self.track_usage(
+            "media_generated",
+            &[
+                ("kind", serde_json::json!("video")),
+                ("provider", serde_json::json!(generated.1)),
+            ],
+        );
+        Ok(generated)
+    }
+
     /// Generates a clip with the workspace's first video provider that has an adapter and a key
     /// (or the named `provider`) and adds it to the workspace assets with `notes`. `model` picks one
     /// of the provider's models, and `references` are workspace images and MP4 videos sent to it.
     /// Returns the asset ID and the provider used.
     #[allow(clippy::too_many_arguments)]
-    pub fn generate_library_video(
+    fn generate_library_video_untracked(
         &self,
         database: &Path,
         workspace_id: i64,

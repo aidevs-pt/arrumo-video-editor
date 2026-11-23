@@ -1,0 +1,9 @@
+{
+  "identifier": "crash-reports",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "sentry:default"
+  ]
+}

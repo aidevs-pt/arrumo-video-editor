@@ -193,7 +193,10 @@ pub use supplemental_review::{
     RequestedReplacement, SupplementalDecision, SupplementalItemNotes, SupplementalReview,
     SupplementalRevisionRequest,
 };
-pub use telemetry::{PrivacySettings, install_crash_reporter};
+pub use telemetry::{
+    PrivacySettings, crash_dsn, crash_reports_allowed, install_crash_reporter, redact_report_text,
+    set_usage_sink, usage_key,
+};
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
 pub use workspace_feedback::WorkspaceFeedback;
@@ -346,12 +349,14 @@ impl WorkspaceStore {
         let seed = uuid::Uuid::new_v4().into_bytes();
         let color = WORKSPACE_COLORS[usize::from(seed[0]) % WORKSPACE_COLORS.len()];
         let icon = WORKSPACE_ICONS[usize::from(seed[1]) % 8];
-        self.0.query_row(
-            "INSERT INTO workspaces (name, color, icon) VALUES (?1, ?2, ?3)
+        self.0
+            .query_row(
+                "INSERT INTO workspaces (name, color, icon) VALUES (?1, ?2, ?3)
              RETURNING id, name, color, icon, image_asset_id",
-            rusqlite::params![name, color, icon],
-            Self::read_workspace,
-        )
+                rusqlite::params![name, color, icon],
+                Self::read_workspace,
+            )
+            .inspect(|_| self.track_usage("workspace_created", &[]))
     }
 
     /// Sets how the workspace is shown: a color, a preset icon, and optionally one of its

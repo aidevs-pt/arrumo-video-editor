@@ -73,7 +73,10 @@ impl WorkspaceStore {
         archive: impl Read,
     ) -> Result<CatalogPlugin, Box<dyn Error>> {
         let (source, digest) = read_plugin_registry(catalog)?.select_release(id, version)?;
-        self.register_plugin_zip(archive, Some(&digest), Some(source), None)
+        let plugin = self.register_plugin_zip(archive, Some(&digest), Some(source), None)?;
+        // Registry plugins are public, so their ID says nothing about the creator.
+        self.track_usage("plugin_installed", &[("plugin", serde_json::json!(id))]);
+        Ok(plugin)
     }
 
     pub fn download_plugin_release(

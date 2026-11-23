@@ -741,6 +741,43 @@ impl WorkspaceStore {
         model: Option<&str>,
         references: &[i64],
     ) -> Result<Vec<GeneratedAsset>, Box<dyn Error>> {
+        let generated = self.generate_library_images_untracked(
+            database,
+            workspace_id,
+            prompt,
+            aspect_ratio,
+            count,
+            notes,
+            provider,
+            model,
+            references,
+        )?;
+        if let Some(first) = generated.first() {
+            self.track_usage(
+                "media_generated",
+                &[
+                    ("kind", serde_json::json!("image")),
+                    ("provider", serde_json::json!(first.provider)),
+                    ("count", serde_json::json!(generated.len())),
+                ],
+            );
+        }
+        Ok(generated)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn generate_library_images_untracked(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        prompt: &str,
+        aspect_ratio: &str,
+        count: usize,
+        notes: &str,
+        provider: Option<&str>,
+        model: Option<&str>,
+        references: &[i64],
+    ) -> Result<Vec<GeneratedAsset>, Box<dyn Error>> {
         let prompt = prompt.trim();
         if let Some(asked) = model {
             let provider = provider

@@ -4,13 +4,17 @@
 //! Events carry an event name, a random install ID, a per-launch session ID, the app version and
 //! the operating system: never content, file names, paths or account details.
 //!
-//! The services are reached through small adapters (`usage_request`, `crash_request`), so the
-//! provider can change without touching the rest of the app.
+//! The desktop app sends usage through the Aptabase Tauri plugin (see [`set_usage_sink`]) and
+//! crashes through the Sentry SDK, which checks [`crash_reports_allowed`]. Headless processes
+//! (CLI, MCP, A2A) fall back to small adapters (`usage_request`, `crash_request`).
 
 use std::{
     collections::BTreeMap,
     error::Error,
-    sync::OnceLock,
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -23,6 +27,33 @@ use crate::WorkspaceStore;
 const USAGE_KEY: Option<&str> = option_env!("ARRUMO_USAGE_KEY");
 const USAGE_ENDPOINT: Option<&str> = option_env!("ARRUMO_USAGE_ENDPOINT");
 const CRASH_DSN: Option<&str> = option_env!("ARRUMO_CRASH_DSN");
+
+/// Receives each allowed usage event with its properties, including the install ID.
+type UsageSink = Box<dyn Fn(&str, Value) + Send + Sync>;
+static USAGE_SINK: OnceLock<UsageSink> = OnceLock::new();
+static CRASH_ALLOWED: AtomicBool = AtomicBool::new(false);
+
+/// The usage service key this build was given, if any.
+pub fn usage_key() -> Option<&'static str> {
+    USAGE_KEY
+}
+
+/// The crash service DSN this build was given, if any.
+pub fn crash_dsn() -> Option<&'static str> {
+    CRASH_DSN
+}
+
+/// Sends usage events through `sink` instead of the built-in adapter, such as the desktop app's
+/// analytics plugin. Events still pass the creator's setting first.
+pub fn set_usage_sink(sink: impl Fn(&str, Value) + Send + Sync + 'static) {
+    let _ = USAGE_SINK.set(Box::new(sink));
+}
+
+/// Whether the creator currently allows crash reports, for crash SDKs to check before sending.
+/// Kept up to date by [`WorkspaceStore::privacy_settings`] and its setter.
+pub fn crash_reports_allowed() -> bool {
+    CRASH_ALLOWED.load(Ordering::Relaxed)
+}
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -40,9 +71,11 @@ impl WorkspaceStore {
             "SELECT usage_data, crash_reports FROM privacy_settings WHERE id = 1",
             [],
             |row| {
+                let crash_reports = row.get(1)?;
+                CRASH_ALLOWED.store(crash_reports, Ordering::Relaxed);
                 Ok(PrivacySettings {
                     usage_data: row.get(0)?,
-                    crash_reports: row.get(1)?,
+                    crash_reports,
                     usage_available: USAGE_KEY.is_some(),
                     crash_available: CRASH_DSN.is_some(),
                 })
@@ -90,6 +123,15 @@ impl WorkspaceStore {
             })
             .cloned()
             .collect();
+        if let Some(sink) = USAGE_SINK.get() {
+            let mut props: serde_json::Map<String, Value> = props
+                .into_iter()
+                .map(|(name, value)| (name.to_owned(), value))
+                .collect();
+            props.insert("install".into(), json!(install));
+            sink(event, Value::Object(props));
+            return;
+        }
         let body = usage_request(event, &install, &props);
         let endpoint = USAGE_ENDPOINT.unwrap_or("https://eu.aptabase.com/api/v0/events");
         send(endpoint, vec![("App-Key".to_owned(), key.to_owned())], body);
@@ -155,6 +197,12 @@ fn usage_request(event: &str, install: &str, props: &BTreeMap<&str, Value>) -> V
         },
         "props": props,
     }])
+}
+
+/// Removes anything that looks like a local path or address from a crash message, for crash
+/// SDKs to apply before they send.
+pub fn redact_report_text(message: &str) -> String {
+    redact(message)
 }
 
 /// Removes anything that looks like a local path or address from a crash message.

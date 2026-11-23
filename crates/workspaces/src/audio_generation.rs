@@ -240,11 +240,44 @@ fn audio_request(
 }
 
 impl WorkspaceStore {
+    /// Generates audio like `generate_library_audio_untracked` and counts it in usage data.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_library_audio(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        kind: AudioKind,
+        prompt: &str,
+        seconds: f64,
+        notes: &str,
+        provider: Option<&str>,
+        label: Option<&str>,
+    ) -> Result<(i64, String), Box<dyn std::error::Error>> {
+        let generated = self.generate_library_audio_untracked(
+            database,
+            workspace_id,
+            kind,
+            prompt,
+            seconds,
+            notes,
+            provider,
+            label,
+        )?;
+        self.track_usage(
+            "media_generated",
+            &[
+                ("kind", serde_json::json!("audio")),
+                ("provider", serde_json::json!(generated.1)),
+            ],
+        );
+        Ok(generated)
+    }
+
     /// Makes music or a sound effect from `prompt` with the workspace's first provider for
     /// that kind (or `provider`) and adds it to the workspace assets with `notes`. Returns the
     /// asset ID and the provider used. The asset is labelled `label`, or Music / Sound effect.
     #[allow(clippy::too_many_arguments)]
-    pub fn generate_library_audio(
+    fn generate_library_audio_untracked(
         &self,
         database: &Path,
         workspace_id: i64,
