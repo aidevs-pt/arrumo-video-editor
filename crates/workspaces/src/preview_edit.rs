@@ -4,6 +4,7 @@
 
 use std::{error::Error, io, path::Path};
 
+use rusqlite::OptionalExtension;
 use serde_json::{Value, json};
 
 use crate::{
@@ -412,6 +413,51 @@ fn preview_prompt(
 }
 
 impl WorkspaceStore {
+    /// The run's approved animations followed by the saved library animations its asset plan
+    /// names, so a planned library item is reused as it is instead of being designed again.
+    fn planned_animations(
+        &self,
+        workspace_id: i64,
+        approved: Option<&Value>,
+    ) -> rusqlite::Result<Vec<Value>> {
+        let mut animations: Vec<Value> = approved
+            .and_then(|result| result["motion_specs"].as_array().cloned())
+            .unwrap_or_default();
+        let plan = approved
+            .and_then(|result| result["asset_plan"].as_array())
+            .into_iter()
+            .flatten();
+        let mut seen = Vec::new();
+        for entry in plan {
+            let Some(id) = entry["reference"]
+                .as_str()
+                .and_then(|reference| reference.strip_prefix("motion-"))
+                .and_then(|id| id.parse::<i64>().ok())
+            else {
+                continue;
+            };
+            if seen.contains(&id) {
+                continue;
+            }
+            seen.push(id);
+            let spec: Option<String> = self
+                .0
+                .query_row(
+                    "SELECT spec_json FROM motion_library WHERE workspace_id = ?1 AND id = ?2",
+                    rusqlite::params![workspace_id, id],
+                    |row| row.get(0),
+                )
+                .optional()?
+                .flatten();
+            if let Some(spec) = spec.and_then(|spec| serde_json::from_str::<Value>(&spec).ok())
+                && spec.is_object()
+            {
+                animations.push(spec);
+            }
+        }
+        Ok(animations)
+    }
+
     /// Finds a Preview stage whose agent can cut its footage, or storyboard it when it has none,
     /// and renders the result.
     pub fn process_next_preview_edit(
@@ -473,10 +519,7 @@ impl WorkspaceStore {
         let approved = self.approved_stage_result(run_id, "assets")?;
         let tracks = approved_tracks(approved.as_ref().map(|result| &result["asset_plan"]));
         let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
-        let animations = approved
-            .as_ref()
-            .map(|result| result["motion_specs"].clone())
-            .unwrap_or(Value::Null);
+        let animations = json!(self.planned_animations(workspace_id, approved.as_ref())?);
         let progress = self.production_progress(workspace_id, run_id)?;
         let earlier: Vec<Value> = progress
             .results
@@ -704,10 +747,7 @@ impl WorkspaceStore {
             })
             .collect();
         let assets = self.approved_stage_result(run_id, "assets")?;
-        let animations: Vec<Value> = assets
-            .as_ref()
-            .and_then(|result| result["motion_specs"].as_array().cloned())
-            .unwrap_or_default();
+        let animations = self.planned_animations(workspace_id, assets.as_ref())?;
         let tracks = approved_tracks(assets.as_ref().map(|result| &result["asset_plan"]));
         let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
         let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
@@ -796,6 +836,69 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn planned_library_animations_follow_the_approved_ones() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("studio.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let foreign = store.create("Other").unwrap().id;
+        let path = temp.path().join("card.mp4");
+        std::fs::write(&path, b"preview fixture").unwrap();
+        let root = asset_root(&database);
+        let mut item = |workspace_id: i64, title: &str| {
+            let preview = store.import_asset(&root, workspace_id, &path).unwrap().id;
+            let id = store
+                .create_motion_library_item(
+                    workspace_id,
+                    &crate::MotionLibrarySettings {
+                        profile_id: None,
+                        kind: crate::MotionKind::Animation,
+                        title: title.into(),
+                        usage_markdown: String::new(),
+                        preview_asset_id: preview,
+                        thumbnail_asset_id: None,
+                        sound_asset_id: None,
+                    },
+                )
+                .unwrap()
+                .id;
+            store
+                .0
+                .execute(
+                    "UPDATE motion_library SET spec_json = ?2 WHERE id = ?1",
+                    rusqlite::params![id, json!({"title": title, "layers": []}).to_string()],
+                )
+                .unwrap();
+            id
+        };
+        let card = item(workspace, "End card");
+        let elsewhere = item(foreign, "Not ours");
+        let approved = json!({
+            "motion_specs": [{"title": "Hook"}],
+            "asset_plan": [
+                {"reference": format!("motion-{card}"), "kind": "animation"},
+                {"reference": format!("motion-{card}"), "kind": "animation"},
+                {"reference": format!("motion-{elsewhere}"), "kind": "animation"},
+                {"reference": "motion-999", "kind": "animation"},
+                {"reference": "asset-1", "kind": "image"}
+            ]
+        });
+        let titles: Vec<Value> = store
+            .planned_animations(workspace, Some(&approved))
+            .unwrap()
+            .iter()
+            .map(|spec| spec["title"].clone())
+            .collect();
+        assert_eq!(titles, vec![json!("Hook"), json!("End card")]);
+        assert!(
+            store
+                .planned_animations(workspace, None)
+                .unwrap()
+                .is_empty()
+        );
+    }
 
     #[test]
     fn approved_audio_becomes_the_music_the_agent_may_lay() {
