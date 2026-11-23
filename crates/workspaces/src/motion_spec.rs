@@ -56,6 +56,10 @@ pub(crate) enum Motion {
     Drop,
     SlideLeft,
     SlideRight,
+    /// Text lines rise into place from behind their baseline, one after another; other layers fade.
+    Reveal,
+    /// Text lines are uncovered from left to right; other layers fade.
+    Wipe,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -220,7 +224,7 @@ pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
 /// Like `spec_schema_with_clips`, also letting layers play the workspace sound effects in `sounds`.
 pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i64]) -> Value {
     let assets: Vec<i64> = images.iter().chain(clips).copied().collect();
-    let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right"]});
+    let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right", "reveal", "wipe"]});
     let unit = json!({"type": "number", "minimum": 0, "maximum": 1});
     let optional_color =
         json!({"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}]});
@@ -328,7 +332,9 @@ fraction of the frame height; 0.06 to 0.1 suits titles and 0.035 to 0.05 body te
 rectangles with an opacity, useful for bars, cards, underlines and lower thirds. Images show a \
 workspace image by assetId, fitted inside their box. Layers paint in order, so put backgrounds \
 first. start and end are seconds within the animation; enter and exit choose how a layer arrives \
-and leaves. Use the brand colours, keep strong contrast between text and what is behind it, keep \
+and leaves; for text, reveal raises each line from behind its baseline one after another and wipe \
+uncovers lines from left to right, the polished choices for headlines (a reveal or wipe exit fades). \
+Use the brand colours, keep strong contrast between text and what is behind it, keep \
 text short and inside the frame with a safe margin of 0.06, and stagger entrances so the motion \
 reads clearly. A layer can play a short sound as it arrives (a whoosh for slides, a pop or click for \
 items appearing, a chime for a reveal, a rise for a build-up); use them sparingly, on the beats that \
@@ -626,6 +632,90 @@ fn wrap(text: &str, columns: usize) -> String {
     lines.join("\n")
 }
 
+/// Seconds between the entrances of a text layer's lines in a reveal or wipe.
+const LINE_STAGGER: f64 = 0.09;
+
+/// One line of text drawn on its own transparent strip, so a reveal or wipe can mask it.
+struct MaskedLine<'a> {
+    font: &'a str,
+    file: &'a str,
+    font_px: f64,
+    line_height: f64,
+    color: &'a str,
+    /// Where the line starts, as a drawtext x expression in frame pixels.
+    anchor: &'a str,
+    width: f64,
+    /// The layer's left edge and width in pixels, which a wipe sweeps across.
+    left: f64,
+    span: f64,
+    start: f64,
+    /// How long the strip lasts, in seconds of the base video.
+    length: f64,
+}
+
+impl MaskedLine<'_> {
+    /// Appends filters that draw this line over `[input]` as `[output]`, its strip `strip` pixels
+    /// down from `top`.
+    #[allow(clippy::too_many_arguments)]
+    fn draw(
+        &self,
+        layer: &Layer,
+        strip: &str,
+        input: &str,
+        output: &str,
+        top: f64,
+        enable: &str,
+        graph: &mut String,
+    ) {
+        let (font, file, color, anchor) = (self.font, self.file, self.color, self.anchor);
+        let font_px = self.font_px;
+        let pad = (self.line_height * 0.2).round();
+        let strip_h = ((self.line_height + pad * 2.0) / 2.0).ceil() * 2.0;
+        let strip_w = (self.width / 2.0).ceil() * 2.0;
+        let ease = ((layer.end - layer.start).max(0.1) / 3.0).min(0.7);
+        let progress = format!("(1-pow(1-clip((t-{:.3})/{ease:.3},0,1),3))", self.start);
+        let fade_out = if layer.exit == Motion::None {
+            "1".to_owned()
+        } else {
+            let exit = ((layer.end - layer.start).max(0.1) / 3.0).min(0.6);
+            format!("(1-pow(clip((t-{:.3})/{exit:.3},0,1),3))", layer.end - exit)
+        };
+        let rest = pad + font_px * 0.1;
+        let (y, mask) = match layer.enter {
+            Motion::Reveal => (
+                format!("{rest:.2}+{:.2}*(1-{progress})", self.line_height * 1.1),
+                String::new(),
+            ),
+            // The uncovered edge sweeps across the layer with a soft edge; once it has passed,
+            // the mask is switched off.
+            _ => {
+                let (from, across) = (self.left - font_px, self.span + font_px * 2.0);
+                // geq names the time T.
+                let progress = progress.replace("(t-", "(T-");
+                (
+                    format!("{rest:.2}"),
+                    format!(
+                        ",geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':\
+                         a='alpha(X,Y)*clip(({from:.2}+{across:.2}*{progress}-X)/{font_px:.2},0,1)':\
+                         enable='lte(t,{:.3})'",
+                        self.start + ease + 0.05
+                    ),
+                )
+            }
+        };
+        write!(
+            graph,
+            "color=c=black@0:s={strip_w:.0}x{strip_h:.0}:r={FPS}:d={length:.3},format=rgba,\
+             drawtext=fontfile={font}:textfile={file}:expansion=none:fontsize={font_px:.0}:\
+             fontcolor={color}:alpha='{fade_out}':x='{anchor}':y='{y}'{mask}[{strip}];\
+             [{input}][{strip}]overlay=x=0:y={:.2}:enable='{enable}':format=auto[{output}];",
+            top - pad,
+            length = self.length,
+        )
+        .ok();
+    }
+}
+
 /// FFmpeg expressions for a layer's entrance and exit: (alpha, x offset, y offset) in pixels.
 fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String, String) {
     let span = (layer.end - layer.start).max(0.1);
@@ -654,7 +744,7 @@ fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String
             Motion::Drop => ("0".into(), format!("{:.2}*{amount}", -sign * dy)),
             Motion::SlideLeft => (format!("{:.2}*{amount}", sign * dx), "0".into()),
             Motion::SlideRight => (format!("{:.2}*{amount}", -sign * dx), "0".into()),
-            Motion::None | Motion::Fade => ("0".into(), "0".into()),
+            Motion::None | Motion::Fade | Motion::Reveal | Motion::Wipe => ("0".into(), "0".into()),
         }
     };
     let (enter_x, enter_y) = offset(layer.enter, &enter, true);
@@ -787,10 +877,43 @@ impl LayerTarget<'_> {
                             format!("{:.2}-text_w", (layer.x + layer.width / 2.0) * frame_w)
                         }
                     };
+                    let masked = matches!(layer.enter, Motion::Reveal | Motion::Wipe);
                     let mut line_input = current.clone();
                     for (number, line) in lines.iter().enumerate() {
                         let file = format!("{prefix}text-{index}-{number}.txt");
                         fs::write(directory.join(&file), line)?;
+                        if masked {
+                            let output = if number + 1 == lines.len() {
+                                label.clone()
+                            } else {
+                                format!("{label}l{number}")
+                            };
+                            let line_top = top + line_height * number as f64;
+                            let masked_line = MaskedLine {
+                                font: &font,
+                                file: &file,
+                                font_px,
+                                line_height,
+                                color: &color,
+                                anchor: &anchor,
+                                width: frame_w,
+                                left: (layer.x - layer.width / 2.0) * frame_w,
+                                span: layer.width * frame_w,
+                                start: layer.start + LINE_STAGGER * number as f64,
+                                length: duration,
+                            };
+                            masked_line.draw(
+                                layer,
+                                &format!("{label}c{number}"),
+                                &line_input,
+                                &output,
+                                line_top,
+                                &enable,
+                                graph,
+                            );
+                            line_input = output;
+                            continue;
+                        }
                         let output = if number + 1 == lines.len() {
                             label.clone()
                         } else {
@@ -2313,6 +2436,64 @@ mod tests {
         };
         assert!(level(1.0) > -30.0, "the effect plays");
         assert!(level(5.0) < -60.0, "the effect stops after its limit");
+    }
+
+    #[test]
+    fn reveal_and_wipe_uncover_text_over_time() {
+        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        for motion in ["reveal", "wipe"] {
+            let spec = MotionSpec::from_answer(
+                &json!({
+                    "title": "Headline", "kind": "animation", "usage": "", "durationSeconds": 2,
+                    "background": "#000000", "backgroundTo": null,
+                    "layers": [{"type": "text", "text": "Arrumo makes it", "assetId": null,
+                        "x": 0.5, "y": 0.5, "width": 0.9, "height": 0.2, "size": 0.2,
+                        "color": "#FFFFFF", "bold": true, "opacity": 1, "start": 0.2, "end": 2,
+                        "enter": motion, "exit": "none", "sound": "none", "align": "left",
+                        "radius": 0, "gradientTo": null, "shadow": false, "font": "heading"}]
+                }),
+                |_| true,
+            )
+            .unwrap();
+            let name = format!("{motion}.mp4");
+            render_spec(
+                &spec,
+                (320, 180),
+                directory.path(),
+                &name,
+                &|_| None,
+                &FontSet::default(),
+                &mut || Ok(()),
+            )
+            .unwrap();
+            let brightness = |at: f64| {
+                let frame = Command::new("ffmpeg")
+                    .args(["-v", "error", "-ss", &at.to_string(), "-i"])
+                    .arg(directory.path().join(&name))
+                    .args([
+                        "-frames:v",
+                        "1",
+                        "-vf",
+                        "format=gray",
+                        "-f",
+                        "rawvideo",
+                        "-",
+                    ])
+                    .output()
+                    .unwrap()
+                    .stdout;
+                frame.iter().map(|&value| u64::from(value)).sum::<u64>()
+            };
+            let (before, during, after) = (brightness(0.1), brightness(0.3), brightness(1.8));
+            assert!(
+                before < during && during < after,
+                "{motion}: {before} {during} {after}"
+            );
+        }
     }
 
     #[test]
