@@ -84,7 +84,7 @@ export function WorkspaceBrand({ workspace }: { workspace: Workspace }) {
           </div>
           <ul className="flex flex-wrap items-start gap-4">
             {palette.map((color) => (
-              <li key={color.hex} className="group relative flex w-32 flex-col gap-1.5">
+              <li key={color.hex} className="group relative flex w-36 flex-col gap-1.5">
                 <span className="h-20 rounded-lg border" style={{ backgroundColor: color.hex }} aria-hidden="true" />
                 <Button type="button" size="icon-sm" aria-pressed={color.forVideos}
                   aria-label={copy.forVideos.replace("{color}", color.name || color.hex)} title={copy.forVideos.replace("{color}", color.name || color.hex)}
@@ -95,14 +95,14 @@ export function WorkspaceBrand({ workspace }: { workspace: Workspace }) {
                   className="absolute start-1.5 top-1.5 size-7 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
                   onClick={() => void save(colors.filter((item) => item !== color.hex))}><X /></Button>
                 <input key={color.name} defaultValue={color.name} maxLength={40} placeholder={copy.namePlaceholder}
-                  aria-label={copy.nameLabel.replace("{color}", color.hex)}
-                  className="-mx-1 rounded-sm px-1 py-0.5 font-semibold outline-none placeholder:font-normal placeholder:text-muted-foreground/60 hover:bg-secondary focus-visible:bg-card focus-visible:outline-2 focus-visible:outline-ring"
+                  aria-label={copy.nameLabel.replace("{color}", color.hex)} title={color.name || undefined}
+                  className="-mx-1 w-[calc(100%+0.5rem)] text-ellipsis rounded-sm px-1 py-0.5 font-semibold outline-none placeholder:font-normal placeholder:text-muted-foreground/60 hover:bg-secondary focus-visible:bg-card focus-visible:outline-2 focus-visible:outline-ring"
                   onBlur={(event) => void saveDetails(color, event.currentTarget.value, color.forVideos)}
                   onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
                 <span className={cn("text-sm tabular-nums", color.forVideos ? "text-muted-foreground" : "text-muted-foreground/70 line-through")}>{color.hex}</span>
               </li>
             ))}
-            <li className="w-32">
+            <li className="w-36">
               <label className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line-strong text-sm text-muted-foreground hover:border-primary hover:text-foreground focus-within:outline-2 focus-within:outline-ring">
                 <Plus className="size-4" aria-hidden="true" />{copy.add}
                 <input type="color" className="sr-only" value={candidate} disabled={saving}
