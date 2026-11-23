@@ -236,6 +236,16 @@ pub struct PendingReview {
 }
 
 impl WorkspaceStore {
+    /// Runs the workers are generating or about to, not counting runs waiting for a review.
+    pub fn active_generation_count(&self) -> rusqlite::Result<i64> {
+        self.0.query_row(
+            "SELECT COUNT(*) FROM generation_runs
+             WHERE state IN ('queued', 'running') AND pending_review_id IS NULL",
+            [],
+            |row| row.get(0),
+        )
+    }
+
     pub fn enqueue_video_draft(
         &self,
         workspace_id: i64,

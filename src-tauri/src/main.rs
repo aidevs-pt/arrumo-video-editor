@@ -13,6 +13,7 @@ use tauri::{AppHandle, Manager, State};
 
 mod agent_settings;
 mod backup;
+mod close_guard;
 mod completed_video;
 mod delivery_stream;
 mod desktop_job_workers;
@@ -1672,6 +1673,8 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .register_uri_scheme_protocol("arrumo-panel", plugin_settings::serve_plugin_surface)
         .manage(delivery_stream::DeliveryStream::default())
+        .manage(close_guard::CloseGuard::default())
+        .on_window_event(close_guard::on_window_event)
         .setup(|app| {
             #[cfg(any(target_os = "linux", all(debug_assertions, target_os = "windows")))]
             {
@@ -1899,7 +1902,8 @@ fn main() {
             media_worker::desktop_motion_renderer_available,
             media_worker::render_desktop_run_motion,
             media_worker::generate_delivery_subtitles,
-            media_worker::import_delivery_subtitles
+            media_worker::import_delivery_subtitles,
+            close_guard::answer_close_request
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Arrumo")

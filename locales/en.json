@@ -1898,5 +1898,12 @@
     "cancel": "Cancel",
     "apply": "Apply",
     "summary": "Style"
+  },
+  "closeGuard": {
+    "title": "Close Arrumo while videos are generating?",
+    "descriptionOne": "1 video is generating. Closing Arrumo pauses it, and it continues from the same step the next time you open Arrumo.",
+    "description": "{count} videos are generating. Closing Arrumo pauses them, and they continue from the same step the next time you open Arrumo.",
+    "keepOpen": "Keep Arrumo open",
+    "close": "Close and pause"
   }
 }

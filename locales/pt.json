@@ -1898,5 +1898,12 @@
     "cancel": "Cancelar",
     "apply": "Aplicar",
     "summary": "Estilo"
+  },
+  "closeGuard": {
+    "title": "Fechar o Arrumo enquanto se geram vídeos?",
+    "descriptionOne": "Está a ser gerado 1 vídeo. Se fechares o Arrumo, fica em pausa e continua no mesmo passo da próxima vez que abrires o Arrumo.",
+    "description": "Estão a ser gerados {count} vídeos. Se fechares o Arrumo, ficam em pausa e continuam no mesmo passo da próxima vez que abrires o Arrumo.",
+    "keepOpen": "Manter o Arrumo aberto",
+    "close": "Fechar e pausar"
   }
 }
