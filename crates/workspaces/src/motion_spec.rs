@@ -467,8 +467,14 @@ impl MotionSpec {
             };
             layer.x = unit(layer.x);
             layer.y = unit(layer.y);
-            layer.width = unit(layer.width).max(0.02);
-            layer.height = unit(layer.height).max(0.005);
+            // Text needs room to wrap; boxes and images may be hairlines.
+            let least = if layer.kind == LayerType::Text {
+                0.02
+            } else {
+                0.001
+            };
+            layer.width = unit(layer.width).max(least);
+            layer.height = unit(layer.height).max(least.min(0.005));
             layer.opacity = unit(layer.opacity);
             layer.size = if layer.size.is_finite() {
                 layer.size.clamp(0.02, 0.25)
@@ -2301,6 +2307,21 @@ mod tests {
         };
         assert!(level(1.0) > -30.0, "the effect plays");
         assert!(level(5.0) < -60.0, "the effect stops after its limit");
+    }
+
+    #[test]
+    fn boxes_may_be_hairlines_but_text_keeps_room_to_wrap() {
+        let mut value = answer();
+        value["layers"][0]["type"] = json!("box");
+        value["layers"][0]["width"] = json!(0.001);
+        value["layers"][0]["height"] = json!(0.0005);
+        let spec = MotionSpec::from_answer(&value, |_| true).unwrap();
+        assert_eq!(spec.layers[0].width, 0.001);
+        assert_eq!(spec.layers[0].height, 0.001);
+        value["layers"][0]["type"] = json!("text");
+        let spec = MotionSpec::from_answer(&value, |_| true).unwrap();
+        assert!(spec.layers[0].width >= 0.02);
+        assert!(spec.layers[0].height >= 0.005);
     }
 
     #[test]
