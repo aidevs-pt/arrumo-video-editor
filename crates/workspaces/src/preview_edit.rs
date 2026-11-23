@@ -588,7 +588,9 @@ impl WorkspaceStore {
              message from the screen alone. Give each scene enough time to read its text comfortably. Where an approved \
              animation fits a beat, use it as that scene unchanged. Keep a consistent visual style across scenes.\n\
              Give each scene the narration a voice reads over it: the script's spoken words for that beat, in the \
-             script's language, short enough to say within the scene. Leave it empty where nothing is said.\n\
+             script's language, short enough to say within the scene. Leave it empty where nothing is said. Write \
+             narration the way it is spoken, since the voice reads exactly what is written: write a name said as a word \
+             in normal case even where it is styled in capitals on screen, and spell out only what is said letter by letter.\n\
              Each scene is an animation: {guide}{clip_guide}{sound_guide}\n\
              {revision}\
              {music}\
