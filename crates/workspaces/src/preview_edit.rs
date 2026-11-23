@@ -317,8 +317,9 @@ fn place_motion(edit: &mut Value, answer: &Value, animations: &[Value]) {
 /// A storyboard scene is an animation with the narration read over it.
 fn with_narration(mut scene: Value) -> Value {
     scene["properties"]["narration"] = json!({"type": "string", "maxLength": MAX_NARRATION});
+    scene["properties"]["transition"] = json!({"enum": crate::scene_transitions::TRANSITIONS});
     if let Some(required) = scene["required"].as_array_mut() {
-        required.push(json!("narration"));
+        required.extend([json!("narration"), json!("transition")]);
     }
     scene
 }
@@ -591,6 +592,9 @@ impl WorkspaceStore {
              script's language, short enough to say within the scene. Leave it empty where nothing is said. Write \
              narration the way it is spoken, since the voice reads exactly what is written: write a name said as a word \
              in normal case even where it is styled in capitals on screen, and spell out only what is said letter by letter.\n\
+             Give each scene the transition into the next one: none for a cut, fade, push, zoom, blur, or the 3D cube \
+             (both scenes turn as faces of a cube) and flip (a card turning over). Choose them with intent: a cut keeps \
+             pace, a 3D turn marks a change of chapter; the last scene's transition is ignored.\n\
              Each scene is an animation: {guide}{clip_guide}{sound_guide}\n\
              {revision}\
              {music}\

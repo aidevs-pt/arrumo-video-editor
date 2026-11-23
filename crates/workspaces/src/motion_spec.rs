@@ -199,6 +199,12 @@ pub(crate) struct MotionSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_to: Option<String>,
     pub layers: Vec<Layer>,
+    /// How a storyboard scene hands over to the next one.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::scene_transitions::Transition::is_none"
+    )]
+    pub transition: crate::scene_transitions::Transition,
 }
 
 /// The JSON schema agents answer with for one animation. `assets` are the image IDs it may use.

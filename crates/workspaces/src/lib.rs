@@ -86,6 +86,7 @@ mod provider_jobs;
 mod provider_media;
 mod provider_preferences;
 mod provider_usage;
+mod scene_transitions;
 mod script_stage;
 pub(crate) mod source_pages;
 mod source_transcripts;

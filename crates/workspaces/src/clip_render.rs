@@ -869,28 +869,86 @@ impl ActiveRender<'_> {
         }
         fs::write(directory.join("scenes.ffconcat"), manifest)?;
         let output = scratch.join(format!("{}-joined.mp4", format.id));
-        let args: Vec<String> = [
-            "-nostdin",
-            "-v",
-            "error",
-            "-protocol_whitelist",
-            "file",
-            "-f",
-            "concat",
-            "-safe",
-            "1",
-            "-i",
-            "scenes.ffconcat",
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            "-y",
-        ]
-        .map(String::from)
-        .into_iter()
-        .chain([output.to_string_lossy().into_owned()])
-        .collect();
+        let transitions: Vec<_> = scenes.iter().map(|scene| scene.transition).collect();
+        let args: Vec<String> = if transitions[..transitions.len().saturating_sub(1)]
+            .iter()
+            .any(|transition| !transition.is_none())
+        {
+            // Pictures are joined through the transitions; the soundtrack is the plain join.
+            let mut args: Vec<String> = ["-nostdin", "-v", "error", "-protocol_whitelist", "file"]
+                .map(String::from)
+                .to_vec();
+            for index in 0..scenes.len() {
+                args.extend(["-i".to_owned(), format!("scene-{index}.mp4")]);
+            }
+            args.extend(
+                [
+                    "-f",
+                    "concat",
+                    "-safe",
+                    "1",
+                    "-i",
+                    "scenes.ffconcat",
+                    "-filter_complex",
+                ]
+                .map(String::from),
+            );
+            args.push(crate::scene_transitions::join_graph(
+                &parts,
+                &transitions,
+                format.width,
+                format.height,
+            ));
+            args.extend(["-map".into(), "[out]".into(), "-map".into()]);
+            args.push(format!("{}:a:0", scenes.len()));
+            args.extend(
+                [
+                    "-r",
+                    "30",
+                    "-c:v",
+                    "libx264",
+                    "-crf",
+                    "17",
+                    "-preset",
+                    "medium",
+                    "-threads",
+                    "2",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "copy",
+                    "-movflags",
+                    "+faststart",
+                    "-y",
+                ]
+                .map(String::from),
+            );
+            args.push(output.to_string_lossy().into_owned());
+            args
+        } else {
+            [
+                "-nostdin",
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "file",
+                "-f",
+                "concat",
+                "-safe",
+                "1",
+                "-i",
+                "scenes.ffconcat",
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                "-y",
+            ]
+            .map(String::from)
+            .into_iter()
+            .chain([output.to_string_lossy().into_owned()])
+            .collect()
+        };
         run_ffmpeg(&directory, &args, &mut check)?;
         let finished = scratch.join(format!("{}.mp4", format.id));
         let staged = scratch.join(format!("{}-staged.mp4", format.id));
