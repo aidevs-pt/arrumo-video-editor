@@ -31,6 +31,8 @@ pub(crate) struct WorkspaceClip {
 
 /// The most clips a storyboard is offered.
 const MAX_CLIPS: i64 = 40;
+/// The longest workspace audio a storyboard is offered as a sound effect.
+pub(crate) const MAX_SOUND_SECONDS: f64 = 8.0;
 
 /// A workspace image the agent may place in animations.
 pub(crate) struct WorkspaceImage {
@@ -84,6 +86,40 @@ impl WorkspaceStore {
 
     /// The workspace's own videos (not footage of a draft, nor files Arrumo generated), newest
     /// first, with their length when it can be read.
+    /// The workspace's short audio files, which storyboard layers may play as sound effects.
+    pub(crate) fn workspace_sounds(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+    ) -> rusqlite::Result<Vec<WorkspaceClip>> {
+        let root = asset_root(database);
+        let sounds: Vec<(i64, String, String)> = self
+            .0
+            .prepare(
+                "SELECT id, name, notes FROM workspace_assets
+                 WHERE workspace_id = ?1 AND kind = 'audio' AND superseded = 0
+                 ORDER BY id DESC LIMIT ?2",
+            )?
+            .query_map(params![workspace_id, MAX_CLIPS], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(sounds
+            .into_iter()
+            .filter_map(|(id, name, notes)| {
+                let seconds =
+                    crate::source_transcripts::media_duration(&asset_path(&root, workspace_id, id))
+                        .ok()?;
+                (seconds <= MAX_SOUND_SECONDS).then_some(WorkspaceClip {
+                    id,
+                    name,
+                    notes,
+                    seconds: Some(seconds),
+                })
+            })
+            .collect())
+    }
+
     pub(crate) fn workspace_clips(
         &self,
         database: &Path,

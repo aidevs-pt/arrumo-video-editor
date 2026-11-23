@@ -329,6 +329,7 @@ fn storyboard(
     answer: &Value,
     images: &[i64],
     clips: &[i64],
+    sounds: &[i64],
     agent: &str,
 ) -> Result<Value, &'static str> {
     let (scenes, narration): (Vec<crate::motion_spec::MotionSpec>, Vec<String>) = answer
@@ -338,10 +339,11 @@ fn storyboard(
         .iter()
         .take(MAX_SCENES)
         .filter_map(|scene| {
-            let spec = crate::motion_spec::MotionSpec::from_answer_with_clips(
+            let spec = crate::motion_spec::MotionSpec::from_answer_with_media(
                 scene,
                 |id| images.contains(&id),
                 |id| clips.contains(&id),
+                |id| sounds.contains(&id),
             )
             .ok()?;
             let words: String = scene["narration"]
@@ -511,6 +513,8 @@ impl WorkspaceStore {
         let image_ids: Vec<i64> = images.iter().map(|image| image.id).collect();
         let clips = self.workspace_clips(database, workspace_id)?;
         let clip_ids: Vec<i64> = clips.iter().map(|clip| clip.id).collect();
+        let sounds = self.workspace_sounds(database, workspace_id)?;
+        let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
         let script = self.approved_stage_result(run_id, "script")?;
         let script = script
             .as_ref()
@@ -565,6 +569,17 @@ impl WorkspaceStore {
                     .collect::<Vec<_>>()
             );
         }
+        if !sounds.is_empty() {
+            brief["soundEffects"] = json!(
+                sounds
+                    .iter()
+                    .map(|sound| json!({
+                        "assetId": sound.id, "name": sound.name, "notes": sound.notes,
+                        "seconds": sound.seconds.map(|seconds| (seconds * 10.0).round() / 10.0),
+                    }))
+                    .collect::<Vec<_>>()
+            );
+        }
         let prompt = format!(
             "You storyboard one video in Arrumo that has no recorded footage. It is built from animated scenes \
              played one after another.\n\
@@ -574,7 +589,7 @@ impl WorkspaceStore {
              animation fits a beat, use it as that scene unchanged. Keep a consistent visual style across scenes.\n\
              Give each scene the narration a voice reads over it: the script's spoken words for that beat, in the \
              script's language, short enough to say within the scene. Leave it empty where nothing is said.\n\
-             Each scene is an animation: {guide}{clip_guide}\n\
+             Each scene is an animation: {guide}{clip_guide}{sound_guide}\n\
              {revision}\
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
@@ -597,6 +612,14 @@ impl WorkspaceStore {
                 )
             },
             guide = crate::motion_spec::SPEC_GUIDE,
+            sound_guide = if sounds.is_empty() {
+                ""
+            } else {
+                " A layer can play one of the workspace's sound effects (soundEffects in the brief) as it arrives: \
+                 set soundAssetId to its asset ID, and it replaces the layer's built-in sound. Prefer these designed \
+                 effects to the built-in sounds, pick one whose notes fit the moment, and use them sparingly. \
+                 Otherwise set soundAssetId to null."
+            },
             clip_guide = if clips.is_empty() {
                 String::new()
             } else {
@@ -620,7 +643,7 @@ impl WorkspaceStore {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": MAX_SCENES,
-                    "items": with_narration(crate::motion_spec::spec_schema_with_clips(&image_ids, &clip_ids))
+                    "items": with_narration(crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids))
                 }
             }
         });
@@ -641,8 +664,8 @@ impl WorkspaceStore {
                     .map_err(Into::into)
             },
         )?;
-        let mut edit =
-            storyboard(&answer, &image_ids, &clip_ids, &provider.id).map_err(io::Error::other)?;
+        let mut edit = storyboard(&answer, &image_ids, &clip_ids, &sound_ids, &provider.id)
+            .map_err(io::Error::other)?;
         place_music(&mut edit, &answer, &track_ids);
         self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)?;
         self.renew_generation_lease(workspace_id, run_id, attempt)?;

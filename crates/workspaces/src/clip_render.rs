@@ -771,11 +771,26 @@ impl WorkspaceStore {
                 )
                 .is_ok()
         };
+        let is_sound = |id: i64| {
+            self.0
+                .query_row(
+                    "SELECT 1 FROM workspace_assets
+                     WHERE workspace_id = ?1 AND id = ?2 AND kind = 'audio' AND superseded = 0",
+                    params![workspace_id, id],
+                    |_| Ok(()),
+                )
+                .is_ok()
+        };
         scenes
             .iter()
             .map(|scene| {
-                MotionSpec::from_answer_with_clips(scene, |id| images.contains(&id), is_clip)
-                    .map_err(|reason| io::Error::other(reason).into())
+                MotionSpec::from_answer_with_media(
+                    scene,
+                    |id| images.contains(&id),
+                    is_clip,
+                    is_sound,
+                )
+                .map_err(|reason| io::Error::other(reason).into())
             })
             .collect::<Result<Vec<_>, Box<dyn Error>>>()
             .map(|mut scenes| {

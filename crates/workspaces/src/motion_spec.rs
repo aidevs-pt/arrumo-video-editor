@@ -30,6 +30,8 @@ const MAX_SPOTLIGHTS: usize = 6;
 /// How long a spotlight takes to dim the rest of the clip, and how dark it gets.
 const SPOTLIGHT_EASE: f64 = 0.3;
 const SPOTLIGHT_DIM: f64 = 0.62;
+/// How long a layer's sound-effect file may play before it fades out.
+const SOUND_ASSET_SECONDS: f64 = 4.0;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
 pub(crate) const MAX_SECONDS: f64 = 20.0;
 const MAX_STORED_SECONDS: f64 = 60.0;
@@ -78,6 +80,9 @@ pub(crate) struct Layer {
     /// A sound effect played as the layer arrives.
     #[serde(default)]
     pub sound: Sound,
+    /// A workspace sound-effect file played as the layer arrives, in place of `sound`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound_asset_id: Option<i64>,
     /// How text lines sit inside the layer's width.
     #[serde(default, skip_serializing_if = "Align::is_center")]
     pub align: Align,
@@ -203,6 +208,11 @@ pub(crate) fn spec_schema(assets: &[i64]) -> Value {
 
 /// Like `spec_schema`, also offering clip layers that play the workspace videos in `clips`.
 pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
+    spec_schema_with_media(images, clips, &[])
+}
+
+/// Like `spec_schema_with_clips`, also letting layers play the workspace sound effects in `sounds`.
+pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i64]) -> Value {
     let assets: Vec<i64> = images.iter().chain(clips).copied().collect();
     let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right"]});
     let unit = json!({"type": "number", "minimum": 0, "maximum": 1});
@@ -273,6 +283,13 @@ pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
         });
         if let Some(required) = layer["required"].as_array_mut() {
             required.extend([json!("clipStart"), json!("zoom"), json!("spotlight")]);
+        }
+    }
+    if !sounds.is_empty() {
+        layer["properties"]["soundAssetId"] =
+            json!({"anyOf": [{"type": "null"}, {"enum": sounds}]});
+        if let Some(required) = layer["required"].as_array_mut() {
+            required.push(json!("soundAssetId"));
         }
     }
     json!({
@@ -393,11 +410,30 @@ impl MotionSpec {
         Self::from_answer_with_clips(answer, image_allowed, |_| false)
     }
 
+    /// Like `from_answer_with_clips`, also keeping layer sound effects that `sound_allowed` approves.
+    pub(crate) fn from_answer_with_media(
+        answer: &Value,
+        image_allowed: impl Fn(i64) -> bool,
+        clip_allowed: impl Fn(i64) -> bool,
+        sound_allowed: impl Fn(i64) -> bool,
+    ) -> Result<Self, &'static str> {
+        Self::read_answer(answer, image_allowed, clip_allowed, sound_allowed)
+    }
+
     /// Like `from_answer`, also accepting clip layers whose asset ID `clip_allowed` approves.
     pub(crate) fn from_answer_with_clips(
         answer: &Value,
         image_allowed: impl Fn(i64) -> bool,
         clip_allowed: impl Fn(i64) -> bool,
+    ) -> Result<Self, &'static str> {
+        Self::read_answer(answer, image_allowed, clip_allowed, |_| false)
+    }
+
+    fn read_answer(
+        answer: &Value,
+        image_allowed: impl Fn(i64) -> bool,
+        clip_allowed: impl Fn(i64) -> bool,
+        sound_allowed: impl Fn(i64) -> bool,
     ) -> Result<Self, &'static str> {
         let invalid = "The agent's animation did not follow the expected structure";
         let mut spec: MotionSpec = serde_json::from_value(answer.clone()).map_err(|_| invalid)?;
@@ -418,6 +454,10 @@ impl MotionSpec {
         let duration = spec.duration_seconds;
         spec.layers.truncate(MAX_LAYERS);
         spec.layers.retain_mut(|layer| {
+            layer.sound_asset_id = layer.sound_asset_id.filter(|id| sound_allowed(*id));
+            if layer.sound_asset_id.is_some() {
+                layer.sound = Sound::None;
+            }
             let unit = |value: f64| {
                 if value.is_finite() {
                     value.clamp(0.0, 1.0)
@@ -1373,7 +1413,19 @@ fn render_arguments(
     );
     let mut inputs = vec!["[bed]".to_owned()];
     for (index, layer) in spec.layers.iter().enumerate() {
-        if let Some(source) = layer.sound.source() {
+        if let Some(path) = layer.sound_asset_id.and_then(images) {
+            let input = args.iter().filter(|arg| *arg == "-i").count();
+            args.extend(["-i".to_owned(), path.to_string_lossy().into_owned()]);
+            let delay = (layer.start * 1000.0).round() as u64;
+            write!(
+                mix,
+                ";[{input}:a:0]aformat=sample_rates=48000:channel_layouts=stereo,\
+                 afade=t=out:st={SOUND_ASSET_SECONDS}:d=0.3,atrim=end={:.3},adelay={delay}:all=1[fx{index}]",
+                SOUND_ASSET_SECONDS + 0.3
+            )
+            .ok();
+            inputs.push(format!("[fx{index}]"));
+        } else if let Some(source) = layer.sound.source() {
             let delay = (layer.start * 1000.0).round() as u64;
             write!(
                 mix,
@@ -2202,5 +2254,70 @@ mod tests {
                 .unwrap();
             assert!(peak > -30.0, "{sound} peaked at {peak} dB");
         }
+
+        // A layer's sound-effect file plays in place of the built-in sound, cut after a few seconds.
+        let effect = directory.path().join("effect.wav");
+        let made = Command::new("ffmpeg")
+            .args(["-v", "error", "-f", "lavfi", "-i", "sine=f=300:d=6"])
+            .arg(&effect)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let mut value = answer();
+        value["layers"][0]["sound"] = json!("none");
+        value["layers"][0]["soundAssetId"] = json!(9);
+        value["layers"][0]["start"] = json!(0);
+        value["durationSeconds"] = json!(6);
+        let spec =
+            MotionSpec::from_answer_with_media(&value, |_| true, |_| false, |id| id == 9).unwrap();
+        assert_eq!(spec.layers[0].sound_asset_id, Some(9));
+        let resolve = |id| {
+            (id == 9)
+                .then(|| effect.clone())
+                .or_else(|| Some(image.clone()))
+        };
+        render_spec(
+            &spec,
+            (160, 90),
+            directory.path(),
+            "effect.mp4",
+            &resolve,
+            &FontSet::default(),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let level = |from: f64| {
+            let report = Command::new("ffmpeg")
+                .args(["-v", "info", "-ss", &from.to_string(), "-t", "0.5", "-i"])
+                .arg(directory.path().join("effect.mp4"))
+                .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&report.stderr)
+                .lines()
+                .find_map(|line| line.split("max_volume: ").nth(1))
+                .and_then(|value| value.trim_end_matches(" dB").parse::<f64>().ok())
+                .unwrap_or(-91.0)
+        };
+        assert!(level(1.0) > -30.0, "the effect plays");
+        assert!(level(5.0) < -60.0, "the effect stops after its limit");
+    }
+
+    #[test]
+    fn layers_keep_only_offered_sound_effects() {
+        let mut value = answer();
+        value["layers"][0]["sound"] = json!("chime");
+        value["layers"][0]["soundAssetId"] = json!(4);
+        let refused =
+            MotionSpec::from_answer_with_media(&value, |_| true, |_| false, |_| false).unwrap();
+        assert_eq!(refused.layers[0].sound_asset_id, None);
+        assert_eq!(refused.layers[0].sound, Sound::Chime);
+        let kept =
+            MotionSpec::from_answer_with_media(&value, |_| true, |_| false, |id| id == 4).unwrap();
+        assert_eq!(kept.layers[0].sound_asset_id, Some(4));
+        assert_eq!(kept.layers[0].sound, Sound::None);
+        // Plain animations never carry a sound-effect file.
+        let plain = MotionSpec::from_answer(&value, |_| true).unwrap();
+        assert_eq!(plain.layers[0].sound_asset_id, None);
     }
 }
