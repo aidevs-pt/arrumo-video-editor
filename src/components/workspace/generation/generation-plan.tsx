@@ -402,7 +402,8 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
       notes = [decision === "revise" || draft.motionNotes && Object.values(draft.motionNotes).some((note) => note.trim())
         ? `${copy.motionDecisions}\n${lines.join("\n")}` : "", draft.notes.trim()].filter(Boolean).join("\n\n");
     }
-    if (!decision) return;
+    // Item reviews send each item's decision; only a whole-step review needs one decision.
+    if (!decision && !hasItemReview) return;
     if (await onReview(result.id, decision, notes,
       decision === "approved" && motionItems.length ? selectedMotion : undefined,
       hasSupplemental ? {
