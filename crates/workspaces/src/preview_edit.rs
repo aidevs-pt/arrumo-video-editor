@@ -536,7 +536,8 @@ impl WorkspaceStore {
             revision = if earlier.is_empty() {
                 ""
             } else {
-                "Earlier storyboards and the creator's review notes are included. Address every note.\n"
+                "Earlier storyboards and the creator's review notes are included. Address every note, and say what you \
+                 changed only in the summary, never in narration or on-screen text.\n"
             },
             brief = serde_json::to_string_pretty(&brief).unwrap_or_default(),
         );

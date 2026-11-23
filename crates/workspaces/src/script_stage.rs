@@ -141,7 +141,8 @@ fn script_prompt(
             ""
         } else {
             "Earlier drafts and the creator's review notes are included. Address every note, and keep what \
-             was approved. Say what you changed in the summary.\n"
+             was approved. Say what you changed only in the summary, never in the script: its spoken lines are read aloud \
+             and its on-screen text is shown exactly as written.\n"
         },
         brief = serde_json::to_string_pretty(&brief).unwrap_or_default(),
     )
@@ -376,7 +377,7 @@ mod tests {
                 Some("Move the verdict".into()),
             )],
         );
-        assert!(revised.contains("Address every note"));
+        assert!(revised.contains("Address every note") && revised.contains("never in the script"));
         assert!(revised.contains("Move the verdict"));
     }
 
