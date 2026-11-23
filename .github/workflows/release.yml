@@ -137,7 +137,8 @@ jobs:
           projectPath: video-editor
           tagName: v${{ needs.prepare.outputs.version }}
           releaseDraft: true
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
 
   publish:
