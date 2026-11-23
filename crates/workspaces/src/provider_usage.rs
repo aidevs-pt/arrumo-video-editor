@@ -320,6 +320,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn claude_code_usage_comes_from_its_rate_limit_events() {
         let event = crate::agent_plugin("claude-code")
             .and_then(|plugin| plugin.cli.usage_event.as_ref())
@@ -342,6 +343,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn codex_describes_a_usage_read_with_reset_times() {
         let run = crate::agent_plugin("codex")
             .and_then(|plugin| plugin.cli.usage_run.as_ref())
@@ -351,6 +353,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn the_bundled_elevenlabs_usage_adapter_is_valid() {
         let index = bundled_manifests()
             .iter()

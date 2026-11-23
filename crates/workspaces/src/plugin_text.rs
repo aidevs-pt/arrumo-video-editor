@@ -244,6 +244,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn translations_must_match_what_the_manifest_declares() {
         for id in ["codex", "claude-code"] {
             let plugin = crate::agent_plugin(id).unwrap();

@@ -17,6 +17,10 @@ fn main() {
     ] {
         println!("cargo:rerun-if-env-changed={name}");
     }
+    println!("cargo::rustc-check-cfg=cfg(core_only)");
+    if env::var("ARRUMO_CORE_ONLY").as_deref() == Ok("1") {
+        println!("cargo::rustc-cfg=core_only");
+    }
     let debug = env::var("PROFILE").as_deref() == Ok("debug");
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut index = String::from("pub(crate) const BUNDLED: &[BundledSource] = &[\n");

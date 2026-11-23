@@ -500,6 +500,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn bundled_agents_declare_their_capability_settings() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let workspace = store.create("Studio").unwrap().id;
@@ -625,6 +626,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn claude_code_events_become_thinking_search_and_answer_steps() {
         let printed = concat!(
             r#"{"type":"system","subtype":"init"}"#,
@@ -676,6 +678,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn codex_progress_becomes_thinking_and_search_steps() {
         let printed = "user\nPrompt\n**Planning the hook**\nweb search: \nweb search: cube record 2026\nweb search: cube record 2026\ncodex\n{}";
         assert_eq!(

@@ -93,6 +93,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn only_plugins_that_arrive_later_are_introduced() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         // The first look takes the baseline: bundled plugins are not toured.

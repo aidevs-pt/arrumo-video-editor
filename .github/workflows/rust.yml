@@ -3,15 +3,38 @@ on: [push, pull_request]
 permissions:
   contents: read
 env:
-  ARRUMO_CORE_ONLY: "1"
+  CARGO_INCREMENTAL: "0"
 jobs:
   verify:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: video-editor
     steps:
       - uses: actions/checkout@v7
+        with:
+          path: video-editor
+      # Tests of the bundled plugins need their checkouts beside the editor. While the plugin
+      # repositories are private this takes ARRUMO_REPOS_TOKEN; without access the build is
+      # core-only and those tests are skipped.
+      - name: Check out the default plugins
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN || github.token }}
+        run: |
+          if ! gh repo clone aidevs-pt/arrumo-plugin-registry plugin-registry -- --depth 1 2>/dev/null; then
+            echo "::notice::The plugin repositories are not readable; testing core only."
+            echo "ARRUMO_CORE_ONLY=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          for id in $(jq -r '.plugins[] | select(.default) | .id' plugin-registry/catalog.json); do
+            gh repo clone "aidevs-pt/arrumo-plugin-$id" "plugins/$id" -- --depth 1
+          done
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev ffmpeg
       - run: cargo fmt --check

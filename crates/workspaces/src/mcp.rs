@@ -185,6 +185,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn generation_failures_tell_the_agent_why() {
         let temp = tempfile::tempdir().unwrap();
         let database = temp.path().join("studio.sqlite");

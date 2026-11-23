@@ -193,6 +193,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn codex_declares_an_image_run() {
         let codex = crate::agent_plugin("codex").unwrap();
         assert!(makes_images(codex));

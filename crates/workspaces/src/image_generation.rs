@@ -1174,6 +1174,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn library_images_need_a_prompt_a_size_and_one_to_four_variations() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let workspace = store.create("Studio").unwrap().id;
@@ -1249,6 +1250,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn bundled_image_adapters_are_valid() {
         for id in ["openai", "gemini"] {
             let adapter = image_adapter(id).unwrap().expect("bundled image adapter");
@@ -1258,6 +1260,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn the_bundled_higgsfield_image_adapter_polls_and_uploads_references() {
         let adapter = image_adapter("higgsfield")
             .unwrap()
@@ -1288,6 +1291,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn url_references_need_an_upload_flow() {
         let mut adapter: ImageAdapter = serde_json::from_slice(
             crate::plugin_catalog::BUNDLED

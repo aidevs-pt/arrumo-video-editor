@@ -822,6 +822,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn the_bundled_higgsfield_adapter_is_valid() {
         let adapter = video_adapter("higgsfield")
             .unwrap()
@@ -830,6 +831,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn higgsfield_picks_the_variant_that_takes_the_references() {
         let adapter = video_adapter("higgsfield").unwrap().unwrap();
         let models = adapter.models.as_ref().expect("schema 2 models");

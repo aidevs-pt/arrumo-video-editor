@@ -534,6 +534,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn the_catalogue_lists_creator_material_and_hands_over_what_exists() {
         let temp = tempfile::tempdir().unwrap();
         let database = temp.path().join("studio.sqlite");

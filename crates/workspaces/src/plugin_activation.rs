@@ -311,6 +311,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn a_retried_run_whose_agent_was_turned_off_fails_with_the_reason() {
         let mut store = WorkspaceStore::open(":memory:").unwrap();
         let workspace = store.create("Studio").unwrap().id;
@@ -357,6 +358,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn an_agent_in_use_cannot_be_turned_off() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let workspace = store.create("Studio").unwrap().id;

@@ -615,6 +615,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn the_bundled_elevenlabs_models_change_the_body_and_limit() {
         let (adapter, _) = speech_adapter("elevenlabs").unwrap();
         let models = adapter.models.as_ref().expect("schema 2 models");

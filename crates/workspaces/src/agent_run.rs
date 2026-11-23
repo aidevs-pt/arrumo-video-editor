@@ -852,6 +852,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn sessions_are_kept_only_when_a_follow_up_is_expected() {
         for id in ["codex", "claude-code"] {
             let plugin = crate::agent_plugin(id).unwrap();
@@ -890,6 +891,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
     fn the_session_id_comes_from_the_declared_stream() {
         let codex = crate::agent_plugin("codex").unwrap();
         let claude = crate::agent_plugin("claude-code").unwrap();
