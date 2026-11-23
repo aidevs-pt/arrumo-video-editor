@@ -22,10 +22,10 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: video-editor
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
       - id: version
@@ -54,17 +54,17 @@ jobs:
           - os: ubuntu-22.04
             args: ""
           - os: windows-latest
-            args: ""
+            args: --config windows-signing.json
           - os: macos-latest
             args: --target universal-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: video-editor
           ref: v${{ needs.prepare.outputs.version }}
       # The default plugins are bundled from their published, digest-checked registry releases.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: aidevs-pt/arrumo-plugin-registry
           path: plugin-registry
@@ -83,10 +83,10 @@ jobs:
             gh repo clone "${repository#https://github.com/}" "plugins/$id" -- --depth 1 --branch "v$tag"
             gh release download "v$tag" --repo "${repository#https://github.com/}" --pattern "*.zip" --output "plugin-releases/$id.zip"
           done
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: video-editor/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: pnpm
@@ -99,7 +99,23 @@ jobs:
           sudo apt-get install -y libdbus-1-dev libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - working-directory: video-editor
         run: pnpm install --frozen-lockfile
-      - uses: tauri-apps/tauri-action@v0
+      # Windows installers are signed with Azure Artifact Signing when its account is configured;
+      # without it the build is unsigned and SmartScreen warns on first install.
+      - name: Prepare Windows signing
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: video-editor
+        env:
+          ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+        run: |
+          if [ -z "$ACCOUNT" ]; then echo '{}' > windows-signing.json; exit 0; fi
+          cargo install --locked artifact-signing-cli@0.12.0
+          jq -n --arg e "$ENDPOINT" --arg a "$ACCOUNT" --arg c "$PROFILE" \
+            '{bundle: {windows: {signCommand: {cmd: "artifact-signing-cli",
+              args: ["-e", $e, "-a", $a, "-c", $c, "-d", "Arrumo AI Video Editor", "%1"]}}}}' > windows-signing.json
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ARRUMO_PLUGIN_RELEASE_ROOT: ${{ github.workspace }}/plugin-releases
@@ -114,6 +130,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         with:
           projectPath: video-editor
           tagName: v${{ needs.prepare.outputs.version }}
