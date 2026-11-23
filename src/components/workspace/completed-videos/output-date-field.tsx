@@ -61,9 +61,9 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button id={id} type="button" variant="outline" disabled={pending}
-              className="w-full justify-start gap-2 text-start font-normal">
+              className="h-auto min-h-9 w-full justify-start gap-2 py-2 text-start font-normal whitespace-normal">
               <CalendarDays data-icon="inline-start" className="text-muted-foreground" />
-              <span className={selected ? "truncate" : "truncate text-muted-foreground"}>{label}</span>
+              <span className={selected ? undefined : "text-muted-foreground"}>{label}</span>
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
