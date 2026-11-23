@@ -43,6 +43,8 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
 
 ## When a release breaks
 
-Publish a fixed release as usual. Arrumo marks each launch, and removes the mark after a minute of running or on a normal quit. If a launch ends before then, the next one checks for an update first and installs it without asking, so a release that crashes on start can still be replaced.
+Publish a fixed release as usual. Arrumo marks each launch before anything else runs, and removes the mark once the interface has stayed up for 30 seconds, or on a normal quit after the interface appeared. If a launch fails before then, the next one checks for an update before opening any data, and installs it without asking (waiting up to 90 seconds), so a release that crashes on start can still be replaced.
+
+Crash reports follow the creator's saved choice from the first moment, even when the data can't be opened. They never include native crash dumps or breadcrumbs.
 
 Builds made without `ARRUMO_UPDATER_PUBKEY` (contributor builds), or with `ARRUMO_STORE_BUILD` set (store builds), never check for updates. Builds without `ARRUMO_CRASH_DSN` or `ARRUMO_USAGE_KEY` send nothing.
