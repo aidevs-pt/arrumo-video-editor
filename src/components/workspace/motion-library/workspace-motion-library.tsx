@@ -215,7 +215,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
                 className={cn("flex h-full w-full flex-col gap-3 rounded-xl border-2 border-border bg-card p-2 text-start transition-colors duration-150 hover:border-line-strong",
                   chosen?.id === id && "border-primary hover:border-primary")}>
                 <AssetThumbnail workspaceId={workspaceId} kind={settings.thumbnail_asset_id ? "image" : "video"}
-                  assetId={settings.thumbnail_asset_id ?? settings.preview_asset_id} className="w-full bg-ink/90" />
+                  assetId={settings.thumbnail_asset_id ?? settings.preview_asset_id} fit="contain" className="w-full bg-ink/90" />
                 <span className="flex flex-col items-start gap-2 px-1.5 pb-1.5">
                   <span className="flex w-full items-center gap-2 font-semibold wrap-anywhere">
                     <span className="min-w-0 flex-1">{settings.title}</span>
@@ -236,7 +236,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
               <Button variant="ghost" size="icon-sm" aria-label={copy.close} onClick={() => setChosenId(null)}><X /></Button>
             </div>
             <AssetThumbnail workspaceId={workspaceId} kind={chosen.settings.thumbnail_asset_id ? "image" : "video"}
-              assetId={chosen.settings.thumbnail_asset_id ?? chosen.settings.preview_asset_id} className="w-full bg-ink/90" />
+              assetId={chosen.settings.thumbnail_asset_id ?? chosen.settings.preview_asset_id} fit="contain" className="w-full bg-ink/90" />
             <MotionPreviewDialog workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
               itemId={chosen.id} title={chosen.settings.title} />
             {chosen.settings.usage_markdown && <div>

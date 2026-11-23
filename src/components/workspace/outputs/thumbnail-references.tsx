@@ -35,7 +35,7 @@ export function ThumbnailReferences({ id, workspaceId, images, selected, copy, o
                       onChange={(event) => onChange(event.target.checked
                         ? [...selected, image.id]
                         : selected.filter((value) => value !== image.id))} />
-                    <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" />
+                    <AssetThumbnail workspaceId={workspaceId} assetId={image.id} kind="image" fit="contain" />
                     <span className="truncate text-xs font-medium" title={image.name}>{image.name}</span>
                     {checked && (
                       <span aria-hidden="true" className="absolute end-2.5 top-2.5 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
