@@ -2,6 +2,7 @@
 
 import { MotionConfig } from "motion/react";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { appearanceStorageKey } from "./appearance-script";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type MotionPreference = "system" | "reduce" | "full";
@@ -13,11 +14,8 @@ type Appearance = {
   setMotion: (motion: MotionPreference) => void;
 };
 
-const storageKey = "arrumo:appearance";
+const storageKey = appearanceStorageKey;
 const Context = createContext<Appearance | null>(null);
-
-/** Runs before hydration so the first paint already uses the saved theme and motion choice. */
-export const appearanceScript = `try{var a=JSON.parse(localStorage.getItem("${storageKey}")||"{}"),d=document.documentElement,m=matchMedia("(prefers-color-scheme: dark)").matches;if(a.theme==="dark"||(a.theme!=="light"&&m))d.classList.add("dark");if(a.motion==="reduce"||(a.motion!=="full"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.dataset.reduceMotion=""}catch(e){}`;
 
 function read(): { theme: ThemePreference; motion: MotionPreference } {
   try {
