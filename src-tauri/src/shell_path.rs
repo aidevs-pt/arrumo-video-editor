@@ -6,8 +6,9 @@
 use std::{
     env,
     ffi::OsString,
-    io::{IsTerminal, Read},
-    path::PathBuf,
+    fs,
+    io::IsTerminal,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
@@ -33,13 +34,22 @@ pub fn login_shell_path() -> Option<OsString> {
                 "/bin/sh"
             })
         });
+    // A file, not a pipe: helpers that start-up files leave running inherit the output, and
+    // reading a pipe would wait for all of them to exit, keeping the app from ever opening.
+    let output_file = env::temp_dir().join(format!("arrumo-shell-path-{}", std::process::id()));
+    let output = read_shell_path(shell, &output_file);
+    let _ = fs::remove_file(&output_file);
+    merge(&output?, env::var_os("PATH").unwrap_or_default())
+}
+
+fn read_shell_path(shell: PathBuf, output_file: &Path) -> Option<String> {
     let mut child = Command::new(shell)
         .args([
             "-ilc",
             &format!("printf '\\n{MARKER}%s{MARKER}\\n' \"$PATH\""),
         ])
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
+        .stdout(fs::File::create(output_file).ok()?)
         .stderr(Stdio::null())
         .spawn()
         .ok()?;
@@ -55,9 +65,7 @@ pub fn login_shell_path() -> Option<OsString> {
             }
         }
     }
-    let mut output = String::new();
-    child.stdout.take()?.read_to_string(&mut output).ok()?;
-    merge(&output, env::var_os("PATH").unwrap_or_default())
+    fs::read_to_string(output_file).ok()
 }
 
 /// The shell's folders first, then any of the current ones it lacks. `None` when the output has
@@ -98,5 +106,25 @@ mod tests {
             merge(&format!("{MARKER}{MARKER}"), OsString::from("/usr/bin")),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod lingering_helpers {
+    use super::*;
+
+    #[test]
+    fn a_helper_left_running_by_the_shell_does_not_delay_the_path() {
+        let folder = env::temp_dir().join(format!("arrumo-shell-test-{}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let shell = folder.join("shell");
+        // Like start-up files that launch a background agent without redirecting its output.
+        fs::write(&shell, "#!/bin/sh\nsleep 20 &\neval \"$2\"\n").unwrap();
+        fs::set_permissions(&shell, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        let started = Instant::now();
+        let output = read_shell_path(shell, &folder.join("output")).unwrap();
+        assert!(started.elapsed() < LIMIT, "took {:?}", started.elapsed());
+        assert!(output.contains(MARKER));
+        let _ = fs::remove_dir_all(folder);
     }
 }
