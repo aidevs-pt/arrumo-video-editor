@@ -134,6 +134,13 @@ jobs:
           for tool in ffmpeg ffprobe; do
             mv "media-tools/$tool$exe" "binaries/arrumo-$tool-$triple$exe"
             chmod +x "binaries/arrumo-$tool-$triple$exe"
+            # A universal build compiles each architecture on its own, and each looks for its own
+            # copy. The universal binary runs on both.
+            if [ "$RUNNER_OS" = macOS ]; then
+              for arch in aarch64 x86_64; do
+                cp "binaries/arrumo-$tool-$triple" "binaries/arrumo-$tool-$arch-apple-darwin"
+              done
+            fi
           done
           jq -n '{bundle: {externalBin: ["binaries/arrumo-ffmpeg", "binaries/arrumo-ffprobe"],
             resources: {"media-tools/": "media-tools/"}}}' > ../media-tools.json
@@ -201,6 +208,16 @@ jobs:
               echo "$name<<$delimiter"; echo "$value"; echo "$delimiter"
             } >> "$GITHUB_ENV"
           done
+      # Signing the update checks the signature against the app's public key, so the config
+      # needs the same key the app is built with.
+      - name: Set the updater key
+        shell: bash
+        working-directory: video-editor
+        env:
+          ARRUMO_UPDATER_PUBKEY: ${{ vars.ARRUMO_UPDATER_PUBKEY }}
+        run: |
+          if [ -z "$ARRUMO_UPDATER_PUBKEY" ]; then echo "::error::ARRUMO_UPDATER_PUBKEY is not set"; exit 1; fi
+          jq -n --arg key "$ARRUMO_UPDATER_PUBKEY" '{plugins: {updater: {pubkey: $key}}}' > updater-key.json
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -223,7 +240,7 @@ jobs:
           releaseBody: ${{ needs.prepare.outputs.notes }}
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
-          args: ${{ matrix.args }} --config media-tools.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
+          args: ${{ matrix.args }} --config media-tools.json --config updater-key.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
 
   publish:
     needs: [prepare, build]
