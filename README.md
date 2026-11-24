@@ -21,6 +21,10 @@
   <a href="https://github.com/aidevs-pt/arrumo-plugin-registry">Plugins</a>
 </p>
 
+<p align="center">
+  <a href="https://www.producthunt.com/products/arrumo-ai-video-editor?utm_source=badge-follow&utm_medium=badge&utm_source=badge-arrumo&#0045;ai&#0045;video&#0045;editor" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/follow.svg?product_id=1389483&theme=dark" alt="Arrumo&#0032;AI&#0032;Video&#0032;Editor - An&#0032;AI&#0032;agent&#0032;edits&#0032;your&#0032;videos&#0046;&#0032;You&#0032;approve&#0032;every&#0032;step | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+</p>
+
 [![Meet Arrumo, a video made entirely in Arrumo](docs/assets/meet-arrumo.gif)](https://youtu.be/v2KcwE8xuso)
 
 <p align="center"><sub>Every video on our channel is made entirely in Arrumo: the agent wrote the script, designed the animations, voiced and cut it, and wrote the titles and tags. People only reviewed and approved each step.</sub></p>
