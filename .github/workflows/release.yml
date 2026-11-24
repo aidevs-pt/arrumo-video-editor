@@ -25,10 +25,13 @@ jobs:
     environment: release
     outputs:
       version: ${{ steps.version.outputs.version }}
+      notes: ${{ steps.version.outputs.notes }}
     steps:
       - uses: actions/checkout@v7
         with:
           path: video-editor
+          # The changelog needs the history since the previous release tag.
+          fetch-depth: 0
           # "Protect main" exempts this deploy key, so the version bump can be pushed.
           ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
       - uses: actions/setup-node@v7
@@ -40,16 +43,21 @@ jobs:
           version=$(node scripts/set-version.mjs "${{ inputs.version }}")
           cargo update --workspace
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The changelog goes into CHANGELOG.md, the release and the update dialog.
+          delimiter="EOF_$(openssl rand -hex 8)"
+          { echo "notes<<$delimiter"; node scripts/release-notes.mjs "$version" --changelog; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+          git add CHANGELOG.md
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           # The first release can keep the version already in the files.
-          git diff --quiet || git commit -am "chore(release): v$version"
+          git diff --quiet HEAD || git commit -am "chore(release): v$version"
           git tag "v$version"
           git push origin HEAD "v$version"
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+          NOTES: ${{ steps.version.outputs.notes }}
           PREVIEW: ${{ inputs.preview }}
           WINDOWS_SIGNED: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && vars.AZURE_ARTIFACT_SIGNING_PROFILE != '' && secrets.AZURE_CLIENT_ID != '' }}
           MACOS_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
@@ -57,8 +65,9 @@ jobs:
           title="Arrumo $VERSION"; flags=""
           if [ "$PREVIEW" = true ]; then title="$title (preview)"; flags="--prerelease"; fi
           node video-editor/scripts/unsigned-notes.mjs "$WINDOWS_SIGNED" "$MACOS_SIGNED" > notes.md
+          printf '%s\n' "$NOTES" >> notes.md
           gh release create "v$VERSION" --repo "${{ github.repository }}" --draft $flags \
-            --generate-notes --notes-file notes.md --title "$title"
+            --notes-file notes.md --title "$title"
 
   build:
     needs: prepare
@@ -206,6 +215,8 @@ jobs:
           projectPath: video-editor
           tagName: v${{ needs.prepare.outputs.version }}
           releaseDraft: true
+          # The update dialog shows these notes.
+          releaseBody: ${{ needs.prepare.outputs.notes }}
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --config media-tools.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'

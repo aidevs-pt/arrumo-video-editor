@@ -57,6 +57,16 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
   The editor build bundles the latest catalog release of each default plugin. It stops if a plugin has no release, or if a ZIP differs from its catalog digest or from the plugin's manifest at that tag.
 - Run the local checks: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `pnpm build`.
 
+## Changelog
+
+Each release writes its notes from the [Conventional Commits](https://www.conventionalcommits.org/) since the previous release tag (`scripts/release-notes.mjs`): `feat` commits under **New**, `fix` and `perf` under **Fixes**, in the words of the commit subject. Other types, such as `docs`, `ci` and `test`, are left out. The notes go at the top of `CHANGELOG.md` in the release commit, into the GitHub release, and into `latest.json`, so the update dialog shows them with a link to the release page. Write commit subjects for the people who use Arrumo.
+
+## Messages to everyone using Arrumo
+
+To tell everyone something at their next launch, such as asking people on a broken version to update by hand, run **Actions › Announcements** with **add**. Give a new id (ids are never reused), the English text (Spanish and Portuguese are optional, and English is shown where a translation is missing), an optional `https://` link, and optionally the versions it applies to: from `from` up to, but not including, `before`. Run it again with **remove** and the id once the message no longer applies.
+
+The workflow edits `announcements/announcements.json`, raises its serial and signs the whole file with the updater key. Only the accounts in `RELEASE_ACTORS` can run it. At launch, Arrumo downloads the list and its signature, verifies the exact bytes against the public key built into the app, refuses any list with a lower serial than one it has already seen, and shows at most one message per launch: the first that applies to its version and wasn't closed before. Closed messages stay closed on that computer. Builds without the updater key never show messages. Debug builds can read a local list from `ARRUMO_ANNOUNCEMENTS_URL` to try a message before publishing it.
+
 ## Previews and unsigned builds
 
 Tick **Preview** when you run the workflow to publish a pre-release. It's on the Releases page for testers, but `releases/latest` and the updater keep pointing at the last full release, so the public download and installed copies don't move to it. Testers on a preview update to the next full release with a higher version.
