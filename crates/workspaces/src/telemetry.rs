@@ -49,6 +49,54 @@ pub fn set_usage_sink(sink: impl Fn(&str, Value) + Send + Sync + 'static) {
     let _ = USAGE_SINK.set(Box::new(sink));
 }
 
+/// Receives handled failures that the creator should not have hit, already redacted.
+type FailureSink = Box<dyn Fn(&str, &str) + Send + Sync>;
+static FAILURE_SINK: OnceLock<FailureSink> = OnceLock::new();
+
+/// Sends handled failures through `sink`, such as the desktop app's crash reporter, as
+/// `(area, message)`. They pass the crash report setting first.
+pub fn set_failure_sink(sink: impl Fn(&str, &str) + Send + Sync + 'static) {
+    let _ = FAILURE_SINK.set(Box::new(sink));
+}
+
+/// Reports a failure the app handled but the creator should not have hit, such as a render that
+/// stopped, so it can be fixed. `area` names the feature. The message keeps its first line,
+/// without paths, addresses or quoted text, where names and titles usually appear.
+pub fn report_failure(area: &str, error: &dyn std::fmt::Display) {
+    if !crash_reports_allowed() {
+        return;
+    }
+    if let Some(sink) = FAILURE_SINK.get() {
+        sink(area, &redact(&without_quotes(&error.to_string())));
+    }
+}
+
+/// Replaces quoted text with `[redacted]`.
+fn without_quotes(message: &str) -> String {
+    let mut out = String::with_capacity(message.len());
+    let mut closing: Option<char> = None;
+    for ch in message.chars() {
+        match closing {
+            Some(end) if ch == end => {
+                closing = None;
+                out.push_str("[redacted]");
+            }
+            Some(_) => {}
+            None => match ch {
+                '"' => closing = Some('"'),
+                '“' => closing = Some('”'),
+                '«' => closing = Some('»'),
+                '\'' if !out.ends_with(|c: char| c.is_alphanumeric()) => closing = Some('\''),
+                _ => out.push(ch),
+            },
+        }
+    }
+    if closing.is_some() {
+        out.push_str("[redacted]");
+    }
+    out
+}
+
 /// Whether the creator currently allows crash reports, for crash SDKs to check before sending.
 /// Kept up to date by [`WorkspaceStore::privacy_settings`] and its setter.
 pub fn crash_reports_allowed() -> bool {
@@ -320,6 +368,21 @@ pub fn install_crash_reporter(database: std::path::PathBuf) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failure_reports_leave_out_quoted_names_and_paths() {
+        assert_eq!(
+            redact(&without_quotes(
+                "Could not render \"Lower third\" from C:\\Users\\ana\\clip.mp4: drawtext failed"
+            )),
+            "Could not render [redacted] from [redacted] drawtext failed"
+        );
+        assert_eq!(
+            without_quotes("Can't read 'brand.ttf' or «Mi vídeo»"),
+            "Can't read [redacted] or [redacted]"
+        );
+        assert_eq!(without_quotes("Unclosed \"name"), "Unclosed [redacted]");
+    }
 
     #[test]
     fn privacy_settings_default_on_and_persist() {

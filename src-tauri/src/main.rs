@@ -1081,6 +1081,7 @@ async fn generate_motion_library_item(
             .map_err(|_| "store_unavailable".to_owned())?
             .generate_motion_library_item(&database, workspace_id, profile_id, &request, based_on)
             .map_err(|error| {
+                arrumo_workspaces::report_failure("motion_library", &error);
                 match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
                     Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
                     Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
@@ -1732,6 +1733,14 @@ fn main() {
             // Loads the crash report choice the crash reporter checks before sending.
             if let Ok(privacy) = store.privacy_settings() {
                 crash_reports::remember_choice(&data_dir, privacy.crash_reports);
+            }
+            if arrumo_workspaces::crash_dsn().is_some() {
+                arrumo_workspaces::set_failure_sink(|area, message| {
+                    sentry::with_scope(
+                        |scope| scope.set_tag("area", area),
+                        || sentry::capture_message(message, sentry::Level::Error),
+                    );
+                });
             }
             if arrumo_workspaces::usage_key().is_some() {
                 use tauri_plugin_aptabase::EventTracker;
