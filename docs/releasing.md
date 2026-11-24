@@ -30,7 +30,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password |
    | `ARRUMO_CRASH_DSN` | The Sentry project DSN |
    | `ARRUMO_USAGE_KEY` | The Aptabase app key |
-   | `ARRUMO_REPOS_TOKEN` | A fine-grained token with read access to the plugin and registry repositories. Remove it once they are public. |
+   | `ARRUMO_REPOS_TOKEN` | Only while the plugin and registry repositories are private: a fine-grained token with read access to them. Not needed once they are public. |
    | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` | The Developer ID Application certificate (base64 `.p12`), its password and its identity name |
    | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | For notarization; `APPLE_PASSWORD` is an app-specific password |
    | `RELEASE_DEPLOY_KEY` | The private half of a deploy key with write access (see below). Needed once the repository is public |
