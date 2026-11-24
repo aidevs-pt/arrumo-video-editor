@@ -25,7 +25,7 @@ pub(crate) fn burn_captions(
         .parent()
         .ok_or_else(|| io::Error::other("The captioned copy needs a directory"))?;
     std::fs::write(directory.join("captions.srt"), subtitles)?;
-    let status = std::process::Command::new(crate::media_tools::ffmpeg())
+    let status = crate::quiet_command(crate::media_tools::ffmpeg())
         .args([
             "-nostdin",
             "-v",

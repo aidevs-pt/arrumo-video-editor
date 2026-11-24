@@ -282,7 +282,7 @@ pub(crate) fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::R
         }
     };
     let selector = if kind == "audio" { "a:0" } else { "V:0" };
-    let mut probe = Command::new(crate::media_tools::ffprobe());
+    let mut probe = crate::quiet_command(crate::media_tools::ffprobe());
     probe
         .args([
             "-v",
@@ -346,8 +346,11 @@ mod tests {
 
     #[test]
     fn stops_an_unresponsive_motion_probe() {
-        let error =
-            run_probe(Command::new("sleep").arg("10"), Duration::from_millis(20)).unwrap_err();
+        let error = run_probe(
+            crate::quiet_command("sleep").arg("10"),
+            Duration::from_millis(20),
+        )
+        .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::TimedOut);
     }
 }

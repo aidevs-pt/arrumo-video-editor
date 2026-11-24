@@ -3,7 +3,6 @@ use std::{
     fs,
     io::{self, Read},
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
@@ -223,7 +222,7 @@ fn probe(
             "Missing or empty delivery file: {filename}"
         )));
     }
-    let output = Command::new(crate::media_tools::ffprobe())
+    let output = crate::quiet_command(crate::media_tools::ffprobe())
         .args([
             "-v",
             "error",
@@ -572,7 +571,7 @@ impl WorkspaceStore {
         }
         let job = tempfile::tempdir()?;
         let wave = job.path().join("delivery.wav");
-        let status = Command::new(crate::media_tools::ffmpeg())
+        let status = crate::quiet_command(crate::media_tools::ffmpeg())
             .args([
                 "-nostdin",
                 "-v",
@@ -746,7 +745,7 @@ mod transcription_tests {
         let directory = delivery_directory(&database, workspace, run.id);
         fs::create_dir_all(&directory).unwrap();
         let video = directory.join("5.mp4");
-        let status = Command::new(crate::media_tools::ffmpeg())
+        let status = crate::quiet_command(crate::media_tools::ffmpeg())
             .args([
                 "-nostdin",
                 "-v",

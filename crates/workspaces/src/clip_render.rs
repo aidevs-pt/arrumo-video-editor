@@ -1185,7 +1185,7 @@ impl ActiveRender<'_> {
     /// the gain is linear. A silent or nearly silent video is moved unchanged.
     fn master_audio(&self, input: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
         let measured = self.run_output(
-            Command::new(crate::media_tools::ffmpeg())
+            crate::quiet_command(crate::media_tools::ffmpeg())
                 .args(["-nostdin", "-hide_banner", "-nostats", "-v", "info"])
                 .args(["-protocol_whitelist", "file", "-i"])
                 .arg(input)
@@ -1199,7 +1199,7 @@ impl ActiveRender<'_> {
             return Ok(());
         };
         self.run(
-            Command::new(crate::media_tools::ffmpeg())
+            crate::quiet_command(crate::media_tools::ffmpeg())
                 .args([
                     "-nostdin",
                     "-v",
@@ -1226,7 +1226,7 @@ impl ActiveRender<'_> {
         cut: Option<&PreviewCut>,
     ) -> Result<bool, Box<dyn Error>> {
         self.confirm_lease()?;
-        let output = Command::new(crate::media_tools::ffprobe())
+        let output = crate::quiet_command(crate::media_tools::ffprobe())
             .args([
                 "-v",
                 "error",
@@ -1324,7 +1324,7 @@ impl ActiveRender<'_> {
         for (index, clip) in clips.iter().enumerate() {
             insert(index, &mut manifest, &mut parts)?;
             let filename = format!("clip-{id}-{index}.mp4");
-            let mut command = Command::new(crate::media_tools::ffmpeg());
+            let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
             command.args([
                 "-nostdin",
                 "-v",
@@ -1412,7 +1412,7 @@ impl ActiveRender<'_> {
         insert(clips.len(), &mut manifest, &mut parts)?;
         let list = scratch.join(format!("{id}.ffconcat"));
         fs::write(&list, manifest)?;
-        let mut command = Command::new(crate::media_tools::ffmpeg());
+        let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
         command
             .args([
                 "-nostdin",
@@ -1454,7 +1454,7 @@ impl ActiveRender<'_> {
     /// crossfade. Each track is levelled on its own so the changes keep one loudness.
     fn trim_silence(&self, track: &Path, output: &Path) -> Result<(), Box<dyn Error>> {
         self.run(
-            Command::new(crate::media_tools::ffmpeg())
+            crate::quiet_command(crate::media_tools::ffmpeg())
                 .args([
                     "-nostdin",
                     "-v",
@@ -1482,7 +1482,7 @@ impl ActiveRender<'_> {
         let length = probe_duration(input)?;
         let fade_at = (length - 1.5).max(0.0);
         let stereo = "aformat=sample_rates=48000:channel_layouts=stereo";
-        let mut command = Command::new(crate::media_tools::ffmpeg());
+        let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
         command
             .args([
                 "-nostdin",
@@ -1557,7 +1557,7 @@ impl ActiveRender<'_> {
 }
 
 fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
-    let output = Command::new(crate::media_tools::ffprobe())
+    let output = crate::quiet_command(crate::media_tools::ffprobe())
         .args(["-v", "error", "-protocol_whitelist", "file"])
         .args(["-show_entries", "format=duration", "-of", "csv=p=0"])
         .arg(path)
@@ -1574,7 +1574,7 @@ fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
 mod tests {
     #[test]
     fn music_loses_the_silence_at_both_ends() {
-        if std::process::Command::new(crate::media_tools::ffmpeg())
+        if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
             .output()
             .is_err()
@@ -1583,7 +1583,7 @@ mod tests {
         }
         let directory = tempfile::tempdir().unwrap();
         let output = directory.path().join("trimmed.wav");
-        let made = std::process::Command::new(crate::media_tools::ffmpeg())
+        let made = crate::quiet_command(crate::media_tools::ffmpeg())
             .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
             .arg("anullsrc=r=48000:cl=stereo:d=1[a];sine=f=440:d=2,aformat=channel_layouts=stereo[b];anullsrc=r=48000:cl=stereo:d=1.5[c];[a][b][c]concat=n=3:v=0:a=1")
             .arg("-af")
@@ -1598,7 +1598,7 @@ mod tests {
 
     #[test]
     fn music_changes_crossfade_at_their_scenes() {
-        if std::process::Command::new(crate::media_tools::ffmpeg())
+        if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
             .output()
             .is_err()
@@ -1619,7 +1619,7 @@ mod tests {
         .to_vec();
         for frequency in [220, 440, 880] {
             let path = directory.path().join(format!("{frequency}.wav"));
-            let made = std::process::Command::new(crate::media_tools::ffmpeg())
+            let made = crate::quiet_command(crate::media_tools::ffmpeg())
                 .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
                 .arg(format!("sine=f={frequency}:d=2"))
                 .arg(&path)
@@ -1647,7 +1647,7 @@ mod tests {
             output.to_string_lossy().into(),
         ]);
         assert!(
-            std::process::Command::new(crate::media_tools::ffmpeg())
+            crate::quiet_command(crate::media_tools::ffmpeg())
                 .args(&args)
                 .status()
                 .unwrap()
@@ -1657,7 +1657,7 @@ mod tests {
         assert!((seconds - 9.0).abs() < 0.05, "{seconds}");
         // Each track is heard in its own stretch.
         let pitch_at = |from: f64| {
-            let report = std::process::Command::new(crate::media_tools::ffmpeg())
+            let report = crate::quiet_command(crate::media_tools::ffmpeg())
                 .args([
                     "-nostdin",
                     "-v",
