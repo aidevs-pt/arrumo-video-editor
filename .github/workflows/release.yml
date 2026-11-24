@@ -51,7 +51,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
           PREVIEW: ${{ inputs.preview }}
-          WINDOWS_SIGNED: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' }}
+          WINDOWS_SIGNED: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && vars.AZURE_ARTIFACT_SIGNING_PROFILE != '' && secrets.AZURE_CLIENT_ID != '' }}
           MACOS_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
         run: |
           title="Arrumo $VERSION"; flags=""
@@ -125,8 +125,13 @@ jobs:
           ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
           ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
           PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         run: |
-          if [ -z "$ACCOUNT" ]; then echo '{}' > windows-signing.json; exit 0; fi
+          # Signing needs the account, its certificate profile and the app registration's login.
+          if [ -z "$ACCOUNT" ] || [ -z "$PROFILE" ] || [ -z "$CLIENT_ID" ]; then
+            echo '{}' > windows-signing.json
+            exit 0
+          fi
           cargo install --locked artifact-signing-cli@0.12.0
           jq -n --arg e "$ENDPOINT" --arg a "$ACCOUNT" --arg c "$PROFILE" \
             '{bundle: {windows: {signCommand: {cmd: "artifact-signing-cli",
