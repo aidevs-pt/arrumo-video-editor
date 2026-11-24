@@ -23,6 +23,9 @@
     </pattern>
     <linearGradient id="fadeR" x1="0" x2="1"><stop offset=".45" stop-color="#2337b4"/><stop offset="1" stop-color="#2337b4" stop-opacity="0"/></linearGradient>
     <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2337b4" stop-opacity=".09"/><stop offset="1" stop-color="#2337b4" stop-opacity="0"/></radialGradient>
+    <marker id="head" viewBox="0 0 20 20" refX="7" refY="10" markerWidth="22" markerHeight="22" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M3 3 L17 10 L3 17 Z" fill="#2337b4" stroke="#2337b4" stroke-width="3" stroke-linejoin="round"/>
+    </marker>
   </defs>
   <rect width="660" height="84" fill="#2337b4"/>
   <rect width="660" height="84" fill="url(#az)"/>
@@ -32,8 +35,7 @@
   <rect y="84" width="660" height="4" fill="#f2c230"/>
   <circle cx="180" cy="182" r="96" fill="url(#glow)"/>
   <circle cx="480" cy="182" r="96" fill="url(#glow)"/>
-  <path d="M262 176 C 312 140, 352 140, 396 170" fill="none" stroke="#2337b4" stroke-width="7" stroke-linecap="round"/>
-  <path d="M384 152 L 404 176 L 377 183" fill="none" stroke="#2337b4" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M266 180 C 296 140, 350 132, 388 158" fill="none" stroke="#2337b4" stroke-width="6" stroke-linecap="round" marker-end="url(#head)"/>
   <text class="hint" x="330" y="322" text-anchor="middle">Drag Arrumo into Applications to install it</text>
   <text class="small" x="330" y="344" text-anchor="middle">Then open it from Launchpad or your Applications folder.</text>
   <g transform="translate(0 372)">
