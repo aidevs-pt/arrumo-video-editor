@@ -115,7 +115,7 @@ The code follows domain boundaries: `crates/workspaces` holds the business rules
 
 ## Contributing
 
-Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md). Report security problems privately as described in [SECURITY.md](SECURITY.md).
+See the [roadmap](ROADMAP.md) for what comes next. Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md). Report security problems privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
