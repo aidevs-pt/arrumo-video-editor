@@ -78,6 +78,14 @@ Missing signing credentials don't stop a release:
 
 When either platform is unsigned, the release notes start with these steps (`scripts/unsigned-notes.mjs`). Updates are verified with the updater key either way, so copies installed from an unsigned build update normally to the next signed one. Once the certificates arrive, add the secrets and publish the next version; earlier releases don't need re-signing.
 
+## When a platform fails to build
+
+The other platforms still upload to the draft, and nothing is published. Fix the cause on `main`, then run **Actions › Release** again with **Resume** set to the draft's version, such as `0.1.0`, and **Platforms** set to the one that failed. It rebuilds only that platform from the existing tag, keeps the draft's notes and preview setting, adds its files to the update manifest and publishes once every platform is in it. The workflow comes from `main`, so a fix to the workflow applies; a fix to the app's code needs a new version instead.
+
+## CI
+
+Rust and Desktop run on pull requests and on `main`, not on pull request branches or tags. Each starts with a gate that skips the build when only documentation changed, or when a pull request already verified the exact code `main` now has (a squash merge of an up-to-date pull request). The checks still report, so required checks pass. Run either workflow by hand to force a full build.
+
 ## When a release breaks
 
 Publish a fixed release as usual. Arrumo marks each launch before anything else runs, and removes the mark once the interface has stayed up for 30 seconds, or on a normal quit after the interface appeared. If a launch fails before then, the next one checks for an update before opening any data, and installs it without asking (waiting up to 90 seconds), so a release that crashes on start can still be replaced.
