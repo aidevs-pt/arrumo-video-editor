@@ -60,7 +60,7 @@ function rustPackages() {
 }
 
 function npmPackages() {
-  const listed = JSON.parse(execFileSync("pnpm", ["licenses", "list", "--prod", "--json"], { encoding: "utf8", maxBuffer: 1 << 28 }));
+  const listed = JSON.parse(execFileSync("pnpm", ["licenses", "list", "--prod", "--json"], { encoding: "utf8", maxBuffer: 1 << 28, shell: process.platform === "win32" }));
   return Object.values(listed)
     .flat()
     .filter((pkg) => !buildOnly.test(pkg.name))
