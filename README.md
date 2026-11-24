@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://www.aidevs.pt/tools/arrumo"><b>Download</b></a> ·
-  <a href="https://www.aidevs.pt/tools/arrumo/docs/user/tutorial">Tutorial</a> ·
+  <a href="https://www.aidevs.pt/tools/arrumo/docs/user/tutorials/website-to-video">Tutorial</a> ·
   <a href="https://www.aidevs.pt/tools/arrumo/docs">Documentation</a> ·
   <a href="https://www.aidevs.pt/tools/arrumo/docs/developer">Developers</a> ·
   <a href="https://github.com/aidevs-pt/arrumo-plugin-registry">Plugins</a>
@@ -59,7 +59,7 @@ Most AI video tools give you a clip and hope you like it. Arrumo works like an e
 
 1. [Download Arrumo](https://www.aidevs.pt/tools/arrumo) for Windows, macOS or Linux. It updates itself and asks before installing a new version.
 2. Install and sign in to [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://learn.chatgpt.com/docs/codex/cli).
-3. Follow the [tutorial](https://www.aidevs.pt/tools/arrumo/docs/user/tutorial): from your website to a finished video, one screen at a time ([Español](https://www.aidevs.pt/es/tools/arrumo/docs/user/tutorial) · [Português](https://www.aidevs.pt/pt/tools/arrumo/docs/user/tutorial)).
+3. Follow the [tutorial](https://www.aidevs.pt/tools/arrumo/docs/user/tutorials/website-to-video): from your website to a finished video, one screen at a time ([Español](https://www.aidevs.pt/es/tools/arrumo/docs/user/tutorials/website-to-video) · [Português](https://www.aidevs.pt/pt/tools/arrumo/docs/user/tutorials/website-to-video)).
 
 ## Drive it from your agent
 
@@ -86,7 +86,7 @@ Agents and media providers are plugins built with the [Plugin SDK](https://githu
 
 | | English | Español | Português |
 | --- | --- | --- | --- |
-| Tutorial | [Read](https://www.aidevs.pt/tools/arrumo/docs/user/tutorial) | [Leer](https://www.aidevs.pt/es/tools/arrumo/docs/user/tutorial) | [Ler](https://www.aidevs.pt/pt/tools/arrumo/docs/user/tutorial) |
+| Tutorial | [Read](https://www.aidevs.pt/tools/arrumo/docs/user/tutorials/website-to-video) | [Leer](https://www.aidevs.pt/es/tools/arrumo/docs/user/tutorials/website-to-video) | [Ler](https://www.aidevs.pt/pt/tools/arrumo/docs/user/tutorials/website-to-video) |
 | Use Arrumo | [Read](https://www.aidevs.pt/tools/arrumo/docs/user) | [Leer](https://www.aidevs.pt/es/tools/arrumo/docs/user) | [Ler](https://www.aidevs.pt/pt/tools/arrumo/docs/user) |
 | Build on Arrumo | [Read](https://www.aidevs.pt/tools/arrumo/docs/developer) | [Leer](https://www.aidevs.pt/es/tools/arrumo/docs/developer) | [Ler](https://www.aidevs.pt/pt/tools/arrumo/docs/developer) |
 | Official plugins | [Read](https://www.aidevs.pt/tools/arrumo/docs/plugins) | [Leer](https://www.aidevs.pt/es/tools/arrumo/docs/plugins) | [Ler](https://www.aidevs.pt/pt/tools/arrumo/docs/plugins) |
