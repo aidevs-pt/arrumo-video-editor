@@ -612,7 +612,9 @@
       "modelNeedsImages": "O {model} precisa de pelo menos {count} imagens de referência. Escolhe-as ou carrega-as.",
       "modelNeedsVideo": "O {model} precisa de um vídeo de referência. Escolhe ou carrega um.",
       "modelNeedsVideoAndImages": "O {model} precisa de um vídeo de referência e de pelo menos {count} imagens. Escolhe-os ou carrega-os.",
-      "orChoose": "Ou escolhe {models}."
+      "orChoose": "Ou escolhe {models}.",
+      "chooseReferences": "Escolher da biblioteca",
+      "removeReference": "Remover {name}"
     }
   },
   "delivery": {
@@ -683,7 +685,11 @@
     "summarySize": "Tamanho",
     "summaryTitles": "Títulos, descrições",
     "summaryHint": "Junta a app, o espaço de trabalho e este perfil. Podes mudar qualquer coisa em cada vídeo.",
-    "caption_style": "Estilo das legendas"
+    "caption_style": "Estilo das legendas",
+    "chooseReferences": "Escolher imagens",
+    "noReferencesChosen": "Ainda não há nenhuma escolhida.",
+    "removeReference": "Remover {name}",
+    "referencesPickerHint": "As miniaturas seguem o estilo destas imagens: composição, tratamento do texto, rostos e cores."
   },
   "drafts": {
     "deleteDraft": "Eliminar rascunho",
@@ -1027,7 +1033,7 @@
   },
   "brandImages": {
     "manage": "Da biblioteca",
-    "manageHint": "As alterações são guardadas ao selecionar ou desmarcar uma imagem.",
+    "manageHint": "Escolhe as imagens pelo seu aspeto e pelo que diz a descrição. Nada muda até usares a seleção.",
     "noAssignments": "Ainda nada. Carrega imagens ou escolhe-as da biblioteca.",
     "title": "Imagens da marca",
     "identity": "Recursos da marca",
@@ -1114,11 +1120,6 @@
     "importVariantError": "Não foi possível importar este MP4. Escolhe um vídeo com áudio que corresponda à resolução e à duração da saída selecionada.",
     "attachFile": "Anexar ficheiro",
     "attachFileDescription": "Escolhe um recurso do espaço de trabalho para incluir em {format}.",
-    "attachNoAssets": "Não há recursos disponíveis. Importa primeiro um ficheiro em Recursos.",
-    "attachAssetLabel": "Recurso do espaço de trabalho",
-    "attachAssetPlaceholder": "Escolhe um recurso",
-    "attachLoadError": "Não foi possível carregar os recursos.",
-    "attachSaveError": "Não foi possível anexar o ficheiro. Confirma que ainda está disponível em Recursos.",
     "detachAttachment": "Remover ficheiro",
     "detachAttachmentTitle": "Remover {name}?",
     "detachAttachmentDescription": "O ficheiro será removido desta entrega e do respetivo ZIP. Continuará nos recursos do espaço de trabalho.",
@@ -1958,5 +1959,17 @@
     "search": "Pesquisar por nome ou licença",
     "project": "Página do projeto",
     "noText": "Este pacote não inclui ficheiro de licença; é distribuído com a licença indicada acima."
+  },
+  "assetPicker": {
+    "allGroups": "Todos os grupos",
+    "upload": "Carregar",
+    "loadError": "Não foi possível carregar a biblioteca.",
+    "retry": "Tentar novamente",
+    "loading": "A carregar a biblioteca",
+    "empty": "Ainda não há nada para escolher aqui. Carrega um ficheiro para o adicionar à biblioteca.",
+    "saveError": "Não foi possível guardar. Tenta novamente.",
+    "cancel": "Cancelar",
+    "choose": "Usar seleção",
+    "limit": "até {count} {kind}"
   }
 }

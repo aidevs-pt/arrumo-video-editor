@@ -9,11 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Images, TriangleAlert, Upload, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import Link from "next/link";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AssetPicker } from "../assets/asset-picker";
 import { AssetThumbnail } from "../assets/asset-thumbnail";
 import { workspaceHref } from "../home/workspace-links";
 
@@ -67,6 +64,19 @@ export function WorkspaceBrandImages({ workspaceId }: {
     } finally {
       setPending(false);
     }
+  }
+
+  /** Assigns the picked images to the role and lets go of the ones no longer picked. */
+  async function choose(role: Role, ids: number[]) {
+    setSaveError(false);
+    const current = associations.filter((entry) => entry.role === role).map((entry) => entry.asset_id);
+    for (const assetId of ids.filter((id) => !current.includes(id))) {
+      await invoke("attach_brand_asset", { workspaceId, assetId, role });
+    }
+    for (const assetId of current.filter((id) => !ids.includes(id))) {
+      await invoke("detach_brand_asset", { workspaceId, assetId, role });
+    }
+    setAssociations((existing) => [...existing.filter((entry) => entry.role !== role), ...ids.map((asset_id) => ({ asset_id, role }))]);
   }
 
   async function upload(role: Role) {
@@ -125,6 +135,7 @@ export function WorkspaceBrandImages({ workspaceId }: {
   return (
     <div className="mt-12 flex flex-col gap-12" aria-busy={pending}>
       {uploadError && <Alert variant="destructive"><AlertDescription>{copy.uploadError}</AlertDescription></Alert>}
+      {saveError && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
       {loadError ? (
         <Alert variant="destructive">
           <AlertDescription>{copy.loadError}</AlertDescription>
@@ -174,27 +185,9 @@ export function WorkspaceBrandImages({ workspaceId }: {
           </ul> : empty}
         </section>
       </>}
-      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open && !pending) setEditing(null); }}>
-        {editing && <DialogContent showCloseButton={!pending}>
-          <DialogHeader><DialogTitle>{copy[editing]}</DialogTitle><DialogDescription>{copy.manageHint}</DialogDescription></DialogHeader>
-          <ScrollArea className="max-h-64">
-            <div className="flex flex-col gap-2 p-1">
-              {images?.map((image) => {
-                const id = `brand-${editing}-${image.id}`;
-                return (
-                  <Field key={image.id} orientation="horizontal" className="rounded-lg border p-2">
-                    <Checkbox id={id} disabled={pending}
-                      checked={associations.some((entry) => entry.asset_id === image.id && entry.role === editing)}
-                      onCheckedChange={(checked) => void assign(image.id, editing, checked === true)} />
-                    <FieldLabel htmlFor={id} className="wrap-anywhere">{image.name}</FieldLabel>
-                  </Field>
-                );
-              })}
-            </div>
-          </ScrollArea>
-          {saveError && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
-        </DialogContent>}
-      </Dialog>
+      <AssetPicker workspaceId={workspaceId} open={editing !== null} onOpenChange={(next) => { if (!next) setEditing(null); }}
+        title={editing ? copy[editing] : ""} description={copy.manageHint} kinds={["image"]} multiple
+        value={editing ? assigned(editing).map(({ id }) => id) : []} onConfirm={(ids) => editing ? choose(editing, ids) : undefined} />
     </div>
   );
 }
