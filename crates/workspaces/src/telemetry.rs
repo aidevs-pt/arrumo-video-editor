@@ -426,6 +426,28 @@ mod tests {
     }
 
     #[test]
+    fn an_update_is_not_counted_as_an_install() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("workspaces.sqlite");
+        WorkspaceStore::open(&path)
+            .unwrap()
+            .0
+            .execute_batch(
+                "ALTER TABLE privacy_settings DROP COLUMN install_reported;
+                 PRAGMA user_version = 68;",
+            )
+            .unwrap();
+        let store = WorkspaceStore::open(&path).unwrap();
+        let reported: bool = store
+            .0
+            .query_row("SELECT install_reported FROM privacy_settings", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert!(reported);
+    }
+
+    #[test]
     fn requests_carry_no_paths_or_content() {
         assert_eq!(
             redact("could not open /home/ana/Videos/secret.mp4 for ana@example.com\nmore"),
