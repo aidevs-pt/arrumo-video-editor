@@ -14,8 +14,8 @@ ideas are all welcome. You can write in English, Spanish or Portuguese.
 
 ## Develop
 
-Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node and the
-pnpm version in `package.json`. Clone this repository next to
+Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node, the
+pnpm version in `package.json`, and FFmpeg with ffprobe on your PATH. Clone this repository next to
 [`arrumo-plugin-registry`](https://github.com/aidevs-pt/arrumo-plugin-registry) and the
 default plugins under `plugins/<id>`, or set `ARRUMO_CORE_ONLY=1` to build without them.
 

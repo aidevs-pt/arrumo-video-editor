@@ -100,6 +100,32 @@ jobs:
             gh repo clone "${repository#https://github.com/}" "plugins/$id" -- --depth 1 --branch "v$tag"
             gh release download "v$tag" --repo "${repository#https://github.com/}" --pattern "*.zip" --output "plugin-releases/$id.zip"
           done
+      # FFmpeg and ffprobe ship inside the app as arrumo-ffmpeg and arrumo-ffprobe, from the
+      # release and checksums pinned in src-tauri/media-tools.txt.
+      - name: Fetch the media tools
+        shell: bash
+        working-directory: video-editor/src-tauri
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$RUNNER_OS" in
+            Linux) asset=linux-x64 triple=x86_64-unknown-linux-gnu exe="" ;;
+            Windows) asset=windows-x64 triple=x86_64-pc-windows-msvc exe=.exe ;;
+            macOS) asset=macos-universal triple=universal-apple-darwin exe="" ;;
+          esac
+          release=$(awk '$1 == "release" { print $2 }' media-tools.txt)
+          file=$(awk -v a="$asset" '$1 == a { print $2 }' media-tools.txt)
+          sha=$(awk -v a="$asset" '$1 == a { print $3 }' media-tools.txt)
+          gh release download "$release" --repo aidevs-pt/ffmpeg-builds --pattern "$file" --dir "$RUNNER_TEMP"
+          echo "$sha  $RUNNER_TEMP/$file" | sha256sum -c - 2>/dev/null || echo "$sha  $RUNNER_TEMP/$file" | shasum -a 256 -c -
+          mkdir -p binaries media-tools
+          unzip -q "$RUNNER_TEMP/$file" -d media-tools
+          for tool in ffmpeg ffprobe; do
+            mv "media-tools/$tool$exe" "binaries/arrumo-$tool-$triple$exe"
+            chmod +x "binaries/arrumo-$tool-$triple$exe"
+          done
+          jq -n '{bundle: {externalBin: ["binaries/arrumo-ffmpeg", "binaries/arrumo-ffprobe"],
+            resources: {"media-tools/": "media-tools/"}}}' > ../media-tools.json
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: video-editor/package.json
@@ -182,7 +208,7 @@ jobs:
           releaseDraft: true
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
-          args: ${{ matrix.args }} --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
+          args: ${{ matrix.args }} --config media-tools.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
 
   publish:
     needs: [prepare, build]

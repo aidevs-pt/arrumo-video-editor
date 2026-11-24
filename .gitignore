@@ -15,3 +15,8 @@
 *.sqlite.deliveries/
 
 /src-tauri/motion-worker/
+
+# Bundled FFmpeg, fetched by the release workflow
+/src-tauri/binaries/
+/src-tauri/media-tools/
+/media-tools.json

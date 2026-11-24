@@ -102,7 +102,7 @@ The docs source lives in [arrumo-docs](https://github.com/aidevs-pt/arrumo-docs)
 
 ## Develop
 
-Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node, and the pnpm version in `package.json`.
+Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node, the pnpm version in `package.json`, and FFmpeg with ffprobe on your PATH. Installers bring their own FFmpeg, from [aidevs-pt/ffmpeg-builds](https://github.com/aidevs-pt/ffmpeg-builds); development builds use yours.
 
 ```sh
 pnpm install --frozen-lockfile
