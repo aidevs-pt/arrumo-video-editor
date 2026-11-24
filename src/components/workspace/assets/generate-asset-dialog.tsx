@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFiles } from "@tauri-apps/plugin-dialog";
-import { AudioLines, Check, Clapperboard, ImageIcon, Info, Music, Sparkles, Upload, Volume2 } from "lucide-react";
+import { AudioLines, Clapperboard, ImageIcon, Images, Info, Music, Sparkles, Upload, Volume2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,8 +15,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
 import { usePluginText } from "@/lib/plugin-text";
-import { cn } from "@/lib/utils";
 
+import { AssetPicker } from "./asset-picker";
 import { AssetThumbnail } from "./asset-thumbnail";
 
 type Provider = { id: string; name: string };
@@ -100,6 +100,7 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
   const [problem, setProblem] = useState<string>();
   const [library, setLibrary] = useState<LibraryAsset[]>([]);
   const [references, setReferences] = useState<number[]>([]);
+  const [picking, setPicking] = useState(false);
   const [models, setModels] = useState<VideoModel[]>([]);
   const [imageModels, setImageModels] = useState<ImageModel[]>([]);
   const [speechModels, setSpeechModels] = useState<SpeechModel[]>([]);
@@ -309,18 +310,25 @@ export function GenerateAssetDialog({ workspaceId, disabled, onCreated, imagesOn
                 <Upload data-icon="inline-start" />{uploading ? copy.uploading : copy.uploadReferences}
               </Button>
             </div>
-            {choices.length ? <div role="group" aria-labelledby="generate-references" className="scroll-fade grid max-h-44 grid-cols-4 gap-2 overflow-y-auto p-0.5 sm:grid-cols-5">
-              {choices.map((asset) => {
-                const selected = chosen.includes(asset.id);
-                return <button key={asset.id} type="button" aria-pressed={selected} disabled={pending} title={asset.name} onClick={() => toggleReference(asset)}
-                  className="group/reference relative rounded-thumb text-left outline-none">
-                  <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind}
-                    className={cn("aspect-square [&>img]:object-contain group-focus-visible/reference:ring-3 group-focus-visible/reference:ring-ring/50", selected && "ring-2 ring-primary")} />
-                  <span className="mt-1 block truncate text-xs text-muted-foreground">{asset.name}</span>
-                  {selected && <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3.5" aria-hidden="true" /></span>}
-                </button>;
+            {chosen.length > 0 && <ul aria-labelledby="generate-references" className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2">
+              {chosen.map((id) => {
+                const asset = library.find((entry) => entry.id === id);
+                return asset && <li key={id} className="relative min-w-0">
+                  <AssetThumbnail workspaceId={workspaceId} assetId={asset.id} kind={asset.kind} fit="contain" transparency={asset.kind === "image"} className="aspect-square w-full" />
+                  <span className="mt-1 block truncate text-xs text-muted-foreground" title={asset.name}>{asset.name}</span>
+                  <Button type="button" variant="secondary" size="icon-xs" className="absolute end-1 top-1" disabled={pending}
+                    aria-label={copy.removeReference.replace("{name}", asset.name)} onClick={() => toggleReference(asset)}><X /></Button>
+                </li>;
               })}
-            </div> : <p className="text-sm text-muted-foreground">{copy.referencesNoneUpload}</p>}
+            </ul>}
+            {choices.length ? <Button type="button" variant="outline" size="sm" className="w-fit" disabled={pending} onClick={() => setPicking(true)}>
+              <Images data-icon="inline-start" />{copy.chooseReferences}
+            </Button> : <p className="text-sm text-muted-foreground">{copy.referencesNoneUpload}</p>}
+            <AssetPicker workspaceId={workspaceId} open={picking} onOpenChange={setPicking} title={copy.references}
+              description={kind === "video" ? copy.referencesVideoHint : copy.referencesImageHint}
+              kinds={kind === "video" ? ["image", "video"] : ["image"]} multiple value={chosen}
+              limits={{ image: MAX_IMAGE_REFERENCES, video: MAX_VIDEO_REFERENCES }}
+              onConfirm={(ids) => { setProblem(undefined); setReferences(ids); }} />
           </Field>}
           {unfit && activeModel && <Alert role="status"><Info /><AlertDescription>{(needs ? (fitting.length ? `${needsText} ${copy.orChoose}` : needsText) : fitting.length ? copy.modelCantTake : copy.noModelTakes)
             .replace("{model}", modelName(activeModel.id)).replace("{models}", new Intl.ListFormat(locale, { type: "disjunction" }).format(fitting.map((entry) => modelName(entry.id))))}</AlertDescription></Alert>}

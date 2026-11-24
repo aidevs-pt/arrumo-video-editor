@@ -617,7 +617,9 @@
       "modelNeedsImages": "{model} needs at least {count} reference images. Pick or upload them.",
       "modelNeedsVideo": "{model} needs a reference video. Pick or upload one.",
       "modelNeedsVideoAndImages": "{model} needs a reference video and at least {count} images. Pick or upload them.",
-      "orChoose": "Or choose {models}."
+      "orChoose": "Or choose {models}.",
+      "chooseReferences": "Choose from the library",
+      "removeReference": "Remove {name}"
     },
     "bulkRemoval": {
       "deleteTitle": "Remove {count} assets",
@@ -699,7 +701,11 @@
     "summarySize": "Size",
     "summaryTitles": "Titles, descriptions",
     "summaryHint": "Merged from App, Workspace and this profile. You can still change any of it per video.",
-    "caption_style": "Subtitle style"
+    "caption_style": "Subtitle style",
+    "chooseReferences": "Choose images",
+    "noReferencesChosen": "None chosen yet.",
+    "removeReference": "Remove {name}",
+    "referencesPickerHint": "Thumbnails follow the style of these images: layout, text treatment, faces and colours."
   },
   "drafts": {
     "deleteDraft": "Delete draft",
@@ -1043,7 +1049,7 @@
   },
   "brandImages": {
     "manage": "From library",
-    "manageHint": "Changes are saved when you select or clear an image.",
+    "manageHint": "Pick the images by how they look and what their description says. Nothing changes until you use the selection.",
     "noAssignments": "Nothing here yet. Upload images or pick them from the library.",
     "title": "Brand images",
     "identity": "Brand assets",
@@ -1130,11 +1136,6 @@
     "importVariantError": "Could not import this MP4. Choose a video with audio that matches the selected output’s resolution and duration.",
     "attachFile": "Attach file",
     "attachFileDescription": "Choose a workspace asset to include with {format}.",
-    "attachNoAssets": "There are no available assets. Import a file in workspace Assets first.",
-    "attachAssetLabel": "Workspace asset",
-    "attachAssetPlaceholder": "Choose an asset",
-    "attachLoadError": "Could not load workspace assets.",
-    "attachSaveError": "Could not attach the file. Check that it is still available in Assets.",
     "detachAttachment": "Detach file",
     "detachAttachmentTitle": "Detach {name}?",
     "detachAttachmentDescription": "The file will leave this delivery and its ZIP export. It will stay in workspace Assets.",
@@ -1992,5 +1993,17 @@
     "search": "Search by name or license",
     "project": "Project page",
     "noText": "This package ships no license file; it's distributed under the license named above."
+  },
+  "assetPicker": {
+    "allGroups": "All groups",
+    "upload": "Upload",
+    "loadError": "The library could not be loaded.",
+    "retry": "Try again",
+    "loading": "Loading the library",
+    "empty": "There is nothing to pick here yet. Upload a file to add it to the library.",
+    "saveError": "That could not be saved. Try again.",
+    "cancel": "Cancel",
+    "choose": "Use selected",
+    "limit": "up to {count} {kind}"
   }
 }
