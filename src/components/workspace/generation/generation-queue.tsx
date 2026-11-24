@@ -192,7 +192,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
         )}
         {runs && (catalogView || !selected) ? (
           <Tabs defaultValue="all" className="min-w-0 gap-4">
-            <TabsList variant="line" className="max-w-full justify-start scroll-fade-x overflow-x-auto" aria-label={copy.filterRuns}>
+            <TabsList variant="line" className="max-w-full justify-start scroll-fade-x overflow-x-auto overflow-y-hidden group-data-horizontal/tabs:h-10 pb-2" aria-label={copy.filterRuns}>
               {groups.map(({ id, label, runs: group }) => (
                 <TabsTrigger value={id} key={id}>{label} <span className="tabular-nums text-muted-foreground">{group.length}</span></TabsTrigger>
               ))}

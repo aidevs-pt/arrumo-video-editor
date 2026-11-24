@@ -15,6 +15,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { TagInput } from "@/components/ui/tag-input";
 import { cn } from "@/lib/utils";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
+import { type AssetRemoval, removalOutcome } from "./asset-removal";
 import { AssetPlayer, AssetThumbnail } from "./asset-thumbnail";
 import { AudioTransformDialog, type AudioTransformProvider } from "./audio-transform-dialog";
 import { DubDialog, type DubbingProvider } from "./dub-dialog";
@@ -35,7 +36,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   onRemoved: (id: number) => void;
   onCreated: (id: number) => void;
 }) {
-  const { messages } = useLocale();
+  const { locale, messages } = useLocale();
   const copy = messages.assetLibrary;
   const single = assets.length === 1 ? assets[0] : null;
   const [notes, setNotes] = useState(single?.notes ?? "");
@@ -209,7 +210,9 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
         {hasSound && dubbing[0] && <DubDialog workspaceId={workspaceId} assetId={single.id} assetName={single.name}
           offer={dubbing[0]} disabled={busy} onCreated={onCreated} />}
         <ConfirmTitleDelete title={single.name} size="sm" disabled={busy} copy={messages.assets.removal}
-          onConfirm={(confirmedName) => invoke<boolean>("remove_asset", { workspaceId, assetId: single.id, confirmedName })}
+          onConfirm={async (confirmedName) => removalOutcome(
+            await invoke<AssetRemoval>("remove_asset", { workspaceId, assetId: single.id, confirmedName }),
+            messages.assets.removal, locale)}
           onDelete={() => onRemoved(single.id)} />
       </div>}
     </aside>

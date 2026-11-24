@@ -4,7 +4,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceColumns, WorkspaceForm, WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, FileText, Film, Lock, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, Film, Lock, Pencil, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
@@ -393,9 +393,8 @@ export function FormatDelivery({
               const on = group.fields.some(overridden);
               return (
                 <section key={group.key} aria-labelledby={`group-${group.key}-${format.id}`} className="rounded-xl border bg-card p-4 sm:p-5">
+                  {/* A switch here read as turning the output off; inherited values stay shown below. */}
                   <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <Switch id={`override-${group.key}-${format.id}`} checked={on} aria-label={`${copy.override}, ${group.title}`}
-                      onCheckedChange={(checked) => setGroup(group.fields, checked)} />
                     <h3 id={`group-${group.key}-${format.id}`} className="min-w-0 flex-1 font-semibold">{group.title}</h3>
                     {on ? <>
                       <span className="rounded-md bg-attention px-2 py-1 text-xs font-semibold text-ink">
@@ -404,7 +403,13 @@ export function FormatDelivery({
                       <Button type="button" size="sm" variant="outline" onClick={() => setGroup(group.fields, false)}>
                         <RotateCcw data-icon="inline-start" />{copy.reset}
                       </Button>
-                    </> : <LayerGauge layer="workspace" />}
+                    </> : <>
+                      <LayerGauge layer="workspace" />
+                      <Button type="button" size="sm" variant="outline" aria-label={`${copy.override}, ${group.title}`}
+                        onClick={() => setGroup(group.fields, true)}>
+                        <Pencil data-icon="inline-start" />{copy.override}
+                      </Button>
+                    </>}
                   </div>
                   <div className="flex flex-col gap-3">{group.body}</div>
                 </section>

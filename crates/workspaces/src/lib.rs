@@ -17,6 +17,7 @@ mod agent_settings;
 mod agent_stage;
 mod agent_work;
 mod asset_cleanup;
+pub use asset_cleanup::{AssetRemoval, AssetUse, AssetUseKind};
 mod asset_organization;
 mod asset_plan;
 mod assets;
@@ -340,6 +341,7 @@ impl WorkspaceStore {
             include_str!("../migrations/066-brand-fonts.sql"),
             include_str!("../migrations/067-agent-executables.sql"),
             include_str!("../migrations/068-plugin-tour-for-new-installs.sql"),
+            include_str!("../migrations/069-install-event.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
