@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod a2a;
 mod agent_cli;
+mod lease_keeper;
 mod quiet_process;
 pub(crate) use quiet_process::quiet_command;
 mod agent_explore;
