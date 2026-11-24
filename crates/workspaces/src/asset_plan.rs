@@ -21,6 +21,50 @@ const MAX_PLACEMENTS: usize = 100;
 const MAX_DESIGNS: usize = 6;
 /// A saved design longer than this is left out rather than crowding the prompt.
 const MAX_DESIGN_BYTES: usize = 12_000;
+/// New clips the agent may order for one plan; each costs the creator provider credits.
+const MAX_NEW_CLIPS: usize = 3;
+
+/// What the run's video provider can make, offered to the agent when one is on.
+#[derive(Debug, Clone, PartialEq)]
+struct ClipGeneration {
+    aspect_ratio: &'static str,
+    min_seconds: u32,
+    max_seconds: u32,
+}
+
+/// The aspect ratio of the run's first format, as video providers name them.
+fn run_aspect_ratio(snapshot: &Value) -> &'static str {
+    let format = &snapshot["formats"][0]["format"];
+    match (format["width"].as_u64(), format["height"].as_u64()) {
+        (Some(width), Some(height)) if height > width => "9:16",
+        (Some(width), Some(height)) if height == width => "1:1",
+        _ => "16:9",
+    }
+}
+
+/// Adds the clips the agent may order to its answer schema. Every property stays required, as
+/// strict output checks expect; an empty list orders none.
+fn with_clip_schema(mut schema: Value, generation: &ClipGeneration) -> Value {
+    schema["properties"]["clips"] = json!({
+        "type": "array",
+        "maxItems": MAX_NEW_CLIPS,
+        "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["section", "prompt", "seconds", "use"],
+            "properties": {
+                "section": {"type": "string", "maxLength": 120},
+                "prompt": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "seconds": {"type": "integer", "minimum": generation.min_seconds, "maximum": generation.max_seconds},
+                "use": {"type": "string", "maxLength": 300}
+            }
+        }
+    });
+    if let Some(required) = schema["required"].as_array_mut() {
+        required.push(json!("clips"));
+    }
+    schema
+}
 
 /// One thing the agent may place: a workspace asset or a motion library item.
 #[derive(Debug, Clone, PartialEq)]
@@ -93,6 +137,7 @@ fn plan_prompt(
     library: &[LibraryEntry],
     images: &[WorkspaceImage],
     earlier: &[Value],
+    clips: Option<&ClipGeneration>,
 ) -> String {
     let entries: Vec<Value> = library
         .iter()
@@ -137,6 +182,7 @@ fn plan_prompt(
          Library animations with a design show the creator's house style: when a new animation does a similar job, \
          such as a lower third with this video's words, follow that design's layout, colors, fonts and timing.\n\
          Put the script section each one serves in its usage.\n\
+         {clips}\
          {guide}\n\
          {revision}\
          The summary is one sentence to the creator about the plan, in the first person.\n\n\
@@ -149,6 +195,21 @@ fn plan_prompt(
             "This video has no recorded footage and is built from animated scenes, so design animations that carry its main beats. "
         },
         guide = SPEC_GUIDE,
+        clips = match clips {
+            Some(generation) => format!(
+                "You can also order up to {MAX_NEW_CLIPS} new video clips, which Arrumo generates with the creator's \
+                 video provider at {ratio}, each {min} to {max} seconds. Order one only where real-looking footage \
+                 carries a beat better than an animation or the library, such as b-roll of a place, a product in use \
+                 or an atmosphere, and never for text, logos, screens or charts. Each clip costs the creator \
+                 provider credits. Write each prompt as a shot description: subject, action, setting, camera, \
+                 light and mood, with no text in the picture. Reuse clips made for earlier plans, which are in \
+                 the library, instead of ordering them again. Return an empty list when none is needed.\n",
+                ratio = generation.aspect_ratio,
+                min = generation.min_seconds,
+                max = generation.max_seconds,
+            ),
+            None => String::new(),
+        },
         revision = if earlier.is_empty() {
             ""
         } else {
@@ -330,6 +391,11 @@ impl WorkspaceStore {
             self.renew_generation_lease(workspace_id, run_id, attempt)?;
             Ok(())
         };
+        let generation = self.clip_generation(workspace_id, snapshot)?;
+        let mut schema = assets_answer_schema(&references, &image_ids);
+        if let Some(generation) = &generation {
+            schema = with_clip_schema(schema, generation);
+        }
         let answer = self.run_exploring_agent(
             database,
             crate::agent_logs::AgentLogScope {
@@ -339,13 +405,30 @@ impl WorkspaceStore {
                 attempt: Some(attempt),
             },
             provider,
-            &plan_prompt(snapshot, script, &library, &images, &earlier),
-            &assets_answer_schema(&references, &image_ids),
+            &plan_prompt(
+                snapshot,
+                script,
+                &library,
+                &images,
+                &earlier,
+                generation.as_ref(),
+            ),
+            &schema,
             AGENT_TIMEOUT,
             &[],
             renew,
         )?;
         let mut result = asset_plan(&answer, &library, &provider.id).map_err(io::Error::other)?;
+        if let Some(generation) = &generation {
+            self.generate_planned_clips(
+                database,
+                (workspace_id, run_id, attempt),
+                snapshot,
+                &answer,
+                generation,
+                &mut result,
+            )?;
+        }
         let specs = answer_animations(&answer, &image_ids);
         renew()?;
         if specs.is_empty() {
@@ -377,6 +460,129 @@ impl WorkspaceStore {
             &result,
         )
         .map_err(|error| -> Box<dyn Error> { io::Error::other(error.to_string()).into() })
+    }
+
+    /// The clip generation this run can offer its agent: a video provider is on and makes clips
+    /// at the run's aspect ratio with a set length.
+    fn clip_generation(
+        &self,
+        workspace_id: i64,
+        snapshot: &Value,
+    ) -> Result<Option<ClipGeneration>, Box<dyn Error>> {
+        let ordered = snapshot["provider_orders"]["video-generation"]["effective"]
+            .as_array()
+            .is_some_and(|order| !order.is_empty());
+        if !ordered {
+            return Ok(None);
+        }
+        let aspect_ratio = run_aspect_ratio(snapshot);
+        let models = self.video_models(workspace_id)?;
+        let model = models
+            .iter()
+            .find(|model| model.selected)
+            .or_else(|| models.first());
+        Ok(model.and_then(|model| {
+            model
+                .variants
+                .iter()
+                .find(|variant| {
+                    variant.images[0] == 0
+                        && variant.videos[0] == 0
+                        && variant.max_seconds > 0
+                        && (variant.aspect_ratios.is_empty()
+                            || variant
+                                .aspect_ratios
+                                .iter()
+                                .any(|ratio| ratio == aspect_ratio))
+                })
+                .map(|variant| ClipGeneration {
+                    aspect_ratio,
+                    min_seconds: variant.min_seconds.max(1),
+                    max_seconds: variant.max_seconds,
+                })
+        }))
+    }
+
+    /// Generates the clips the agent ordered and adds them to the plan like library entries.
+    /// A clip that cannot be made is left out and named in the summary; the plan goes on.
+    fn generate_planned_clips(
+        &self,
+        database: &Path,
+        (workspace_id, run_id, attempt): (i64, i64, i64),
+        snapshot: &Value,
+        answer: &Value,
+        generation: &ClipGeneration,
+        result: &mut Value,
+    ) -> Result<(), Box<dyn Error>> {
+        let title = snapshot["draft"]["title"].as_str().unwrap_or_default();
+        let mut failed = 0;
+        for clip in answer["clips"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(MAX_NEW_CLIPS)
+        {
+            let text = |key: &str| clip[key].as_str().unwrap_or_default().trim().to_owned();
+            let (prompt, use_) = (text("prompt"), text("use"));
+            if prompt.is_empty() {
+                continue;
+            }
+            let seconds = clip["seconds"].as_u64().map(|seconds| {
+                (seconds as u32).clamp(generation.min_seconds, generation.max_seconds)
+            });
+            let notes = format!("Generated for the video {title}: {use_}");
+            let keeper =
+                crate::lease_keeper::LeaseKeeper::start(database, workspace_id, run_id, attempt);
+            let made = self.generate_library_video(
+                database,
+                workspace_id,
+                &prompt,
+                generation.aspect_ratio,
+                seconds,
+                &notes,
+                None,
+                None,
+                &[],
+            );
+            if !keeper.finish() {
+                return Err(
+                    io::Error::other("The run stopped while a clip was being generated").into(),
+                );
+            }
+            match made {
+                Ok((asset_id, _)) => {
+                    let name: String = self.0.query_row(
+                        "SELECT name FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2",
+                        params![workspace_id, asset_id],
+                        |row| row.get(0),
+                    )?;
+                    if let Some(plan) = result["asset_plan"].as_array_mut() {
+                        plan.push(json!({
+                            "section": text("section"),
+                            "reference": format!("asset-{asset_id}"),
+                            "name": name,
+                            "kind": "video",
+                            "use": use_,
+                        }));
+                    }
+                }
+                Err(error) => {
+                    failed += 1;
+                    crate::report_failure_with(
+                        "video_generation",
+                        &"A clip the agent ordered could not be generated",
+                        &[("stage", "assets"), ("cause", &crate::error_chain(&*error))],
+                    );
+                }
+            }
+        }
+        if failed > 0 {
+            let summary = result["summary"].as_str().unwrap_or_default().to_owned();
+            result["summary"] = json!(format!(
+                "{summary} {failed} of the clips I ordered could not be generated, so the plan goes on without them."
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -433,7 +639,7 @@ mod tests {
     #[test]
     fn the_prompt_lists_the_library_and_review_notes() {
         let snapshot = json!({"draft": {"title": "T", "intent": "I"}});
-        let first = plan_prompt(&snapshot, Some("## Hook"), &library(), &[], &[]);
+        let first = plan_prompt(&snapshot, Some("## Hook"), &library(), &[], &[], None);
         assert!(first.contains("\"reference\": \"asset-4\"") && !first.contains("earlierPlans"));
         assert!(first.contains("\"design\"") && first.contains("house style"));
         let revised = plan_prompt(
@@ -442,11 +648,42 @@ mod tests {
             &library(),
             &[],
             &[json!({"notes": "No logo"})],
+            None,
         );
         assert!(revised.contains("No logo") && revised.contains("Address every note"));
         assert!(
             !has_motion_renderer(&snapshot)
                 && has_motion_renderer(&json!({"motion_renderer": {"plugin_id": "x"}}))
         );
+    }
+
+    #[test]
+    fn runs_with_a_video_provider_can_order_clips() {
+        let generation = ClipGeneration {
+            aspect_ratio: "9:16",
+            min_seconds: 3,
+            max_seconds: 10,
+        };
+        let schema = with_clip_schema(assets_answer_schema(&[], &[]), &generation);
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("clips"))
+        );
+        let clips = &schema["properties"]["clips"];
+        assert_eq!(clips["maxItems"], json!(MAX_NEW_CLIPS));
+        assert_eq!(
+            clips["items"]["properties"]["seconds"]["maximum"],
+            json!(10)
+        );
+        let portrait = json!({"formats": [{"format": {"width": 1080, "height": 1920}}]});
+        assert_eq!(run_aspect_ratio(&portrait), "9:16");
+        assert_eq!(run_aspect_ratio(&json!({})), "16:9");
+        let with = plan_prompt(&portrait, None, &[], &[], &[], Some(&generation));
+        assert!(
+            with.contains("up to 3 new video clips") && with.contains("9:16, each 3 to 10 seconds")
+        );
+        assert!(!plan_prompt(&portrait, None, &[], &[], &[], None).contains("video clips"));
     }
 }
