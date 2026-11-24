@@ -396,14 +396,15 @@ impl WorkspaceStore {
         if let Some(generation) = &generation {
             schema = with_clip_schema(schema, generation);
         }
-        let answer = self.run_exploring_agent(
+        let scope = crate::agent_logs::AgentLogScope {
+            workspace_id,
+            run_id: Some(run_id),
+            stage: "assets",
+            attempt: Some(attempt),
+        };
+        let mut answer = self.run_exploring_agent(
             database,
-            crate::agent_logs::AgentLogScope {
-                workspace_id,
-                run_id: Some(run_id),
-                stage: "assets",
-                attempt: Some(attempt),
-            },
+            scope,
             provider,
             &plan_prompt(
                 snapshot,
@@ -418,6 +419,26 @@ impl WorkspaceStore {
             &[],
             renew,
         )?;
+        if let Some(animations) = answer["animations"].as_array_mut() {
+            let fonts = self.run_font_set(&crate::asset_root(database), workspace_id, run_id)?;
+            self.review_motion_answers(
+                database,
+                workspace_id,
+                animations,
+                &crate::motion_spec::spec_schema(&image_ids),
+                &|item| {
+                    crate::motion_spec::MotionSpec::from_answer(item, |id| image_ids.contains(&id))
+                        .ok()
+                },
+                &crate::motion_design::MotionReview {
+                    scope,
+                    provider,
+                    size: run_preview_size(snapshot),
+                    fonts: &fonts,
+                },
+                &mut || renew(),
+            )?;
+        }
         let mut result = asset_plan(&answer, &library, &provider.id).map_err(io::Error::other)?;
         if let Some(generation) = &generation {
             self.generate_planned_clips(

@@ -256,19 +256,37 @@ impl WorkspaceStore {
             serde_json::to_string_pretty(&brief).unwrap_or_default(),
             guides = crate::editing_guides::guide_section(&["animation"]),
         );
+        let scope = crate::agent_logs::AgentLogScope {
+            workspace_id,
+            run_id: None,
+            stage: "motion_library",
+            attempt: None,
+        };
         let answer = self.run_logged_agent(
-            crate::agent_logs::AgentLogScope {
-                workspace_id,
-                run_id: None,
-                stage: "motion_library",
-                attempt: None,
-            },
+            scope,
             provider,
             &prompt,
             &spec_schema(&image_ids),
             crate::script_stage::AGENT_TIMEOUT,
             || Ok(()),
         )?;
+        let fonts = self.current_font_set(&asset_root(database), workspace_id)?;
+        let mut items = [answer];
+        self.review_motion_answers(
+            database,
+            workspace_id,
+            &mut items,
+            &spec_schema(&image_ids),
+            &|item| MotionSpec::from_answer(item, |id| image_ids.contains(&id)).ok(),
+            &MotionReview {
+                scope,
+                provider,
+                size: LIBRARY_PREVIEW,
+                fonts: &fonts,
+            },
+            &mut || Ok(()),
+        )?;
+        let [answer] = items;
         let spec = MotionSpec::from_answer(&answer, |id| image_ids.contains(&id))
             .map_err(io::Error::other)?;
         let scratch = MotionScratch::create(database)?;
@@ -363,6 +381,141 @@ pub(crate) fn answer_animations(answer: &Value, images: &[i64]) -> Vec<MotionSpe
         .unwrap_or_default()
 }
 
+/// Rounds in which an agent looks at its rendered animations and corrects what it sees.
+pub(crate) const REVIEW_ROUNDS: usize = 2;
+
+/// How an agent reviews the animations it designed: its run, and what to draw them with.
+pub(crate) struct MotionReview<'a> {
+    pub scope: crate::agent_logs::AgentLogScope<'a>,
+    pub provider: &'a crate::AgentPlugin,
+    pub size: (u32, u32),
+    pub fonts: &'a crate::brand_fonts::FontSet,
+}
+
+/// Review frames keep the shape but are drawn small: enough to judge layout, quick to render.
+fn review_size((width, height): (u32, u32)) -> (u32, u32) {
+    let scale = 640.0 / f64::from(width.max(height).max(1));
+    let even = |value: u32| ((f64::from(value) * scale.min(1.0) / 2.0).round() as u32).max(8) * 2;
+    (even(width), even(height))
+}
+
+fn review_prompt(items: &[&Value]) -> String {
+    format!(
+        "You designed the animations below for a creator in Arrumo. Each attached image shows one of them at \
+         six moments, left to right and top to bottom, in the order they are listed.\n\
+         Check each one for what a viewer would notice: text running outside the box or card behind it or \
+         past the frame's safe margin, text overlapping other text or images, lines sitting off-centre in \
+         their shape, words cut off, text hard to read against what is behind it, and layers that never \
+         appear. Fix them by moving, resizing or rewording layers, or by enlarging the shape behind the \
+         text. Change only what is wrong and keep everything that works, including all wording that fits, \
+         narration, timing and transitions.\n\
+         Return every item in the same order. Set changed to false and return them as they are when all of \
+         them look right.\n\nANIMATIONS (JSON):\n{}",
+        serde_json::to_string_pretty(items).unwrap_or_default()
+    )
+}
+
+impl WorkspaceStore {
+    /// Renders each animation the agent designed, shows it six moments of each and lets it correct
+    /// the ones that look wrong, for up to [`REVIEW_ROUNDS`] rounds. `items` are the agent's own
+    /// answers, replaced in place by corrections that still pass `parse`. A failed review keeps
+    /// the designs as they are.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn review_motion_answers(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        items: &mut [Value],
+        item_schema: &Value,
+        parse: &dyn Fn(&Value) -> Option<MotionSpec>,
+        review: &MotionReview<'_>,
+        check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
+    ) -> Result<(), Box<dyn Error>> {
+        if items.is_empty() || !crate::agent_run::accepts_images(review.provider) {
+            return Ok(());
+        }
+        let root = asset_root(database);
+        let media = |id: i64| asset_path(&root, workspace_id, id).canonicalize().ok();
+        let size = review_size(review.size);
+        for _ in 0..REVIEW_ROUNDS {
+            let scratch = MotionScratch::create(database)?;
+            let mut corrected = false;
+            for start in (0..items.len()).step_by(crate::agent_run::MAX_IMAGES) {
+                let end = (start + crate::agent_run::MAX_IMAGES).min(items.len());
+                let mut sheets = Vec::new();
+                let mut shown = Vec::new();
+                for (index, item) in items.iter().enumerate().take(end).skip(start) {
+                    let Some(spec) = parse(item) else {
+                        continue;
+                    };
+                    let (video, still) =
+                        (format!("review-{index}.mp4"), format!("review-{index}.png"));
+                    render_spec(
+                        &spec,
+                        size,
+                        scratch.path(),
+                        &video,
+                        &media,
+                        review.fonts,
+                        check,
+                    )?;
+                    render_thumbnail(scratch.path(), &video, spec.duration_seconds, &still)?;
+                    sheets.push(scratch.path().join(&still));
+                    shown.push(index);
+                }
+                if shown.is_empty() {
+                    continue;
+                }
+                let listed: Vec<&Value> = shown.iter().map(|index| &items[*index]).collect();
+                let schema = json!({
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["changed", "items"],
+                    "properties": {
+                        "changed": {"type": "boolean"},
+                        "items": {"type": "array", "minItems": shown.len(), "maxItems": shown.len(), "items": item_schema}
+                    }
+                });
+                let answer = match self.run_logged_agent_with_images(
+                    review.scope,
+                    review.provider,
+                    &review_prompt(&listed),
+                    &schema,
+                    crate::script_stage::AGENT_TIMEOUT,
+                    &sheets,
+                    &mut *check,
+                ) {
+                    Ok(answer) => answer,
+                    Err(error) => {
+                        crate::report_failure_with(
+                            "motion_review",
+                            &"The agent could not review its animations",
+                            &[("stage", review.scope.stage), ("cause", &error.to_string())],
+                        );
+                        return Ok(());
+                    }
+                };
+                if answer["changed"] != json!(true) {
+                    continue;
+                }
+                for (position, index) in shown.iter().enumerate() {
+                    if let Some(item) = answer["items"].get(position)
+                        && *item != items[*index]
+                        && parse(item).is_some()
+                    {
+                        items[*index] = item.clone();
+                        corrected = true;
+                    }
+                }
+            }
+            if !corrected {
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,5 +534,16 @@ mod tests {
     fn invalid_animations_are_skipped() {
         let answer = json!({"animations": [{"title": "x"}]});
         assert!(answer_animations(&answer, &[]).is_empty());
+    }
+
+    #[test]
+    fn reviews_draw_small_frames_and_ask_to_keep_what_works() {
+        assert_eq!(review_size((1920, 1080)), (640, 360));
+        assert_eq!(review_size((1080, 1920)), (360, 640));
+        assert_eq!(review_size((320, 180)), (320, 180));
+        let item = json!({"title": "Card"});
+        let prompt = review_prompt(&[&item]);
+        assert!(prompt.contains("six moments") && prompt.contains("\"title\": \"Card\""));
+        assert!(prompt.contains("Set changed to false"));
     }
 }
