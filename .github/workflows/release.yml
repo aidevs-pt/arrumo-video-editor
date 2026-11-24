@@ -112,7 +112,7 @@ jobs:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libdbus-1-dev libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
       - working-directory: video-editor
         run: pnpm install --frozen-lockfile
       # Windows installers are signed with Azure Artifact Signing when its account is configured;
