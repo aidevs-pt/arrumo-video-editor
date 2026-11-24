@@ -352,6 +352,9 @@ impl WorkspaceStore {
         for migration_sql in pending {
             migration.execute_batch(migration_sql)?;
         }
+        if version == 0 {
+            migration.execute("UPDATE privacy_settings SET install_reported = 0", [])?;
+        }
         migration.commit()?;
         agent_cli::load_executables(&connection)?;
         Ok(Self(connection))
