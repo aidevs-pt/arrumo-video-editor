@@ -1561,13 +1561,24 @@ fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
         .args(["-v", "error", "-protocol_whitelist", "file"])
         .args(["-show_entries", "format=duration", "-of", "csv=p=0"])
         .arg(path)
-        .output()?;
+        .output()
+        .map_err(|error| {
+            io::Error::new(error.kind(), format!("ffprobe could not start: {error}"))
+        })?;
     String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse::<f64>()
         .ok()
         .filter(|seconds| output.status.success() && seconds.is_finite())
-        .ok_or_else(|| io::Error::other("Could not measure a rendered video's duration").into())
+        .ok_or_else(|| {
+            let errors = String::from_utf8_lossy(&output.stderr);
+            io::Error::other(format!(
+                "Could not measure a rendered video's duration ({}): {}",
+                output.status,
+                errors.lines().rev().take(4).collect::<Vec<_>>().join(" | ")
+            ))
+            .into()
+        })
 }
 
 #[cfg(test)]

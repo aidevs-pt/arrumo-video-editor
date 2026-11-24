@@ -49,13 +49,15 @@ pub fn set_usage_sink(sink: impl Fn(&str, Value) + Send + Sync + 'static) {
     let _ = USAGE_SINK.set(Box::new(sink));
 }
 
-/// Receives handled failures that the creator should not have hit, already redacted.
-type FailureSink = Box<dyn Fn(&str, &str) + Send + Sync>;
+/// Receives handled failures that the creator should not have hit, already redacted, as
+/// `(area, message, details)`. Details name where it failed and why, such as the stage and the
+/// underlying error.
+type FailureSink = Box<dyn Fn(&str, &str, &[(&str, String)]) + Send + Sync>;
 static FAILURE_SINK: OnceLock<FailureSink> = OnceLock::new();
 
-/// Sends handled failures through `sink`, such as the desktop app's crash reporter, as
-/// `(area, message)`. They pass the crash report setting first.
-pub fn set_failure_sink(sink: impl Fn(&str, &str) + Send + Sync + 'static) {
+/// Sends handled failures through `sink`, such as the desktop app's crash reporter. They pass the
+/// crash report setting first.
+pub fn set_failure_sink(sink: impl Fn(&str, &str, &[(&str, String)]) + Send + Sync + 'static) {
     let _ = FAILURE_SINK.set(Box::new(sink));
 }
 
@@ -63,12 +65,43 @@ pub fn set_failure_sink(sink: impl Fn(&str, &str) + Send + Sync + 'static) {
 /// stopped, so it can be fixed. `area` names the feature. The message keeps its first line,
 /// without paths, addresses or quoted text, where names and titles usually appear.
 pub fn report_failure(area: &str, error: &dyn std::fmt::Display) {
+    report_failure_with(area, error, &[]);
+}
+
+/// [`report_failure`] with details of where and why, redacted the same way line by line.
+pub fn report_failure_with(area: &str, error: &dyn std::fmt::Display, details: &[(&str, &str)]) {
     if !crash_reports_allowed() {
         return;
     }
     if let Some(sink) = FAILURE_SINK.get() {
-        sink(area, &redact(&without_quotes(&error.to_string())));
+        let details: Vec<(&str, String)> = details
+            .iter()
+            .filter(|(_, value)| !value.trim().is_empty())
+            .map(|(key, value)| (*key, redact_lines(value)))
+            .collect();
+        sink(area, &redact(&without_quotes(&error.to_string())), &details);
     }
+}
+
+/// The error and each error that caused it, one per line, for a failure report.
+pub fn error_chain(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut lines = vec![error.to_string()];
+    let mut source = error.source();
+    while let Some(cause) = source {
+        lines.push(cause.to_string());
+        source = cause.source();
+    }
+    lines.join("\n")
+}
+
+/// Redacts every line of a longer text, such as an error chain or tool output.
+fn redact_lines(text: &str) -> String {
+    text.lines()
+        .filter(|line| !line.trim().is_empty())
+        .take(12)
+        .map(|line| redact(&without_quotes(line)))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Replaces quoted text with `[redacted]`.

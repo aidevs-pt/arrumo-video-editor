@@ -145,11 +145,34 @@ impl WorkspaceStore {
         attempt: i64,
         detail: &str,
     ) -> rusqlite::Result<GenerationRun> {
+        self.fail_generation_because(workspace_id, run_id, attempt, detail, None)
+    }
+
+    /// Fails the run with `detail` for the creator, and reports `cause`, the error underneath
+    /// it, with the stage and agent so the report says where it went wrong.
+    pub(crate) fn fail_generation_because(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        detail: &str,
+        cause: Option<&str>,
+    ) -> rusqlite::Result<GenerationRun> {
         let detail = detail.trim();
         if detail.is_empty() || detail.len() > 2000 || detail.contains('\0') {
             return Err(rusqlite::Error::InvalidQuery);
         }
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let (stage, agent): (Option<String>, Option<String>) = tx
+            .query_row(
+                "SELECT json_extract(plan_json, '$.steps[' || stage_index || '].stage'),
+                        json_extract(snapshot_json, '$.agent_settings.effective_provider')
+                 FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+                params![workspace_id, run_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+            .unwrap_or_default();
         let run = tx.query_row(
             "UPDATE generation_runs SET state = 'failed', lease_until = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
@@ -164,7 +187,17 @@ impl WorkspaceStore {
             params![run_id, detail],
         )?;
         tx.commit()?;
-        crate::report_failure("generation", &detail);
+        let attempt_text = attempt.to_string();
+        crate::report_failure_with(
+            "generation",
+            &detail,
+            &[
+                ("stage", stage.as_deref().unwrap_or_default()),
+                ("agent", agent.as_deref().unwrap_or_default()),
+                ("attempt", &attempt_text),
+                ("cause", cause.unwrap_or_default()),
+            ],
+        );
         self.queue_generation_failed_hooks(workspace_id, run_id, attempt, detail);
         Ok(run)
     }

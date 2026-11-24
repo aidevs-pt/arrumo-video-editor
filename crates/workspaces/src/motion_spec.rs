@@ -1637,6 +1637,18 @@ pub(crate) fn run_ffmpeg(
     Err(io::Error::other("FFmpeg stopped making progress").into())
 }
 
+/// The exit code, or on Unix the signal that ended the process, such as a crash.
+fn describe_exit(status: std::process::ExitStatus) -> String {
+    #[cfg(unix)]
+    if let Some(signal) = std::os::unix::process::ExitStatusExt::signal(&status) {
+        return format!("ended by signal {signal}");
+    }
+    status.code().map_or_else(
+        || "no exit code".to_owned(),
+        |code| format!("exit code {code}"),
+    )
+}
+
 /// Runs FFmpeg once. `Ok(None)` means it stalled and was stopped.
 fn run_ffmpeg_once(
     directory: &Path,
@@ -1658,7 +1670,10 @@ fn run_ffmpeg_once(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(fs::File::create(&log)?)
-        .spawn()?;
+        .spawn()
+        .map_err(|error| {
+            io::Error::new(error.kind(), format!("FFmpeg could not start: {error}"))
+        })?;
     let mut last = Instant::now();
     loop {
         if let Some(status) = process.try_wait()? {
@@ -1667,9 +1682,11 @@ fn run_ffmpeg_once(
             }
             let errors = fs::read_to_string(&log).unwrap_or_default();
             let tail: String = errors.lines().rev().take(6).collect::<Vec<_>>().join(" | ");
-            return Err(
-                io::Error::other(format!("FFmpeg could not render the animation: {tail}")).into(),
-            );
+            return Err(io::Error::other(format!(
+                "FFmpeg could not render ({}): {tail}",
+                describe_exit(status)
+            ))
+            .into());
         }
         if last.elapsed() >= Duration::from_secs(2) {
             last = Instant::now();
