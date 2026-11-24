@@ -84,7 +84,7 @@ The other platforms still upload to the draft, and nothing is published. Fix the
 
 ## CI
 
-Rust and Desktop run on pull requests and on `main`, not on pull request branches or tags. Each starts with a gate that skips the build when only documentation changed, or when a pull request already verified the exact code `main` now has (a squash merge of an up-to-date pull request). The checks still report, so required checks pass. Run either workflow by hand to force a full build.
+Rust and Desktop run on pull requests and on `main`, not on pull request branches or tags. Each starts with a gate that skips the build when only documentation changed, or when a pull request already verified the exact code `main` now has (a squash merge of an up-to-date pull request). The checks still report, so required checks pass. A newer commit on the same pull request or on `main` cancels the run still in progress, so merging several pull requests at once builds only the last. Run either workflow by hand to force a full build.
 
 ## When a release breaks
 
