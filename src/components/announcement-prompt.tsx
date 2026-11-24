@@ -31,7 +31,7 @@ export function AnnouncementPrompt() {
   const text = announcement && (announcement.text[locale] ?? announcement.text.en);
   return (
     <AlertDialog open={open} onOpenChange={(next) => { if (!next) close(); }}>
-      <AlertDialogContent>
+      <AlertDialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           <AlertDialogDescription className="whitespace-pre-line">{text}</AlertDialogDescription>

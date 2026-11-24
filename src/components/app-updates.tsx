@@ -52,7 +52,7 @@ export function UpdatePrompt() {
   const busy = state === "installing";
   return (
     <AlertDialog open={open} onOpenChange={(open) => { if (!open && !busy) setUpdate(undefined); }}>
-      <AlertDialogContent className="data-[size=default]:max-w-[calc(100vw-2rem)] data-[size=default]:sm:max-w-lg">
+      <AlertDialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto data-[size=default]:max-w-[calc(100vw-2rem)] data-[size=default]:sm:max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title.replace("{version}", update?.version ?? "")}</AlertDialogTitle>
           <AlertDialogDescription>
