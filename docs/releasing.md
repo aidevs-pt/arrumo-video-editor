@@ -33,8 +33,10 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    | `ARRUMO_REPOS_TOKEN` | A fine-grained token with read access to the plugin and registry repositories. Remove it once they are public. |
    | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` | The Developer ID Application certificate (base64 `.p12`), its password and its identity name |
    | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | For notarization; `APPLE_PASSWORD` is an app-specific password |
-
+   | `RELEASE_DEPLOY_KEY` | The private half of a deploy key with write access (see below). Needed once the repository is public |
    | `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | The Azure app registration allowed to sign (Windows) |
+
+   Once the repository is public, the "Protect main" ruleset only lets you and one deploy key push to `main`, and the release workflow pushes its version commit with that key. Create it on your computer with `ssh-keygen -t ed25519 -N "" -C "release" -f release-deploy-key`. Add `release-deploy-key.pub` under Settings › Deploy keys with **Allow write access**, save `release-deploy-key` as the `RELEASE_DEPLOY_KEY` secret, then delete both files. `arrumo-plugin-registry` needs its own key the same way, for **Add plugin release**.
 
 6. **Set up Windows signing** with [Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/), which is open to organisations in the EU. Without it the Windows build is unsigned, and SmartScreen warns on first install.
    1. In the Azure portal, create an **Artifact Signing account**. Note its region's endpoint: `https://neu.codesigning.azure.net` for North Europe, which DEVS AI uses (West Europe wasn't accepting new customers in November 2026). The endpoint must match the account's region, or signing fails with 403.
