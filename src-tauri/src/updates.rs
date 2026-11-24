@@ -52,6 +52,11 @@ pub struct UpdateStatus {
     store: bool,
 }
 
+/// The key that signs releases, and the Announcements list; `None` in contributor builds.
+pub fn public_key() -> Option<&'static str> {
+    PUBKEY.filter(|key| !key.trim().is_empty())
+}
+
 pub fn enabled() -> bool {
     PUBKEY.is_some_and(|key| !key.trim().is_empty()) && STORE_BUILD.is_none()
 }

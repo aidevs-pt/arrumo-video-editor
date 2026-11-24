@@ -1,0 +1,71 @@
+# Adds or removes a message that installed copies of Arrumo show once at launch, such as asking
+# people on a broken version to update by hand. Only the accounts in RELEASE_ACTORS can run it.
+# The list is signed with the updater key, which apps verify before showing anything.
+name: Announcements
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Add or remove a message
+        required: true
+        type: choice
+        options: [add, remove]
+      id:
+        description: "Message id, such as 2026-12-update-by-hand (never reuse one)"
+        required: true
+      english:
+        description: English text (required to add)
+      spanish:
+        description: Spanish text
+      portuguese:
+        description: Portuguese text (European)
+      link:
+        description: "Link to the details (https://)"
+      from:
+        description: "Show from this version (such as 0.1.0); empty for all"
+      before:
+        description: "Show only before this version (such as 0.2.0); empty for all"
+concurrency: announcements
+permissions:
+  contents: write
+jobs:
+  update:
+    if: contains(format(',{0},', vars.RELEASE_ACTORS), format(',{0},', github.actor))
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # "Protect main" exempts this deploy key, so the signed list can be pushed.
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - name: Update the list
+        env:
+          ACTION: ${{ inputs.action }}
+          ID: ${{ inputs.id }}
+          ENGLISH: ${{ inputs.english }}
+          SPANISH: ${{ inputs.spanish }}
+          PORTUGUESE: ${{ inputs.portuguese }}
+          LINK: ${{ inputs.link }}
+          FROM: ${{ inputs.from }}
+          BEFORE: ${{ inputs.before }}
+        run: node scripts/announcements.mjs "$ACTION" "$ID" "$ENGLISH" "$SPANISH" "$PORTUGUESE" "$LINK" "$FROM" "$BEFORE"
+      - name: Sign the list
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          cli=$(jq -r '.devDependencies["@tauri-apps/cli"] // .dependencies["@tauri-apps/cli"]' package.json)
+          npx --yes "@tauri-apps/cli@$cli" signer sign announcements/announcements.json
+      - name: Commit
+        env:
+          ACTION: ${{ inputs.action }}
+          ID: ${{ inputs.id }}
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git add announcements/announcements.json announcements/announcements.json.sig
+          git commit -m "chore(announcements): $ACTION $ID"
+          git push origin HEAD:main

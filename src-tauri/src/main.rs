@@ -12,6 +12,7 @@ use arrumo_workspaces::{
 use tauri::{AppHandle, Manager, State};
 
 mod agent_settings;
+mod announcements;
 mod backup;
 mod close_guard;
 mod completed_video;
@@ -1954,6 +1955,8 @@ fn main() {
             updates::update_status,
             updates::launch_ready,
             media_tools::media_tools_status,
+            announcements::pending_announcement,
+            announcements::dismiss_announcement,
             updates::check_for_update,
             updates::install_update
         ])

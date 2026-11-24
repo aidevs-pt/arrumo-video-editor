@@ -1918,6 +1918,7 @@
     "notInThisBuild": "Esta versão não se atualiza sozinha. Descarrega as versões novas no site do Arrumo.",
     "title": "O Arrumo {version} está disponível",
     "description": "Tens a {current}. Instala-a agora e o Arrumo reinicia, ou instala-a ao sair. Os vídeos em geração ficam em pausa e continuam após o reinício.",
+    "whatsNew": "Ver todas as novidades",
     "now": "Instalar e reiniciar",
     "onQuit": "Instalar ao sair",
     "later": "Mais tarde",
@@ -1930,5 +1931,10 @@
     "title": "O Arrumo não encontra o FFmpeg",
     "description": "O Arrumo usa o FFmpeg para pré-visualizar, renderizar e exportar vídeos, e não conseguiu iniciar {tools}. Reinstala o Arrumo para recuperar a cópia que o acompanha. Se executas o Arrumo a partir do código-fonte, instala o FFmpeg e confirma que está no teu PATH.",
     "done": "OK"
+  },
+  "announcements": {
+    "title": "Uma mensagem da equipa do Arrumo",
+    "more": "Saber mais",
+    "close": "Fechar"
   }
 }

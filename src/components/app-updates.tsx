@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLaunchDialog } from "@/lib/launch-dialogs";
 import { useLocale } from "@/lib/locale-provider";
 
 type AvailableUpdate = { version: string; currentVersion: string; notes: string | null };
@@ -22,6 +23,7 @@ export function UpdatePrompt() {
   const { messages: { updates: copy } } = useLocale();
   const [update, setUpdate] = useState<AvailableUpdate>();
   const [state, setState] = useState<"idle" | "installing" | "scheduled" | "failed">("idle");
+  const open = useLaunchDialog("update", update !== undefined);
 
   useEffect(() => {
     let active = true;
@@ -49,7 +51,7 @@ export function UpdatePrompt() {
 
   const busy = state === "installing";
   return (
-    <AlertDialog open={update !== undefined} onOpenChange={(open) => { if (!open && !busy) setUpdate(undefined); }}>
+    <AlertDialog open={open} onOpenChange={(open) => { if (!open && !busy) setUpdate(undefined); }}>
       <AlertDialogContent className="data-[size=default]:max-w-[calc(100vw-2rem)] data-[size=default]:sm:max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title.replace("{version}", update?.version ?? "")}</AlertDialogTitle>
@@ -57,7 +59,8 @@ export function UpdatePrompt() {
             {state === "scheduled" ? copy.scheduled : copy.description.replace("{current}", update?.currentVersion ?? "")}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {update?.notes && state !== "scheduled" && <div className="max-h-48 overflow-y-auto rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap">{update.notes}</div>}
+        {update?.notes && state !== "scheduled" && <ReleaseNotes notes={update.notes} />}
+        {update && state !== "scheduled" && <a href={`https://github.com/aidevs-pt/arrumo-video-editor/releases/tag/v${update.version}`} target="_blank" rel="noreferrer" className="w-fit text-sm font-semibold text-primary underline underline-offset-4">{copy.whatsNew}</a>}
         {state === "failed" && <Alert variant="destructive"><AlertDescription>{copy.failed}</AlertDescription></Alert>}
         <AlertDialogFooter className="sm:flex-wrap">
           {state === "scheduled" ? <AlertDialogAction>{copy.done}</AlertDialogAction> : <>
@@ -68,6 +71,27 @@ export function UpdatePrompt() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+/** The changelog the release workflow writes: `### Section` headings and `- item` lines. */
+function ReleaseNotes({ notes }: { notes: string }) {
+  const blocks: { heading?: string; items: string[]; text: string[] }[] = [{ items: [], text: [] }];
+  for (const line of notes.split("\n").map((value) => value.trim()).filter(Boolean)) {
+    if (line.startsWith("### ")) blocks.push({ heading: line.slice(4), items: [], text: [] });
+    else if (line.startsWith("- ")) blocks[blocks.length - 1].items.push(line.slice(2).replace(/^\*\*(.+?)\*\*\s*/, "$1 "));
+    else blocks[blocks.length - 1].text.push(line);
+  }
+  return (
+    <div className="flex max-h-56 flex-col gap-3 overflow-y-auto rounded-lg bg-muted p-3 text-sm">
+      {blocks.filter((block) => block.heading || block.items.length || block.text.length).map((block, index) => (
+        <div key={index} className="flex flex-col gap-1">
+          {block.heading && <p className="font-semibold">{block.heading}</p>}
+          {block.text.map((text) => <p key={text}>{text}</p>)}
+          {block.items.length > 0 && <ul className="list-disc ps-5">{block.items.map((item) => <li key={item}>{item}</li>)}</ul>}
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -1,0 +1,20 @@
+{
+  "serial": 3,
+  "messages": [
+    {
+      "id": "2026-12-update-by-hand",
+      "text": {
+        "en": "Arrumo 0.1.0 can't update itself. Download 0.1.1 from the website.",
+        "es": "Arrumo 0.1.0 no puede actualizarse solo. Descarga la 0.1.1 desde la web.",
+        "pt": "O Arrumo 0.1.0 não se consegue atualizar sozinho. Descarrega a 0.1.1 no site."
+      },
+      "link": "https://aidevs.pt",
+      "versions": {
+        "before": "0.1.1"
+      }
+    }
+  ],
+  "retired": [
+    "welcome"
+  ]
+}
