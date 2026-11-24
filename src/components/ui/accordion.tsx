@@ -62,7 +62,8 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className="overflow-hidden text-sm data-open:animate-accordion-down data-closed:animate-accordion-up"
+      // The clip, needed for the height animation, reaches past the content so focus rings show.
+      className="-mx-1 overflow-hidden px-1 text-sm data-open:animate-accordion-down data-closed:animate-accordion-up"
       {...props}
     >
       <div
