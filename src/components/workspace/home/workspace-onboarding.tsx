@@ -217,10 +217,13 @@ function SetupHeading({ title, children }: { title: string; children: ReactNode 
   </header>;
 }
 
+/** Cobalt azulejo tiles behind the top of the panel. They fade out behind the logo and toward the
+ * tagline, so the wordmark and text sit on plain cobalt. */
 function AzulejoTilework() {
-  const pattern = useId();
+  const id = useId();
+  const [pattern, fade, mask] = [`${id}-tile`, `${id}-fade`, `${id}-mask`];
   return (
-    <svg aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-1/2 w-full">
+    <svg aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[58%] w-full">
       <defs>
         <pattern id={pattern} width={84} height={84} patternUnits="userSpaceOnUse">
           <g fill="none" stroke="white" strokeWidth={5} opacity={0.23}>
@@ -229,16 +232,38 @@ function AzulejoTilework() {
             <circle cx={0} cy={84} r={24} />
             <circle cx={84} cy={84} r={24} />
           </g>
+          <g fill="none" stroke="white" strokeWidth={2} opacity={0.16}>
+            <circle cx={0} cy={0} r={13} />
+            <circle cx={84} cy={0} r={13} />
+            <circle cx={0} cy={84} r={13} />
+            <circle cx={84} cy={84} r={13} />
+          </g>
           <g fill="white" opacity={0.23}>
             <rect x={38} y={20} width={8} height={15} rx={4} />
             <rect x={38} y={49} width={8} height={15} rx={4} />
             <rect x={20} y={38} width={15} height={8} rx={4} />
             <rect x={49} y={38} width={15} height={8} rx={4} />
           </g>
+          <g fill="white" opacity={0.16}>
+            <path d="M42 -5 L47 0 L42 5 L37 0 Z" />
+            <path d="M42 79 L47 84 L42 89 L37 84 Z" />
+            <path d="M-5 42 L0 37 L5 42 L0 47 Z" />
+            <path d="M79 42 L84 37 L89 42 L84 47 Z" />
+          </g>
           <circle cx={42} cy={42} r={4.5} fill="var(--attention)" />
         </pattern>
+        <linearGradient id={fade} x1={0} y1={0} x2={0} y2={1}>
+          <stop offset="0" stopColor="white" stopOpacity={0} />
+          <stop offset="0.2" stopColor="white" stopOpacity={0} />
+          <stop offset="0.38" stopColor="white" stopOpacity={1} />
+          <stop offset="0.72" stopColor="white" stopOpacity={1} />
+          <stop offset="1" stopColor="white" stopOpacity={0} />
+        </linearGradient>
+        <mask id={mask} maskContentUnits="objectBoundingBox">
+          <rect width={1} height={1} fill={`url(#${fade})`} />
+        </mask>
       </defs>
-      <rect width="100%" height="100%" fill={`url(#${pattern})`} />
+      <rect width="100%" height="100%" fill={`url(#${pattern})`} mask={`url(#${mask})`} />
     </svg>
   );
 }
