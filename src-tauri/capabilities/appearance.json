@@ -1,0 +1,6 @@
+{
+  "identifier": "appearance",
+  "description": "Lets the window's native theme and background follow the app's appearance setting.",
+  "windows": ["main"],
+  "permissions": ["core:window:allow-set-theme", "core:window:allow-set-background-color"]
+}

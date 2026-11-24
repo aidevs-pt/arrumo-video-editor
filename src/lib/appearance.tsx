@@ -15,6 +15,9 @@ type Appearance = {
 };
 
 const storageKey = appearanceStorageKey;
+/** The sidebar colours, painted behind the page so the native window and title bar follow the theme. */
+const lightSidebar = "#2337b4";
+const darkSidebar = "#0f1b45";
 const Context = createContext<Appearance | null>(null);
 
 function read(): { theme: ThemePreference; motion: MotionPreference } {
@@ -55,6 +58,16 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     if (reduce) root.dataset.reduceMotion = "";
     else delete root.dataset.reduceMotion;
   }, [dark, reduce]);
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+      const current = getCurrentWindow();
+      return Promise.all([
+        current.setTheme(preferences.theme === "system" ? null : preferences.theme),
+        current.setBackgroundColor(dark ? darkSidebar : lightSidebar),
+      ]);
+    }).catch(() => {});
+  }, [dark, preferences.theme]);
 
   function update(change: Partial<typeof preferences>) {
     setPreferences((current) => {

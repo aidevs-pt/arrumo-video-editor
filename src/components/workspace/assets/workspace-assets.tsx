@@ -196,7 +196,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
   }
 
   return (
-    <WorkspaceShell className="max-w-[90rem]">
+    <WorkspaceShell>
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 ref={heading} tabIndex={-1} className="text-[clamp(2.25rem,5vw,3.25rem)] leading-[1] font-[850] outline-none [font-variation-settings:'wdth'_135]">{messages.assets.title}</h1>
@@ -229,7 +229,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                   <li key={kind}>
                     <button type="button" aria-pressed={active} onClick={() => { setFilter(kind); setGroupFilter(null); setLabelFilter(null); }}
                       className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start font-semibold hover:bg-secondary",
-                        active && "bg-foreground text-background hover:bg-foreground")}>
+                        active && "bg-selected text-selected-foreground hover:bg-selected")}>
                       <Icon className={cn("size-4", active && "text-attention")} aria-hidden="true" />
                       <span className="flex-1">{copy[kind === "all" ? "all" : kind === "image" ? "images" : kind === "audio" ? "audio" : "videos"]}</span>
                       <span className={cn("rounded-[5px] px-1.5 text-sm tabular-nums", active ? "bg-white/15" : "bg-secondary")}>{kindCount(kind)}</span>
@@ -260,7 +260,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                   <li key={label}>
                     <button type="button" aria-pressed={labelFilter === label} onClick={() => setLabelFilter(labelFilter === label ? null : label)}
                       className={cn("flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 text-sm font-semibold hover:bg-accent",
-                        labelFilter === label && "bg-foreground text-background hover:bg-foreground")}>
+                        labelFilter === label && "bg-selected text-selected-foreground hover:bg-selected")}>
                       <Tag className="size-3.5" aria-hidden="true" />{label}
                     </button>
                   </li>
@@ -326,7 +326,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                 {sections.length > 1 && <h2 className="font-sans flex items-center gap-2 text-base font-bold">
                   <Folder className="size-4" aria-hidden="true" />{group ?? messages.assets.ungrouped}
                 </h2>}
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(9.5rem,100%),1fr))] gap-3">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(9.5rem,100%),1fr))] gap-3 2xl:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] 2xl:gap-4">
                   {items.map((asset) => {
                     const checked = selected.includes(asset.id);
                     const isNew = recent.includes(asset.id);
