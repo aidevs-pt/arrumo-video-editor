@@ -21,7 +21,7 @@
   <a href="https://github.com/aidevs-pt/arrumo-plugin-registry">Plugins</a>
 </p>
 
-[![Meet Arrumo, a video made entirely in Arrumo](https://img.youtube.com/vi/v2KcwE8xuso/maxresdefault.jpg)](https://youtu.be/v2KcwE8xuso)
+[![Meet Arrumo, a video made entirely in Arrumo](docs/assets/meet-arrumo.gif)](https://youtu.be/v2KcwE8xuso)
 
 <p align="center"><sub>Every video on our channel is made entirely in Arrumo: the agent wrote the script, designed the animations, voiced and cut it, and wrote the titles and tags. People only reviewed and approved each step.</sub></p>
 
