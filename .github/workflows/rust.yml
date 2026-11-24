@@ -1,28 +1,50 @@
 name: Rust
-on: [push, pull_request]
+on:
+  push:
+    # Pull request branches are verified by their pull request, and tags by the release build.
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  # A new commit on a pull request makes its earlier, unfinished run pointless.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 env:
   CARGO_INCREMENTAL: "0"
 jobs:
+  gate:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/gate.yml
+    with:
+      name: rust
   verify:
+    needs: gate
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # Each step waits for the gate rather than the job: required checks are named after the
+    # matrix, and a skipped matrix job never reports them.
     defaults:
       run:
         shell: bash
         working-directory: video-editor
     steps:
-      - uses: actions/checkout@v7
+      - if: needs.gate.outputs.run == 'true'
+        uses: actions/checkout@v7
         with:
           path: video-editor
       # Tests of the bundled plugins need their checkouts beside the editor. While the plugin
       # repositories are private this takes ARRUMO_REPOS_TOKEN; without access the build is
       # core-only and those tests are skipped.
-      - name: Check out the default plugins
+      - if: needs.gate.outputs.run == 'true'
+        name: Check out the default plugins
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN || github.token }}
@@ -37,8 +59,24 @@ jobs:
           for id in $(jq -r '.plugins[] | select(.default) | .id' plugin-registry/catalog.json); do
             gh repo clone "aidevs-pt/arrumo-plugin-$id" "plugins/$id" -- --depth 1
           done
-      - if: runner.os == 'Linux'
+      - if: needs.gate.outputs.run == 'true' && (runner.os == 'Linux')
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev ffmpeg
-      - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
-      - run: cargo test --locked
+      - if: needs.gate.outputs.run == 'true'
+        run: cargo fmt --check
+      - if: needs.gate.outputs.run == 'true'
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - if: needs.gate.outputs.run == 'true'
+        run: cargo test --locked
+
+  # Lets the push to main skip this exact tree once its pull request verified it.
+  record:
+    needs: [gate, verify]
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ needs.gate.outputs.tree }}" > tree.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tested-rust-${{ needs.gate.outputs.tree }}
+          path: tree.txt
+          retention-days: 30

@@ -1,0 +1,62 @@
+# Decides whether a CI workflow needs to build this commit, so the same code is verified once.
+# It is skipped when only documentation changed, or when a pull request of this repository already
+# verified the exact same tree, as with the squash commit of an up-to-date pull request.
+# Callers mark the tree as verified with the `tested-<name>-<tree>` artifact once every job passed.
+name: Gate
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: The calling workflow's short name, used in the verified-tree artifact
+        required: true
+        type: string
+    outputs:
+      run:
+        value: ${{ jobs.gate.outputs.run }}
+      tree:
+        value: ${{ jobs.gate.outputs.tree }}
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      tree: ${{ steps.decide.outputs.tree }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REPO_ID: ${{ github.repository_id }}
+          EVENT: ${{ github.event_name }}
+          NAME: ${{ inputs.name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          tree=$(gh api "repos/$REPO/git/commits/$GITHUB_SHA" -q .tree.sha)
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          decide() { echo "run=$1" >> "$GITHUB_OUTPUT"; echo "::notice::$2"; exit 0; }
+
+          [ "$EVENT" = workflow_dispatch ] && decide true "Requested by hand."
+
+          # Only artifacts from this repository count; a fork's pull request runs its own workflow files.
+          if [ "$EVENT" = push ]; then
+            verified=$(gh api "repos/$REPO/actions/artifacts?name=tested-$NAME-$tree" \
+              -q "[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == $REPO_ID)] | length")
+            [ "$verified" -gt 0 ] && decide false "This tree was already verified in a pull request."
+          fi
+
+          case "$EVENT" in
+            pull_request) files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" -q '.[].filename') ;;
+            push)
+              case "$BEFORE" in ""|0000000000000000000000000000000000000000) decide true "New branch." ;; esac
+              files=$(gh api "repos/$REPO/compare/$BEFORE...$GITHUB_SHA" -q '.files[].filename')
+              # The compare API lists at most 300 files.
+              [ "$(printf '%s\n' "$files" | wc -l)" -ge 300 ] && decide true "Too many changes to classify." ;;
+            *) decide true "Event $EVENT." ;;
+          esac
+
+          # Documentation the build never reads. The editing guides in crates/ are compiled in, so
+          # only top-level Markdown counts.
+          code=$(printf '%s\n' "$files" | grep -vE '^$|^[^/]+\.md$|^LICENSE|^docs/|^skills/|^\.github/(ISSUE_TEMPLATE/|pull_request_template\.md$)' || true)
+          [ -z "$code" ] && decide false "Only documentation changed."
+          decide true "Code changed."
