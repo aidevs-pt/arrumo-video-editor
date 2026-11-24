@@ -123,6 +123,26 @@ impl WorkspaceStore {
                     invalid_setting("Plugin setting value has the wrong type or size").into(),
                 );
             }
+            // A value the plugin passes as a command-line word must be one, or the agent would
+            // silently run without it.
+            let as_argument = crate::agent_plugin(plugin_id)
+                .and_then(|agent| agent.cli.structured_run.as_ref())
+                .is_some_and(|run| {
+                    run.setting_args.iter().any(|entry| {
+                        entry.setting == setting_id
+                            && entry.args.iter().any(|arg| arg.contains("{value}"))
+                    })
+                });
+            if as_argument
+                && value.as_str().is_some_and(|text| {
+                    !text.trim().is_empty() && !crate::plugin_catalog::plain_value(text.trim())
+                })
+            {
+                return Err(invalid_setting(
+                    "Use letters, digits, dots, dashes, underscores or colons only, such as claude-opus-5-5",
+                )
+                .into());
+            }
             transaction.execute(
                 "INSERT INTO plugin_setting_values (plugin_id, setting_id, workspace_id, value)
                  VALUES (?1, ?2, ?3, ?4)

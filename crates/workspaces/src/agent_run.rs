@@ -395,13 +395,7 @@ pub(crate) fn setting_arguments(
     run: &StructuredRun,
     settings: &BTreeMap<String, Value>,
 ) -> Vec<String> {
-    let plain = |value: &str| {
-        !value.is_empty()
-            && value.len() <= 64
-            && value.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
-            })
-    };
+    let plain = crate::plugin_catalog::plain_value;
     let on = |id: &str| settings.get(id) == Some(&Value::Bool(true));
     let mut arguments = Vec::new();
     for entry in &run.setting_args {

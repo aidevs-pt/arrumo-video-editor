@@ -44,6 +44,10 @@ pub struct PluginSetting {
         skip_serializing_if = "Option::is_none"
     )]
     pub hidden_when: Option<String>,
+    /// For free string settings, values the editor offers as presets, such as model names
+    /// (schema 15). Any other value is still allowed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggestions: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

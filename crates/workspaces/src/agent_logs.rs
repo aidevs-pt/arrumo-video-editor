@@ -535,6 +535,17 @@ mod tests {
         drop(queued);
         assert_eq!(options.get("model"), Some(&Value::from("claude-fable-5-2")));
         assert_eq!(options.get("reasoning-effort"), Some(&Value::from("high")));
+        // A model typed as a name would be dropped from the command, so it is refused instead.
+        assert!(
+            store
+                .set_plugin_setting(
+                    "claude-code",
+                    "model",
+                    Some(workspace),
+                    Some(&Value::from("Opus 5.5"))
+                )
+                .is_err()
+        );
     }
 
     #[test]

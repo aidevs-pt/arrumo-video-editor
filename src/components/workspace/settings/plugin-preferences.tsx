@@ -34,6 +34,8 @@ export type PluginSettingDeclaration = {
   warning?: string;
   /** Another switch that, while on, makes this setting irrelevant. */
   hiddenWhen?: string;
+  /** Presets offered for a free text value, such as model names. */
+  suggestions?: string[];
 };
 export type PluginSettingsManifest = { id: string; name: string; settings?: PluginSettingDeclaration[] };
 type CatalogEntry = { bundled: boolean; manifest: PluginSettingsManifest };
@@ -285,6 +287,11 @@ function PreferenceField({ field, values, workspace, pluginId, draft, disabled, 
     <Label htmlFor={id} className="font-semibold">{field.label}</Label>
     <p id={id + "-description"} className="text-sm text-muted-foreground">{field.description}</p>
     {control}
+    {field.suggestions && <div role="group" aria-label={copy.suggestions} className="flex flex-wrap gap-1.5">
+      {field.suggestions.map((value) => <Button key={value} type="button" size="xs" disabled={disabled}
+        variant={effective === value ? "default" : "outline"} aria-pressed={effective === value}
+        onClick={() => onChange(value)}>{field.choiceLabels[value] ?? value}</Button>)}
+    </div>}
     {status}
     <SettingHelpLink pluginId={pluginId} settingId={field.id} helpUrl={field.helpUrl} />
   </div>;
