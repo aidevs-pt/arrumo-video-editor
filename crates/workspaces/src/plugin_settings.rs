@@ -21,10 +21,16 @@ impl WorkspaceStore {
         plugin_id: &str,
         workspace_id: Option<i64>,
     ) -> Result<BTreeMap<String, ResolvedPluginSetting>, Box<dyn Error>> {
-        let transaction = self.0.unchecked_transaction()?;
+        // Reads one consistent state. A caller's transaction, such as queuing a run, already
+        // provides it, and SQLite refuses to open another one inside it.
+        let _snapshot = if self.0.is_autocommit() {
+            Some(self.0.unchecked_transaction()?)
+        } else {
+            None
+        };
         self.check_plugin_settings_workspace(workspace_id)?;
         let manifest = self.plugin_manifest(plugin_id)?;
-        let mut statement = transaction.prepare(
+        let mut statement = self.0.prepare(
             "SELECT setting_id, workspace_id, value FROM plugin_setting_values
              WHERE plugin_id = ?1 AND (workspace_id IS NULL OR workspace_id = ?2)",
         )?;
@@ -116,6 +122,26 @@ impl WorkspaceStore {
                 return Err(
                     invalid_setting("Plugin setting value has the wrong type or size").into(),
                 );
+            }
+            // A value the plugin passes as a command-line word must be one, or the agent would
+            // silently run without it.
+            let as_argument = crate::agent_plugin(plugin_id)
+                .and_then(|agent| agent.cli.structured_run.as_ref())
+                .is_some_and(|run| {
+                    run.setting_args.iter().any(|entry| {
+                        entry.setting == setting_id
+                            && entry.args.iter().any(|arg| arg.contains("{value}"))
+                    })
+                });
+            if as_argument
+                && value.as_str().is_some_and(|text| {
+                    !text.trim().is_empty() && !crate::plugin_catalog::plain_value(text.trim())
+                })
+            {
+                return Err(invalid_setting(
+                    "Use letters, digits, dots, dashes, underscores or colons only, such as claude-opus-5-5",
+                )
+                .into());
             }
             transaction.execute(
                 "INSERT INTO plugin_setting_values (plugin_id, setting_id, workspace_id, value)

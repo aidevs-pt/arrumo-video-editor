@@ -1810,9 +1810,19 @@ fn main() {
                 crash_reports::remember_choice(&data_dir, privacy.crash_reports);
             }
             if arrumo_workspaces::crash_dsn().is_some() {
-                arrumo_workspaces::set_failure_sink(|area, message| {
+                arrumo_workspaces::set_failure_sink(|area, message, details| {
                     sentry::with_scope(
-                        |scope| scope.set_tag("area", area),
+                        |scope| {
+                            scope.set_tag("area", area);
+                            for (key, value) in details {
+                                // Short values can be searched as tags; longer ones read as data.
+                                if value.len() <= 64 && !value.contains('\n') {
+                                    scope.set_tag(key, value);
+                                } else {
+                                    scope.set_extra(key, value.clone().into());
+                                }
+                            }
+                        },
                         || sentry::capture_message(message, sentry::Level::Error),
                     );
                 });

@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 14] =
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 15] =
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -689,6 +689,14 @@ impl PluginManifest {
                                 || other == setting.id
                                 || !boolean_setting(&manifest, other)
                         })
+                        || setting.suggestions.as_deref().is_some_and(|suggestions| {
+                            manifest.schema_version < 15
+                                || setting.kind != crate::PluginSettingKind::String
+                                || setting.choices.is_some()
+                                || suggestions.is_empty()
+                                || suggestions.len() > 32
+                                || !suggestions.iter().all(|value| plain_value(value))
+                        })
                 }))
         {
             return Err(invalid_manifest("Invalid or duplicate plugin setting declaration").into());
@@ -1115,6 +1123,15 @@ fn boolean_setting(manifest: &PluginManifest, id: &str) -> bool {
         .iter()
         .flatten()
         .any(|setting| setting.id == id && setting.kind == crate::PluginSettingKind::Boolean)
+}
+
+/// A value a plugin can pass as one command-line word: letters, digits and `._:-`, up to 64.
+pub(crate) fn plain_value(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
 }
 
 #[cfg(test)]

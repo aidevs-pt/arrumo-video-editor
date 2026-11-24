@@ -172,7 +172,8 @@
     "saving": "Saving…",
     "discard": "Discard changes",
     "unsaved": "Not saved yet",
-    "whereToFind": "Where to find it"
+    "whereToFind": "Where to find it",
+    "suggestions": "Suggested values"
   },
   "pluginRegistry": {
     "update": "Update",

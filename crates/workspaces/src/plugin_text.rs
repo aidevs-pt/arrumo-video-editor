@@ -147,6 +147,7 @@ pub(crate) fn valid_translations(manifest: &PluginManifest) -> bool {
                                 setting
                                     .choices
                                     .iter()
+                                    .chain(&setting.suggestions)
                                     .flatten()
                                     .any(|known| known == choice)
                                     && text(label, 80)

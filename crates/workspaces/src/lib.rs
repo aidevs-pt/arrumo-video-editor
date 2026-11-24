@@ -203,8 +203,9 @@ pub use supplemental_review::{
     SupplementalRevisionRequest,
 };
 pub use telemetry::{
-    PrivacySettings, allow_crash_reports, crash_dsn, crash_reports_allowed, install_crash_reporter,
-    redact_report_text, report_failure, set_failure_sink, set_usage_sink, usage_key,
+    PrivacySettings, allow_crash_reports, crash_dsn, crash_reports_allowed, error_chain,
+    install_crash_reporter, redact_report_text, report_failure, report_failure_with,
+    set_failure_sink, set_usage_sink, usage_key,
 };
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};

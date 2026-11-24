@@ -96,7 +96,14 @@ impl WorkspaceStore {
                 } else {
                     fallback.to_owned()
                 };
-                match self.fail_generation(workspace_id, run_id, attempt, &reason) {
+                let cause = crate::error_chain(&*error);
+                match self.fail_generation_because(
+                    workspace_id,
+                    run_id,
+                    attempt,
+                    &reason,
+                    (cause != reason).then_some(cause.as_str()),
+                ) {
                     Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
                     Err(failure) => return Err(failure.into()),
                 }

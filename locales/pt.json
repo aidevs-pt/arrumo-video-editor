@@ -172,7 +172,8 @@
     "saving": "A guardar…",
     "discard": "Descartar alterações",
     "unsaved": "Por guardar",
-    "whereToFind": "Onde a encontrar"
+    "whereToFind": "Onde a encontrar",
+    "suggestions": "Valores sugeridos"
   },
   "pluginRegistry": {
     "update": "Atualizar",
