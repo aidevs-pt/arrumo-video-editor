@@ -81,7 +81,7 @@ export function AgentSettingsPage() {
   };
 
   return (
-    <WorkspaceShell className="grid max-w-6xl items-start gap-8 md:grid-cols-[12rem_minmax(0,1fr)]">
+    <WorkspaceShell className="grid max-w-7xl items-start gap-8 md:grid-cols-[12rem_minmax(0,1fr)]">
       <nav className="flex flex-wrap gap-1 md:sticky md:top-20 md:flex-col" aria-label={copy.title}>
         {sections.map((key) => {
           const Icon = sectionIcons[key];
@@ -89,7 +89,7 @@ export function AgentSettingsPage() {
           return (
             <Link key={key} href={settingsHref(key)} aria-current={active ? "page" : undefined}
               className={cn("flex items-center gap-2.5 rounded-lg px-3 py-2 font-semibold text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground",
-                active && "bg-foreground text-background hover:bg-foreground hover:text-background")}>
+                active && "bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground")}>
               <Icon className={cn("size-4", active && "text-attention")} aria-hidden="true" />{titles[key][0]}
             </Link>
           );
