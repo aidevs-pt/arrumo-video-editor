@@ -3,6 +3,10 @@ name = "arrumo-desktop"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
+authors = ["DEVS.AI UNIPESSOAL LDA <hi@aidevs.pt>"]
+description = "AI video editor where an agent edits and you approve every step."
+homepage = "https://www.aidevs.pt/tools/arrumo"
+repository = "https://github.com/aidevs-pt/arrumo-video-editor"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

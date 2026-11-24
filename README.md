@@ -119,6 +119,6 @@ Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code
 
 ## License
 
-Copyright © 2026 DEVS AI Unipessoal LDA. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
+Copyright © 2026 DEVS.AI UNIPESSOAL LDA. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
 Arrumo is built by [DEVS AI](https://aidevs.pt), an AI studio in Porto. Need a custom AI solution for your company? [Let's talk](https://aidevs.pt).
