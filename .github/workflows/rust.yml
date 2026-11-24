@@ -27,6 +27,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN || github.token }}
         run: |
+          # jq on Windows ends lines with CR, which would end up in repository names.
+          jq() { command jq "$@" | tr -d '\r'; }
           if ! gh repo clone aidevs-pt/arrumo-plugin-registry plugin-registry -- --depth 1 2>/dev/null; then
             echo "::notice::The plugin repositories are not readable; testing core only."
             echo "ARRUMO_CORE_ONLY=1" >> "$GITHUB_ENV"

@@ -100,6 +100,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN || github.token }}
         run: |
+          # jq on Windows ends lines with CR, which would end up in repository names.
+          jq() { command jq "$@" | tr -d '\r'; }
           mkdir -p plugin-releases plugins
           for id in $(jq -r '.plugins[] | select(.default) | .id' plugin-registry/catalog.json); do
             repository=$(jq -r --arg id "$id" '.plugins[] | select(.id == $id) | .repository' plugin-registry/catalog.json)
