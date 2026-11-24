@@ -9,6 +9,10 @@ on:
         description: "patch, minor, major, or an exact version such as 0.2.0"
         required: true
         default: patch
+      preview:
+        description: "Preview: publish as a pre-release that the updater and the latest download skip"
+        type: boolean
+        default: false
 concurrency: release
 permissions:
   contents: write
@@ -43,7 +47,16 @@ jobs:
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v${{ steps.version.outputs.version }}" --repo "${{ github.repository }}" --draft --generate-notes --title "Arrumo ${{ steps.version.outputs.version }}"
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIEW: ${{ inputs.preview }}
+          WINDOWS_SIGNED: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' }}
+          MACOS_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        run: |
+          title="Arrumo $VERSION"; flags=""
+          if [ "$PREVIEW" = true ]; then title="$title (preview)"; flags="--prerelease"; fi
+          node video-editor/scripts/unsigned-notes.mjs "$WINDOWS_SIGNED" "$MACOS_SIGNED" > notes.md
+          gh release create "v$VERSION" --repo "${{ github.repository }}" --draft $flags \
+            --generate-notes --notes-file notes.md --title "$title"
 
   build:
     needs: prepare
@@ -57,7 +70,7 @@ jobs:
           - os: windows-latest
             args: --config windows-signing.json
           - os: macos-latest
-            args: --target universal-apple-darwin
+            args: --target universal-apple-darwin --config macos-signing.json
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -116,6 +129,33 @@ jobs:
           jq -n --arg e "$ENDPOINT" --arg a "$ACCOUNT" --arg c "$PROFILE" \
             '{bundle: {windows: {signCommand: {cmd: "artifact-signing-cli",
               args: ["-e", $e, "-a", $a, "-c", $c, "-d", "Arrumo AI Video Editor", "%1"]}}}}' > windows-signing.json
+      # Apple variables are only set when the certificate exists, since empty values would make
+      # the bundler try to import a certificate. Without one the app gets an ad-hoc signature, so
+      # macOS offers "Open Anyway" instead of calling the app damaged.
+      - name: Prepare macOS signing
+        if: runner.os == 'macOS'
+        working-directory: video-editor
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo '{"bundle": {"macOS": {"signingIdentity": "-"}}}' > macos-signing.json
+            exit 0
+          fi
+          echo '{}' > macos-signing.json
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value=${!name}
+            [ -n "$value" ] || continue
+            {
+              delimiter="EOF_$(openssl rand -hex 8)"
+              echo "$name<<$delimiter"; echo "$value"; echo "$delimiter"
+            } >> "$GITHUB_ENV"
+          done
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -125,12 +165,6 @@ jobs:
           ARRUMO_USAGE_KEY: ${{ secrets.ARRUMO_USAGE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -149,4 +183,12 @@ jobs:
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "v${{ needs.prepare.outputs.version }}" --repo "${{ github.repository }}" --draft=false --latest
+          PREVIEW: ${{ inputs.preview }}
+        # A preview stays a pre-release, so releases/latest and the updater keep pointing at the
+        # last full release.
+        run: |
+          if [ "$PREVIEW" = true ]; then
+            gh release edit "v${{ needs.prepare.outputs.version }}" --repo "${{ github.repository }}" --draft=false --prerelease
+          else
+            gh release edit "v${{ needs.prepare.outputs.version }}" --repo "${{ github.repository }}" --draft=false --latest
+          fi

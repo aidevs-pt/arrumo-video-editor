@@ -3,7 +3,7 @@
 Releases are built by the **Release** workflow (`.github/workflows/release.yml`). Run it by hand from the repository's Actions tab. It:
 
 1. sets the new version with `scripts/set-version.mjs` (`patch`, `minor`, `major`, or an exact version), commits `chore(release): vX.Y.Z` as the person who ran it, tags `vX.Y.Z` and drafts a GitHub release;
-2. builds and signs Linux (`.deb`, `.rpm`, AppImage), Windows (NSIS and MSI) and macOS (universal `.dmg`) on GitHub's runners;
+2. builds Linux (`.deb`, `.rpm`, AppImage), Windows (NSIS and MSI) and macOS (universal `.dmg`) on GitHub's runners, signing Windows and macOS when their credentials are set (see [Previews and unsigned builds](#previews-and-unsigned-builds));
 3. bundles the default plugins from their published registry releases, after checking each ZIP's digest against `plugin-registry/catalog.json`;
 4. uploads the installers, the signed updater packages and `latest.json`, then publishes the release.
 
@@ -54,6 +54,17 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
 
   The editor build bundles the latest catalog release of each default plugin. It stops if a plugin has no release, or if a ZIP differs from its catalog digest or from the plugin's manifest at that tag.
 - Run the local checks: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `pnpm build`.
+
+## Previews and unsigned builds
+
+Tick **Preview** when you run the workflow to publish a pre-release. It's on the Releases page for testers, but `releases/latest` and the updater keep pointing at the last full release, so the public download and installed copies don't move to it. Testers on a preview update to the next full release with a higher version.
+
+Missing signing credentials don't stop a release:
+
+- **Windows** without the Azure Artifact Signing variables builds unsigned installers. SmartScreen asks people to choose **More info › Run anyway**.
+- **macOS** without `APPLE_CERTIFICATE` gets an ad-hoc signature and no notarization. macOS asks people to allow the app once in **System Settings › Privacy & Security › Open Anyway**.
+
+When either platform is unsigned, the release notes start with these steps (`scripts/unsigned-notes.mjs`). Updates are verified with the updater key either way, so copies installed from an unsigned build update normally to the next signed one. Once the certificates arrive, add the secrets and publish the next version; earlier releases don't need re-signing.
 
 ## When a release breaks
 
