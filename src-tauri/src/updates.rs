@@ -146,7 +146,12 @@ pub fn on_exit(app: &AppHandle) {
 }
 
 async fn check(app: &AppHandle) -> Result<Option<Update>, tauri_plugin_updater::Error> {
-    app.updater()?.check().await
+    match app.updater()?.check().await {
+        // The server answered without a release, as before the first full release (previews
+        // don't count): there's nothing newer. Network failures are other errors.
+        Err(tauri_plugin_updater::Error::ReleaseNotFound) => Ok(None),
+        result => result,
+    }
 }
 
 fn describe(update: &Update) -> AvailableUpdate {
