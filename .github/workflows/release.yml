@@ -215,6 +215,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     steps:
+      # Every way Arrumo can be installed must find its update, or those copies stop updating.
+      - name: Check the update manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v${{ needs.prepare.outputs.version }}" --repo "${{ github.repository }}" --pattern latest.json
+          for target in linux-x86_64 linux-x86_64-appimage linux-x86_64-deb linux-x86_64-rpm windows-x86_64 \
+            windows-x86_64-nsis windows-x86_64-msi darwin-aarch64 darwin-x86_64; do
+            jq -e --arg t "$target" '.platforms[$t].url and .platforms[$t].signature' latest.json >/dev/null \
+              || { echo "::error::latest.json has no update for $target"; exit 1; }
+          done
       - env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW: ${{ inputs.preview }}

@@ -9,7 +9,7 @@ if (!macosSigned) {
   sections.push(`**macOS:** open the disk image and drag Arrumo into Applications. The first time you open it, macOS says it can't verify the app. Choose **Done**, open **System Settings → Privacy & Security**, scroll to Security and choose **Open Anyway** next to Arrumo, then confirm. macOS remembers your choice.`);
 }
 if (!windowsSigned) {
-  sections.push(`**Windows:** when SmartScreen says "Windows protected your PC", choose **More info**, then **Run anyway**.`);
+  sections.push(`**Windows:** when SmartScreen says "Windows protected your PC", choose **More info**, then **Run anyway**. Windows 11 with Smart App Control turned on blocks unsigned apps with no way to allow them; wait for a signed build on those computers.`);
 }
 
 if (sections.length > 0) {
