@@ -7,6 +7,7 @@ const files = {
   tauri: "src-tauri/tauri.conf.json",
   npm: "package.json",
   cargo: ["src-tauri/Cargo.toml", "crates/workspaces/Cargo.toml"],
+  metainfo: "src-tauri/linux/pt.aidevs.arrumo.metainfo.xml",
 };
 const current = JSON.parse(readFileSync(files.tauri, "utf8")).version;
 const [major, minor, patch] = current.split(".").map(Number);
@@ -25,5 +26,11 @@ for (const path of [files.tauri, files.npm]) {
 }
 for (const path of files.cargo) {
   writeFileSync(path, readFileSync(path, "utf8").replace(/^version = "[^"]+"/m, `version = "${next}"`));
+}
+// Linux software centres list each release from the metainfo, newest first.
+const metainfo = readFileSync(files.metainfo, "utf8");
+if (!metainfo.includes(`<release version="${next}"`)) {
+  const date = new Date().toISOString().slice(0, 10);
+  writeFileSync(files.metainfo, metainfo.replace("<releases>", `<releases>\n    <release version="${next}" date="${date}"/>`));
 }
 console.log(next);

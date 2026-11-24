@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>pt.aidevs.arrumo</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <name>Arrumo AI Video Editor</name>
+  <summary>AI video editor where an agent edits and you approve every step</summary>
+  <summary xml:lang="es">Editor de vídeo con IA en el que un agente edita y tú apruebas cada paso</summary>
+  <summary xml:lang="pt">Editor de vídeo com IA em que um agente edita e tu aprovas cada passo</summary>
+  <developer id="pt.aidevs">
+    <name>DEVS AI</name>
+  </developer>
+  <description>
+    <p>Describe the video or add your footage. An AI agent writes the script, designs on-brand animations, voices, cuts and renders it, and waits for your approval at each step.</p>
+    <p xml:lang="es">Describe el vídeo o añade tus grabaciones. Un agente de IA escribe el guion, diseña animaciones con tu marca, pone la voz, corta y renderiza, y espera tu aprobación en cada paso.</p>
+    <p xml:lang="pt">Descreve o vídeo ou adiciona as tuas gravações. Um agente de IA escreve o guião, desenha animações com a tua marca, dá a voz, corta e renderiza, e espera pela tua aprovação em cada passo.</p>
+    <p>The agent is Claude Code or Codex, signed in on your own computer with your own plan. Voices, music, images and video clips come from provider plugins such as ElevenLabs, OpenAI, Gemini and Higgsfield. Your footage, assets and keys stay on your computer.</p>
+    <p xml:lang="es">El agente es Claude Code o Codex, con tu sesión y tu propio plan en tu ordenador. Las voces, la música, las imágenes y los clips de vídeo vienen de complementos de proveedores como ElevenLabs, OpenAI, Gemini y Higgsfield. Tus grabaciones, recursos y claves se quedan en tu ordenador.</p>
+    <p xml:lang="pt">O agente é o Claude Code ou o Codex, com sessão iniciada no teu computador e o teu próprio plano. As vozes, a música, as imagens e os clipes de vídeo vêm de plugins de fornecedores como a ElevenLabs, a OpenAI, a Gemini e a Higgsfield. As tuas gravações, recursos e chaves ficam no teu computador.</p>
+  </description>
+  <launchable type="desktop-id">Arrumo AI Video Editor.desktop</launchable>
+  <icon type="stock">arrumo-desktop</icon>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+  </categories>
+  <keywords>
+    <keyword>video</keyword>
+    <keyword>editor</keyword>
+    <keyword>AI</keyword>
+    <keyword>agent</keyword>
+    <keyword>subtitles</keyword>
+  </keywords>
+  <url type="homepage">https://www.aidevs.pt/tools/arrumo</url>
+  <url type="help">https://www.aidevs.pt/tools/arrumo/docs</url>
+  <url type="bugtracker">https://github.com/aidevs-pt/arrumo-video-editor/issues</url>
+  <url type="vcs-browser">https://github.com/aidevs-pt/arrumo-video-editor</url>
+  <url type="contribute">https://github.com/aidevs-pt/arrumo-video-editor/blob/main/CONTRIBUTING.md</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Review each section of the script, approve it or send it back with a note</caption>
+      <image>https://github.com/aidevs-pt/arrumo-video-editor/raw/main/docs/assets/review.jpg</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>arrumo-desktop</binary>
+  </provides>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">1024</display_length>
+  </requires>
+  <releases>
+    <release version="0.1.0" date="2026-11-24"/>
+  </releases>
+</component>
