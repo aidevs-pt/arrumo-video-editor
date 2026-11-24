@@ -632,6 +632,80 @@ fn wrap(text: &str, columns: usize) -> String {
     lines.join("\n")
 }
 
+/// A font file read for layout, so lines wrap by their real width in the font FFmpeg draws.
+struct TextFont(Vec<u8>);
+
+impl TextFont {
+    fn load(path: &Path) -> Option<Self> {
+        let data = fs::read(path).ok()?;
+        ttf_parser::Face::parse(&data, 0).ok()?;
+        Some(Self(data))
+    }
+
+    fn face(&self) -> ttf_parser::Face<'_> {
+        ttf_parser::Face::parse(&self.0, 0).expect("checked when loaded")
+    }
+
+    /// The width of `text` at `px`, from the font's advances. Characters the font lacks count
+    /// as wide as its widest letter, so they never overflow.
+    fn width(&self, text: &str, px: f64) -> f64 {
+        let face = self.face();
+        let fallback = face
+            .glyph_index('W')
+            .and_then(|glyph| face.glyph_hor_advance(glyph))
+            .unwrap_or(face.units_per_em());
+        let units: f64 = text
+            .chars()
+            .map(|ch| {
+                f64::from(
+                    face.glyph_index(ch)
+                        .and_then(|glyph| face.glyph_hor_advance(glyph))
+                        .unwrap_or(fallback),
+                )
+            })
+            .sum();
+        units / f64::from(face.units_per_em()) * px
+    }
+
+    /// The height FFmpeg gives a line at `px` when lines align to the font's metrics.
+    fn line_box(&self, px: f64) -> f64 {
+        let face = self.face();
+        f64::from(face.ascender() - face.descender()) / f64::from(face.units_per_em()) * px
+    }
+}
+
+/// Wraps `text` so no line is wider than `max` by `measure`, breaking inside a word only when
+/// the word alone is wider.
+fn wrap_measured(text: &str, max: f64, measure: impl Fn(&str) -> f64) -> String {
+    let mut lines = Vec::new();
+    for paragraph in text.split('\n') {
+        let mut line = String::new();
+        for word in paragraph.split_whitespace() {
+            let candidate = if line.is_empty() {
+                word.to_owned()
+            } else {
+                format!("{line} {word}")
+            };
+            if measure(&candidate) <= max {
+                line = candidate;
+                continue;
+            }
+            if !line.is_empty() {
+                lines.push(std::mem::take(&mut line));
+            }
+            for ch in word.chars() {
+                line.push(ch);
+                if measure(&line) > max && line.chars().count() > 1 {
+                    line.pop();
+                    lines.push(std::mem::replace(&mut line, ch.to_string()));
+                }
+            }
+        }
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
 /// Seconds between the entrances of a text layer's lines in a reveal or wipe.
 const LINE_STAGGER: f64 = 0.09;
 
@@ -641,6 +715,8 @@ struct MaskedLine<'a> {
     file: &'a str,
     font_px: f64,
     line_height: f64,
+    /// How far below the line's top the font's metric box starts.
+    inset: f64,
     color: &'a str,
     /// Where the line starts, as a drawtext x expression in frame pixels.
     anchor: &'a str,
@@ -680,7 +756,7 @@ impl MaskedLine<'_> {
             let exit = ((layer.end - layer.start).max(0.1) / 3.0).min(0.6);
             format!("(1-pow(clip((t-{:.3})/{exit:.3},0,1),3))", layer.end - exit)
         };
-        let rest = pad + font_px * 0.1;
+        let rest = pad + self.inset;
         let (y, mask) = match layer.enter {
             Motion::Reveal => (
                 format!("{rest:.2}+{:.2}*(1-{progress})", self.line_height * 1.1),
@@ -706,7 +782,7 @@ impl MaskedLine<'_> {
         write!(
             graph,
             "color=c=black@0:s={strip_w:.0}x{strip_h:.0}:r={FPS}:d={length:.3},format=rgba,\
-             drawtext=fontfile={font}:textfile={file}:expansion=none:fontsize={font_px:.0}:\
+             drawtext=fontfile={font}:textfile={file}:expansion=none:y_align=font:fontsize={font_px:.0}:\
              fontcolor={color}:alpha='{fade_out}':x='{anchor}':y='{y}'{mask}[{strip}];\
              [{input}][{strip}]overlay=x=0:y={:.2}:enable='{enable}':format=auto[{output}];",
             top - pad,
@@ -861,14 +937,30 @@ impl LayerTarget<'_> {
                     } else {
                         FontWeight::Regular
                     };
-                    let advance = self.fonts.advance(layer.font, weight);
-                    let columns = (layer.width * frame_w / (font_px * advance)).floor() as usize;
-                    let wrapped = wrap(layer.text.as_deref().unwrap_or_default(), columns);
                     let font = font_name(layer.font, weight);
+                    let text = layer.text.as_deref().unwrap_or_default();
+                    let measured = TextFont::load(&directory.join(&font));
+                    let wrapped = match &measured {
+                        Some(face) => wrap_measured(text, layer.width * frame_w, |line| {
+                            face.width(line, font_px)
+                        }),
+                        None => {
+                            let advance = self.fonts.advance(layer.font, weight);
+                            wrap(
+                                text,
+                                (layer.width * frame_w / (font_px * advance)).floor() as usize,
+                            )
+                        }
+                    };
                     // FFmpeg 8's drawtext draws a missing-glyph box at each line break, so
                     // every line is its own centred drawtext.
                     let lines: Vec<&str> = wrapped.lines().collect();
                     let line_height = font_px * 1.25;
+                    // Lines align to the font's metrics, so every line shares a baseline whatever
+                    // letters it holds; the metric box sits centred in its line.
+                    let inset = measured.as_ref().map_or(font_px * 0.1, |face| {
+                        (line_height - face.line_box(font_px)) / 2.0
+                    });
                     let top = layer.y * frame_h - line_height * lines.len() as f64 / 2.0;
                     let anchor = match layer.align {
                         Align::Left => format!("{:.2}", (layer.x - layer.width / 2.0) * frame_w),
@@ -894,6 +986,7 @@ impl LayerTarget<'_> {
                                 file: &file,
                                 font_px,
                                 line_height,
+                                inset,
                                 color: &color,
                                 anchor: &anchor,
                                 width: frame_w,
@@ -921,11 +1014,11 @@ impl LayerTarget<'_> {
                         };
                         write!(
                             graph,
-                            "[{line_input}]drawtext=fontfile={font}:textfile={file}:expansion=none:\
+                            "[{line_input}]drawtext=fontfile={font}:textfile={file}:expansion=none:y_align=font:\
                          fontsize={font_px:.0}:fontcolor={color}:\
                          alpha='{alpha}':x='{anchor}+{dx}':y='{:.2}+{dy}':\
                          enable='{enable}'[{output}];",
-                            top + line_height * number as f64 + font_px * 0.1,
+                            top + line_height * number as f64 + inset,
                         )
                         .ok();
                         line_input = output;
@@ -2634,5 +2727,28 @@ mod tests {
         // Plain animations never carry a sound-effect file.
         let plain = MotionSpec::from_answer(&value, |_| true).unwrap();
         assert_eq!(plain.layers[0].sound_asset_id, None);
+    }
+
+    #[test]
+    fn text_wraps_by_its_measured_width() {
+        let ten = |line: &str| line.chars().count() as f64 * 10.0;
+        let wrapped = wrap_measured("Brilliant ideas ready now", 100.0, ten);
+        assert_eq!(wrapped, "Brilliant\nideas\nready now");
+        assert!(wrapped.lines().all(|line| ten(line) <= 100.0));
+        assert_eq!(
+            wrap_measured("Supercalifragilistic", 100.0, ten),
+            "Supercalif\nragilistic"
+        );
+        let Some(face) = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        ]
+        .iter()
+        .find_map(|path| TextFont::load(Path::new(path))) else {
+            return;
+        };
+        assert!(face.width("iii", 80.0) < face.width("WWW", 80.0));
+        let line_box = face.line_box(80.0);
+        assert!((80.0..100.0).contains(&line_box), "{line_box}");
     }
 }
