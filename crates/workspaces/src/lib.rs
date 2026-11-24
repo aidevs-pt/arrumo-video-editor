@@ -110,7 +110,9 @@ pub use video_generation::{VideoModel, VideoVariant};
 mod workspace_feedback;
 
 pub use a2a::serve_a2a;
-pub use agent_cli::{AgentLoginStatus, agent_cli_detected, check_agent_login};
+pub use agent_cli::{
+    AgentExecutableError, AgentLoginStatus, agent_cli_detected, agent_cli_path, check_agent_login,
+};
 pub use agent_logs::{AgentLog, AgentLogSummary};
 pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};
 pub use agent_run::AgentRunError;
@@ -334,6 +336,7 @@ impl WorkspaceStore {
             include_str!("../migrations/064-plugin-activation.sql"),
             include_str!("../migrations/065-agent-usage-observations.sql"),
             include_str!("../migrations/066-brand-fonts.sql"),
+            include_str!("../migrations/067-agent-executables.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
@@ -343,6 +346,7 @@ impl WorkspaceStore {
             migration.execute_batch(migration_sql)?;
         }
         migration.commit()?;
+        agent_cli::load_executables(&connection)?;
         Ok(Self(connection))
     }
 

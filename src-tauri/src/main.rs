@@ -1838,6 +1838,8 @@ fn main() {
             plugin_settings::open_plugin_setting_help,
             agent_settings::set_agent_provider,
             agent_settings::agent_cli_detected,
+            agent_settings::agent_cli_location,
+            agent_settings::set_agent_cli_path,
             agent_settings::agent_login_status,
             agent_settings::open_agent_setup_guide,
             create_workspace,

@@ -235,7 +235,7 @@
     "checking": "Checking for the agent CLI…",
     "detected": "Agent CLI found",
     "notDetected": "Agent CLI not found",
-    "connectionHint": "The check looks for the CLI on Arrumo’s PATH. Follow the provider’s guide to install and authenticate it.",
+    "connectionHint": "Arrumo looks for the CLI in your usual program folders. If it's installed somewhere else, choose its program file.",
     "guide": "Open setup guide",
     "recheck": "Check again",
     "guideError": "Couldn’t open the setup guide.",
@@ -256,7 +256,13 @@
     "saved": "Provider saved.",
     "loading": "Loading agent settings…",
     "loadError": "Agent settings couldn’t be loaded.",
-    "saveError": "The provider couldn’t be saved."
+    "saveError": "The provider couldn’t be saved.",
+    "foundAt": "Using {path}",
+    "chooseProgram": "Choose the program…",
+    "chooseProgramTitle": "Choose the agent's program file",
+    "resetProgram": "Find it automatically",
+    "programNotRunnable": "That file can't be run. Choose the agent's program file, such as the one named after the agent.",
+    "programFailed": "Couldn't save the program."
   },
   "dashboard": {
     "search": "Search workspace",

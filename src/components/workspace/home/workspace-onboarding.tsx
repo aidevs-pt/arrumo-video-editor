@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OnboardingKeys } from "./onboarding-keys";
 import type { PluginSettingsManifest } from "@/components/workspace/settings/plugin-preferences";
+import { chooseAgentProgram } from "@/lib/agent-cli";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
@@ -269,6 +270,7 @@ function AgentOption({ agent, description, selected }: {
   const [detected, setDetected] = useState<boolean>();
   const [failed, setFailed] = useState(false);
   const [guideError, setGuideError] = useState(false);
+  const [programError, setProgramError] = useState<string>();
   useEffect(() => {
     let active = true;
     invoke<boolean>("agent_cli_detected", { provider: agent.id }).then(
@@ -296,7 +298,15 @@ function AgentOption({ agent, description, selected }: {
         setGuideError(false);
         void invoke("open_agent_setup_guide", { provider: agent.id }).catch(() => setGuideError(true));
       }}>{copy.guide}<ArrowUpRight aria-hidden="true" className="size-3.5" /></button>}
+      {detected === false && <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={() => {
+        setProgramError(undefined);
+        chooseAgentProgram(agent.id, copy.chooseProgramTitle).then(
+          (location) => { if (location) setDetected(location.found !== null); },
+          (error) => setProgramError(error === "agent_cli_not_runnable" ? copy.programNotRunnable : copy.programFailed),
+        );
+      }}>{copy.chooseProgram}</button>}
       {guideError && <p role="alert" className="text-destructive">{copy.guideError}</p>}
+      {programError && <p role="alert" className="w-full text-destructive">{programError}</p>}
     </div>
   </div>;
 }

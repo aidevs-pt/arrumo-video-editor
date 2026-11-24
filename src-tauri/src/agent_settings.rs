@@ -1,4 +1,7 @@
-use arrumo_workspaces::{AgentPlugin, AgentSettings};
+use std::path::Path;
+
+use arrumo_workspaces::{AgentExecutableError, AgentPlugin, AgentSettings};
+use serde::Serialize;
 use tauri::State;
 
 use crate::Store;
@@ -33,6 +36,50 @@ pub fn set_agent_provider(
 #[tauri::command]
 pub fn agent_cli_detected(provider: String) -> bool {
     arrumo_workspaces::agent_cli_detected(&provider)
+}
+
+/// Where an agent's CLI was found, and the program chosen for it in settings, if any.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCliLocation {
+    found: Option<String>,
+    chosen: Option<String>,
+}
+
+fn location(provider: &str, store: &arrumo_workspaces::WorkspaceStore) -> AgentCliLocation {
+    AgentCliLocation {
+        found: arrumo_workspaces::agent_cli_path(provider)
+            .map(|path| path.to_string_lossy().into_owned()),
+        chosen: store.agent_executable(provider).ok().flatten(),
+    }
+}
+
+#[tauri::command]
+pub fn agent_cli_location(
+    provider: String,
+    store: State<'_, Store>,
+) -> Result<AgentCliLocation, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    Ok(location(&provider, &store))
+}
+
+/// Chooses the program that runs an agent, or with no path goes back to finding it on the PATH.
+/// Only the desktop offers this; the MCP and A2A servers agents talk to don't.
+#[tauri::command]
+pub fn set_agent_cli_path(
+    provider: String,
+    path: Option<String>,
+    store: State<'_, Store>,
+) -> Result<AgentCliLocation, &'static str> {
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    store
+        .set_agent_executable(&provider, path.as_deref().map(Path::new))
+        .map_err(|error| match error {
+            AgentExecutableError::NotRunnable => "agent_cli_not_runnable",
+            AgentExecutableError::UnknownAgent => "agent_unknown",
+            AgentExecutableError::Database(_) => "agent_cli_save_failed",
+        })?;
+    Ok(location(&provider, &store))
 }
 
 #[tauri::command]

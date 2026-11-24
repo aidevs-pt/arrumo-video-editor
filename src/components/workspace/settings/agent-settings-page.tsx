@@ -17,6 +17,7 @@ import { useWorkspaceCatalog, workspaceHref } from "@/components/workspace/home/
 import { WorkspaceShell } from "@/components/workspace/layout";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { useAppearance } from "@/lib/appearance";
+import { type AgentCliLocation, agentCliLocation, chooseAgentProgram, resetAgentProgram } from "@/lib/agent-cli";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -452,21 +453,33 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
 
 function AgentSetupHelp({ provider }: { provider: string }) {
   const { messages: { agentSettings: copy } } = useLocale();
-  const [detected, setDetected] = useState<boolean>();
+  const [location, setLocation] = useState<AgentCliLocation>();
+  const detected = location && location.found !== null;
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [programError, setProgramError] = useState<string>();
   const [loginStatus, setLoginStatus] = useState<LoginStatus>();
   const [checkingLogin, setCheckingLogin] = useState(false);
   const [guideError, setGuideError] = useState(false);
 
   useEffect(() => {
     let active = true;
-    invoke<boolean>("agent_cli_detected", { provider }).then(
-      (status) => { if (active) setDetected(status); },
+    agentCliLocation(provider).then(
+      (next) => { if (active) setLocation(next); },
       () => { if (active) setFailed(true); },
     );
     return () => { active = false; };
   }, [attempt, provider]);
+
+  async function changeProgram(choose: boolean) {
+    setProgramError(undefined);
+    try {
+      const next = choose ? await chooseAgentProgram(provider, copy.chooseProgramTitle) : await resetAgentProgram(provider);
+      if (next) { setLocation(next); setLoginStatus(undefined); }
+    } catch (error) {
+      setProgramError(error === "agent_cli_not_runnable" ? copy.programNotRunnable : copy.programFailed);
+    }
+  }
 
   async function checkLogin() {
     setCheckingLogin(true);
@@ -486,6 +499,7 @@ function AgentSetupHelp({ provider }: { provider: string }) {
         <p className="font-medium">{failed ? copy.checkFailed
           : detected === undefined ? copy.checking
           : detected ? copy.detected : copy.notDetected}</p>
+        {location?.found && <p className="break-all text-muted-foreground">{copy.foundAt.replace("{path}", location.found)}</p>}
         <p className="text-muted-foreground">{copy.connectionHint}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -497,9 +511,11 @@ function AgentSetupHelp({ provider }: { provider: string }) {
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => {
           setFailed(false);
-          setDetected(undefined);
+          setLocation(undefined);
           setAttempt((value) => value + 1);
         }}>{copy.recheck}</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => void changeProgram(true)}>{copy.chooseProgram}</Button>
+        {location?.chosen && <Button type="button" size="sm" variant="ghost" onClick={() => void changeProgram(false)}>{copy.resetProgram}</Button>}
         {detected && <Button type="button" size="sm" variant="outline"
           disabled={checkingLogin} onClick={() => void checkLogin()}>
           {checkingLogin ? copy.checkingLogin : copy.checkLogin}
@@ -512,6 +528,7 @@ function AgentSetupHelp({ provider }: { provider: string }) {
         })[loginStatus]}
       </p>
       {guideError && <p role="alert" className="text-sm text-destructive">{copy.guideError}</p>}
+      {programError && <p role="alert" className="text-sm text-destructive">{programError}</p>}
     </div>
   );
 }

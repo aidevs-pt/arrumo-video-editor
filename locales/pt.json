@@ -235,7 +235,7 @@
     "checking": "A procurar a CLI do agente…",
     "detected": "CLI do agente encontrada",
     "notDetected": "CLI do agente não encontrada",
-    "connectionHint": "A verificação procura a CLI no PATH do Arrumo. Segue o guia do fornecedor para instalar e autenticar.",
+    "connectionHint": "O Arrumo procura a CLI nas tuas pastas de programas habituais. Se estiver instalada noutro sítio, escolhe o ficheiro do programa.",
     "guide": "Abrir guia de configuração",
     "recheck": "Verificar novamente",
     "guideError": "Não foi possível abrir o guia de configuração.",
@@ -256,7 +256,13 @@
     "saved": "Fornecedor guardado.",
     "loading": "A carregar definições do agente…",
     "loadError": "Não foi possível carregar as definições do agente.",
-    "saveError": "Não foi possível guardar o fornecedor."
+    "saveError": "Não foi possível guardar o fornecedor.",
+    "foundAt": "A usar {path}",
+    "chooseProgram": "Escolher o programa…",
+    "chooseProgramTitle": "Escolhe o ficheiro do programa do agente",
+    "resetProgram": "Procurar automaticamente",
+    "programNotRunnable": "Esse ficheiro não pode ser executado. Escolhe o ficheiro do programa do agente, como o que tem o nome dele.",
+    "programFailed": "Não foi possível guardar o programa."
   },
   "dashboard": {
     "search": "Pesquisar no espaço",

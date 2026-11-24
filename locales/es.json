@@ -235,7 +235,7 @@
     "checking": "Buscando la CLI del agente…",
     "detected": "CLI del agente encontrada",
     "notDetected": "No se encontró la CLI del agente",
-    "connectionHint": "La comprobación busca la CLI en el PATH de Arrumo. Sigue la guía del proveedor para instalarla y autenticarte.",
+    "connectionHint": "Arrumo busca la CLI en tus carpetas de programas habituales. Si está instalada en otro sitio, elige su archivo de programa.",
     "guide": "Abrir guía de configuración",
     "recheck": "Volver a comprobar",
     "guideError": "No se pudo abrir la guía de configuración.",
@@ -256,7 +256,13 @@
     "saved": "Proveedor guardado.",
     "loading": "Cargando ajustes del agente…",
     "loadError": "No se pudieron cargar los ajustes del agente.",
-    "saveError": "No se pudo guardar el proveedor."
+    "saveError": "No se pudo guardar el proveedor.",
+    "foundAt": "Se usa {path}",
+    "chooseProgram": "Elegir el programa…",
+    "chooseProgramTitle": "Elige el archivo de programa del agente",
+    "resetProgram": "Buscarlo automáticamente",
+    "programNotRunnable": "Ese archivo no se puede ejecutar. Elige el archivo de programa del agente, como el que lleva su nombre.",
+    "programFailed": "No se pudo guardar el programa."
   },
   "dashboard": {
     "search": "Buscar en el espacio",

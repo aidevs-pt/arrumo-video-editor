@@ -1,14 +1,17 @@
 use std::{
+    collections::BTreeMap,
     env,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::RwLock,
     thread,
     time::{Duration, Instant},
 };
 
+use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
 
-use crate::{AgentPlugin, agent_plugin};
+use crate::{AgentPlugin, WorkspaceStore, agent_plugin};
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -21,7 +24,69 @@ pub enum AgentLoginStatus {
 }
 
 pub fn agent_cli_detected(provider: &str) -> bool {
-    agent_plugin(provider).and_then(find_agent_cli).is_some()
+    agent_cli_path(provider).is_some()
+}
+
+impl WorkspaceStore {
+    /// The program chosen for an agent, if any.
+    pub fn agent_executable(&self, provider: &str) -> rusqlite::Result<Option<String>> {
+        self.0
+            .query_row(
+                "SELECT path FROM agent_executables WHERE plugin_id = ?1",
+                [provider],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    /// Chooses the program that runs an agent, or with `None` goes back to the PATH. Only the
+    /// desktop's settings call this: agents talk to the MCP and A2A servers, and must not pick
+    /// the program the next run executes.
+    pub fn set_agent_executable(
+        &self,
+        provider: &str,
+        path: Option<&Path>,
+    ) -> Result<(), AgentExecutableError> {
+        let plugin = agent_plugin(provider).ok_or(AgentExecutableError::UnknownAgent)?;
+        match path {
+            Some(path) => {
+                if !path.is_absolute() || !runnable(path) {
+                    return Err(AgentExecutableError::NotRunnable);
+                }
+                let text = path.to_str().ok_or(AgentExecutableError::NotRunnable)?;
+                self.0.execute(
+                    "INSERT INTO agent_executables (plugin_id, path) VALUES (?1, ?2)
+                     ON CONFLICT (plugin_id) DO UPDATE SET path = excluded.path",
+                    params![plugin.id, text],
+                )?;
+            }
+            None => {
+                self.0.execute(
+                    "DELETE FROM agent_executables WHERE plugin_id = ?1",
+                    [&plugin.id],
+                )?;
+                CHOSEN
+                    .write()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .remove(&plugin.id);
+            }
+        }
+        load_executables(&self.0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum AgentExecutableError {
+    UnknownAgent,
+    NotRunnable,
+    Database(rusqlite::Error),
+}
+
+impl From<rusqlite::Error> for AgentExecutableError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Database(error)
+    }
 }
 
 pub fn check_agent_login(provider: &str) -> AgentLoginStatus {
@@ -70,7 +135,55 @@ pub fn check_agent_login(provider: &str) -> AgentLoginStatus {
     }
 }
 
+/// Agent CLIs people chose by hand because they aren't on the PATH, by plugin id. Every process
+/// loads them when it opens the database, so the desktop, CLI and MCP server resolve alike.
+static CHOSEN: RwLock<BTreeMap<String, PathBuf>> = RwLock::new(BTreeMap::new());
+
+pub(crate) fn load_executables(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let mut statement = connection.prepare("SELECT plugin_id, path FROM agent_executables")?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                PathBuf::from(row.get::<_, String>(1)?),
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    CHOSEN
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .extend(rows);
+    Ok(())
+}
+
+fn runnable(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        path.metadata()
+            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
+}
+
+/// Where an agent's CLI is: the program chosen in settings while it still exists, otherwise the
+/// first match on the PATH.
+pub fn agent_cli_path(provider: &str) -> Option<PathBuf> {
+    agent_plugin(provider).and_then(find_agent_cli)
+}
+
 pub(crate) fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
+    let chosen = CHOSEN
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(&plugin.id)
+        .cloned();
+    if let Some(path) = chosen.filter(|path| runnable(path)) {
+        return Some(path);
+    }
     let executable = &plugin.cli.executable;
     let search_path = env::var_os("PATH")?;
     env::split_paths(&search_path)
@@ -176,4 +289,72 @@ pub(crate) fn read_agent_usage(plugin: &AgentPlugin) -> Option<std::io::Result<A
             .max_by(|first, second| first.0.total_cmp(&second.0))
             .ok_or_else(|| failed("the answer has no usage"))
     })())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
+    fn a_chosen_program_is_used_while_it_exists_and_left_out_of_backups() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = WorkspaceStore::open(temp.path().join("workspaces.sqlite")).unwrap();
+        let plugin = &crate::agent_plugins()[0];
+        let program = temp
+            .path()
+            .join(format!("agent{}", env::consts::EXE_SUFFIX));
+        std::fs::write(&program, "#!/bin/sh\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let not_runnable = temp.path().join("notes.txt");
+            std::fs::write(&not_runnable, "").unwrap();
+            assert!(matches!(
+                store.set_agent_executable(&plugin.id, Some(&not_runnable)),
+                Err(AgentExecutableError::NotRunnable)
+            ));
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        assert!(matches!(
+            store.set_agent_executable(&plugin.id, Some(Path::new("relative/agent"))),
+            Err(AgentExecutableError::NotRunnable)
+        ));
+        assert!(matches!(
+            store.set_agent_executable("not-an-agent", Some(&program)),
+            Err(AgentExecutableError::UnknownAgent)
+        ));
+
+        store
+            .set_agent_executable(&plugin.id, Some(&program))
+            .unwrap();
+        assert_eq!(agent_cli_path(&plugin.id), Some(program.clone()));
+        assert_eq!(
+            store.agent_executable(&plugin.id).unwrap().as_deref(),
+            program.to_str()
+        );
+
+        let backup = temp.path().join("backup.zip");
+        store
+            .export_backup(&temp.path().join("workspaces.sqlite"), &backup)
+            .unwrap();
+        let staging = tempfile::tempdir().unwrap();
+        zip::ZipArchive::new(std::fs::File::open(&backup).unwrap())
+            .unwrap()
+            .extract(staging.path())
+            .unwrap();
+        let snapshot =
+            rusqlite::Connection::open(staging.path().join("database/workspaces.sqlite")).unwrap();
+        let saved: i64 = snapshot
+            .query_row("SELECT count(*) FROM agent_executables", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(saved, 0);
+
+        std::fs::remove_file(&program).unwrap();
+        assert_ne!(agent_cli_path(&plugin.id), Some(program.clone()));
+        store.set_agent_executable(&plugin.id, None).unwrap();
+        assert_eq!(store.agent_executable(&plugin.id).unwrap(), None);
+    }
 }

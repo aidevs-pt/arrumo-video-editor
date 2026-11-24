@@ -179,6 +179,8 @@ impl WorkspaceStore {
         let scratch = tempfile::tempdir_in(parent)?;
         let snapshot = scratch.path().join("workspaces.sqlite");
         self.snapshot_database(&snapshot)?;
+        // Chosen agent programs are paths on this computer; another one has its own.
+        rusqlite::Connection::open(&snapshot)?.execute("DELETE FROM agent_executables", [])?;
         let workspaces = self
             .list()?
             .into_iter()
