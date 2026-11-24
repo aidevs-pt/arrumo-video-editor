@@ -156,6 +156,17 @@ impl WorkspaceStore {
         )
     }
 
+    /// Counts a new install once, on its first launch, rather than every launch.
+    pub fn track_install(&self) {
+        let first = self.0.execute(
+            "UPDATE privacy_settings SET install_reported = 1 WHERE id = 1 AND install_reported = 0",
+            [],
+        );
+        if first == Ok(1) {
+            self.track_usage("app_installed", &[]);
+        }
+    }
+
     /// Counts one use of a feature, if the creator allows it and this build can send it.
     /// `props` must only hold coarse, non-identifying values such as a provider ID or a flag.
     pub fn track_usage(&self, event: &str, props: &[(&str, Value)]) {
@@ -393,7 +404,25 @@ mod tests {
         let off = store.set_privacy_settings(false, true).unwrap();
         assert!(!off.usage_data && off.crash_reports);
         // Contributor builds have no keys, so tracking is a no-op.
-        store.track_usage("app_started", &[]);
+        store.track_usage("app_installed", &[]);
+    }
+
+    #[test]
+    fn a_new_install_is_counted_once() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let reported = || -> bool {
+            store
+                .0
+                .query_row("SELECT install_reported FROM privacy_settings", [], |row| {
+                    row.get(0)
+                })
+                .unwrap()
+        };
+        assert!(!reported());
+        store.track_install();
+        assert!(reported());
+        store.track_install();
+        assert!(reported());
     }
 
     #[test]
