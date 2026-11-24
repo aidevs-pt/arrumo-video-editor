@@ -83,7 +83,7 @@ export function StudioDashboard({ workspace }: { workspace: Workspace }) {
   }
 
   return (
-    <WorkspaceShell className="flex max-w-7xl flex-col gap-10">
+    <WorkspaceShell className="flex flex-col gap-10">
       <header className="flex flex-col items-start gap-6 border-b-2 border-foreground pb-8">
         <h1 className="max-w-4xl text-[clamp(2.25rem,5vw,3.25rem)] leading-[.98] font-[850] tracking-[-.015em] text-balance [font-variation-settings:'wdth'_135]">{heading}</h1>
         <div className="flex flex-wrap gap-3">

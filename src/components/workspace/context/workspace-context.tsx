@@ -61,7 +61,7 @@ export function WorkspaceContext({ workspace }: {
   }
 
   return (
-    <WorkspaceShell className="max-w-7xl">
+    <WorkspaceShell>
       <WorkspaceSettingsHeading workspace={workspace} current="context" headingRef={heading} />
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="flex min-w-0 flex-col gap-12">
