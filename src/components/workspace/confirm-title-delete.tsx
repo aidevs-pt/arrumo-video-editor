@@ -26,7 +26,8 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
     cancelDelete: string;
     deleting: string;
   };
-  onConfirm: (title: string) => Promise<boolean>;
+  /** `true` once deleted; a string explains why it was not. */
+  onConfirm: (title: string) => Promise<boolean | string>;
   onDelete: () => void;
   /** Lets another control, such as a context menu, open the dialog. */
   open?: boolean;
@@ -38,7 +39,7 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
   const setOpen = (next: boolean) => { setOwn(next); onOpenChange?.(next); };
   const [confirmation, setConfirmation] = useState("");
   const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<boolean | string>(false);
   const [copied, setCopied] = useState(false);
   const { messages } = useLocale();
   const shared = messages.pluginActions;
@@ -49,11 +50,12 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
     setPending(true);
     setFailed(false);
     try {
-      if (await onConfirm(confirmation)) {
+      const result = await onConfirm(confirmation);
+      if (result === true) {
         setOpen(false);
         onDelete();
       } else {
-        setFailed(true);
+        setFailed(result || true);
       }
     } catch {
       setFailed(true);
@@ -95,7 +97,7 @@ export function ConfirmTitleDelete({ title, disabled, copy, onConfirm, onDelete,
             <Input id={inputId} value={confirmation} onChange={(event) => setConfirmation(event.target.value)}
               disabled={pending} autoComplete="off" spellCheck={false} />
           </Field>
-          {failed && <Alert variant="destructive"><AlertDescription>{copy.deleteError}</AlertDescription></Alert>}
+          {failed && <Alert variant="destructive" role="alert"><AlertDescription>{typeof failed === "string" ? failed : copy.deleteError}</AlertDescription></Alert>}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>{copy.cancelDelete}</AlertDialogCancel>
             <Button type="submit" variant="destructive" disabled={pending || confirmation !== title}>
