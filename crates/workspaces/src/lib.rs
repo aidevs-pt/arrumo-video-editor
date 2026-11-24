@@ -17,6 +17,7 @@ mod agent_settings;
 mod agent_stage;
 mod agent_work;
 mod asset_cleanup;
+pub use asset_cleanup::{AssetRemoval, AssetUse, AssetUseKind};
 mod asset_organization;
 mod asset_plan;
 mod assets;

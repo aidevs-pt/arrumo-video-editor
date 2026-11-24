@@ -491,7 +491,7 @@ async fn remove_asset(
     workspace_id: i64,
     asset_id: i64,
     confirmed_name: String,
-) -> Result<bool, &'static str> {
+) -> Result<arrumo_workspaces::AssetRemoval, &'static str> {
     let database = app
         .path()
         .app_local_data_dir()
@@ -500,8 +500,34 @@ async fn remove_asset(
     tauri::async_runtime::spawn_blocking(move || {
         WorkspaceStore::open(&database)
             .map_err(|_| "store_unavailable")?
-            .remove_workspace_asset(&database, workspace_id, asset_id, &confirmed_name)
+            .remove_asset_explained(&database, workspace_id, asset_id, &confirmed_name)
             .map_err(|_| "asset_removal_failed")
+    })
+    .await
+    .map_err(|_| "asset_removal_failed")?
+}
+
+/// Removes the selected assets after the creator confirmed them together.
+#[tauri::command]
+async fn remove_assets(
+    app: AppHandle,
+    workspace_id: i64,
+    asset_ids: Vec<i64>,
+) -> Result<Vec<serde_json::Value>, &'static str> {
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "store_unavailable")?
+        .join("workspaces.sqlite");
+    tauri::async_runtime::spawn_blocking(move || {
+        let results = WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .remove_assets_explained(&database, workspace_id, &asset_ids)
+            .map_err(|_| "asset_removal_failed")?;
+        Ok(results
+            .into_iter()
+            .map(|(asset_id, result)| serde_json::json!({"assetId": asset_id, "result": result}))
+            .collect())
     })
     .await
     .map_err(|_| "asset_removal_failed")?
@@ -1878,6 +1904,7 @@ fn main() {
             list_asset_organization,
             set_asset_organization,
             remove_asset,
+            remove_assets,
             replace_asset,
             get_workspace_context,
             draft_workspace_context,
