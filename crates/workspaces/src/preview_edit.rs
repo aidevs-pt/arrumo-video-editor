@@ -698,13 +698,14 @@ impl WorkspaceStore {
                 }
             }
         });
-        let answer = self.run_logged_agent(
-            crate::agent_logs::AgentLogScope {
-                workspace_id,
-                run_id: Some(run_id),
-                stage: "preview",
-                attempt: Some(attempt),
-            },
+        let scope = crate::agent_logs::AgentLogScope {
+            workspace_id,
+            run_id: Some(run_id),
+            stage: "preview",
+            attempt: Some(attempt),
+        };
+        let mut answer = self.run_logged_agent(
+            scope,
             provider,
             &prompt,
             &with_music_schema(schema, &track_ids, true),
@@ -715,6 +716,36 @@ impl WorkspaceStore {
                     .map_err(Into::into)
             },
         )?;
+        if let Some(scenes) = answer["scenes"].as_array_mut() {
+            let fonts = self.run_font_set(&crate::asset_root(database), workspace_id, run_id)?;
+            self.review_motion_answers(
+                database,
+                workspace_id,
+                scenes,
+                &with_narration(crate::motion_spec::spec_schema_with_media(
+                    &image_ids, &clip_ids, &sound_ids,
+                )),
+                &|scene| {
+                    crate::motion_spec::MotionSpec::from_answer_with_media(
+                        scene,
+                        |id| image_ids.contains(&id),
+                        |id| clip_ids.contains(&id),
+                        |id| sound_ids.contains(&id),
+                    )
+                    .ok()
+                },
+                &crate::motion_design::MotionReview {
+                    scope,
+                    provider,
+                    size: crate::motion_design::run_preview_size(snapshot),
+                    fonts: &fonts,
+                },
+                &mut || {
+                    self.renew_generation_lease(workspace_id, run_id, attempt)?;
+                    Ok(())
+                },
+            )?;
+        }
         let mut edit = storyboard(&answer, &image_ids, &clip_ids, &sound_ids, &provider.id)
             .map_err(io::Error::other)?;
         place_music(&mut edit, &answer, &track_ids);
