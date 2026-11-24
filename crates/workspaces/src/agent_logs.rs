@@ -178,12 +178,23 @@ impl WorkspaceStore {
                     .collect()
             })
             .unwrap_or_default();
-        if let Ok(settings) = self.plugin_settings(plugin_id, Some(workspace_id)) {
-            for (id, setting) in settings {
-                if let Some(value) = setting.effective {
-                    options.insert(id, value);
+        match self.plugin_settings(plugin_id, Some(workspace_id)) {
+            Ok(settings) => {
+                for (id, setting) in settings {
+                    if let Some(value) = setting.effective {
+                        options.insert(id, value);
+                    }
                 }
             }
+            // The defaults still let the agent work; the report says its settings were lost.
+            Err(error) => crate::report_failure_with(
+                "agent_settings",
+                &"The agent's saved settings could not be read",
+                &[
+                    ("agent", plugin_id),
+                    ("cause", &crate::error_chain(&*error)),
+                ],
+            ),
         }
         options
     }
@@ -497,6 +508,33 @@ mod tests {
         assert_eq!(status(&Err(AgentRunError::TimedOut)), "timed_out");
         assert_eq!(status(&Err(AgentRunError::Unavailable)), "unavailable");
         assert_eq!(status(&Err(AgentRunError::Failed("x"))), "failed");
+    }
+
+    #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
+    fn saved_agent_settings_reach_runs_queued_inside_a_transaction() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        for (id, value) in [("model", "claude-fable-5-2"), ("reasoning-effort", "high")] {
+            store
+                .set_plugin_setting(
+                    "claude-code",
+                    id,
+                    Some(workspace),
+                    Some(&Value::from(value)),
+                )
+                .unwrap();
+        }
+        // Queuing a run captures its inputs inside one transaction.
+        let queued = rusqlite::Transaction::new_unchecked(
+            &store.0,
+            rusqlite::TransactionBehavior::Immediate,
+        )
+        .unwrap();
+        let options = store.agent_options(workspace, "claude-code");
+        drop(queued);
+        assert_eq!(options.get("model"), Some(&Value::from("claude-fable-5-2")));
+        assert_eq!(options.get("reasoning-effort"), Some(&Value::from("high")));
     }
 
     #[test]
