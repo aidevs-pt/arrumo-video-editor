@@ -252,6 +252,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE plugin_activation; DROP TABLE agent_usage_observations;
                      DROP TABLE brand_fonts; DROP TABLE agent_executables;
+                     ALTER TABLE privacy_settings DROP COLUMN install_reported;
                      PRAGMA user_version = 63;",
                 )
                 .unwrap();

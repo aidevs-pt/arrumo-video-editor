@@ -284,8 +284,17 @@ impl WorkspaceStore {
             .pop()
             .ok_or_else(|| io::Error::other("Nothing was rendered"))?;
         artifact.profile_id = profile_id;
-        self.import_motion_library_item(database, workspace_id, &artifact, &spec)
-            .map_err(|error| -> Box<dyn Error> { io::Error::other(error.to_string()).into() })
+        let item = self
+            .import_motion_library_item(database, workspace_id, &artifact, &spec)
+            .map_err(|error| -> Box<dyn Error> { io::Error::other(error.to_string()).into() })?;
+        self.track_usage(
+            "animation_generated",
+            &[
+                ("agent", json!(provider.id)),
+                ("changed", json!(based_on.is_some())),
+            ],
+        );
+        Ok(item)
     }
 
     /// The saved spec of a library item, when Arrumo rendered it.

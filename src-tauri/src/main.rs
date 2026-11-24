@@ -1408,10 +1408,6 @@ async fn enqueue_video_draft(
     let run = store
         .enqueue_video_draft(workspace_id, draft_id, &request_key, &options)
         .map_err(|_| "generation_enqueue_failed")?;
-    store.track_usage(
-        "video_queued",
-        &[("autopilot", serde_json::json!(options.autopilot))],
-    );
     Ok(run)
 }
 
@@ -1775,7 +1771,7 @@ fn main() {
                     let _ = handle.track_event(event, Some(props));
                 });
             }
-            store.track_usage("app_started", &[]);
+            store.track_install();
             app.manage(Mutex::new(store));
             app.manage(desktop_job_workers::DesktopJobWorkers::start(
                 app.handle().clone(),
