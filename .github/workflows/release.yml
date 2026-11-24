@@ -278,6 +278,17 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --config media-tools.json --config updater-key.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
+      # A signed build has to open without a Gatekeeper warning, so a bad certificate or a failed
+      # notarization stops the release here instead of reaching users.
+      - name: Check the macOS signature
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE != ''
+        working-directory: video-editor/target/universal-apple-darwin/release/bundle/macos
+        run: |
+          app=$(ls -d *.app | head -1)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          for tool in "$app"/Contents/MacOS/arrumo-ff*; do codesign --verify --strict --verbose=2 "$tool"; done
+          spctl --assess --type execute --verbose=2 "$app"
+          xcrun stapler validate "$app"
 
   publish:
     needs: [prepare, build]
