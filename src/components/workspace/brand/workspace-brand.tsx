@@ -64,7 +64,7 @@ export function WorkspaceBrand({ workspace }: { workspace: Workspace }) {
   }
 
   return (
-    <WorkspaceShell className="max-w-6xl">
+    <WorkspaceShell>
       <WorkspaceSettingsHeading workspace={workspace} current="brand" headingRef={heading} />
       {loadError ? (
         <Alert variant="destructive">

@@ -69,7 +69,7 @@ export function ProfileRoute() {
     }
     const key = `${workspaceId}-${profileId}`;
     return (
-      <WorkspaceShell className="max-w-7xl">
+      <WorkspaceShell>
         {header}
         {tab === "videos" && <ProfileVideos key={key} workspaceId={workspaceId} profile={profile} />}
         {tab === "context" && <ProfileContext key={key} workspace={workspace} profile={profile} onUpdate={update} />}

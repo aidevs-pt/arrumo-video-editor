@@ -54,6 +54,8 @@
     --color-cobalt-deep: var(--cobalt-deep);
     --color-caption: var(--caption-bg);
     --color-approval: var(--approval);
+    --color-selected: var(--selected);
+    --color-selected-foreground: var(--selected-foreground);
     --color-workspace-panel: var(--workspace-panel);
     --radius-thumb: var(--azulejo-radius-thumb);
     --radius-sm: var(--azulejo-radius-sm);
@@ -70,6 +72,9 @@
     --agent: var(--cobalt-deep);
     --approval: var(--ok);
     --selection: oklch(86% .065 269);
+    /* The chosen item in a list of filters or sections, and the hover of outline buttons. */
+    --selected: var(--ink);
+    --selected-foreground: var(--on-cobalt);
     --workspace-panel: var(--sheet);
     --background: var(--paper);
     --foreground: var(--ink);
@@ -128,12 +133,15 @@
     --input: oklch(43% .05 268);
     --line-strong: oklch(43% .05 268);
     --selection: oklch(40% .1 268);
+    --selected: var(--primary);
     --agent: oklch(24% .1 268);
-    --sidebar: oklch(29% .12 268);
+    /* Matches darkSidebar in appearance.tsx, which paints the native window behind it. */
+    --sidebar: oklch(24% .08 268);
     --sidebar-primary: var(--background);
     --sidebar-primary-foreground: var(--foreground);
-    --sidebar-accent: oklch(34% .12 268);
-    --sidebar-border: oklch(38% .1 268);
+    --sidebar-accent: oklch(31% .1 268);
+    --sidebar-border: oklch(32% .08 268);
+    --cobalt-deep: oklch(49% .17 268);
     --ring: var(--attention);
 }
 

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export function WorkspaceShell({ className, ...props }: ComponentProps<"main">) {
   return <main className={cn(
-    "mx-auto max-w-6xl px-4 py-6 sm:px-9 sm:py-9 [&>button]:mb-4",
+    "mx-auto max-w-[96rem] px-4 py-6 sm:px-9 sm:py-9 2xl:px-12 [&>button]:mb-4",
     className,
   )} {...props} />;
 }

@@ -37,7 +37,7 @@ function ImageChoice({ workspaceId, asset, selected, onSelect }: {
 /** Workspace settings › Appearance. Only how the workspace looks in Arrumo; videos never use it. */
 export function WorkspaceAppearancePage({ workspace }: { workspace: Workspace }) {
   const { messages: { workspaces: copy } } = useLocale();
-  return <WorkspaceShell className="max-w-6xl">
+  return <WorkspaceShell>
     <WorkspaceSettingsHeading workspace={workspace} current="appearance" />
     <p className="mb-6 flex max-w-[70ch] items-start gap-2.5 rounded-lg border bg-card px-4 py-3 text-sm">
       <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{copy.customizeHint} {copy.appearanceNotGeneration}</span>
@@ -140,7 +140,7 @@ function WorkspaceAppearance({ workspace }: { workspace: Workspace }) {
           </> : (
             <FieldSet>
               <FieldLegend variant="label">{copy.image}</FieldLegend>
-              <div role="radiogroup" aria-label={copy.image} className="grid grid-cols-5 gap-2 sm:max-w-md">
+              <div role="radiogroup" aria-label={copy.image} className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
                 {images.map((asset) => <ImageChoice key={asset.id} workspaceId={workspace.id} asset={asset}
                   selected={image === asset.id} onSelect={() => { setImage(asset.id); setResult(null); }} />)}
                 <button type="button" onClick={() => void importImage()} aria-label={copy.importImage}
