@@ -6,9 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 concurrency:
-  # A new commit on a pull request makes its earlier, unfinished run pointless.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer commit on the same pull request or branch makes an unfinished run pointless: each
+  # commit on main contains the ones before it, as when several pull requests merge at once.
+  # Runs started by hand are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 env:
