@@ -1540,7 +1540,25 @@
       "wait": "A dobragem pode demorar alguns minutos.",
       "working": "A dobrar…",
       "confirm": "Dobrar"
-    }
+    },
+    "describeWithAgent": "Descrever com o agente",
+    "describeHint": "O agente escreve o contexto, o grupo e as etiquetas a partir do que vê ou ouve, usando o contexto do espaço e os grupos que já tens. Podes editá-los depois.",
+    "describingOne": "A descrever {name}…",
+    "describingMany": "A descrever {count} recursos…",
+    "describedOne": "{name} descrito.",
+    "describedMany": "{count} recursos descritos.",
+    "describeSkipped": "Ficaram de fora: {list}.",
+    "describeNone": "Nenhum destes pode ser descrito: {list}.",
+    "describeError": "O agente não conseguiu descrevê-los. Tenta novamente ou verifica o agente nas Definições.",
+    "describeUnavailable": "O teu agente não está pronto. Verifica-o em Definições › Agente.",
+    "skipReason": {
+      "agent_cannot_see": "o teu agente não consegue ver imagens",
+      "unsupported_format": "um formato que o agente não consegue abrir",
+      "nothing_to_read": "não há voz para ler",
+      "unavailable": "o ficheiro está em falta",
+      "not_described": "o agente não o descreveu"
+    },
+    "dismissNotice": "Dispensar"
   },
   "videoDetails": {
     "step1": "Material gravado",

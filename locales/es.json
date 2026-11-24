@@ -1540,7 +1540,25 @@
       "wait": "El doblaje puede tardar unos minutos.",
       "working": "Doblando…",
       "confirm": "Doblar"
-    }
+    },
+    "describeWithAgent": "Describir con el agente",
+    "describeHint": "El agente escribe el contexto, el grupo y las etiquetas a partir de lo que ve u oye, usando el contexto del espacio y los grupos que ya tienes. Puedes editarlos después.",
+    "describingOne": "Describiendo {name}…",
+    "describingMany": "Describiendo {count} recursos…",
+    "describedOne": "{name} descrito.",
+    "describedMany": "{count} recursos descritos.",
+    "describeSkipped": "Se omitieron: {list}.",
+    "describeNone": "Ninguno de estos se puede describir: {list}.",
+    "describeError": "El agente no pudo describirlos. Inténtalo de nuevo o revisa el agente en Ajustes.",
+    "describeUnavailable": "Tu agente no está listo. Revísalo en Ajustes › Agente.",
+    "skipReason": {
+      "agent_cannot_see": "tu agente no puede ver imágenes",
+      "unsupported_format": "un formato que el agente no puede abrir",
+      "nothing_to_read": "no hay voz que leer",
+      "unavailable": "falta el archivo",
+      "not_described": "el agente no lo describió"
+    },
+    "dismissNotice": "Descartar"
   },
   "videoDetails": {
     "step1": "Material grabado",

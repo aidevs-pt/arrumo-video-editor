@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { ConfirmTitleDelete } from "@/components/workspace/confirm-title-delete";
 import { AssetDetailsPanel } from "./asset-details-panel";
+import { type DescribedAssets, type DescriptionPlan, type DescriptionState, DescriptionNotice } from "./asset-description-notice";
 import { type AssetRemoval, describeUses } from "./asset-removal";
 import { AssetThumbnail } from "./asset-thumbnail";
 
@@ -47,12 +48,38 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
   const [progress, setProgress] = useState<{ completed: number; total: number }>();
   const [importError, setImportError] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
+  const [description, setDescription] = useState<DescriptionState>();
+  /** Bumped when the agent rewrites what the open panel shows, so it reloads. */
+  const [revision, setRevision] = useState(0);
   /** How many assets the open removal dialog is for; 0 while it is closed. */
   const [removing, setRemoving] = useState(0);
   const { locale, messages } = useLocale();
   const copy = messages.assetLibrary;
   const bulk = messages.assets.bulkRemoval;
   const workspaceId = workspace.id;
+
+  /** Asks the agent to describe the assets; names those it can't look at before it starts. */
+  async function describe(ids: number[]) {
+    if (description?.phase === "running") return;
+    const named = (id: number) => all.find((asset) => asset.id === id)?.name ?? String(id);
+    try {
+      const plan = await invoke<DescriptionPlan>("plan_asset_descriptions", { workspaceId, assetIds: ids });
+      if (!plan.eligible.length) {
+        setDescription({ phase: "none", omitted: plan.omitted });
+        return;
+      }
+      setDescription({ phase: "running", label: plan.eligible.length === 1 ? named(plan.eligible[0]) : plan.eligible.length, omitted: plan.omitted });
+      const result = await invoke<DescribedAssets>("describe_assets", { workspaceId, assetIds: plan.eligible });
+      const changes = new Map(result.assets.map((asset) => [asset.id, asset]));
+      setAssets((rows) => rows?.map((row) => changes.get(row.id) ?? row));
+      setOrganizations((current) => ({ ...current, ...result.organization }));
+      setRevision((value) => value + 1);
+      setDescription({ phase: "done", label: result.assets.length === 1 ? result.assets[0].name : result.assets.length,
+        omitted: [...plan.omitted, ...result.omitted.filter((entry) => !plan.omitted.some(({ assetId }) => assetId === entry.assetId))] });
+    } catch (error) {
+      setDescription((current) => ({ phase: error === "agent_unavailable" ? "unavailable" : "error", omitted: current?.omitted ?? [] }));
+    }
+  }
 
   /** Removes the selection together; what is still needed stays selected and is named. */
   async function removeSelected(): Promise<true | string> {
@@ -274,6 +301,7 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
                 copy={{ ...bulk, deleteTitle: bulk.deleteTitle.replace("{count}", String(removing)) }}
                 onConfirm={() => removeSelected()} onDelete={() => setSelected([])} />
             </div>}
+            {description && <DescriptionNotice state={description} onClose={() => setDescription(undefined)} />}
             {progress && <div role="status" className="flex flex-col gap-2 text-sm">
               {copy.uploading.replace("{done}", String(progress.completed)).replace("{total}", String(progress.total))}
               <Progress aria-hidden="true" value={progress.completed / progress.total * 100} />
@@ -339,8 +367,9 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
             ))}
             {all.length > 0 && <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">{copy.dropHint}</p>}
           </section>
-          {selectedAssets.length > 0 && <AssetDetailsPanel key={selected.join("-")} workspaceId={workspaceId} assets={selectedAssets}
+          {selectedAssets.length > 0 && <AssetDetailsPanel key={`${selected.join("-")}:${revision}`} workspaceId={workspaceId} assets={selectedAssets}
             organizations={organizations} onClose={() => setSelected([])}
+            describing={description?.phase === "running"} onDescribe={() => void describe(selected)}
             onSaved={(updated, organization) => {
               const changes = new Map(updated.map((asset) => [asset.id, asset]));
               setAssets((rows) => rows?.map((row) => changes.get(row.id) ?? row));

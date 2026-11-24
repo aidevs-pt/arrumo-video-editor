@@ -533,6 +533,59 @@ async fn remove_assets(
     .map_err(|_| "asset_removal_failed")?
 }
 
+/// Which of the chosen assets the agent can describe, before asking it.
+#[tauri::command]
+async fn plan_asset_descriptions(
+    app: AppHandle,
+    workspace_id: i64,
+    asset_ids: Vec<i64>,
+) -> Result<arrumo_workspaces::DescriptionPlan, &'static str> {
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "store_unavailable")?
+        .join("workspaces.sqlite");
+    tauri::async_runtime::spawn_blocking(move || {
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .plan_asset_descriptions(&database, workspace_id, &asset_ids)
+            .map_err(|_| "asset_description_failed")
+    })
+    .await
+    .map_err(|_| "asset_description_failed")?
+}
+
+/// Has the agent write the context, group and labels of the chosen assets, and saves them.
+#[tauri::command]
+async fn describe_assets(
+    app: AppHandle,
+    workspace_id: i64,
+    asset_ids: Vec<i64>,
+) -> Result<arrumo_workspaces::DescribedAssets, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .describe_assets(&database, workspace_id, &asset_ids)
+            .map_err(|error| {
+                arrumo_workspaces::report_failure("asset_descriptions", &error);
+                match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
+                    Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
+                    Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
+                    Some(_) => "agent_failed",
+                    None => "asset_description_failed",
+                }
+                .to_owned()
+            })
+    })
+    .await
+    .map_err(|_| "asset_description_failed".to_owned())?
+}
+
 #[tauri::command]
 async fn set_batch_asset_notes(
     workspace_id: i64,
@@ -1897,6 +1950,8 @@ fn main() {
             preview_workspace_media,
             set_asset_notes,
             set_batch_asset_notes,
+            plan_asset_descriptions,
+            describe_assets,
             list_asset_organization,
             set_asset_organization,
             remove_asset,

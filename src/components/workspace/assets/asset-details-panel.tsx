@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { RectangleHorizontal, RectangleVertical, X } from "lucide-react";
+import { RectangleHorizontal, RectangleVertical, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,11 @@ type Format = { id: number; name: string; width: number; height: number };
 type Share = { profile_id: number; format_id: number | null };
 
 /** Describes, organizes and shares one asset or several at once; nothing is written until Save. */
-export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose, onSaved, onReplaced, onRemoved, onCreated }: {
+export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose, onSaved, onReplaced, onRemoved, onCreated, describing, onDescribe }: {
   workspaceId: number;
+  /** The agent is describing assets; the page keeps that running if this panel closes. */
+  describing: boolean;
+  onDescribe: () => void;
   assets: Asset[];
   organizations: Record<number, AssetOrganization>;
   onClose: () => void;
@@ -148,6 +151,12 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
         ))}
         {assets.length > 6 && <li className="grid aspect-[4/3] w-16 place-items-center rounded-thumb bg-secondary text-sm font-bold">+{assets.length - 6}</li>}
       </ul>
+      <div className="flex flex-col gap-1.5">
+        <Button variant="outline" disabled={busy || describing} onClick={onDescribe}>
+          <Sparkles data-icon="inline-start" />{copy.describeWithAgent}
+        </Button>
+        <p className="text-xs text-muted-foreground">{copy.describeHint}</p>
+      </div>
       <Field>
         <FieldLabel htmlFor="asset-context">{copy.context}</FieldLabel>
         {!single && <label className="flex items-center gap-2 text-sm">
