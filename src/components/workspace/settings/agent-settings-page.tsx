@@ -2,7 +2,7 @@
 
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Bot, DatabaseBackup, Gauge, KeyRound, Package, Settings2 } from "lucide-react";
+import { ArrowUpRight, Bot, DatabaseBackup, Gauge, Info, KeyRound, Package, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
@@ -18,6 +18,7 @@ import { WorkspaceShell } from "@/components/workspace/layout";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { useAppearance } from "@/lib/appearance";
 import { type AgentCliLocation, agentCliLocation, chooseAgentProgram, resetAgentProgram } from "@/lib/agent-cli";
+import { AboutSettings } from "@/components/workspace/settings/about-settings";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -42,9 +43,9 @@ const unset = "__inherit__";
 type LoginStatus = "confirmed" | "unconfirmed" | "unavailable" | "timed_out" | "failed";
 
 
-const sections = ["general", "agent", "services", "plugins", "quality", "backup"] as const;
+const sections = ["general", "agent", "services", "plugins", "quality", "backup", "about"] as const;
 type Section = (typeof sections)[number];
-const sectionIcons = { general: Settings2, agent: Bot, services: KeyRound, plugins: Package, quality: Gauge, backup: DatabaseBackup };
+const sectionIcons = { general: Settings2, agent: Bot, services: KeyRound, plugins: Package, quality: Gauge, backup: DatabaseBackup, about: Info };
 
 export function AgentSettingsPage() {
   const { status, workspaces, load } = useWorkspaceCatalog();
@@ -76,6 +77,7 @@ export function AgentSettingsPage() {
     plugins: [text.plugins, text.pluginsIntro],
     quality: [text.quality, text.qualityIntro],
     backup: [text.backup, text.backupIntro],
+    about: [text.about, text.aboutIntro],
   };
 
   return (
@@ -113,6 +115,7 @@ export function AgentSettingsPage() {
               {tab === "general" && <UpdateSettings />}
               {tab === "quality" && <QualitySettings />}
               {tab === "backup" && <BackupSettings />}
+              {tab === "about" && <AboutSettings />}
               {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
               {scoped && <div className="flex flex-wrap items-center gap-3">
                 <span id="settings-scope" className="font-semibold">{text.appliesTo}</span>

@@ -6,7 +6,7 @@ const workspaceSections: readonly WorkspaceView[] = [
   "profiles", "context", "brand", "assets", "motion-library", "outputs", "appearance", "drafts", "generations", "videos", "calendar",
 ];
 
-const settingsSections = ["general", "agent", "services", "plugins", "quality", "backup"] as const;
+const settingsSections = ["general", "agent", "services", "plugins", "quality", "backup", "about"] as const;
 const profileTabs = ["context", "brand", "assets", "outputs", "animations", "calendar"] as const;
 
 function numericId(query: URLSearchParams, name: string) {

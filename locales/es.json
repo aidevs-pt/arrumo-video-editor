@@ -341,7 +341,9 @@
     "changeAgent": "Cambiar de agente",
     "agentSettings": "Ajustes del agente",
     "notifications": "Notificaciones",
-    "notificationsError": "No se pudieron cambiar las notificaciones. Inténtalo de nuevo."
+    "notificationsError": "No se pudieron cambiar las notificaciones. Inténtalo de nuevo.",
+    "about": "Acerca de",
+    "aboutIntro": "Versión, licencia y el software de código abierto que incluye Arrumo."
   },
   "studio": {
     "videos": "Vídeos",
@@ -1942,5 +1944,19 @@
     "title": "Un mensaje del equipo de Arrumo",
     "more": "Más información",
     "close": "Cerrar"
+  },
+  "about": {
+    "copyright": "© 2026 DEVS AI Unipessoal LDA.",
+    "license": "Arrumo es software libre: puedes redistribuirlo y modificarlo según los términos de la Licencia Pública General Affero de GNU, versión 3. Se ofrece sin ninguna garantía, en la medida en que lo permita la ley.",
+    "source": "Código fuente",
+    "licenseLink": "GNU AGPL v3",
+    "ffmpeg": "Arrumo incluye FFmpeg {version} y ffprobe, con licencia GNU General Public License versión 2 o posterior. Se ejecutan como programas aparte y sus archivos de licencia se instalan con Arrumo.",
+    "ffmpegSource": "Código fuente y scripts de compilación de FFmpeg",
+    "notices": "Software de código abierto",
+    "noticesIntro": "Arrumo usa {count} paquetes y tipografías de código abierto. Elige uno para leer su licencia.",
+    "noticesMissing": "La lista de licencias se incluye en las versiones instaladas.",
+    "search": "Buscar por nombre o licencia",
+    "project": "Página del proyecto",
+    "noText": "Este paquete no incluye archivo de licencia; se distribuye con la licencia indicada arriba."
   }
 }

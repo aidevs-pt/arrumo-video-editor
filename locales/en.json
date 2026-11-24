@@ -341,7 +341,9 @@
     "changeAgent": "Change agent",
     "agentSettings": "Agent settings",
     "notifications": "Notifications",
-    "notificationsError": "Couldn't change notifications. Try again."
+    "notificationsError": "Couldn't change notifications. Try again.",
+    "about": "About",
+    "aboutIntro": "Version, license and the open-source software Arrumo includes."
   },
   "studio": {
     "videos": "Videos",
@@ -1942,5 +1944,19 @@
     "title": "A message from the Arrumo team",
     "more": "Read more",
     "close": "Close"
+  },
+  "about": {
+    "copyright": "© 2026 DEVS AI Unipessoal LDA.",
+    "license": "Arrumo is free software: you can redistribute it and modify it under the terms of the GNU Affero General Public License, version 3. It comes with no warranty, to the extent permitted by law.",
+    "source": "Source code",
+    "licenseLink": "GNU AGPL v3",
+    "ffmpeg": "Arrumo includes FFmpeg {version} and ffprobe, licensed under the GNU General Public License version 2 or later. They run as separate programs, and their license files are installed with Arrumo.",
+    "ffmpegSource": "FFmpeg sources and build scripts",
+    "notices": "Open-source software",
+    "noticesIntro": "Arrumo is built with {count} open-source packages and fonts. Select one to read its license.",
+    "noticesMissing": "The license list is included in installed builds.",
+    "search": "Search by name or license",
+    "project": "Project page",
+    "noText": "This package ships no license file; it's distributed under the license named above."
   }
 }

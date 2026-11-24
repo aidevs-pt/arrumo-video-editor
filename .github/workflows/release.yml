@@ -203,6 +203,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ARRUMO_PLUGIN_RELEASE_ROOT: ${{ github.workspace }}/plugin-releases
+          # Releases must carry the third-party license notices shown in Settings › About.
+          ARRUMO_REQUIRE_LICENSES: "1"
           ARRUMO_UPDATER_PUBKEY: ${{ vars.ARRUMO_UPDATER_PUBKEY }}
           ARRUMO_CRASH_DSN: ${{ secrets.ARRUMO_CRASH_DSN }}
           ARRUMO_USAGE_KEY: ${{ secrets.ARRUMO_USAGE_KEY }}
