@@ -19,6 +19,7 @@ mod crash_reports;
 mod delivery_stream;
 mod desktop_job_workers;
 mod guided_preview;
+mod media_tools;
 mod media_worker;
 mod motion_library;
 mod plugin_settings;
@@ -1945,6 +1946,7 @@ fn main() {
             close_guard::answer_close_request,
             updates::update_status,
             updates::launch_ready,
+            media_tools::media_tools_status,
             updates::check_for_update,
             updates::install_update
         ])

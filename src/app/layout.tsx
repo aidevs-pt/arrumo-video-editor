@@ -11,6 +11,7 @@ import { LaunchScreen } from "@/components/launch-screen";
 import { ExternalLinks } from "@/components/external-links";
 import { CloseGuard } from "@/components/close-guard";
 import { UpdatePrompt } from "@/components/app-updates";
+import { MediaToolsCheck } from "@/components/media-tools-check";
 
 const anybody = Anybody({ subsets: ["latin"], axes: ["wdth"], variable: "--font-anybody" });
 const atkinson = Atkinson_Hyperlegible_Next({ subsets: ["latin"], adjustFontFallback: false, variable: "--font-atkinson" });
@@ -24,7 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={cn("font-sans", anybody.variable, atkinson.variable)} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: `${appearanceScript};setTimeout(function(){document.documentElement.dataset.appReady=""},12000)` }} /></head>
-      <body><LaunchScreen /><ExternalLinks /><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}><PluginTextProvider>{children}<CloseGuard /><UpdatePrompt /></PluginTextProvider></LocaleProvider></AppearanceProvider></body>
+      <body><LaunchScreen /><ExternalLinks /><AppearanceProvider><LocaleProvider catalog={getLocaleCatalog()}><PluginTextProvider>{children}<CloseGuard /><UpdatePrompt /><MediaToolsCheck /></PluginTextProvider></LocaleProvider></AppearanceProvider></body>
     </html>
   );
 }

@@ -255,7 +255,11 @@ mod tests {
 
     #[test]
     fn joins_with_transitions_keep_the_total_length() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let directory = tempfile::tempdir().unwrap();
@@ -267,7 +271,7 @@ mod tests {
             .enumerate()
         {
             let name = format!("{index}.mp4");
-            let made = Command::new("ffmpeg")
+            let made = Command::new(crate::media_tools::ffmpeg())
                 .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
                 .arg(format!("color=c={colour}:s=160x90:r=30:d={length}"))
                 .args(["-pix_fmt", "yuv420p", "-y"])
@@ -296,7 +300,10 @@ mod tests {
         ]);
         args.extend(["-c:v", "libx264", "-y"].map(String::from));
         args.push(output.to_string_lossy().into());
-        let status = Command::new("ffmpeg").args(&args).status().unwrap();
+        let status = Command::new(crate::media_tools::ffmpeg())
+            .args(&args)
+            .status()
+            .unwrap();
         assert!(status.success());
         let seconds = crate::source_transcripts::media_duration(&output).unwrap();
         let total: f64 = lengths.iter().sum();

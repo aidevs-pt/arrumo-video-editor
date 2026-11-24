@@ -137,7 +137,7 @@ fn middle_frames(
         .take(crate::agent_run::MAX_IMAGES)
         .filter_map(|(id, duration, _)| {
             let frame = directory.join(format!("clip-{id}.jpg"));
-            let made = std::process::Command::new("ffmpeg")
+            let made = std::process::Command::new(crate::media_tools::ffmpeg())
                 .args([
                     "-nostdin",
                     "-v",

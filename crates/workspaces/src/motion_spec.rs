@@ -1285,7 +1285,7 @@ fn keyed(keys: &[ZoomKey], value: impl Fn(&ZoomKey) -> f64) -> String {
 
 /// The width and height of a clip's first video stream.
 fn clip_size(path: &Path) -> io::Result<(f64, f64)> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(crate::media_tools::ffprobe())
         .args(["-v", "error", "-select_streams", "v:0", "-show_entries"])
         .args(["stream=width,height", "-of", "csv=p=0:s=x"])
         .arg(path)
@@ -1346,7 +1346,7 @@ fn spotlight_png(
         inner_w = half_w - radius,
         inner_h = half_h - radius,
     );
-    let status = Command::new("ffmpeg")
+    let status = Command::new(crate::media_tools::ffmpeg())
         .args(["-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i"])
         .arg(format!("color=c=black:s={width}x{height}:d=0.1"))
         .arg("-vf")
@@ -1432,7 +1432,7 @@ fn shape_png(directory: &Path, file: &str, fill: &Fill, shape: &Shape) -> io::Re
     ]);
     args.extend(["-frames:v", "1", "-update", "1", "-y"].map(String::from));
     args.push(file.to_owned());
-    let status = Command::new("ffmpeg")
+    let status = Command::new(crate::media_tools::ffmpeg())
         .args(&args)
         .current_dir(directory)
         .stdin(Stdio::null())
@@ -1652,7 +1652,7 @@ fn run_ffmpeg_once(
     };
     let mut grown = (size(), Instant::now());
     let log = directory.join("ffmpeg-errors.txt");
-    let mut process = Command::new("ffmpeg")
+    let mut process = Command::new(crate::media_tools::ffmpeg())
         .args(args)
         .current_dir(directory)
         .stdin(Stdio::null())
@@ -2026,13 +2026,17 @@ mod tests {
 
     #[test]
     fn clip_layers_render_rounded_and_zoomed() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let directory = tempfile::tempdir().unwrap();
         // A clip whose top-right quarter is red and the rest green, so zooming in shows red.
         let clip = directory.path().join("clip.mp4");
-        let made = Command::new("ffmpeg")
+        let made = Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",
@@ -2064,7 +2068,7 @@ mod tests {
         )
         .unwrap();
         let frame_at = |at: &str| {
-            Command::new("ffmpeg")
+            Command::new(crate::media_tools::ffmpeg())
                 .args(["-v", "error", "-ss", at, "-i"])
                 .arg(directory.path().join("out.mp4"))
                 .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
@@ -2101,12 +2105,16 @@ mod tests {
 
     #[test]
     fn spotlights_dim_all_but_their_area() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let directory = tempfile::tempdir().unwrap();
         let clip = directory.path().join("clip.mp4");
-        let made = Command::new("ffmpeg")
+        let made = Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",
@@ -2158,7 +2166,7 @@ mod tests {
             &mut || Ok(()),
         )
         .unwrap();
-        let frame = Command::new("ffmpeg")
+        let frame = Command::new(crate::media_tools::ffmpeg())
             .args(["-v", "error", "-ss", "2.0", "-i"])
             .arg(directory.path().join("out.mp4"))
             .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
@@ -2173,12 +2181,16 @@ mod tests {
 
     #[test]
     fn a_clip_started_past_its_end_holds_its_last_frame() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let directory = tempfile::tempdir().unwrap();
         let clip = directory.path().join("clip.mp4");
-        let made = Command::new("ffmpeg")
+        let made = Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",
@@ -2212,7 +2224,7 @@ mod tests {
             &mut || Ok(()),
         )
         .unwrap();
-        let frame = Command::new("ffmpeg")
+        let frame = Command::new(crate::media_tools::ffmpeg())
             .args(["-v", "error", "-ss", "1.0", "-i"])
             .arg(directory.path().join("out.mp4"))
             .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
@@ -2229,7 +2241,11 @@ mod tests {
 
     #[test]
     fn rounded_gradient_boxes_and_backgrounds_render() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+            || system_font("bold").is_none()
         {
             return;
         }
@@ -2265,7 +2281,7 @@ mod tests {
             &mut || Ok(()),
         )
         .unwrap();
-        let frame = Command::new("ffmpeg")
+        let frame = Command::new(crate::media_tools::ffmpeg())
             .args(["-v", "error", "-ss", "1", "-i"])
             .arg(directory.path().join("out.mp4"))
             .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
@@ -2298,7 +2314,11 @@ mod tests {
 
     #[test]
     fn shaped_overlays_take_their_own_inputs_over_footage() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+            || system_font("bold").is_none()
         {
             return;
         }
@@ -2337,7 +2357,7 @@ mod tests {
         }
         assert_eq!(inputs.iter().filter(|arg| *arg == "-i").count(), 2);
         graph.push_str(&format!("[{drawn}]null[video]"));
-        let frame = Command::new("ffmpeg")
+        let frame = Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",
@@ -2373,13 +2393,17 @@ mod tests {
 
     #[test]
     fn renders_a_spec_with_ffmpeg() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+            || system_font("bold").is_none()
         {
             return;
         }
         let directory = tempfile::tempdir().unwrap();
         let image = directory.path().join("logo.png");
-        let made = Command::new("ffmpeg")
+        let made = Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",
@@ -2437,7 +2461,7 @@ mod tests {
                 &mut || Ok(()),
             )
             .unwrap();
-            let report = Command::new("ffmpeg")
+            let report = Command::new(crate::media_tools::ffmpeg())
                 .args(["-v", "info", "-i"])
                 .arg(directory.path().join(&name))
                 .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
@@ -2454,7 +2478,7 @@ mod tests {
 
         // A layer's sound-effect file plays in place of the built-in sound, cut after a few seconds.
         let effect = directory.path().join("effect.wav");
-        let made = Command::new("ffmpeg")
+        let made = Command::new(crate::media_tools::ffmpeg())
             .args(["-v", "error", "-f", "lavfi", "-i", "sine=f=300:d=6"])
             .arg(&effect)
             .status()
@@ -2484,7 +2508,7 @@ mod tests {
         )
         .unwrap();
         let level = |from: f64| {
-            let report = Command::new("ffmpeg")
+            let report = Command::new(crate::media_tools::ffmpeg())
                 .args(["-v", "info", "-ss", &from.to_string(), "-t", "0.5", "-i"])
                 .arg(directory.path().join("effect.mp4"))
                 .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
@@ -2502,7 +2526,11 @@ mod tests {
 
     #[test]
     fn reveal_and_wipe_uncover_text_over_time() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() || system_font("bold").is_none()
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+            || system_font("bold").is_none()
         {
             return;
         }
@@ -2533,7 +2561,7 @@ mod tests {
             )
             .unwrap();
             let brightness = |at: f64| {
-                let frame = Command::new("ffmpeg")
+                let frame = Command::new(crate::media_tools::ffmpeg())
                     .args(["-v", "error", "-ss", &at.to_string(), "-i"])
                     .arg(directory.path().join(&name))
                     .args([

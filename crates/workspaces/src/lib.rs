@@ -41,6 +41,8 @@ mod generation_worker;
 mod image_generation;
 pub use image_generation::ASSET_ASPECT_RATIOS;
 mod mcp;
+mod media_tools;
+pub use media_tools::{MediaToolsStatus, media_tools_status};
 mod media_worker;
 mod motion_artifacts;
 mod motion_design;

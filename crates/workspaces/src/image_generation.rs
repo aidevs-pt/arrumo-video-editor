@@ -966,7 +966,7 @@ fn crop_to_ratio(
     }
     let output = folder.join(format!("{stem}-cropped.png"));
     let ratio = format!("{width}/{height}");
-    let status = std::process::Command::new("ffmpeg")
+    let status = std::process::Command::new(crate::media_tools::ffmpeg())
         .args(["-nostdin", "-loglevel", "error", "-y", "-i"])
         .arg(source)
         .args([
@@ -1312,7 +1312,7 @@ mod tests {
     fn wide_images_are_cropped_to_the_requested_ratio() {
         let folder = tempfile::tempdir().unwrap();
         let source = folder.path().join("wide.png");
-        let made = std::process::Command::new("ffmpeg")
+        let made = std::process::Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-loglevel",
                 "error",
@@ -1329,7 +1329,7 @@ mod tests {
             return;
         }
         let cropped = crop_to_ratio(&source, "16:9", folder.path(), "thumb").unwrap();
-        let probe = std::process::Command::new("ffprobe")
+        let probe = std::process::Command::new(crate::media_tools::ffprobe())
             .args([
                 "-v",
                 "error",

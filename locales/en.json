@@ -1925,5 +1925,10 @@
     "scheduled": "The update is downloaded and installs when you quit Arrumo.",
     "done": "OK",
     "failed": "The update couldn't be downloaded or installed. Try again later."
+  },
+  "mediaTools": {
+    "title": "Arrumo can't find FFmpeg",
+    "description": "Arrumo uses FFmpeg to preview, render and export videos, and it couldn't start {tools}. Reinstall Arrumo to restore the copy it comes with. If you run Arrumo from source, install FFmpeg and make sure it's on your PATH.",
+    "done": "OK"
   }
 }

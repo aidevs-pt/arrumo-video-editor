@@ -304,7 +304,7 @@ impl WorkspaceStore {
 }
 
 pub(crate) fn media_duration(path: &Path) -> io::Result<f64> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(crate::media_tools::ffprobe())
         .args([
             "-v",
             "error",
@@ -328,7 +328,7 @@ pub(crate) fn media_duration(path: &Path) -> io::Result<f64> {
 }
 
 fn extract_chunk(source: &Path, offset: f64, wave: &Path) -> io::Result<()> {
-    let status = Command::new("ffmpeg")
+    let status = Command::new(crate::media_tools::ffmpeg())
         .args([
             "-nostdin",
             "-v",

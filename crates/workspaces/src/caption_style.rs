@@ -233,7 +233,7 @@ pub fn caption_preview(
         work.path().join("captions.srt"),
         format!("1\n00:00:00,000 --> 00:00:05,000\n{cue}\n"),
     )?;
-    let status = std::process::Command::new("ffmpeg")
+    let status = std::process::Command::new(crate::media_tools::ffmpeg())
         .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
         .arg(format!(
             "gradients=s={preview_width}x{preview_height}:c0=0x35506e:c1=0xb08a62:x0=0:y0=0:x1={preview_width}:y1={preview_height}:d=1:speed=0:seed=7"
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn previews_are_drawn_at_the_format_shape() {
-        if std::process::Command::new("ffmpeg")
+        if std::process::Command::new(crate::media_tools::ffmpeg())
             .arg("-version")
             .output()
             .is_err()

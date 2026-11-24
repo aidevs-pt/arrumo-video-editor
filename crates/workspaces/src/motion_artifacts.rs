@@ -282,7 +282,7 @@ pub(crate) fn validate_motion_file(path: &Path, name: &str, kind: &str) -> io::R
         }
     };
     let selector = if kind == "audio" { "a:0" } else { "V:0" };
-    let mut probe = Command::new("ffprobe");
+    let mut probe = Command::new(crate::media_tools::ffprobe());
     probe
         .args([
             "-v",

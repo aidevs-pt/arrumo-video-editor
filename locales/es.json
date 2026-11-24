@@ -1925,5 +1925,10 @@
     "scheduled": "La actualización está descargada y se instala cuando cierres Arrumo.",
     "done": "Aceptar",
     "failed": "No se pudo descargar o instalar la actualización. Inténtalo más tarde."
+  },
+  "mediaTools": {
+    "title": "Arrumo no encuentra FFmpeg",
+    "description": "Arrumo usa FFmpeg para previsualizar, renderizar y exportar vídeos, y no pudo iniciar {tools}. Reinstala Arrumo para recuperar la copia que incluye. Si ejecutas Arrumo desde el código fuente, instala FFmpeg y comprueba que está en tu PATH.",
+    "done": "Aceptar"
   }
 }

@@ -38,7 +38,7 @@ pub struct FrameStrip {
 }
 
 fn probe(video: &Path) -> Result<(f64, bool, bool), Box<dyn Error>> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(crate::media_tools::ffprobe())
         .args([
             "-v",
             "error",
@@ -122,7 +122,7 @@ pub fn render_frame_strip(
     };
     let work = tempfile::tempdir()?;
     let output: PathBuf = work.path().join("strip.png");
-    let status = Command::new("ffmpeg")
+    let status = Command::new(crate::media_tools::ffmpeg())
         .args([
             "-nostdin",
             "-v",
@@ -221,12 +221,16 @@ mod tests {
 
     #[test]
     fn draws_frames_above_the_waveform() {
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
+        if Command::new(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let work = tempfile::tempdir().unwrap();
         let video = work.path().join("clip.mp4");
-        let status = Command::new("ffmpeg")
+        let status = Command::new(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",
