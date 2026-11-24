@@ -25,6 +25,8 @@ concurrency: release
 permissions:
   contents: write
 env:
+  # Builds don't report to Next.js. The app is a static export, so installs never do.
+  NEXT_TELEMETRY_DISABLED: "1"
   CARGO_INCREMENTAL: "0"
 jobs:
   prepare:
