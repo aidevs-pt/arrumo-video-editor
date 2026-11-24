@@ -6,6 +6,7 @@
 use serde::Serialize;
 use std::{
     env,
+    ffi::OsString,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::OnceLock,
@@ -13,18 +14,28 @@ use std::{
 
 pub fn ffmpeg() -> &'static Path {
     static PATH: OnceLock<PathBuf> = OnceLock::new();
-    PATH.get_or_init(|| resolve("ffmpeg", env::current_exe().ok().as_deref()))
+    PATH.get_or_init(|| {
+        resolve(
+            "ffmpeg",
+            env::var_os("ARRUMO_FFMPEG"),
+            env::current_exe().ok().as_deref(),
+        )
+    })
 }
 
 pub fn ffprobe() -> &'static Path {
     static PATH: OnceLock<PathBuf> = OnceLock::new();
-    PATH.get_or_init(|| resolve("ffprobe", env::current_exe().ok().as_deref()))
+    PATH.get_or_init(|| {
+        resolve(
+            "ffprobe",
+            env::var_os("ARRUMO_FFPROBE"),
+            env::current_exe().ok().as_deref(),
+        )
+    })
 }
 
-fn resolve(name: &str, executable: Option<&Path>) -> PathBuf {
-    if let Some(path) =
-        env::var_os(format!("ARRUMO_{}", name.to_ascii_uppercase())).filter(|path| !path.is_empty())
-    {
+fn resolve(name: &str, override_path: Option<OsString>, executable: Option<&Path>) -> PathBuf {
+    if let Some(path) = override_path.filter(|path| !path.is_empty()) {
         return PathBuf::from(path);
     }
     executable
@@ -67,14 +78,19 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let executable = temp.path().join("arrumo");
         assert_eq!(
-            resolve("ffprobe", Some(&executable)),
+            resolve("ffprobe", None, Some(&executable)),
             PathBuf::from("ffprobe")
         );
         let bundled = temp
             .path()
             .join(format!("arrumo-ffprobe{}", env::consts::EXE_SUFFIX));
         std::fs::write(&bundled, b"").unwrap();
-        assert_eq!(resolve("ffprobe", Some(&executable)), bundled);
-        assert_eq!(resolve("ffprobe", None), PathBuf::from("ffprobe"));
+        assert_eq!(resolve("ffprobe", None, Some(&executable)), bundled);
+        assert_eq!(resolve("ffprobe", None, None), PathBuf::from("ffprobe"));
+        let chosen = PathBuf::from("/opt/ffprobe");
+        assert_eq!(
+            resolve("ffprobe", Some(chosen.clone().into()), Some(&executable)),
+            chosen
+        );
     }
 }
