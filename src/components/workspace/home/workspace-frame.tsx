@@ -207,7 +207,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
 
       <div className="flex min-w-0 flex-1 flex-col">
         {workspace && <UsageBanner key={workspace.id} workspaceId={workspace.id} />}
-        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b bg-background px-3 sm:px-5">
+        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b bg-background px-3 sm:px-5">
           <SidebarTrigger aria-label={copy.navigation} />
           <Breadcrumb aria-label={copy.location} className="min-w-0 flex-1">
             <BreadcrumbList className="flex-nowrap">

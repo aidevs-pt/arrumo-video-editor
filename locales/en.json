@@ -499,11 +499,16 @@
     "recentImport": "Just imported",
     "removal": {
       "deleteTitle": "Remove asset",
-      "deleteDescription": "This removes the managed copy from the workspace. The original file stays where you imported it from.",
+      "deleteDescription": "This removes the managed copy from the workspace and from the settings that use it, such as brand roles and thumbnail references. The original file stays where you imported it from.",
       "confirmTitle": "Type the filename exactly",
-      "deleteError": "The asset could not be removed. Check whether a draft, brand assignment, thumbnail setting, or generation run still uses it.",
+      "deleteError": "The asset could not be removed. Try again.",
       "cancelDelete": "Cancel",
-      "deleting": "Removing…"
+      "deleting": "Removing…",
+      "missing": "This asset was already removed, or its name has changed.",
+      "inUse": "Arrumo kept it because it is still needed by {uses}.",
+      "openVideo": "the video “{name}”, which can still continue",
+      "finishedVideo": "the finished video “{name}”",
+      "animation": "the animation “{name}”"
     },
     "groupView": "Group assets",
     "ungrouped": "Ungrouped",
@@ -613,6 +618,17 @@
       "modelNeedsVideo": "{model} needs a reference video. Pick or upload one.",
       "modelNeedsVideoAndImages": "{model} needs a reference video and at least {count} images. Pick or upload them.",
       "orChoose": "Or choose {models}."
+    },
+    "bulkRemoval": {
+      "deleteTitle": "Remove {count} assets",
+      "deleteDescription": "This removes their managed copies from the workspace and from the settings that use them. The original files stay where you imported them from.",
+      "confirmTitle": "Type this sentence to confirm",
+      "phrase": "Delete all files",
+      "deleteError": "The assets could not be removed. Try again.",
+      "partial": "Removed {removed} of {total}. Kept because they are still needed: {kept}.",
+      "cancelDelete": "Cancel",
+      "deleting": "Removing…",
+      "button": "Remove"
     }
   },
   "delivery": {

@@ -4,7 +4,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { GenerateAssetDialog } from "./generate-asset-dialog";
-import { AudioLines, Copy, Film, Folder, ImageIcon, Layers, PanelRight, Search, SquareCheck, SquareMinus, Tag, TriangleAlert, Upload } from "lucide-react";
+import { AudioLines, Copy, Film, Folder, ImageIcon, Layers, PanelRight, Search, SquareCheck, SquareMinus, Tag, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,10 @@ import { WorkspaceShell } from "@/components/workspace/layout";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { ItemContextMenu } from "@/components/workspace/item-context-menu";
+import { ConfirmTitleDelete } from "@/components/workspace/confirm-title-delete";
 import { AssetDetailsPanel } from "./asset-details-panel";
 import { type DescribedAssets, type DescriptionPlan, type DescriptionState, DescriptionNotice } from "./asset-description-notice";
+import { type AssetRemoval, describeUses } from "./asset-removal";
 import { AssetThumbnail } from "./asset-thumbnail";
 
 const kinds = ["image", "audio", "video"] as const;
@@ -49,8 +51,11 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
   const [description, setDescription] = useState<DescriptionState>();
   /** Bumped when the agent rewrites what the open panel shows, so it reloads. */
   const [revision, setRevision] = useState(0);
+  /** How many assets the open removal dialog is for; 0 while it is closed. */
+  const [removing, setRemoving] = useState(0);
   const { locale, messages } = useLocale();
   const copy = messages.assetLibrary;
+  const bulk = messages.assets.bulkRemoval;
   const workspaceId = workspace.id;
 
   /** Asks the agent to describe the assets; names those it can't look at before it starts. */
@@ -74,6 +79,21 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
     } catch (error) {
       setDescription((current) => ({ phase: error === "agent_unavailable" ? "unavailable" : "error", omitted: current?.omitted ?? [] }));
     }
+  }
+
+  /** Removes the selection together; what is still needed stays selected and is named. */
+  async function removeSelected(): Promise<true | string> {
+    const ids = [...selected];
+    const results = await invoke<{ assetId: number; result: AssetRemoval }[]>("remove_assets", { workspaceId, assetIds: ids });
+    const gone = new Set(results.filter(({ result }) => result.state !== "in_use").map(({ assetId }) => assetId));
+    setAssets((rows) => rows?.filter((row) => !gone.has(row.id)));
+    const kept = results.flatMap(({ assetId, result }) => result.state === "in_use"
+      ? [`${assets?.find((asset) => asset.id === assetId)?.name ?? assetId} (${describeUses(result.uses, messages.assets.removal, locale)})`]
+      : []);
+    if (!kept.length) return true;
+    setSelected(ids.filter((id) => !gone.has(id)));
+    return bulk.partial.replace("{removed}", String(gone.size)).replace("{total}", String(ids.length))
+      .replace("{kept}", () => kept.join("; "));
   }
 
   useEffect(() => { heading.current?.focus(); }, []);
@@ -271,6 +291,15 @@ export function WorkspaceAssets({ workspace }: { workspace: { id: number; name: 
               <span className="me-auto font-semibold tabular-nums">{selected.length === 1 ? copy.selectedOne : copy.selected.replace("{count}", String(selected.length))}</span>
               <Button variant="outline" size="sm" className="border-border bg-card" onClick={() => setSelected(visible.map(({ id }) => id))}>{copy.selectAll}</Button>
               <Button variant="outline" size="sm" className="border-border bg-card" onClick={() => setSelected([])}>{copy.clear}</Button>
+              {selected.length > 1 && <Button variant="outline" size="sm" className="border-border bg-card text-destructive"
+                onClick={() => setRemoving(selected.length)}>
+                <Trash2 data-icon="inline-start" />{bulk.button}
+              </Button>}
+              {/* Stays mounted when assets are kept, so the dialog can say which and why. */}
+              <ConfirmTitleDelete hideTrigger open={removing > 0} onOpenChange={(open) => { if (!open) setRemoving(0); }}
+                title={bulk.phrase} disabled={false}
+                copy={{ ...bulk, deleteTitle: bulk.deleteTitle.replace("{count}", String(removing)) }}
+                onConfirm={() => removeSelected()} onDelete={() => setSelected([])} />
             </div>}
             {description && <DescriptionNotice state={description} onClose={() => setDescription(undefined)} />}
             {progress && <div role="status" className="flex flex-col gap-2 text-sm">

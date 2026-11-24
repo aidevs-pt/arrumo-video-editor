@@ -4,7 +4,9 @@ use serde::Deserialize;
 
 use serde_json::{Map, Value, json};
 
-use crate::{AssetOrganization, BrandAssetRole, ContextImport, WorkspaceStore, asset_root};
+use crate::{
+    AssetOrganization, AssetRemoval, BrandAssetRole, ContextImport, WorkspaceStore, asset_root,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -202,6 +204,20 @@ struct RemoveAssetInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RemoveAssetsInput {
+    workspace_id: i64,
+    assets: Vec<RemoveAssetInputItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RemoveAssetInputItem {
+    asset_id: i64,
+    confirmed_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ReplaceAssetInput {
     workspace_id: i64,
     asset_id: i64,
@@ -253,7 +269,7 @@ fn default_frames() -> u32 {
     8
 }
 
-pub(super) fn definitions() -> [Value; 36] {
+pub(super) fn definitions() -> [Value; 37] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -453,7 +469,7 @@ pub(super) fn definitions() -> [Value; 36] {
                 "workspaceId": id, "assetId": id, "source": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "assetId", "source"], "additionalProperties": false},
             "annotations": {"destructiveHint": true}}),
-        json!({"name": "remove_workspace_asset", "description": "Remove an unused workspace asset and its managed copy after confirming its exact filename.",
+        json!({"name": "remove_workspace_asset", "description": "Remove a workspace asset and its managed copy after confirming its exact filename. Settings that point at it let go of it. It stays when a video that can still continue, a finished video or an animation needs it; the answer names those uses.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "assetId", "confirmedName"], "additionalProperties": false},
@@ -464,6 +480,14 @@ pub(super) fn definitions() -> [Value; 36] {
                 "assetIds": {"type": "array", "minItems": 1, "maxItems": 60, "items": id},
                 "planOnly": {"type": "boolean"}
             }, "required": ["workspaceId", "assetIds"], "additionalProperties": false}}),
+        json!({"name": "remove_workspace_assets", "description": "Remove several workspace assets at once, each confirmed by its exact filename, with the same rules as remove_workspace_asset. Answers for each asset.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "assets": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"type": "object", "properties": {
+                    "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
+                }, "required": ["assetId", "confirmedName"], "additionalProperties": false}}
+            }, "required": ["workspaceId", "assets"], "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "render_frame_strip", "description": "Draw evenly spaced frames from a stretch of video above its sound's waveform into a new PNG at an absolute local path, to check a cut, join or overlay. Name a video asset with assetId, or a run's final video with runId and formatId (add previewAttempt for that attempt's preview). Returns each frame's time. Use it at decision points, not to scan a whole video.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "runId": id, "formatId": id, "previewAttempt": id,
@@ -847,16 +871,28 @@ pub(super) fn call(
             .map_err(|_| "Invalid asset removal arguments")
             .and_then(|args: RemoveAssetInput| {
                 store
-                    .remove_workspace_asset(
+                    .remove_asset_explained(
                         database,
                         args.workspace_id,
                         args.asset_id,
                         &args.confirmed_name,
                     )
-                    .map(|removed| json!({"removed": removed}))
+                    .map(|result| json!({"removed": result == AssetRemoval::Removed, "result": result}))
                     .map_err(
                         |_| "Could not finish asset removal. Retry with the same IDs and filename",
                     )
+            }),
+        "remove_workspace_assets" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid asset removal arguments")
+            .and_then(|args: RemoveAssetsInput| {
+                let mut results = Vec::with_capacity(args.assets.len());
+                for asset in args.assets {
+                    let result = store
+                        .remove_asset_explained(database, args.workspace_id, asset.asset_id, &asset.confirmed_name)
+                        .map_err(|_| "Could not finish asset removal. Retry with the same IDs and filenames")?;
+                    results.push(json!({"assetId": asset.asset_id, "removed": result == AssetRemoval::Removed, "result": result}));
+                }
+                Ok(json!({"results": results}))
             }),
         _ => return None,
     })

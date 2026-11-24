@@ -499,11 +499,16 @@
     "recentImport": "Importado agora",
     "removal": {
       "deleteTitle": "Remover recurso",
-      "deleteDescription": "A cópia gerida será removida do espaço de trabalho. O ficheiro original mantém-se na sua localização.",
+      "deleteDescription": "A cópia gerida será removida do espaço de trabalho e das definições que a usam, como as funções de marca e as referências de miniaturas. O ficheiro original mantém-se na sua localização.",
       "confirmTitle": "Escreve o nome exato do ficheiro",
-      "deleteError": "Não foi possível remover o recurso. Verifica se ainda está em uso num rascunho, numa associação de marca, numa definição de miniaturas ou numa geração.",
+      "deleteError": "Não foi possível remover o recurso. Tenta novamente.",
       "cancelDelete": "Cancelar",
-      "deleting": "A remover…"
+      "deleting": "A remover…",
+      "missing": "Este recurso já foi removido ou o nome mudou.",
+      "inUse": "O Arrumo manteve-o porque ainda é necessário para {uses}.",
+      "openVideo": "o vídeo «{name}», que ainda pode continuar",
+      "finishedVideo": "o vídeo terminado «{name}»",
+      "animation": "a animação «{name}»"
     },
     "groupView": "Agrupar recursos",
     "ungrouped": "Sem grupo",
@@ -613,6 +618,17 @@
       "modelNeedsVideo": "O {model} precisa de um vídeo de referência. Escolhe ou carrega um.",
       "modelNeedsVideoAndImages": "O {model} precisa de um vídeo de referência e de pelo menos {count} imagens. Escolhe-os ou carrega-os.",
       "orChoose": "Ou escolhe {models}."
+    },
+    "bulkRemoval": {
+      "deleteTitle": "Remover {count} recursos",
+      "deleteDescription": "As cópias geridas serão removidas do espaço de trabalho e das definições que as usam. Os ficheiros originais mantêm-se na sua localização.",
+      "confirmTitle": "Escreve esta frase para confirmar",
+      "phrase": "Apagar todos os ficheiros",
+      "deleteError": "Não foi possível remover os recursos. Tenta novamente.",
+      "partial": "Foram removidos {removed} de {total}. Mantidos porque ainda são necessários: {kept}.",
+      "cancelDelete": "Cancelar",
+      "deleting": "A remover…",
+      "button": "Remover"
     }
   },
   "delivery": {
