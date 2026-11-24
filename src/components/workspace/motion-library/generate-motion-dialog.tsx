@@ -53,7 +53,7 @@ export function GenerateMotionDialog<Item>({ workspaceId, profileId, basedOn, di
           {basedOn ? copy.changeWithAgent : copy.generate}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{basedOn ? copy.changeWithAgent : copy.generate}</DialogTitle>
           <DialogDescription>

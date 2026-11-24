@@ -139,12 +139,10 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
                       <FolderCog />{copy.workspaceSettings}
                     </Link>
                   </DropdownMenuItem>}
-                  <div className="flex gap-2 border-t p-2 mt-1 -mx-1 -mb-1">
-                    <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => choose(null)}><Plus data-icon="inline-start" />{copy.newWorkspace}</Button>
-                    <Button type="button" variant="outline" size="sm" asChild>
-                      <Link href={workspace ? `/settings?workspace=${workspace.id}&scope=app&section=backup` : "/settings?section=backup"} onClick={() => setOpenMobile(false)}><Download data-icon="inline-start" />{copy.importWorkspaces}</Link>
-                    </Button>
-                  </div>
+                  <DropdownMenuItem onSelect={() => choose(null)}><Plus />{copy.newWorkspace}</DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={workspace ? `/settings?workspace=${workspace.id}&scope=app&section=backup` : "/settings?section=backup"} onClick={() => setOpenMobile(false)}><Download />{copy.importWorkspaces}</Link>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>

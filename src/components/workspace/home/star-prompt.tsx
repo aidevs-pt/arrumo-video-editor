@@ -68,12 +68,11 @@ export function StarPrompt({ workspaceIds }: { workspaceIds: number[] }) {
           <DialogTitle className="flex items-center gap-2"><Star className="size-5 text-attention" aria-hidden="true" />{copy.title}</DialogTitle>
           <DialogDescription>{completed > 1 ? copy.bodyMany.replace("{count}", String(completed)) : copy.body}</DialogDescription>
         </DialogHeader>
-        <DialogFooter className="gap-2 sm:justify-between">
+        {/* Stacked, so the three choices fit in every language and keep one size. */}
+        <DialogFooter className="flex-col sm:flex-col sm:justify-start">
+          <Button onClick={star}><Star data-icon="inline-start" />{copy.star}</Button>
+          <Button variant="outline" onClick={later}>{copy.later}</Button>
           <Button variant="ghost" onClick={finish}>{copy.never}</Button>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button variant="outline" onClick={later}>{copy.later}</Button>
-            <Button onClick={star}><Star data-icon="inline-start" />{copy.star}</Button>
-          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
