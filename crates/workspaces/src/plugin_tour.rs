@@ -1,6 +1,6 @@
-//! The plugin tour: one shared introduction to the plugins that arrived since the creator last
-//! looked, from the `introduction` each plugin declares. Plugins already present when the tour
-//! first runs (a fresh install's bundled plugins, or an existing library) count as introduced.
+//! The plugin tour: one shared introduction to the plugins the creator hasn't met yet, from the
+//! `introduction` each plugin declares. The studio shows it, so a new install sees its bundled
+//! plugins once its first workspace exists, and later updates introduce the plugins they add.
 
 use std::error::Error;
 
@@ -37,24 +37,6 @@ impl WorkspaceStore {
 
     /// The plugins to introduce now, in catalogue order.
     pub fn pending_plugin_tour(&self) -> Result<Vec<TourStop>, Box<dyn Error>> {
-        let baseline: bool = self.0.query_row(
-            "SELECT baseline_taken FROM plugin_tour_state WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )?;
-        if !baseline {
-            let ids: Vec<String> = self
-                .plugin_catalog()?
-                .into_iter()
-                .map(|plugin| plugin.manifest.id)
-                .collect();
-            self.mark_plugins_introduced(&ids)?;
-            self.0.execute(
-                "UPDATE plugin_tour_state SET baseline_taken = 1 WHERE id = 1",
-                [],
-            )?;
-            return Ok(Vec::new());
-        }
         let mut seen = self
             .0
             .prepare("SELECT 1 FROM plugin_introductions_seen WHERE plugin_id = ?1")?;
@@ -94,12 +76,14 @@ mod tests {
 
     #[test]
     #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
-    fn only_plugins_that_arrive_later_are_introduced() {
+    fn each_plugin_is_introduced_once() {
         let store = WorkspaceStore::open(":memory:").unwrap();
-        // The first look takes the baseline: bundled plugins are not toured.
+        // A new install introduces its bundled plugins once.
+        let all = store.pending_plugin_tour().unwrap();
+        assert!(all.iter().any(|stop| stop.plugin_id == "codex"));
+        let ids: Vec<String> = all.iter().map(|stop| stop.plugin_id.clone()).collect();
+        store.mark_plugins_introduced(&ids).unwrap();
         assert!(store.pending_plugin_tour().unwrap().is_empty());
-        let stops = store.plugin_tour(&[]).unwrap();
-        assert!(stops.iter().any(|stop| stop.plugin_id == "codex"));
         // A plugin that was never seen (as after an update adding it) is introduced once.
         store
             .0

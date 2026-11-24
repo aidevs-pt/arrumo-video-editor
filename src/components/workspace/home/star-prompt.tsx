@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { usePluginTourActive } from "@/components/workspace/plugins/plugin-tour";
 import { useLocale } from "@/lib/locale-provider";
 
 const REPOSITORY = "https://github.com/aidevs-pt/arrumo-video-editor";
@@ -31,6 +32,8 @@ export function StarPrompt({ workspaceIds }: { workspaceIds: number[] }) {
   const [open, setOpen] = useState(false);
   const [completed, setCompleted] = useState(0);
   const [checked, setChecked] = useState(false);
+  // Waits for the plugin tour, so the two never open over each other.
+  const touring = usePluginTourActive();
 
   useEffect(() => {
     if (checked || !workspaceIds.length) return;
@@ -62,7 +65,7 @@ export function StarPrompt({ workspaceIds }: { workspaceIds: number[] }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) finish(); }}>
+    <Dialog open={open && !touring} onOpenChange={(next) => { if (!next) finish(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Star className="size-5 text-attention" aria-hidden="true" />{copy.title}</DialogTitle>
