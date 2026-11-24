@@ -43,8 +43,17 @@
       "appimage": { "bundleMediaFramework": true }
     },
     "windows": {
-      "nsis": { "languages": ["English", "Spanish", "Portuguese"] },
-      "wix": { "upgradeCode": "ed28b0b3-fe7c-4c1b-b432-477d3fd62d90" }
+      "nsis": {
+        "languages": ["English", "Spanish", "Portuguese"],
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "installer/nsis-header.bmp",
+        "sidebarImage": "installer/nsis-sidebar.bmp"
+      },
+      "wix": {
+        "upgradeCode": "ed28b0b3-fe7c-4c1b-b432-477d3fd62d90",
+        "bannerPath": "installer/wix-banner.bmp",
+        "dialogImagePath": "installer/wix-dialog.bmp"
+      }
     },
     "macOS": {
       "minimumSystemVersion": "11.0",
