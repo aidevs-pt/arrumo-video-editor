@@ -499,11 +499,16 @@
     "recentImport": "Recién importado",
     "removal": {
       "deleteTitle": "Quitar recurso",
-      "deleteDescription": "Se eliminará la copia gestionada del espacio de trabajo. El archivo original seguirá en su ubicación.",
+      "deleteDescription": "Se eliminará la copia gestionada del espacio de trabajo y de los ajustes que la usan, como los roles de marca y las referencias de miniaturas. El archivo original seguirá en su ubicación.",
       "confirmTitle": "Escribe el nombre exacto del archivo",
-      "deleteError": "No se pudo quitar el recurso. Comprueba si sigue en uso en un borrador, una asignación de marca, una configuración de miniaturas o una generación.",
+      "deleteError": "No se pudo quitar el recurso. Inténtalo de nuevo.",
       "cancelDelete": "Cancelar",
-      "deleting": "Quitando…"
+      "deleting": "Quitando…",
+      "missing": "Este recurso ya se quitó o su nombre ha cambiado.",
+      "inUse": "Arrumo lo ha conservado porque aún lo necesita {uses}.",
+      "openVideo": "el vídeo «{name}», que aún puede continuar",
+      "finishedVideo": "el vídeo terminado «{name}»",
+      "animation": "la animación «{name}»"
     },
     "groupView": "Agrupar recursos",
     "ungrouped": "Sin grupo",
@@ -613,6 +618,17 @@
       "modelNeedsVideo": "{model} necesita un vídeo de referencia. Elige o sube uno.",
       "modelNeedsVideoAndImages": "{model} necesita un vídeo de referencia y al menos {count} imágenes. Elígelos o súbelos.",
       "orChoose": "O elige {models}."
+    },
+    "bulkRemoval": {
+      "deleteTitle": "Quitar {count} recursos",
+      "deleteDescription": "Se eliminarán sus copias gestionadas del espacio de trabajo y de los ajustes que las usan. Los archivos originales seguirán en su ubicación.",
+      "confirmTitle": "Escribe esta frase para confirmar",
+      "phrase": "Borrar todos los archivos",
+      "deleteError": "No se pudieron quitar los recursos. Inténtalo de nuevo.",
+      "partial": "Se quitaron {removed} de {total}. Se conservaron porque aún se necesitan: {kept}.",
+      "cancelDelete": "Cancelar",
+      "deleting": "Quitando…",
+      "button": "Quitar"
     }
   },
   "delivery": {
@@ -1461,7 +1477,7 @@
     "selected": "{count} seleccionados",
     "selectedOne": "1 seleccionado",
     "selectAll": "Seleccionar los visibles",
-    "clear": "Borrar",
+    "clear": "Deseleccionar",
     "describeTogether": "Describir juntos",
     "new": "Nuevo",
     "noContext": "Sin contexto aún",
