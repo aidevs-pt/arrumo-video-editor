@@ -1,12 +1,11 @@
 # Roadmap
 
-Where Arrumo is heading. It's a direction, not a promise: priorities move with what people tell us, and nothing here has a date. To suggest something or vote for an idea, open a [discussion](https://github.com/aidevs-pt/arrumo-video-editor/discussions) or a [feature request](https://github.com/aidevs-pt/arrumo-video-editor/issues/new/choose).
+Where Arrumo is heading. It's a direction, not a promise: priorities move with what people tell us, and nothing here has a date. Follow each item's progress on the [roadmap board](https://github.com/orgs/aidevs-pt/projects/1), where every item is an issue you can react to or comment on. To suggest something new, open a [discussion](https://github.com/aidevs-pt/arrumo-video-editor/discussions) or a [feature request](https://github.com/aidevs-pt/arrumo-video-editor/issues/new/choose).
 
 ## Now: the first release
 
 - **Preview builds** for Windows, macOS and Linux, for early testers.
 - **Signed installers.** Windows and macOS builds signed and notarized, so they install without security warnings. Until then, preview builds explain how to open them.
-- **Official plugins in the registry**, installable and updatable from inside the app with checked releases.
 - **Tested on real machines**: installation, onboarding, a full video and updates, on every platform.
 
 ## Next
@@ -26,6 +25,7 @@ Where Arrumo is heading. It's a direction, not a promise: priorities move with w
 
 ## Done recently
 
+- Official plugins in the registry, installable and updatable from inside the app with checked releases.
 - Arrumo finds your agent even when it isn't on the usual path, or you can choose its program.
 - Licenses and open-source credits in Settings › About.
 - Messages from the Arrumo team at launch, signed so only we can send them, such as "please update by hand".
