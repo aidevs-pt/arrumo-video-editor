@@ -36,6 +36,10 @@
       },
       "appimage": { "bundleMediaFramework": true }
     },
+    "windows": {
+      "nsis": { "languages": ["English", "Spanish", "Portuguese"] },
+      "wix": { "upgradeCode": "ed28b0b3-fe7c-4c1b-b432-477d3fd62d90" }
+    },
     "macOS": {
       "minimumSystemVersion": "11.0",
       "dmg": {
