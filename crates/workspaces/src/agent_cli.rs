@@ -77,10 +77,16 @@ pub(crate) fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
         .filter(|dir| dir.is_absolute())
         .find_map(|dir| {
             let candidate = dir.join(executable);
+            // npm installs CLIs on Windows as `.cmd` shims, so every PATHEXT extension counts.
             #[cfg(windows)]
             {
-                let candidate = candidate.with_extension("exe");
-                candidate.is_file().then_some(candidate)
+                let extensions =
+                    env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+                extensions
+                    .split(';')
+                    .filter(|extension| !extension.is_empty())
+                    .map(|extension| candidate.with_extension(extension.trim_start_matches('.')))
+                    .find(|candidate| candidate.is_file())
             }
             #[cfg(unix)]
             {

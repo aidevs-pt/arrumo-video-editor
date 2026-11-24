@@ -24,6 +24,8 @@ mod media_worker;
 mod motion_library;
 mod plugin_settings;
 mod profiles;
+#[cfg(unix)]
+mod shell_path;
 mod updates;
 
 type Store = Mutex<WorkspaceStore>;
@@ -1666,6 +1668,11 @@ fn main() {
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
         // SAFETY: runs first in main, before any thread exists.
         unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
+    }
+    #[cfg(unix)]
+    if let Some(path) = shell_path::login_shell_path() {
+        // SAFETY: still before any thread exists; the shell it asked has exited.
+        unsafe { std::env::set_var("PATH", path) };
     }
     // Starts first, so panics anywhere after this can be reported.
     let (_crash_reports, crash_plugin) = crash_reports::start();
