@@ -52,7 +52,8 @@
         "languages": ["English", "Spanish", "Portuguese"],
         "installerIcon": "icons/icon.ico",
         "headerImage": "installer/nsis-header.bmp",
-        "sidebarImage": "installer/nsis-sidebar.bmp"
+        "sidebarImage": "installer/nsis-sidebar.bmp",
+        "installerHooks": "installer/hooks.nsh"
       },
       "wix": {
         "upgradeCode": "ed28b0b3-fe7c-4c1b-b432-477d3fd62d90",
