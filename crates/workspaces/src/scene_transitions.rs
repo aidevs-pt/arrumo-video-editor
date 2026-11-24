@@ -240,7 +240,6 @@ fn corners(place: impl Fn(&str) -> (String, String)) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
 
     #[test]
     fn transitions_fit_inside_short_scenes_in_whole_frames() {
@@ -255,7 +254,7 @@ mod tests {
 
     #[test]
     fn joins_with_transitions_keep_the_total_length() {
-        if Command::new(crate::media_tools::ffmpeg())
+        if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
             .output()
             .is_err()
@@ -271,7 +270,7 @@ mod tests {
             .enumerate()
         {
             let name = format!("{index}.mp4");
-            let made = Command::new(crate::media_tools::ffmpeg())
+            let made = crate::quiet_command(crate::media_tools::ffmpeg())
                 .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
                 .arg(format!("color=c={colour}:s=160x90:r=30:d={length}"))
                 .args(["-pix_fmt", "yuv420p", "-y"])
@@ -300,7 +299,7 @@ mod tests {
         ]);
         args.extend(["-c:v", "libx264", "-y"].map(String::from));
         args.push(output.to_string_lossy().into());
-        let status = Command::new(crate::media_tools::ffmpeg())
+        let status = crate::quiet_command(crate::media_tools::ffmpeg())
             .args(&args)
             .status()
             .unwrap();

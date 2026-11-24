@@ -5,7 +5,7 @@ use std::{
     error::Error,
     io,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 use serde::Serialize;
@@ -38,7 +38,7 @@ pub struct FrameStrip {
 }
 
 fn probe(video: &Path) -> Result<(f64, bool, bool), Box<dyn Error>> {
-    let output = Command::new(crate::media_tools::ffprobe())
+    let output = crate::quiet_command(crate::media_tools::ffprobe())
         .args([
             "-v",
             "error",
@@ -122,7 +122,7 @@ pub fn render_frame_strip(
     };
     let work = tempfile::tempdir()?;
     let output: PathBuf = work.path().join("strip.png");
-    let status = Command::new(crate::media_tools::ffmpeg())
+    let status = crate::quiet_command(crate::media_tools::ffmpeg())
         .args([
             "-nostdin",
             "-v",
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn draws_frames_above_the_waveform() {
-        if Command::new(crate::media_tools::ffmpeg())
+        if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
             .output()
             .is_err()
@@ -230,7 +230,7 @@ mod tests {
         }
         let work = tempfile::tempdir().unwrap();
         let video = work.path().join("clip.mp4");
-        let status = Command::new(crate::media_tools::ffmpeg())
+        let status = crate::quiet_command(crate::media_tools::ffmpeg())
             .args([
                 "-v",
                 "error",

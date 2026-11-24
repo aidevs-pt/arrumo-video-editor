@@ -8,7 +8,7 @@ use std::{
     env,
     ffi::OsString,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::OnceLock,
 };
 
@@ -55,7 +55,7 @@ pub struct MediaToolsStatus {
 /// Whether FFmpeg and ffprobe start. Every preview, render and export needs both.
 pub fn media_tools_status() -> MediaToolsStatus {
     let runs = |path: &Path| {
-        Command::new(path)
+        crate::quiet_command(path)
             .arg("-version")
             .stdin(Stdio::null())
             .stdout(Stdio::null())

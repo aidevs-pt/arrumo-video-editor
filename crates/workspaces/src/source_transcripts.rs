@@ -1,12 +1,7 @@
 //! Transcripts of source footage. Audio is extracted in bounded chunks, sent to the run's
 //! transcription providers in their captured order, and cached per managed asset.
 
-use std::{
-    error::Error,
-    fs, io,
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::{error::Error, fs, io, path::Path, process::Stdio};
 
 use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
@@ -304,7 +299,7 @@ impl WorkspaceStore {
 }
 
 pub(crate) fn media_duration(path: &Path) -> io::Result<f64> {
-    let output = Command::new(crate::media_tools::ffprobe())
+    let output = crate::quiet_command(crate::media_tools::ffprobe())
         .args([
             "-v",
             "error",
@@ -328,7 +323,7 @@ pub(crate) fn media_duration(path: &Path) -> io::Result<f64> {
 }
 
 fn extract_chunk(source: &Path, offset: f64, wave: &Path) -> io::Result<()> {
-    let status = Command::new(crate::media_tools::ffmpeg())
+    let status = crate::quiet_command(crate::media_tools::ffmpeg())
         .args([
             "-nostdin",
             "-v",

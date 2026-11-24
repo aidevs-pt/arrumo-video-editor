@@ -265,7 +265,7 @@ fn run_motion_worker(
     }
     let package = scratch.join("renderer.zip");
     std::fs::write(&package, bytes)?;
-    let mut runner = std::process::Command::new("python3");
+    let mut runner = crate::quiet_command("python3");
     #[cfg(target_os = "linux")]
     stop_worker_on_host_exit(&mut runner);
     runner

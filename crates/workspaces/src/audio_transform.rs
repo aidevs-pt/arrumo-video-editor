@@ -5,7 +5,7 @@ use std::{
     collections::BTreeMap,
     io::{self, Read},
     path::Path,
-    process::{Command, Stdio},
+    process::Stdio,
     time::Duration,
 };
 
@@ -198,7 +198,7 @@ pub(crate) fn audio_extension(bytes: &[u8]) -> Option<&'static str> {
 
 /// Converts a workspace media file to an MP3 of its soundtrack for upload.
 pub(crate) fn soundtrack_mp3(source: &Path, output: &Path) -> io::Result<()> {
-    let status = Command::new(crate::media_tools::ffmpeg())
+    let status = crate::quiet_command(crate::media_tools::ffmpeg())
         .args(["-nostdin", "-v", "error", "-y", "-i"])
         .arg(source)
         .args([

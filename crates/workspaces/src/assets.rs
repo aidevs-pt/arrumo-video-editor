@@ -137,7 +137,7 @@ impl WorkspaceStore {
         if !frame.is_file() {
             fs::create_dir_all(&directory)?;
             let pending = directory.join(format!("{asset_id}-pending.jpg"));
-            let made = std::process::Command::new(crate::media_tools::ffmpeg())
+            let made = crate::quiet_command(crate::media_tools::ffmpeg())
                 .args([
                     "-nostdin",
                     "-v",
@@ -633,7 +633,7 @@ mod frame_tests {
 
     #[test]
     fn video_assets_get_a_cached_still_and_images_do_not() {
-        if std::process::Command::new(crate::media_tools::ffmpeg())
+        if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
             .output()
             .is_err()
@@ -647,7 +647,7 @@ mod frame_tests {
         let mut store = WorkspaceStore::open(&database).unwrap();
         let workspace = store.create("Studio").unwrap().id;
         let clip = temp.path().join("clip.mp4");
-        let made = std::process::Command::new(crate::media_tools::ffmpeg())
+        let made = crate::quiet_command(crate::media_tools::ffmpeg())
             .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
             .args(["color=c=red:s=160x90:r=10:d=1", "-pix_fmt", "yuv420p"])
             .arg(&clip)

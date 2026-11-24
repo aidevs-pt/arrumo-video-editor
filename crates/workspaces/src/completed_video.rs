@@ -91,7 +91,7 @@ impl WorkspaceStore {
         if !poster.is_file() {
             let pending = directory.join("poster-pending.jpg");
             let seconds = (output.duration_seconds * 0.2).min(3.0);
-            let made = std::process::Command::new(crate::media_tools::ffmpeg())
+            let made = crate::quiet_command(crate::media_tools::ffmpeg())
                 .args([
                     "-nostdin",
                     "-v",
