@@ -13,6 +13,14 @@ on:
         description: "Preview: publish as a pre-release that the updater and the latest download skip"
         type: boolean
         default: false
+      resume:
+        description: "Finish an existing draft instead of starting a release: its version, such as 0.1.0. Version and Preview are then taken from the draft"
+        default: ""
+      platforms:
+        description: "Platforms to build; with Resume, only the ones that failed"
+        type: choice
+        options: [all, linux, windows, macos]
+        default: all
 concurrency: release
 permissions:
   contents: write
@@ -24,20 +32,52 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      notes: ${{ steps.version.outputs.notes }}
+      version: ${{ steps.version.outputs.version || steps.resume.outputs.version }}
+      notes: ${{ steps.version.outputs.notes || steps.resume.outputs.notes }}
+      preview: ${{ steps.resume.outputs.preview || inputs.preview }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v7
+      - id: matrix
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          matrix=$(jq -cn --arg only "$PLATFORMS" '[
+            {platform: "linux", os: "ubuntu-22.04", args: ""},
+            {platform: "windows", os: "windows-latest", args: "--config windows-signing.json"},
+            {platform: "macos", os: "macos-latest", args: "--target universal-apple-darwin --config macos-signing.json"}
+          ] | map(select($only == "all" or .platform == $only)) | {include: .}')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+      # Resuming reuses the draft's tag, notes and pre-release flag, so a failed platform can be
+      # rebuilt without a new version.
+      - id: resume
+        if: inputs.resume != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.resume }}
+        run: |
+          draft=$(gh release view "v$VERSION" --repo "${{ github.repository }}" --json isDraft,isPrerelease) \
+            || { echo "::error::v$VERSION has no release to resume"; exit 1; }
+          [ "$(jq .isDraft <<< "$draft")" = true ] || { echo "::error::v$VERSION is already published"; exit 1; }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "preview=$(jq .isPrerelease <<< "$draft")" >> "$GITHUB_OUTPUT"
+          # The notes the update dialog shows were stored in the draft's update manifest.
+          gh release download "v$VERSION" --repo "${{ github.repository }}" --pattern latest.json --dir "$RUNNER_TEMP" || true
+          delimiter="EOF_$(openssl rand -hex 8)"
+          { echo "notes<<$delimiter"; jq -r '.notes // ""' "$RUNNER_TEMP/latest.json" 2>/dev/null; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+      - if: inputs.resume == ''
+        uses: actions/checkout@v7
         with:
           path: video-editor
           # The changelog needs the history since the previous release tag.
           fetch-depth: 0
           # "Protect main" exempts this deploy key, so the version bump can be pushed.
           ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
-      - uses: actions/setup-node@v7
+      - if: inputs.resume == ''
+        uses: actions/setup-node@v7
         with:
           node-version: 26
       - id: version
+        if: inputs.resume == ''
         working-directory: video-editor
         run: |
           version=$(node scripts/set-version.mjs "${{ inputs.version }}")
@@ -49,11 +89,13 @@ jobs:
           git add CHANGELOG.md
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-          # The first release can keep the version already in the files.
-          git diff --quiet HEAD || git commit -am "chore(release): v$version"
+          # The first release can keep the version already in the files. The release build verifies
+          # this commit, so CI skips it.
+          git diff --quiet HEAD || git commit -am "chore(release): v$version [skip ci]"
           git tag "v$version"
           git push origin HEAD "v$version"
       - name: Draft the release
+        if: inputs.resume == ''
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -74,14 +116,7 @@ jobs:
     environment: release
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            args: ""
-          - os: windows-latest
-            args: --config windows-signing.json
-          - os: macos-latest
-            args: --target universal-apple-darwin --config macos-signing.json
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -152,7 +187,9 @@ jobs:
           node-version: 26
           cache: pnpm
           cache-dependency-path: video-editor/pnpm-lock.yaml
+      # Inside the checkout, so the targets go to the toolchain that rust-toolchain.toml pins.
       - if: runner.os == 'macOS'
+        working-directory: video-editor
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - if: runner.os == 'Linux'
         run: |
@@ -260,7 +297,7 @@ jobs:
           done
       - env:
           GH_TOKEN: ${{ github.token }}
-          PREVIEW: ${{ inputs.preview }}
+          PREVIEW: ${{ needs.prepare.outputs.preview }}
         # A preview stays a pre-release, so releases/latest and the updater keep pointing at the
         # last full release.
         run: |
