@@ -5,8 +5,13 @@ use std::{
 };
 
 pub(crate) struct MotionScratch {
-    // Drop the directory while its lease is still held.
+    // Elsewhere the lease is a file inside the directory, and Windows can't remove a directory
+    // while a file in it is open, so the lease is released first.
+    #[cfg(not(target_os = "linux"))]
+    _lease: File,
+    // On Linux the lease is a handle on the directory itself, held until the directory is gone.
     directory: tempfile::TempDir,
+    #[cfg(target_os = "linux")]
     _lease: File,
 }
 
@@ -22,6 +27,8 @@ impl MotionScratch {
                 Err(error) => return Err(error),
             }
         }
+        #[cfg(not(target_os = "linux"))]
+        fs::create_dir_all(&root)?;
         let root_lock = open_directory(&root)?;
         root_lock.lock()?;
         let directory = tempfile::Builder::new()
@@ -48,6 +55,8 @@ fn scratch_root(database: &Path) -> io::Result<PathBuf> {
     Ok(database.with_file_name(scratch_name))
 }
 
+/// A handle whose lock marks the directory as in use. Linux locks the directory itself; other
+/// systems can't open a directory as a file, so they lock a `.lease` file inside it.
 fn open_directory(path: &Path) -> io::Result<File> {
     #[cfg(target_os = "linux")]
     {
@@ -60,15 +69,19 @@ fn open_directory(path: &Path) -> io::Result<File> {
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = path;
-        Err(io::ErrorKind::Unsupported.into())
+        if !path.is_dir() {
+            return Err(io::ErrorKind::NotFound.into());
+        }
+        File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path.join(".lease"))
     }
 }
 
 pub fn recover_motion_scratch(database: &Path) -> io::Result<()> {
-    if !cfg!(target_os = "linux") {
-        return Ok(());
-    }
     let root = scratch_root(database)?;
     let root_lock = match open_directory(&root) {
         Ok(lock) => lock,
@@ -95,11 +108,16 @@ pub fn recover_motion_scratch(database: &Path) -> io::Result<()> {
             Err(error) => return Err(error),
         };
         match lease.try_lock() {
-            Ok(()) => match fs::remove_dir_all(&path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error),
-            },
+            // Nobody holds it, and new scratch waits for the root lock, so it can go. The lease
+            // closes first because Windows can't remove a directory with an open file in it.
+            Ok(()) => {
+                drop(lease);
+                match fs::remove_dir_all(&path) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error),
+                }
+            }
             Err(TryLockError::WouldBlock) => {}
             Err(TryLockError::Error(error)) => return Err(error),
         }
@@ -107,10 +125,33 @@ pub fn recover_motion_scratch(database: &Path) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn scratch_is_removed_when_done_and_recovered_when_abandoned() {
+        let directory = tempfile::tempdir().unwrap();
+        let database = directory.path().join("studio.sqlite");
+        let done = MotionScratch::create(&database).unwrap();
+        let done_path = done.path().to_path_buf();
+        fs::write(done_path.join("animation-0.mp4"), b"video").unwrap();
+        drop(done);
+        assert!(!done_path.exists());
+
+        let active = MotionScratch::create(&database).unwrap();
+        let orphan = MotionScratch::create(&database).unwrap().directory.keep();
+        let unrelated = scratch_root(&database).unwrap().join("render-keep");
+        fs::create_dir(&unrelated).unwrap();
+        for _ in 0..2 {
+            recover_motion_scratch(&database).unwrap();
+            assert!(!orphan.exists());
+            assert!(active.path().is_dir());
+            assert!(unrelated.is_dir());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
     #[test]
     fn removes_interrupted_scratch_and_preserves_active_and_unowned_entries() {
         let directory = tempfile::tempdir().unwrap();
