@@ -221,6 +221,12 @@ impl WorkspaceStore {
             .active_plugin_catalog()?
             .into_iter()
             .filter(|plugin| plugin.manifest.capabilities.contains_key(capability))
+            // An agent plugin does its work through its CLI, so it can't provide anything while
+            // the CLI isn't on this computer.
+            .filter(|plugin| {
+                crate::agent_plugin(&plugin.manifest.id)
+                    .is_none_or(|agent| crate::agent_cli::find_agent_cli(agent).is_some())
+            })
             .map(|plugin| CapabilityProvider {
                 id: plugin.manifest.id,
                 name: plugin.manifest.name,
