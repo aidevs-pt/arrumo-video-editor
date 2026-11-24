@@ -199,7 +199,7 @@ pub use supplemental_review::{
 };
 pub use telemetry::{
     PrivacySettings, allow_crash_reports, crash_dsn, crash_reports_allowed, install_crash_reporter,
-    redact_report_text, set_usage_sink, usage_key,
+    redact_report_text, report_failure, set_failure_sink, set_usage_sink, usage_key,
 };
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
