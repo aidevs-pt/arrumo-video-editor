@@ -185,6 +185,15 @@ struct OrganizationInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DescribeAssetsInput {
+    workspace_id: i64,
+    asset_ids: Vec<i64>,
+    #[serde(default)]
+    plan_only: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RemoveAssetInput {
     workspace_id: i64,
     asset_id: i64,
@@ -244,7 +253,7 @@ fn default_frames() -> u32 {
     8
 }
 
-pub(super) fn definitions() -> [Value; 35] {
+pub(super) fn definitions() -> [Value; 36] {
     let id = json!({"type": "integer", "minimum": 1});
     let assignment = json!({"type": "object", "properties": {
         "workspaceId": id, "assetId": id, "role": {"enum": ["identity", "style"]}
@@ -449,6 +458,12 @@ pub(super) fn definitions() -> [Value; 35] {
                 "workspaceId": id, "assetId": id, "confirmedName": {"type": "string", "minLength": 1}
             }, "required": ["workspaceId", "assetId", "confirmedName"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
+        json!({"name": "describe_workspace_assets", "description": "Have the workspace's agent write the context, group and labels of library assets from what it can see or read: the image, a frame of a video, or a cached speech transcript. Saves the answers. Assets it cannot look at are returned in omitted with a reason; set planOnly to only check which those are.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id,
+                "assetIds": {"type": "array", "minItems": 1, "maxItems": 60, "items": id},
+                "planOnly": {"type": "boolean"}
+            }, "required": ["workspaceId", "assetIds"], "additionalProperties": false}}),
         json!({"name": "render_frame_strip", "description": "Draw evenly spaced frames from a stretch of video above its sound's waveform into a new PNG at an absolute local path, to check a cut, join or overlay. Name a video asset with assetId, or a run's final video with runId and formatId (add previewAttempt for that attempt's preview). Returns each frame's time. Use it at decision points, not to scan a whole video.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "assetId": id, "runId": id, "formatId": id, "previewAttempt": id,
@@ -812,6 +827,21 @@ pub(super) fn call(
                     .replace_asset(&asset_root(database), args.workspace_id, args.asset_id, source)
                     .map(|asset| json!({"asset": asset}))
                     .map_err(|_| "Could not replace asset. Check the workspace, active asset ID, and replacement media kind")
+            }),
+        "describe_workspace_assets" => serde_json::from_value(Value::Object(arguments.clone()))
+            .map_err(|_| "Invalid asset description arguments")
+            .and_then(|args: DescribeAssetsInput| {
+                if args.plan_only {
+                    store
+                        .plan_asset_descriptions(database, args.workspace_id, &args.asset_ids)
+                        .map(|plan| json!(plan))
+                        .map_err(|_| "Could not check the assets. Check the workspace and asset IDs")
+                } else {
+                    store
+                        .describe_assets(database, args.workspace_id, &args.asset_ids)
+                        .map(|described| json!(described))
+                        .map_err(|_| "Could not describe the assets. Check the workspace's agent and retry")
+                }
             }),
         "remove_workspace_asset" => serde_json::from_value(Value::Object(arguments.clone()))
             .map_err(|_| "Invalid asset removal arguments")

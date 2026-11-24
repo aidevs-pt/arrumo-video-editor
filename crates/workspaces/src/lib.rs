@@ -17,6 +17,8 @@ mod agent_settings;
 mod agent_stage;
 mod agent_work;
 mod asset_cleanup;
+mod asset_descriptions;
+pub use asset_descriptions::{DescribedAssets, DescriptionPlan, OmitReason, OmittedAsset};
 mod asset_organization;
 mod asset_plan;
 mod assets;

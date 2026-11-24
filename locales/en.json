@@ -1524,7 +1524,25 @@
       "wait": "Dubbing can take a few minutes.",
       "working": "Dubbing…",
       "confirm": "Dub"
-    }
+    },
+    "describeWithAgent": "Describe with agent",
+    "describeHint": "The agent writes the context, group and labels from what it sees or hears, using your workspace context and existing groups. You can edit them after.",
+    "describingOne": "Describing {name}…",
+    "describingMany": "Describing {count} assets…",
+    "describedOne": "Described {name}.",
+    "describedMany": "Described {count} assets.",
+    "describeSkipped": "Left out: {list}.",
+    "describeNone": "None of these can be described: {list}.",
+    "describeError": "The agent could not describe them. Try again, or check the agent in Settings.",
+    "describeUnavailable": "Your agent is not ready. Check it in Settings › Agent.",
+    "skipReason": {
+      "agent_cannot_see": "your agent can’t look at images",
+      "unsupported_format": "a format the agent can’t open",
+      "nothing_to_read": "no speech to read",
+      "unavailable": "the file is missing",
+      "not_described": "the agent didn’t describe it"
+    },
+    "dismissNotice": "Dismiss"
   },
   "videoDetails": {
     "step1": "Raw footage",
