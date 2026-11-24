@@ -2,6 +2,13 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.2 (2026-11-24)
+
+### Fixes
+
+- Stop a lingering shell helper from blocking the app's launch (#28)
+- Installer title, no console windows for FFmpeg, capped text areas in dialogs (#27)
+
 ## 0.1.1 (2026-11-24)
 
 ### Fixes
