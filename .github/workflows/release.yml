@@ -80,15 +80,16 @@ jobs:
           path: video-editor
           ref: v${{ needs.prepare.outputs.version }}
       # The default plugins are bundled from their published, digest-checked registry releases.
+      # Public repositories need no token; ARRUMO_REPOS_TOKEN is only for private ones.
       - uses: actions/checkout@v7
         with:
           repository: aidevs-pt/arrumo-plugin-registry
           path: plugin-registry
-          token: ${{ secrets.ARRUMO_REPOS_TOKEN }}
+          token: ${{ secrets.ARRUMO_REPOS_TOKEN || github.token }}
       - name: Fetch the default plugins
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN }}
+          GH_TOKEN: ${{ secrets.ARRUMO_REPOS_TOKEN || github.token }}
         run: |
           mkdir -p plugin-releases plugins
           for id in $(jq -r '.plugins[] | select(.default) | .id' plugin-registry/catalog.json); do
