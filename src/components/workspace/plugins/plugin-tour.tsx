@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -20,6 +20,22 @@ export function announcePluginChanges() {
   window.dispatchEvent(new Event(PLUGINS_CHANGED));
 }
 
+/** Whether the tour is still being checked for or is showing, so other prompts can wait for it. */
+let touring = true;
+const tourListeners = new Set<() => void>();
+function setTouring(value: boolean) {
+  if (touring === value) return;
+  touring = value;
+  for (const listener of tourListeners) listener();
+}
+function subscribeTouring(listener: () => void) {
+  tourListeners.add(listener);
+  return () => { tourListeners.delete(listener); };
+}
+export function usePluginTourActive() {
+  return useSyncExternalStore(subscribeTouring, () => touring, () => true);
+}
+
 /** Replays the introductions of the given plugins, or of every plugin that has one. */
 export function replayPluginTour(ids: string[] = []) {
   window.dispatchEvent(new CustomEvent<string[]>(REPLAY, { detail: ids }));
@@ -30,6 +46,7 @@ export function replayPluginTour(ids: string[] = []) {
 export function PluginTourHost() {
   const [stops, setStops] = useState<Stop[]>([]);
   const [replaying, setReplaying] = useState(false);
+  const [checked, setChecked] = useState(false);
 
   const checkPending = useCallback(async () => {
     try {
@@ -37,8 +54,12 @@ export function PluginTourHost() {
       if (pending.length > 0) { setReplaying(false); setStops(pending); }
     } catch {
       // The tour is a courtesy; failing to read it must not block the app.
+    } finally {
+      setChecked(true);
     }
   }, []);
+
+  useEffect(() => { setTouring(!checked || stops.length > 0); }, [checked, stops.length]);
 
   useEffect(() => {
     void checkPending();
