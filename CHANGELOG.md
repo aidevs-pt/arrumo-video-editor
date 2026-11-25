@@ -2,6 +2,17 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.9 (2026-11-25)
+
+### New
+
+- Improve content generation guidance and styling (#80)
+- Stop synthesizing animation sounds with FFmpeg (#78)
+
+### Fixes
+
+- Keep every agent session in the progress log without gaps (#76)
+
 ## 0.1.8 (2026-11-25)
 
 ### New
