@@ -3,7 +3,7 @@
 Releases are built by the **Release** workflow (`.github/workflows/release.yml`). Run it by hand from the repository's Actions tab. It:
 
 1. sets the new version with `scripts/set-version.mjs` (`patch`, `minor`, `major`, or an exact version), commits `chore(release): vX.Y.Z` as the person who ran it, tags `vX.Y.Z` and drafts a GitHub release;
-2. builds Linux (`.deb`, `.rpm`, AppImage), Windows (NSIS and MSI) and macOS (universal `.dmg`) on GitHub's runners, signing Windows and macOS when their credentials are set (see [Previews and unsigned builds](#previews-and-unsigned-builds));
+2. builds Linux (`.deb`, `.rpm`, AppImage), Windows (NSIS and MSI) and macOS (universal `.dmg`) on GitHub's runners, signing Windows and macOS when their credentials are set (see [Previews and unsigned builds](#previews-and-unsigned-builds)). The macOS job gives the disk image a Retina background and Arrumo's install-box volume icon, both drawn from sources in `src-tauri/dmg`;
 3. bundles the default plugins from their published registry releases, after checking each ZIP's digest against `plugin-registry/catalog.json`;
 4. uploads the installers, the signed updater packages and `latest.json`, then publishes the release.
 
