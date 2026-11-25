@@ -314,6 +314,69 @@ impl RenderCheck {
     }
 }
 
+/// A sound laid over an edit of recorded footage: a voice-over line or a sound effect, starting
+/// `at` seconds into cut `cut`.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AudioCue {
+    pub cut: usize,
+    pub at: f64,
+    pub path: PathBuf,
+    pub voice: bool,
+}
+
+/// The most voice-over lines and sound effects one edit lays.
+pub(crate) const MAX_CUES: usize = 40;
+
+/// The `filter_complex` that lays cues, given as (start in seconds, whether it is a voice) for
+/// inputs `1..`, over input 0's audio into `[audio]`. Voices are levelled like speech, and the
+/// footage's own sound gives way under them; effects sit below speech, cut after a few seconds.
+fn cue_mix(cues: &[(f64, bool)]) -> String {
+    let stereo = "aformat=sample_rates=48000:channel_layouts=stereo";
+    let mut graph = format!("[0:a:0]{stereo}[base];");
+    let (mut voices, mut effects) = (Vec::new(), Vec::new());
+    for (index, &(at, voice)) in cues.iter().enumerate() {
+        let delay = (at.max(0.0) * 1000.0).round() as u64;
+        let level = if voice {
+            "loudnorm=I=-16:TP=-2:LRA=11,aresample=48000".to_owned()
+        } else {
+            format!(
+                "atrim=0:{seconds},afade=t=out:st={fade}:d=0.5,volume=-8dB",
+                seconds = crate::motion_design::MAX_SOUND_SECONDS,
+                fade = crate::motion_design::MAX_SOUND_SECONDS - 0.5,
+            )
+        };
+        let label = format!("c{index}");
+        graph.push_str(&format!(
+            "[{input}:a:0]{stereo},{level},{stereo},adelay=delays={delay}:all=1[{label}];",
+            input = index + 1
+        ));
+        if voice {
+            voices.push(label);
+        } else {
+            effects.push(label);
+        }
+    }
+    let mut parts = Vec::new();
+    if voices.is_empty() {
+        parts.push("[base]".to_owned());
+    } else {
+        let joined: String = voices.iter().map(|label| format!("[{label}]")).collect();
+        graph.push_str(&format!(
+            "{joined}amix=inputs={}:normalize=0:duration=longest,asplit=2[voice][key];\
+             [base][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=400[ducked];",
+            voices.len()
+        ));
+        parts.extend(["[ducked]".to_owned(), "[voice]".to_owned()]);
+    }
+    parts.extend(effects.iter().map(|label| format!("[{label}]")));
+    graph.push_str(&format!(
+        "{}amix=inputs={}:normalize=0:duration=first[audio]",
+        parts.concat(),
+        parts.len()
+    ));
+    graph
+}
+
 /// The music a storyboard lays under its scenes: a first track, the tracks it changes to at
 /// scenes, and whether the music is featured rather than kept in the background.
 struct SceneMusic<'a> {
@@ -528,6 +591,7 @@ impl WorkspaceStore {
             validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
         }
         let motion = self.edit_motion(workspace_id, &edit)?;
+        let cues = self.edit_cues(database, workspace_id, run_id, &edit)?;
         let music = self.edit_music(&asset_root(database), workspace_id, &edit)?;
         let music_changes = self.edit_music_changes(&asset_root(database), workspace_id, &edit)?;
 
@@ -631,6 +695,11 @@ impl WorkspaceStore {
                     clip_sets.push((cuts, clips));
                     clip_sets.len() - 1
                 };
+                // Cues follow the main cuts; a format cut its own way plays without them.
+                let own_cuts = edit
+                    .get("format_cuts")
+                    .and_then(|cuts| cuts.get(format.id.to_string()))
+                    .is_some();
                 let check = renderer.render_format(
                     &root,
                     &scratch,
@@ -638,6 +707,7 @@ impl WorkspaceStore {
                     &format,
                     &motion,
                     music.as_deref(),
+                    if own_cuts { &[] } else { &cues },
                 )?;
                 checks.insert(format.id.to_string(), check.to_json());
                 let filename = if stage == ProductionStage::Preview {
@@ -748,7 +818,16 @@ impl WorkspaceStore {
             let clips = renderer.inspect_clips(&root, source_ids, cuts.as_deref())?;
             let motion = self.edit_motion(workspace_id, &edit)?;
             let music = self.edit_music(&root, workspace_id, &edit)?;
-            renderer.render_format(&root, directory, &clips, &format, &motion, music.as_deref())?;
+            let cues = self.edit_cues(database, workspace_id, run_id, &edit)?;
+            renderer.render_format(
+                &root,
+                directory,
+                &clips,
+                &format,
+                &motion,
+                music.as_deref(),
+                &cues,
+            )?;
         }
         Ok(directory.join("0.mp4"))
     }
@@ -788,6 +867,59 @@ impl WorkspaceStore {
             inserts,
             overlays,
         })
+    }
+
+    /// The voice-over lines and sound effects an edit of recorded footage lays, validated: sound
+    /// effects are audio in this workspace and voice-over files are ones Arrumo wrote for the run.
+    fn edit_cues(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+        edit: &Value,
+    ) -> Result<Vec<AudioCue>, Box<dyn Error>> {
+        let root = asset_root(database);
+        let at = |entry: &Value| entry["at_ms"].as_u64().unwrap_or(0) as f64 / 1000.0;
+        let cut = |entry: &Value| entry["cut"].as_u64().map(|cut| cut as usize);
+        let mut cues = Vec::new();
+        for entry in edit["sound_cues"].as_array().into_iter().flatten() {
+            let (Some(cut), Some(asset)) = (cut(entry), entry["asset_id"].as_i64()) else {
+                return Err(io::Error::other("A sound effect in the edit is incomplete").into());
+            };
+            let path = self.music_track(&root, workspace_id, &json!({"asset_id": asset}))?;
+            cues.push(AudioCue {
+                cut,
+                at: at(entry),
+                path,
+                voice: false,
+            });
+        }
+        for entry in edit["voice_cues"].as_array().into_iter().flatten() {
+            let (Some(cut), Some(file)) = (cut(entry), entry["file"].as_str()) else {
+                continue;
+            };
+            if !crate::narration::voice_over_file_name(file) {
+                return Err(
+                    io::Error::other("A voice-over file name is not one Arrumo wrote").into(),
+                );
+            }
+            let path = crate::delivery_verification::managed_delivery_file(
+                database,
+                workspace_id,
+                run_id,
+                file,
+            )?;
+            cues.push(AudioCue {
+                cut,
+                at: at(entry),
+                path,
+                voice: true,
+            });
+        }
+        if cues.len() > MAX_CUES {
+            return Err(io::Error::other("The edit lays too many sounds").into());
+        }
+        Ok(cues)
     }
 
     /// The workspace audio file an edit lays under the video as background music, if any.
@@ -1272,6 +1404,7 @@ impl ActiveRender<'_> {
         Ok(streams.iter().any(|stream| stream["codec_type"] == "audio"))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_format(
         &self,
         root: &Path,
@@ -1280,6 +1413,7 @@ impl ActiveRender<'_> {
         format: &Dimensions,
         motion: &EditMotion,
         music: Option<&Path>,
+        cues: &[AudioCue],
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let Dimensions { id, width, height } = format;
         let pixel_format = if width % 2 == 0 && height % 2 == 0 {
@@ -1321,8 +1455,10 @@ impl ActiveRender<'_> {
             }
             Ok(())
         };
+        let mut spans = Vec::with_capacity(clips.len());
         for (index, clip) in clips.iter().enumerate() {
             insert(index, &mut manifest, &mut parts)?;
+            let start: f64 = parts.iter().sum();
             let filename = format!("clip-{id}-{index}.mp4");
             let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
             command.args([
@@ -1406,7 +1542,9 @@ impl ActiveRender<'_> {
                 ])
                 .arg(scratch.join(&filename));
             self.run(&mut command, "normalizing a source clip")?;
-            parts.push(probe_duration(&scratch.join(&filename))?);
+            let length = probe_duration(&scratch.join(&filename))?;
+            spans.push((start, length));
+            parts.push(length);
             manifest.push_str(&format!("file {filename}\n"));
         }
         insert(clips.len(), &mut manifest, &mut parts)?;
@@ -1431,7 +1569,21 @@ impl ActiveRender<'_> {
             .arg(scratch.join(format!("{id}-joined.mp4")));
         self.run(&mut command, "joining source clips")?;
         let output = scratch.join(format!("{id}.mp4"));
-        let joined = scratch.join(format!("{id}-joined.mp4"));
+        let mut joined = scratch.join(format!("{id}-joined.mp4"));
+        // A cue starts inside its cut, at least half a second before the cut ends.
+        let placed: Vec<(f64, &AudioCue)> = cues
+            .iter()
+            .take(MAX_CUES)
+            .filter_map(|cue| {
+                let &(start, length) = spans.get(cue.cut)?;
+                Some((start + cue.at.clamp(0.0, (length - 0.5).max(0.0)), cue))
+            })
+            .collect();
+        if !placed.is_empty() {
+            let cued = scratch.join(format!("{id}-cued.mp4"));
+            self.lay_cues(&joined, &placed, &cued)?;
+            joined = cued;
+        }
         match music {
             Some(music) => {
                 let mastered = scratch.join(format!("{id}-mastered.mp4"));
@@ -1442,6 +1594,39 @@ impl ActiveRender<'_> {
             None => self.master_audio(&joined, &output)?,
         }
         self.check_render(&output, &parts)
+    }
+
+    /// Lays voice-over lines and sound effects, each at its start in seconds, over `input`'s audio.
+    fn lay_cues(
+        &self,
+        input: &Path,
+        cues: &[(f64, &AudioCue)],
+        output: &Path,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
+        command
+            .args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "file",
+                "-i",
+            ])
+            .arg(input);
+        for (_, cue) in cues {
+            command.arg("-i").arg(&cue.path);
+        }
+        let timing: Vec<(f64, bool)> = cues.iter().map(|(at, cue)| (*at, cue.voice)).collect();
+        self.run(
+            command
+                .arg("-filter_complex")
+                .arg(cue_mix(&timing))
+                .args(["-map", "0:v:0", "-map", "[audio]", "-c:v", "copy"])
+                .args(["-c:a", "aac", "-ar", "48000", "-ac", "2", "-y"])
+                .arg(output),
+            "laying voice-over and sound effects",
+        )
     }
 
     /// Loops `music` under the mastered speech at a background level, lowered about 10 dB while
@@ -1694,6 +1879,82 @@ mod tests {
     }
 
     use super::{cut_audio_filter, duration_matches};
+
+    #[test]
+    fn cues_duck_the_footage_under_voice_and_keep_its_length() {
+        let graph = super::cue_mix(&[(1.0, true), (0.25, false)]);
+        assert!(graph.contains("[1:a:0]") && graph.contains("adelay=delays=1000:all=1[c0]"));
+        assert!(graph.contains("adelay=delays=250:all=1[c1]"));
+        assert!(graph.contains("[base][key]sidechaincompress"));
+        assert!(
+            graph.ends_with("[ducked][voice][c1]amix=inputs=3:normalize=0:duration=first[audio]")
+        );
+        let effects_only = super::cue_mix(&[(0.0, false)]);
+        assert!(!effects_only.contains("sidechaincompress"));
+        assert!(
+            effects_only.ends_with("[base][c0]amix=inputs=2:normalize=0:duration=first[audio]")
+        );
+
+        // FFmpeg accepts the graph, and the result keeps the footage's length.
+        let ffmpeg = crate::media_tools::ffmpeg();
+        let dir = tempfile::tempdir().unwrap();
+        let make = |name: &str, args: &[&str]| {
+            let status = std::process::Command::new(ffmpeg)
+                .args(["-nostdin", "-v", "error"])
+                .args(args)
+                .arg(dir.path().join(name))
+                .status();
+            status.is_ok_and(|status| status.success())
+        };
+        if !make(
+            "footage.mp4",
+            &[
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=blue:s=160x90:d=3",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=f=220:d=3",
+                "-shortest",
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "aac",
+                "-y",
+            ],
+        ) {
+            eprintln!("FFmpeg is unavailable; skipping the mix check");
+            return;
+        }
+        assert!(make(
+            "voice.wav",
+            &["-f", "lavfi", "-i", "sine=f=440:d=1.5", "-y"]
+        ));
+        assert!(make(
+            "effect.wav",
+            &["-f", "lavfi", "-i", "sine=f=1800:d=0.2", "-y"]
+        ));
+        let status = std::process::Command::new(ffmpeg)
+            .args(["-nostdin", "-v", "error", "-i"])
+            .arg(dir.path().join("footage.mp4"))
+            .arg("-i")
+            .arg(dir.path().join("voice.wav"))
+            .arg("-i")
+            .arg(dir.path().join("effect.wav"))
+            .arg("-filter_complex")
+            .arg(&graph)
+            .args([
+                "-map", "0:v:0", "-map", "[audio]", "-c:v", "copy", "-c:a", "aac", "-y",
+            ])
+            .arg(dir.path().join("mixed.mp4"))
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let seconds = super::probe_duration(&dir.path().join("mixed.mp4")).unwrap();
+        assert!((seconds - 3.0).abs() < 0.2, "{seconds}");
+    }
 
     #[test]
     fn cut_audio_fades_in_and_out() {

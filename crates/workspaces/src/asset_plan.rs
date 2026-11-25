@@ -26,14 +26,14 @@ const MAX_NEW_CLIPS: usize = 3;
 
 /// What the run's video provider can make, offered to the agent when one is on.
 #[derive(Debug, Clone, PartialEq)]
-struct ClipGeneration {
-    aspect_ratio: &'static str,
-    min_seconds: u32,
-    max_seconds: u32,
+pub(crate) struct ClipGeneration {
+    pub(crate) aspect_ratio: &'static str,
+    pub(crate) min_seconds: u32,
+    pub(crate) max_seconds: u32,
 }
 
 /// The aspect ratio of the run's first format, as video providers name them.
-fn run_aspect_ratio(snapshot: &Value) -> &'static str {
+pub(crate) fn run_aspect_ratio(snapshot: &Value) -> &'static str {
     let format = &snapshot["formats"][0]["format"];
     match (format["width"].as_u64(), format["height"].as_u64()) {
         (Some(width), Some(height)) if height > width => "9:16",
@@ -485,15 +485,17 @@ impl WorkspaceStore {
 
     /// The clip generation this run can offer its agent: a video provider is on and makes clips
     /// at the run's aspect ratio with a set length.
-    fn clip_generation(
+    /// How the run may order generated clips, if a video provider is active now. The current
+    /// providers count, not the run's snapshot, so a provider turned on mid-run can be used.
+    pub(crate) fn clip_generation(
         &self,
         workspace_id: i64,
         snapshot: &Value,
     ) -> Result<Option<ClipGeneration>, Box<dyn Error>> {
-        let ordered = snapshot["provider_orders"]["video-generation"]["effective"]
-            .as_array()
-            .is_some_and(|order| !order.is_empty());
-        if !ordered {
+        if self
+            .current_providers(workspace_id, "video-generation")?
+            .is_empty()
+        {
             return Ok(None);
         }
         let aspect_ratio = run_aspect_ratio(snapshot);

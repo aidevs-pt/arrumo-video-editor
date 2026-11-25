@@ -15,7 +15,16 @@ const BREATH_SECONDS: f64 = 0.6;
 
 /// Whether `name` is a narration file this module writes into a run's delivery directory.
 pub(crate) fn narration_file_name(name: &str) -> bool {
-    let Some(rest) = name.strip_prefix("narration-") else {
+    written_voice_name(name, "narration-")
+}
+
+/// Whether `name` is a voice-over line written for an edit of recorded footage.
+pub(crate) fn voice_over_file_name(name: &str) -> bool {
+    written_voice_name(name, "voice-")
+}
+
+fn written_voice_name(name: &str, prefix: &str) -> bool {
+    let Some(rest) = name.strip_prefix(prefix) else {
         return false;
     };
     let Some((stem, extension)) = rest.rsplit_once('.') else {
@@ -96,6 +105,95 @@ impl WorkspaceStore {
         Ok(())
     }
 
+    /// The speech provider and voice that read voice-over now, if one is on, has its key and has
+    /// a voice chosen.
+    pub(crate) fn current_voice(
+        &self,
+        workspace_id: i64,
+    ) -> Result<Option<(String, String)>, Box<dyn Error>> {
+        let Some(plugin) = self
+            .current_providers(workspace_id, "text-to-speech")?
+            .into_iter()
+            .next()
+        else {
+            return Ok(None);
+        };
+        let configured = self
+            .speech_provider_status(workspace_id, &plugin)
+            .is_ok_and(|status| status.credential_configured());
+        if !configured {
+            return Ok(None);
+        }
+        Ok(self
+            .narration_voice(workspace_id, &plugin)?
+            .map(|voice| (plugin, voice)))
+    }
+
+    /// Voices each line in the edit's `voice_cues` and records its file. A failure drops the
+    /// voice-over and says why in the summary.
+    pub(crate) fn voice_cut_lines(
+        &self,
+        database: &Path,
+        (workspace_id, run_id, attempt): (i64, i64, i64),
+        (plugin, voice): (&str, &str),
+        edit: &mut Value,
+    ) -> Result<(), Box<dyn Error>> {
+        let Some(cues) = edit["voice_cues"].as_array().cloned() else {
+            return Ok(());
+        };
+        let directory = delivery_directory(database, workspace_id, run_id);
+        fs::create_dir_all(&directory)?;
+        let mut written = Vec::new();
+        let result = (|| -> Result<Vec<Value>, Box<dyn Error>> {
+            let extension = speech_extension(plugin)?;
+            let mut voiced = Vec::with_capacity(cues.len());
+            for (index, cue) in cues.iter().enumerate() {
+                let text = cue["text"].as_str().unwrap_or("").trim();
+                if text.is_empty() {
+                    continue;
+                }
+                self.renew_generation_lease(workspace_id, run_id, attempt)?;
+                let name = format!("voice-{attempt}-{index}.{extension}");
+                let path = directory.join(&name);
+                match fs::remove_file(&path) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error.into()),
+                }
+                self.synthesize_speech_to_file(workspace_id, plugin, voice, text, &path)?;
+                written.push(path);
+                let mut cue = cue.clone();
+                cue["file"] = json!(name);
+                voiced.push(cue);
+            }
+            Ok(voiced)
+        })();
+        match result {
+            Ok(voiced) => edit["voice_cues"] = json!(voiced),
+            Err(error) => {
+                for file in written {
+                    let _ = fs::remove_file(file);
+                }
+                crate::report_failure_with(
+                    "voice_over",
+                    &"The voice-over could not be voiced",
+                    &[
+                        ("agent_plugin", plugin),
+                        ("cause", &crate::error_chain(&*error)),
+                    ],
+                );
+                if let Some(edit) = edit.as_object_mut() {
+                    edit.remove("voice_cues");
+                }
+                let summary = edit["summary"].as_str().unwrap_or("").to_owned();
+                edit["summary"] = json!(format!(
+                    "{summary} The voice-over could not be voiced ({error}), so this version has none."
+                ));
+            }
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn synthesize_narration(
         &self,
@@ -161,6 +259,8 @@ mod tests {
     fn only_narration_names_are_accepted() {
         assert!(narration_file_name("narration-3-0.mp3"));
         assert!(narration_file_name("narration-12-40.wav"));
+        assert!(voice_over_file_name("voice-2-7.mp3"));
+        assert!(!voice_over_file_name("narration-2-7.mp3"));
         for name in [
             "narration-3.mp3",
             "narration-3-0.mp4",

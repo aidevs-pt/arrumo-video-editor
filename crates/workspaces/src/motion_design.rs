@@ -92,6 +92,23 @@ impl WorkspaceStore {
         database: &Path,
         workspace_id: i64,
     ) -> rusqlite::Result<Vec<WorkspaceClip>> {
+        Ok(self
+            .workspace_audio(database, workspace_id)?
+            .into_iter()
+            .filter(|sound| {
+                sound
+                    .seconds
+                    .is_some_and(|seconds| seconds <= MAX_SOUND_SECONDS)
+            })
+            .collect())
+    }
+
+    /// The workspace's recent audio files of any length that can be read, newest first.
+    pub(crate) fn workspace_audio(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+    ) -> rusqlite::Result<Vec<WorkspaceClip>> {
         let root = asset_root(database);
         let sounds: Vec<(i64, String, String)> = self
             .0
@@ -110,7 +127,7 @@ impl WorkspaceStore {
                 let seconds =
                     crate::source_transcripts::media_duration(&asset_path(&root, workspace_id, id))
                         .ok()?;
-                (seconds <= MAX_SOUND_SECONDS).then_some(WorkspaceClip {
+                Some(WorkspaceClip {
                     id,
                     name,
                     notes,
