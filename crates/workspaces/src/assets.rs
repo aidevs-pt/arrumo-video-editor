@@ -405,10 +405,10 @@ pub fn frame_cache(database: &Path) -> PathBuf {
 }
 
 /// Whether `path` is already its own canonical form: no symlink, `..` or alias on the way.
-/// Windows canonical paths carry a `\\?\` prefix the paths Arrumo builds never have, so the
-/// comparison uses the plain form wherever Windows can express it.
+/// Windows writes the same canonical path with or without a `\\?\` prefix, so both sides are
+/// compared in the plain form wherever Windows can express it.
 pub fn is_canonical(path: &Path) -> io::Result<bool> {
-    Ok(dunce::canonicalize(path)? == path)
+    Ok(dunce::canonicalize(path)? == dunce::simplified(path))
 }
 
 pub fn asset_path(media_root: &Path, workspace_id: i64, asset_id: i64) -> PathBuf {
@@ -474,6 +474,8 @@ mod canonical_tests {
         fs::create_dir(base.join("folder")).unwrap();
         assert!(!is_canonical(&base.join("folder").join("..").join("image.png")).unwrap());
         assert!(is_canonical(&base.join("missing.png")).is_err());
+        // The prefixed form Windows' own canonicalize returns counts too.
+        assert!(is_canonical(&fs::canonicalize(&file).unwrap()).unwrap());
     }
 }
 
