@@ -20,9 +20,10 @@ use serde_json::{Value, json};
 use crate::{
     MotionKind,
     brand_fonts::{FontRole, FontSet, FontWeight},
+    motion_effects::{Atmosphere, CountUp, Tilt},
 };
 
-pub(crate) const MAX_LAYERS: usize = 12;
+pub(crate) const MAX_LAYERS: usize = 16;
 /// The most camera moves one clip layer has.
 const MAX_ZOOM_KEYS: usize = 8;
 const MAX_ZOOM: f64 = 3.0;
@@ -46,6 +47,10 @@ pub(crate) enum LayerType {
     Box,
     Image,
     Video,
+    /// A soft pool of light in the layer's colour, filling its box.
+    Light,
+    /// A four-point spark of light, `size` tall, centred on the layer's position.
+    Spark,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -61,6 +66,11 @@ pub(crate) enum Motion {
     Reveal,
     /// Text lines are uncovered from left to right; other layers fade.
     Wipe,
+    /// Text words rise into place one after another; other layers fade.
+    Words,
+    /// Boxes grow from their left edge (wide boxes) or their bottom edge (tall ones), like bars
+    /// in a chart; other layers fade.
+    Grow,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -112,6 +122,18 @@ pub(crate) struct Layer {
     /// Moments when a clip layer dims all but one area of the clip.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub spotlight: Vec<Spotlight>,
+    /// The colour of a text layer's `*marked*` words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+    /// A soft glow: around a text layer's marked words (or all of it), or around a box.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub glow: bool,
+    /// A text layer's first number counts up from zero as it arrives.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub count: bool,
+    /// How a box or image card sits in depth.
+    #[serde(default, skip_serializing_if = "Tilt::is_none")]
+    pub tilt: Tilt,
 }
 
 /// From `from` to `to` seconds into the animation, everything in the clip outside a rounded area
@@ -187,6 +209,14 @@ pub(crate) struct MotionSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_to: Option<String>,
     pub layers: Vec<Layer>,
+    /// Light behind the layers, in `light_color`.
+    #[serde(default, skip_serializing_if = "Atmosphere::is_none")]
+    pub atmosphere: Atmosphere,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub light_color: Option<String>,
+    /// Fine moving grain and darkened corners over the finished frame.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub film: bool,
     /// How a storyboard scene hands over to the next one.
     #[serde(
         default,
@@ -208,7 +238,7 @@ pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
 /// Like `spec_schema_with_clips`, also letting layers play the workspace sound effects in `sounds`.
 pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i64]) -> Value {
     let assets: Vec<i64> = images.iter().chain(clips).copied().collect();
-    let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right", "reveal", "wipe"]});
+    let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right", "reveal", "wipe", "words", "grow"]});
     let unit = json!({"type": "number", "minimum": 0, "maximum": 1});
     let optional_color =
         json!({"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}]});
@@ -222,9 +252,9 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
         "additionalProperties": false,
         "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
             "color", "bold", "opacity", "start", "end", "enter", "exit",
-            "align", "radius", "gradientTo", "shadow", "font"],
+            "align", "radius", "gradientTo", "shadow", "font", "accent", "glow", "count", "tilt"],
         "properties": {
-            "type": {"enum": ["text", "box", "image"]},
+            "type": {"enum": ["text", "box", "image", "light", "spark"]},
             "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
             "assetId": asset,
             "x": unit, "y": unit, "width": unit, "height": unit,
@@ -240,11 +270,16 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
             "radius": {"type": "number", "minimum": 0, "maximum": 0.5},
             "gradientTo": optional_color,
             "shadow": {"type": "boolean"},
-            "font": {"enum": ["heading", "body"]}
+            "font": {"enum": ["heading", "body"]},
+            "accent": optional_color,
+            "glow": {"type": "boolean"},
+            "count": {"type": "boolean"},
+            "tilt": {"enum": ["none", "left", "right", "back"]}
         }
     });
     if !clips.is_empty() {
-        layer["properties"]["type"] = json!({"enum": ["text", "box", "image", "video"]});
+        layer["properties"]["type"] =
+            json!({"enum": ["text", "box", "image", "light", "spark", "video"]});
         layer["properties"]["clipStart"] = json!({"type": "number", "minimum": 0});
         layer["properties"]["zoom"] = json!({
             "type": "array",
@@ -288,7 +323,8 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "kind", "usage", "durationSeconds", "background", "backgroundTo", "layers"],
+        "required": ["title", "kind", "usage", "durationSeconds", "background", "backgroundTo",
+            "atmosphere", "lightColor", "film", "layers"],
         "properties": {
             "title": {"type": "string", "maxLength": 80},
             "kind": {"enum": ["animation", "transition"]},
@@ -296,6 +332,9 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
             "durationSeconds": {"type": "number", "minimum": MIN_SECONDS, "maximum": MAX_SECONDS},
             "background": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
             "backgroundTo": optional_color,
+            "atmosphere": {"enum": ["none", "rays", "aura"]},
+            "lightColor": optional_color,
+            "film": {"type": "boolean"},
             "layers": {
                 "type": "array",
                 "minItems": 1,
@@ -311,24 +350,40 @@ pub(crate) const SPEC_GUIDE: &str = "An animation is a timed composition on a ba
 diagonal gradient from background to backgroundTo (null for a solid one). \
 Positions are fractions of the frame: x and y place the layer's centre, width and height its size \
 (for text, width is the widest a line may run before wrapping and height is ignored). Text size is a \
-fraction of the frame height; 0.06 to 0.1 suits titles and 0.035 to 0.05 body text. Boxes are solid \
-rectangles with an opacity, useful for bars, cards, underlines and lower thirds. Images show a \
-workspace image by assetId, fitted inside their box. Layers paint in order, so put backgrounds \
-first. start and end are seconds within the animation; enter and exit choose how a layer arrives \
-and leaves; for text, reveal raises each line from behind its baseline one after another and wipe \
-uncovers lines from left to right, the polished choices for headlines (a reveal or wipe exit fades). \
-Use the brand colours, keep strong contrast between text and what is behind it, keep \
-text short and inside the frame with a safe margin of 0.06, and stagger entrances so the motion \
-reads clearly. Where soundAssetId is offered, a layer can play one of the workspace's sound effects \
-as it arrives; use them sparingly, on the beats that matter, and none when the animation will sit \
-under speech. Text is set in the brand's heading or body \
+fraction of the frame height; 0.045 to 0.09 suits headlines and big numbers, 0.02 to 0.035 supporting \
+lines and 0.014 to 0.018 small labels. Layers paint in order, so put backgrounds and light first. \
+start and end are seconds within the animation; enter and exit choose how a layer arrives and leaves. \
+Text: reveal raises each line from behind its baseline one after another and wipe uncovers lines \
+from left to right, polished choices for headlines; words raises the words one after another, the \
+liveliest choice for a hook or a caption (a reveal, wipe or words exit fades). Mark a word or short \
+phrase as *emphasis* in the text and it is drawn in accent (a colour, or null to keep color); glow \
+adds a soft glow around the marked words, or the whole text when none is marked, best on dark \
+backgrounds. count makes the first number in the text count up from zero as the layer arrives, \
+written the way you wrote it, for a figure that matters. Text is set in the brand's heading or body \
 font (font; a plain sans-serif when the brand has none), with no emoji, pictographs or arrows, so \
-write only letters, digits and common punctuation; use the heading font for titles and big numbers, and draw shapes, grids, bars and diagrams with box \
-layers. Leave text null for boxes and images and assetId null for text and boxes. \
-For a polished look: align a column of text left (align sets where lines sit within width, so a \
-left-aligned layer starts at x minus width/2), round cards and images slightly (radius 0.08 to 0.2 \
-of their shorter side; 0.5 makes pills and circles), give a box a subtle gradient with gradientTo, and \
-lift cards and images off the background with shadow. Keep generous margins, one clear focal point per \
+write only letters, digits and common punctuation; use the heading font for titles and big numbers. \
+Boxes are rectangles with an opacity, for cards, bars, underlines, lines and lower thirds: round \
+them with radius (0.08 to 0.2 of their shorter side for cards; 0.5 makes pills and circles), give \
+them a subtle gradient with gradientTo, lift them with shadow, make the one active element glow in \
+its colour with glow, and let bars enter with grow, which extends a wide box from its left edge and \
+a tall one from its bottom edge, staggered like a chart building. Images show a workspace image by \
+assetId, fitted inside their box. tilt turns a box or image card in depth: back leans its top \
+away like a screen lying back, left and right turn that side away; text on top stays flat, so tilt \
+cards that hold a big number or nothing to read. A light layer is a soft pool of light in its \
+colour filling its box, at its opacity (0.2 to 0.5), drifting gently: put one behind the focal \
+element to lift it off the background. A spark is a four-point flash of light whose size sets its \
+height (0.03 to 0.06): one at most, on the moment that matters, such as the tip of a rising line \
+or a number landing. atmosphere adds light behind every layer in lightColor (null uses the first \
+accent): rays are soft beams from above that fade before the lower third, for dark backgrounds; \
+aura is large soft pools of colour drifting slowly, for light or dark ones; none keeps the \
+background plain. film adds fine moving grain, and darkened corners on dark backgrounds, for a \
+filmic finish. Leave text null for boxes, images, lights and sparks, and assetId null for all but \
+images; set accent null, glow, count false and tilt none where they do not apply. Keep strong contrast \
+between text and what is behind it, and keep text short and inside the frame with a safe margin of \
+0.06. Where soundAssetId is offered, a layer can play one of the workspace's sound effects as it \
+arrives; use them sparingly, on the beats that matter, and none when the animation will sit under \
+speech. For a polished look: align a column of text left (align sets where lines sit within width, so \
+a left-aligned layer starts at x minus width/2), keep generous margins, one clear focal point per \
 moment, a few sizes of text with a strong hierarchy, and consistent spacing between items.";
 
 /// How clip layers are described to the agent, added to `SPEC_GUIDE` when it may use them.
@@ -446,6 +501,7 @@ impl MotionSpec {
         spec.background_to = spec
             .background_to
             .filter(|color| hex_color(color).is_some());
+        spec.light_color = spec.light_color.filter(|color| hex_color(color).is_some());
         let duration = spec.duration_seconds;
         spec.layers.truncate(MAX_LAYERS);
         spec.layers.retain_mut(|layer| {
@@ -493,9 +549,33 @@ impl MotionSpec {
                 .gradient_to
                 .take()
                 .filter(|color| layer.kind == LayerType::Box && hex_color(color).is_some());
-            if layer.kind == LayerType::Text {
+            layer.accent = layer
+                .accent
+                .take()
+                .filter(|color| layer.kind == LayerType::Text && hex_color(color).is_some());
+            layer.glow &= matches!(layer.kind, LayerType::Text | LayerType::Box);
+            layer.count &= layer.kind == LayerType::Text;
+            if !matches!(layer.kind, LayerType::Box | LayerType::Image) {
+                layer.tilt = Tilt::None;
+            }
+            if matches!(
+                layer.kind,
+                LayerType::Text | LayerType::Light | LayerType::Spark
+            ) {
                 layer.radius = 0.0;
                 layer.shadow = false;
+            }
+            // Word and grow entrances belong to text and boxes; elsewhere they fade.
+            let enters = match layer.enter {
+                Motion::Words => layer.kind == LayerType::Text,
+                Motion::Grow => layer.kind == LayerType::Box,
+                _ => true,
+            };
+            if !enters {
+                layer.enter = Motion::Fade;
+            }
+            if matches!(layer.exit, Motion::Words | Motion::Grow) {
+                layer.exit = Motion::Fade;
             }
             if layer.kind == LayerType::Video {
                 layer.clip_start = if layer.clip_start.is_finite() {
@@ -562,7 +642,7 @@ impl MotionSpec {
                     layer.asset_id = None;
                     layer.text.is_some()
                 }
-                LayerType::Box => {
+                LayerType::Box | LayerType::Light | LayerType::Spark => {
                     layer.text = None;
                     layer.asset_id = None;
                     layer.opacity > 0.0
@@ -690,17 +770,22 @@ fn wrap_measured(text: &str, max: f64, measure: impl Fn(&str) -> f64) -> String 
 /// Seconds between the entrances of a text layer's lines in a reveal or wipe.
 const LINE_STAGGER: f64 = 0.09;
 
+/// Part of a line drawn in one colour: its text file, colour and where it starts, as a drawtext x
+/// expression in frame pixels.
+struct LinePiece<'a> {
+    file: &'a str,
+    color: &'a str,
+    anchor: String,
+}
+
 /// One line of text drawn on its own transparent strip, so a reveal or wipe can mask it.
 struct MaskedLine<'a> {
     font: &'a str,
-    file: &'a str,
+    pieces: Vec<LinePiece<'a>>,
     font_px: f64,
     line_height: f64,
     /// How far below the line's top the font's metric box starts.
     inset: f64,
-    color: &'a str,
-    /// Where the line starts, as a drawtext x expression in frame pixels.
-    anchor: &'a str,
     width: f64,
     /// The layer's left edge and width in pixels, which a wipe sweeps across.
     left: f64,
@@ -724,7 +809,7 @@ impl MaskedLine<'_> {
         enable: &str,
         graph: &mut String,
     ) {
-        let (font, file, color, anchor) = (self.font, self.file, self.color, self.anchor);
+        let font = self.font;
         let font_px = self.font_px;
         let pad = (self.line_height * 0.2).round();
         let strip_h = ((self.line_height + pad * 2.0) / 2.0).ceil() * 2.0;
@@ -760,11 +845,21 @@ impl MaskedLine<'_> {
                 )
             }
         };
+        let texts: String = self
+            .pieces
+            .iter()
+            .map(|piece| {
+                format!(
+                    ",drawtext=fontfile={font}:textfile={}:expansion=none:y_align=font:fontsize={font_px:.0}:\
+                     fontcolor={}:alpha='{fade_out}':x='{}':y='{y}'",
+                    piece.file, piece.color, piece.anchor
+                )
+            })
+            .collect();
         write!(
             graph,
-            "color=c=black@0:s={strip_w:.0}x{strip_h:.0}:r={FPS}:d={length:.3},format=rgba,\
-             drawtext=fontfile={font}:textfile={file}:expansion=none:y_align=font:fontsize={font_px:.0}:\
-             fontcolor={color}:alpha='{fade_out}':x='{anchor}':y='{y}'{mask}[{strip}];\
+            "color=c=black@0:s={strip_w:.0}x{strip_h:.0}:r={FPS}:d={length:.3},format=rgba\
+             {texts}{mask}[{strip}];\
              [{input}][{strip}]overlay=x=0:y={:.2}:enable='{enable}':format=auto[{output}];",
             top - pad,
             length = self.length,
@@ -801,7 +896,12 @@ fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String
             Motion::Drop => ("0".into(), format!("{:.2}*{amount}", -sign * dy)),
             Motion::SlideLeft => (format!("{:.2}*{amount}", sign * dx), "0".into()),
             Motion::SlideRight => (format!("{:.2}*{amount}", -sign * dx), "0".into()),
-            Motion::None | Motion::Fade | Motion::Reveal | Motion::Wipe => ("0".into(), "0".into()),
+            Motion::None
+            | Motion::Fade
+            | Motion::Reveal
+            | Motion::Wipe
+            | Motion::Words
+            | Motion::Grow => ("0".into(), "0".into()),
         }
     };
     let (enter_x, enter_y) = offset(layer.enter, &enter, true);
@@ -920,7 +1020,10 @@ impl LayerTarget<'_> {
                         FontWeight::Regular
                     };
                     let font = font_name(layer.font, weight);
-                    let text = layer.text.as_deref().unwrap_or_default();
+                    let (text, marked) = crate::motion_effects::parse_emphasis(
+                        layer.text.as_deref().unwrap_or_default(),
+                    );
+                    let text = text.as_str();
                     let measured = TextFont::load(&directory.join(&font));
                     let wrapped = match &measured {
                         Some(face) => wrap_measured(text, layer.width * frame_w, |line| {
@@ -952,6 +1055,28 @@ impl LayerTarget<'_> {
                         }
                     };
                     let masked = matches!(layer.enter, Motion::Reveal | Motion::Wipe);
+                    let rich = marked.contains(&true)
+                        || layer.enter == Motion::Words
+                        || layer.glow
+                        || layer.count;
+                    if let (true, Some(face)) = (rich, &measured) {
+                        let rich_text = RichText {
+                            index,
+                            font: &font,
+                            face,
+                            font_px,
+                            line_height,
+                            inset,
+                            top,
+                            lines: &lines,
+                            marked: &marked,
+                            color: &color,
+                            enable: &enable,
+                        };
+                        current =
+                            self.draw_rich_text(layer, &rich_text, &current, &label, graph)?;
+                        continue;
+                    }
                     let mut line_input = current.clone();
                     for (number, line) in lines.iter().enumerate() {
                         let file = format!("{prefix}text-{index}-{number}.txt");
@@ -965,12 +1090,14 @@ impl LayerTarget<'_> {
                             let line_top = top + line_height * number as f64;
                             let masked_line = MaskedLine {
                                 font: &font,
-                                file: &file,
+                                pieces: vec![LinePiece {
+                                    file: &file,
+                                    color: &color,
+                                    anchor: anchor.clone(),
+                                }],
                                 font_px,
                                 line_height,
                                 inset,
-                                color: &color,
-                                anchor: &anchor,
                                 width: frame_w,
                                 left: (layer.x - layer.width / 2.0) * frame_w,
                                 span: layer.width * frame_w,
@@ -1013,7 +1140,11 @@ impl LayerTarget<'_> {
                     let box_w = ((layer.width * frame_w).round() as u32).max(2);
                     let box_h = ((layer.height * frame_h).round() as u32).max(2);
                     let source = format!("{prefix}s{index}");
-                    let shaped = layer.kind == LayerType::Box || layer.radius > 0.0 || layer.shadow;
+                    let shaped = layer.kind == LayerType::Box
+                        || layer.radius > 0.0
+                        || layer.shadow
+                        || layer.glow
+                        || !layer.tilt.is_none();
                     let path = if layer.kind == LayerType::Image {
                         Some(
                             layer
@@ -1039,6 +1170,8 @@ impl LayerTarget<'_> {
                             radius: layer.radius,
                             opacity: layer.opacity,
                             shadow: layer.shadow.then_some(frame_h.min(frame_w)),
+                            glow: layer.glow.then_some(frame_h.min(frame_w)),
+                            tilt: layer.tilt,
                         };
                         shape_png(directory, &file, &fill, &shape)?;
                         file
@@ -1066,7 +1199,22 @@ impl LayerTarget<'_> {
                     let span = (layer.end - layer.start).max(0.1);
                     let ease = (span / 3.0).min(0.6);
                     let mut fades = Vec::new();
-                    if layer.enter != Motion::None {
+                    if layer.enter == Motion::Grow {
+                        // The box is uncovered from its left or bottom edge with a soft front.
+                        let grow = (span * 0.6).min(0.9);
+                        let progress =
+                            format!("(1-pow(2,-10*clip((T-{:.3})/{grow:.3},0,1)))", layer.start);
+                        let front = if box_w >= box_h {
+                            format!("clip((W*{progress}-X)/3+0.5,0,1)")
+                        } else {
+                            format!("clip((Y-H*(1-{progress}))/3+0.5,0,1)")
+                        };
+                        fades.push(format!(
+                            "geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*{front}':\
+                             enable='lte(t,{:.3})'",
+                            layer.start + grow + 0.05
+                        ));
+                    } else if layer.enter != Motion::None {
                         fades.push(format!(
                             "fade=t=in:st={:.3}:d={ease:.3}:alpha=1",
                             layer.start
@@ -1090,6 +1238,62 @@ impl LayerTarget<'_> {
                     layer.y * frame_h,
                 )
                 .ok();
+                }
+                LayerType::Light | LayerType::Spark => {
+                    let file = format!("{prefix}glow-{index}.png");
+                    let (drift, (still_w, still_h)) = if layer.kind == LayerType::Light {
+                        let size = (
+                            ((layer.width * frame_w).round() as u32).max(8),
+                            ((layer.height * frame_h).round() as u32).max(8),
+                        );
+                        crate::motion_effects::light_png(
+                            directory,
+                            &file,
+                            size,
+                            &layer.color,
+                            layer.opacity,
+                        )?;
+                        // Light drifts a little, so a still frame never looks frozen.
+                        (f64::from(size.0) * 0.04, size)
+                    } else {
+                        let size = ((layer.size * frame_h * 2.0).round() as u32).max(16);
+                        crate::motion_effects::spark_png(directory, &file, size, &layer.color)?;
+                        (0.0, (size, size))
+                    };
+                    args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
+                    args.push(format!("{duration:.3}"));
+                    args.extend(["-i".to_owned(), file]);
+                    let span = (layer.end - layer.start).max(0.1);
+                    let ease = (span / 3.0).min(0.6);
+                    let mut fades = vec!["format=rgba".to_owned()];
+                    if layer.kind == LayerType::Spark && layer.opacity < 1.0 {
+                        fades.push(format!("colorchannelmixer=aa={:.3}", layer.opacity));
+                    }
+                    if layer.enter != Motion::None {
+                        fades.push(format!(
+                            "fade=t=in:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.start
+                        ));
+                    }
+                    if layer.exit != Motion::None {
+                        fades.push(format!(
+                            "fade=t=out:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.end - ease
+                        ));
+                    }
+                    write!(
+                        graph,
+                        "[{next_input}:v]{}[{prefix}f{index}];\
+                         [{current}][{prefix}f{index}]overlay=\
+                         x='{:.2}+{drift:.2}*sin(2*PI*t/7)+{dx}':y='{:.2}+{:.2}*sin(2*PI*t/9+1)+{dy}':\
+                         enable='{enable}':eof_action=pass:format=auto[{label}];",
+                        fades.join(","),
+                        layer.x * frame_w - f64::from(still_w) / 2.0,
+                        layer.y * frame_h - f64::from(still_h) / 2.0,
+                        drift * 0.6,
+                    )
+                    .ok();
+                    next_input += 1;
                 }
                 LayerType::Video => {
                     let path = layer
@@ -1144,6 +1348,8 @@ impl LayerTarget<'_> {
                             radius: layer.radius,
                             opacity: 1.0,
                             shadow: Some(frame_h.min(frame_w)),
+                            glow: None,
+                            tilt: Tilt::None,
                         };
                         let fill = Fill::Color {
                             from: &layer.color,
@@ -1167,6 +1373,8 @@ impl LayerTarget<'_> {
                             radius: layer.radius,
                             opacity: 1.0,
                             shadow: None,
+                            glow: None,
+                            tilt: Tilt::None,
                         };
                         let fill = Fill::Color {
                             from: "#FFFFFF",
@@ -1286,6 +1494,316 @@ impl LayerTarget<'_> {
     }
 }
 
+/// Seconds between the entrances of words in a word-by-word entrance, and how long each takes.
+const WORD_STAGGER: f64 = 0.06;
+const WORD_EASE: f64 = 0.6;
+/// How many times a second a counting number changes, and the longest it counts for.
+const COUNT_STEPS_PER_SECOND: f64 = 15.0;
+const COUNT_SECONDS: f64 = 1.4;
+
+/// A text layer laid out by its measured font, for drawing word by word or in several colours.
+struct RichText<'a> {
+    index: usize,
+    font: &'a str,
+    face: &'a TextFont,
+    font_px: f64,
+    line_height: f64,
+    inset: f64,
+    top: f64,
+    lines: &'a [&'a str],
+    /// Whether each word of the text, in order, is marked for emphasis.
+    marked: &'a [bool],
+    /// The layer's colour as an FFmpeg colour.
+    color: &'a str,
+    enable: &'a str,
+}
+
+/// Words of one line drawn together: their text, left edge in pixels, line and emphasis, and
+/// when they start to arrive.
+struct Piece {
+    text: String,
+    x: f64,
+    line: usize,
+    marked: bool,
+    start: f64,
+}
+
+impl LayerTarget<'_> {
+    /// Where a line of `width` pixels starts in `layer`.
+    fn line_left(&self, layer: &Layer, width: f64) -> f64 {
+        let frame_w = f64::from(self.width);
+        match layer.align {
+            Align::Left => (layer.x - layer.width / 2.0) * frame_w,
+            Align::Center => layer.x * frame_w - width / 2.0,
+            Align::Right => (layer.x + layer.width / 2.0) * frame_w - width,
+        }
+    }
+
+    /// Draws a text layer piece by piece: marked words in the accent colour, word-by-word
+    /// entrances, a glow and a counting number. Returns the drawn stream's label.
+    fn draw_rich_text(
+        &self,
+        layer: &Layer,
+        text: &RichText<'_>,
+        input: &str,
+        label: &str,
+        graph: &mut String,
+    ) -> io::Result<String> {
+        let (prefix, index, font_px) = (self.prefix, text.index, text.font_px);
+        let accent = match &layer.accent {
+            Some(accent) => hex_color(accent).ok_or_else(|| io::Error::other("Bad colour"))?,
+            None => text.color.to_owned(),
+        };
+        let counted = if layer.count {
+            text.lines
+                .iter()
+                .position(|line| CountUp::parse(line).is_some())
+        } else {
+            None
+        };
+        let masked = matches!(layer.enter, Motion::Reveal | Motion::Wipe);
+        let words = layer.enter == Motion::Words;
+        let mut pieces = Vec::new();
+        let mut word = 0;
+        for (number, line) in text.lines.iter().enumerate() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let first_word = word;
+            word += parts.len();
+            if Some(number) == counted {
+                continue;
+            }
+            let left = self.line_left(layer, text.face.width(line, font_px));
+            let offset = |count: usize| {
+                if count == 0 {
+                    0.0
+                } else {
+                    text.face
+                        .width(&format!("{} ", parts[..count].join(" ")), font_px)
+                }
+            };
+            let flag = |at: usize| text.marked.get(first_word + at).copied().unwrap_or(false);
+            let line_start = if masked {
+                layer.start + LINE_STAGGER * number as f64
+            } else {
+                layer.start
+            };
+            let mut at = 0;
+            while at < parts.len() {
+                let mut end = at + 1;
+                if !words {
+                    while end < parts.len() && flag(end) == flag(at) {
+                        end += 1;
+                    }
+                }
+                pieces.push(Piece {
+                    text: parts[at..end].join(" "),
+                    x: left + offset(at),
+                    line: number,
+                    marked: flag(at),
+                    start: if words {
+                        layer.start + WORD_STAGGER * (first_word + at) as f64
+                    } else {
+                        line_start
+                    },
+                });
+                at = end;
+            }
+        }
+        let line_y = |line: usize| text.top + text.line_height * line as f64 + text.inset;
+        let (alpha, dx, dy) = motion_expressions(layer, self.width, self.height);
+        // Exits apply to word-by-word text too; entrances are each word's own.
+        let (exit_alpha, exit_dx, exit_dy) = motion_expressions(
+            &Layer {
+                enter: Motion::None,
+                ..layer.clone()
+            },
+            self.width,
+            self.height,
+        );
+        let word_expressions = |piece: &Piece, scale: f64| {
+            let progress = format!(
+                "(1-pow(2,-10*clip((t-{:.3})/{WORD_EASE},0,1)))",
+                piece.start
+            );
+            (
+                format!("clip({progress}*1.4,0,1)*{exit_alpha}"),
+                format!("({:.2}+({exit_dx}))*{scale}", piece.x),
+                format!(
+                    "({:.2}+{:.2}*(1-{progress})+({exit_dy}))*{scale}",
+                    line_y(piece.line),
+                    font_px * 0.3
+                ),
+            )
+        };
+        let plain_expressions = |piece: &Piece, scale: f64| {
+            (
+                alpha.clone(),
+                format!("({:.2}+({dx}))*{scale}", piece.x),
+                format!("({:.2}+({dy}))*{scale}", line_y(piece.line)),
+            )
+        };
+        let mut steps = Vec::new();
+        if let Some(line) = counted {
+            let number = CountUp::parse(text.lines[line]).expect("found above");
+            let span = (layer.end - layer.start).max(0.1);
+            let seconds = (span * 0.5).clamp(0.5, COUNT_SECONDS);
+            let count = (seconds * COUNT_STEPS_PER_SECOND).ceil() as usize;
+            for step in 0..=count {
+                let share = step as f64 / count as f64;
+                let from = layer.start + seconds * share;
+                let to = if step == count {
+                    layer.end
+                } else {
+                    layer.start + seconds * (step + 1) as f64 / count as f64
+                };
+                let shown = number.at(1.0 - (1.0 - share).powi(3));
+                let x = self.line_left(layer, text.face.width(&shown, font_px));
+                steps.push((shown, x, from, to));
+            }
+        }
+        let mut current = input.to_owned();
+        let write_text = |name: &str, content: &str| -> io::Result<()> {
+            fs::write(self.directory.join(name), content).io_step("Writing animation text")
+        };
+        if layer.glow {
+            let any_marked = pieces.iter().any(|piece| piece.marked);
+            let (half_w, half_h) = (self.width / 2, self.height / 2);
+            let mut canvas = format!(
+                "color=c=black@0:s={half_w}x{half_h}:r={FPS}:d={:.3},format=rgba",
+                self.length
+            );
+            for (number, piece) in pieces.iter().enumerate() {
+                if any_marked && !piece.marked {
+                    continue;
+                }
+                let file = format!("{prefix}glow-{index}-{number}.txt");
+                write_text(&file, &piece.text)?;
+                let (mut a, x, y) = if words {
+                    word_expressions(piece, 0.5)
+                } else {
+                    plain_expressions(piece, 0.5)
+                };
+                if masked {
+                    // A revealed line glows once its letters are uncovered, never before.
+                    a = format!("clip((t-{:.3})/0.5,0,1)*{exit_alpha}", piece.start + 0.3);
+                }
+                let tint = if piece.marked { &accent } else { text.color };
+                write!(
+                    canvas,
+                    ",drawtext=fontfile={}:textfile={file}:expansion=none:y_align=font:fontsize={:.0}:\
+                     fontcolor={tint}:borderw={:.0}:bordercolor={tint}:alpha='{a}':x='{x}':y='{y}':enable='{}'",
+                    text.font,
+                    font_px / 2.0,
+                    (font_px * 0.025).max(1.0),
+                    text.enable,
+                )
+                .ok();
+            }
+            write!(
+                graph,
+                "{canvas},gblur=sigma={:.2},colorchannelmixer=aa=2,colorchannelmixer=aa=1.3,scale={}:{}[{prefix}glow{index}];\
+                 [{current}][{prefix}glow{index}]overlay=0:0:enable='{}':format=auto[{label}g];",
+                font_px * 0.12,
+                self.width,
+                self.height,
+                text.enable,
+            )
+            .ok();
+            current = format!("{label}g");
+        }
+        if masked {
+            let mut by_line: Vec<Vec<(String, &str, f64)>> = vec![Vec::new(); text.lines.len()];
+            for (number, piece) in pieces.iter().enumerate() {
+                let file = format!("{prefix}text-{index}-{number}.txt");
+                write_text(&file, &piece.text)?;
+                let tint: &str = if piece.marked { &accent } else { text.color };
+                by_line[piece.line].push((file, tint, piece.x));
+            }
+            for (number, parts) in by_line.iter().enumerate() {
+                if parts.is_empty() {
+                    continue;
+                }
+                let output = format!("{label}m{number}");
+                MaskedLine {
+                    font: text.font,
+                    pieces: parts
+                        .iter()
+                        .map(|(file, tint, x)| LinePiece {
+                            file,
+                            color: tint,
+                            anchor: format!("{x:.2}"),
+                        })
+                        .collect(),
+                    font_px,
+                    line_height: text.line_height,
+                    inset: text.inset,
+                    width: f64::from(self.width),
+                    left: (layer.x - layer.width / 2.0) * f64::from(self.width),
+                    span: layer.width * f64::from(self.width),
+                    start: layer.start + LINE_STAGGER * number as f64,
+                    length: self.length,
+                }
+                .draw(
+                    layer,
+                    &format!("{label}c{number}"),
+                    &current,
+                    &output,
+                    text.top + text.line_height * number as f64,
+                    text.enable,
+                    graph,
+                );
+                current = output;
+            }
+        } else {
+            for (number, piece) in pieces.iter().enumerate() {
+                let file = format!("{prefix}text-{index}-{number}.txt");
+                write_text(&file, &piece.text)?;
+                let (a, x, y) = if words {
+                    word_expressions(piece, 1.0)
+                } else {
+                    plain_expressions(piece, 1.0)
+                };
+                let tint = if piece.marked { &accent } else { text.color };
+                let output = format!("{label}p{number}");
+                write!(
+                    graph,
+                    "[{current}]drawtext=fontfile={}:textfile={file}:expansion=none:y_align=font:\
+                     fontsize={font_px:.0}:fontcolor={tint}:alpha='{a}':x='{x}':y='{y}':\
+                     enable='{}'[{output}];",
+                    text.font, text.enable,
+                )
+                .ok();
+                current = output;
+            }
+        }
+        if let Some(line) = counted {
+            let tint = if text.marked.iter().any(|marked| *marked) {
+                &accent
+            } else {
+                text.color
+            };
+            for (step, (shown, x, from, to)) in steps.iter().enumerate() {
+                let file = format!("{prefix}count-{index}-{step}.txt");
+                write_text(&file, shown)?;
+                let output = format!("{label}n{step}");
+                write!(
+                    graph,
+                    "[{current}]drawtext=fontfile={}:textfile={file}:expansion=none:y_align=font:\
+                     fontsize={font_px:.0}:fontcolor={tint}:alpha='{alpha}':x='{x:.2}+{dx}':\
+                     y='{:.2}+{dy}':enable='({})*gte(t,{from:.3})*lt(t,{to:.3})'[{output}];",
+                    text.font,
+                    line_y(line),
+                    text.enable,
+                )
+                .ok();
+                current = output;
+            }
+        }
+        write!(graph, "[{current}]null[{label}];").ok();
+        Ok(label.to_owned())
+    }
+}
+
 /// Keeps a clip moving forward when consecutive scenes play it: a scene that would start the clip
 /// before the previous scene stopped it starts where the previous one stopped, so no moment repeats.
 pub(crate) fn continue_clips(scenes: &mut [MotionSpec]) {
@@ -1391,6 +1909,9 @@ struct Shape {
     opacity: f64,
     /// The frame's shorter side when the shape casts a shadow, which sets the shadow's size.
     shadow: Option<f64>,
+    /// The frame's shorter side when the shape glows in its colour, which sets the glow's size.
+    glow: Option<f64>,
+    tilt: Tilt,
 }
 
 fn channels(color: &str) -> io::Result<[u8; 3]> {
@@ -1481,13 +2002,28 @@ fn shape_png(directory: &Path, file: &str, fill: &Fill, shape: &Shape) -> io::Re
             )
         }
     };
+    let mut shaped = "[shape]";
+    if let (Some(frame), Fill::Color { from, .. }) = (shape.glow, fill) {
+        let [r, g, b] = channels(from)?;
+        let pad = (frame * 0.035).round().max(6.0) as u32;
+        write!(
+            graph,
+            ";[shape]split[core][halo];\
+             [halo]geq=r={r}:g={g}:b={b}:a='alpha(X,Y)*0.9',pad=iw+{double}:ih+{double}:{pad}:{pad}:color=black@0,\
+             gblur=sigma={sigma:.1}[haze];[haze][core]overlay={pad}:{pad}:format=auto[glowing]",
+            double = pad * 2,
+            sigma = f64::from(pad) / 2.2,
+        )
+        .ok();
+        shaped = "[glowing]";
+    }
     let output = match shape.shadow {
         Some(frame) => {
             let pad = (frame * 0.04).round().max(4.0) as u32;
             let drop = pad / 3;
             write!(
                 graph,
-                ";[shape]split[top][under];\
+                ";{shaped}split[top][under];\
                  [under]geq=r=0:g=0:b=0:a='alpha(X,Y)*0.4',pad=iw+{double}:ih+{double}:{pad}:{low}:color=black@0,\
                  gblur=sigma={sigma:.1}[soft];\
                  [soft][top]overlay={pad}:{pad}:format=auto[out]",
@@ -1498,7 +2034,21 @@ fn shape_png(directory: &Path, file: &str, fill: &Fill, shape: &Shape) -> io::Re
             .ok();
             "[out]"
         }
-        None => "[shape]",
+        None => shaped,
+    };
+    let output = match shape.tilt.filter() {
+        Some(perspective) => {
+            // A clear margin keeps the warp from smearing the shape's edges outwards.
+            let margin = (f64::from(width.max(height)) * 0.03).round().max(4.0) as u32;
+            write!(
+                graph,
+                ";{output}pad=iw+{double}:ih+{double}:{margin}:{margin}:color=black@0,{perspective}[tilted]",
+                double = margin * 2,
+            )
+            .ok();
+            "[tilted]"
+        }
+        None => output,
     };
     args.extend([
         "-filter_complex".into(),
@@ -1590,6 +2140,8 @@ fn render_arguments(
                 radius: 0.0,
                 opacity: 1.0,
                 shadow: None,
+                glow: None,
+                tilt: Tilt::None,
             };
             shape_png(directory, "background.png", &fill, &shape)?;
             args.truncate(args.len() - 3);
@@ -1606,6 +2158,35 @@ fn render_arguments(
         None => args.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"].map(String::from)),
     }
     let mut graph = String::new();
+    let mut base = "0:v".to_owned();
+    let mut first_input = 2;
+    if !spec.atmosphere.is_none() {
+        let color = spec
+            .light_color
+            .clone()
+            .or_else(|| spec.layers.iter().find_map(|layer| layer.accent.clone()))
+            .unwrap_or_else(|| "#FFFFFF".to_owned());
+        crate::motion_effects::atmosphere_png(
+            directory,
+            "atmosphere.png",
+            spec.atmosphere,
+            (width, height),
+            &color,
+            spec.background_to.as_deref(),
+            &spec.background,
+        )?;
+        args.extend(["-loop", "1", "-framerate", "30", "-t"].map(String::from));
+        args.push(format!("{duration:.3}"));
+        args.extend(["-i".to_owned(), "atmosphere.png".to_owned()]);
+        write!(
+            graph,
+            "[2:v]format=rgba[air];[0:v][air]overlay={}:format=auto[lit];",
+            crate::motion_effects::atmosphere_drift((width, height)),
+        )
+        .ok();
+        base = "lit".into();
+        first_input = 3;
+    }
     let layers = LayerTarget {
         width,
         height,
@@ -1615,7 +2196,19 @@ fn render_arguments(
         length: duration,
         fonts,
     };
-    let current = layers.draw(spec, "0:v", 2, &mut graph, &mut args, images)?;
+    let mut current = layers.draw(spec, &base, first_input, &mut graph, &mut args, images)?;
+    if spec.film {
+        // Grain shows on any background; darkened corners only flatter dark ones.
+        let light = crate::motion_effects::lightness(&spec.background) > 0.6;
+        let corners = if light { "" } else { "vignette=angle=PI/4.5," };
+        let grain = if light { 4 } else { 7 };
+        write!(
+            graph,
+            "[{current}]{corners}noise=alls={grain}:allf=t+u[film];"
+        )
+        .ok();
+        current = "film".into();
+    }
     let pixel_format = if width.is_multiple_of(2) && height.is_multiple_of(2) {
         "yuv420p"
     } else {
@@ -1971,6 +2564,157 @@ mod tests {
                  "start": 0, "end": 3, "enter": "fade", "exit": "fade"}
             ]
         })
+    }
+
+    #[test]
+    fn stored_animations_keep_their_shape_without_new_effects() {
+        let spec = MotionSpec::from_answer(&answer(), |_| true).unwrap();
+        let saved = serde_json::to_value(&spec).unwrap();
+        for key in ["atmosphere", "lightColor", "film"] {
+            assert!(saved.get(key).is_none(), "{key}");
+        }
+        for layer in saved["layers"].as_array().unwrap() {
+            for key in ["accent", "glow", "count", "tilt"] {
+                assert!(layer.get(key).is_none(), "{key}");
+            }
+        }
+        assert_eq!(serde_json::from_value::<MotionSpec>(saved).unwrap(), spec);
+    }
+
+    #[test]
+    fn the_schema_offers_light_depth_and_type_effects() {
+        let schema = spec_schema(&[]);
+        let layer = &schema["properties"]["layers"]["items"];
+        assert_eq!(
+            layer["properties"]["type"]["enum"],
+            json!(["text", "box", "image", "light", "spark"])
+        );
+        let motions = layer["properties"]["enter"]["enum"].as_array().unwrap();
+        assert!(motions.contains(&json!("words")) && motions.contains(&json!("grow")));
+        for key in ["accent", "glow", "count", "tilt"] {
+            assert!(
+                layer["required"].as_array().unwrap().contains(&json!(key)),
+                "{key}"
+            );
+        }
+        for key in ["atmosphere", "lightColor", "film"] {
+            assert!(
+                schema["required"].as_array().unwrap().contains(&json!(key)),
+                "{key}"
+            );
+        }
+    }
+
+    #[test]
+    fn effects_apply_only_to_the_layers_they_fit() {
+        let layer = |kind: &str, extra: Value| {
+            let mut base = json!({"type": kind, "text": null, "assetId": null, "x": 0.5, "y": 0.5,
+                "width": 0.4, "height": 0.2, "size": 0.05, "color": "#FFFFFF", "bold": false,
+                "opacity": 0.5, "start": 0, "end": 2, "enter": "fade", "exit": "none",
+                "accent": "#FF8800", "glow": true, "count": true, "tilt": "back",
+                "radius": 0.2, "shadow": true});
+            base.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            base
+        };
+        let spec = MotionSpec::from_answer(
+            &json!({"title": "Effects", "kind": "animation", "usage": "", "durationSeconds": 2,
+                "background": "#000000", "atmosphere": "rays", "lightColor": "not a colour", "film": true,
+                "layers": [
+                    layer("text", json!({"text": "Up *37x*", "enter": "words", "exit": "grow"})),
+                    layer("box", json!({"enter": "words"})),
+                    layer("image", json!({"assetId": 3, "enter": "grow"})),
+                    layer("light", json!({"text": "ignored"})),
+                    layer("spark", json!({}))
+                ]}),
+            |_| true,
+        )
+        .unwrap();
+        assert_eq!(spec.atmosphere, Atmosphere::Rays);
+        assert!(spec.light_color.is_none() && spec.film);
+        let [text, card, image, light, spark] = &spec.layers[..] else {
+            panic!("all five layers stay");
+        };
+        assert_eq!((text.enter, text.exit), (Motion::Words, Motion::Fade));
+        assert!(text.glow && text.count && text.accent.is_some() && text.tilt == Tilt::None);
+        assert_eq!(text.radius, 0.0);
+        assert_eq!(card.enter, Motion::Fade);
+        assert!(card.glow && !card.count && card.accent.is_none() && card.tilt == Tilt::Back);
+        assert_eq!(image.enter, Motion::Fade);
+        assert!(!image.glow && image.tilt == Tilt::Back);
+        assert!(light.text.is_none() && !light.glow && light.tilt == Tilt::None);
+        assert!(!spark.shadow && spark.radius == 0.0);
+    }
+
+    #[test]
+    fn light_depth_and_counting_text_render() {
+        if crate::quiet_command(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .launch_output()
+            .is_err()
+            || system_font("bold").is_none()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let layer = |extra: Value| {
+            let mut base = json!({"type": "text", "text": null, "assetId": null, "x": 0.5,
+                "y": 0.5, "width": 0.8, "height": 0.1, "size": 0.05, "color": "#F5F0EA",
+                "bold": true, "opacity": 1, "start": 0, "end": 2, "enter": "fade", "exit": "none",
+                "accent": null, "glow": false, "count": false, "tilt": "none"});
+            base.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            base
+        };
+        let spec = MotionSpec::from_answer(
+            &json!({"title": "Lit", "kind": "animation", "usage": "", "durationSeconds": 2,
+                "background": "#0A0806", "atmosphere": "rays", "lightColor": "#FF7A2E", "film": true,
+                "layers": [
+                    layer(json!({"type": "light", "y": 0.45, "height": 0.3, "color": "#FF7A2E", "opacity": 0.4})),
+                    layer(json!({"type": "box", "y": 0.45, "height": 0.25, "color": "#1C1512",
+                        "radius": 0.1, "shadow": true, "tilt": "back", "glow": true, "enter": "rise"})),
+                    layer(json!({"type": "box", "x": 0.2, "y": 0.62, "width": 0.08, "height": 0.1,
+                        "color": "#FF7A2E", "enter": "grow"})),
+                    layer(json!({"text": "$1,250", "y": 0.45, "size": 0.08, "count": true})),
+                    layer(json!({"type": "spark", "x": 0.7, "y": 0.4, "color": "#FFB070"})),
+                    layer(json!({"text": "Small habits *compound*", "y": 0.78, "accent": "#FF8A3D",
+                        "glow": true, "enter": "words"}))
+                ]}),
+            |_| true,
+        )
+        .unwrap();
+        render_spec(
+            &spec,
+            (360, 640),
+            directory.path(),
+            "out.mp4",
+            &|_| None,
+            &FontSet::default(),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let frame = crate::quiet_command(crate::media_tools::ffmpeg())
+            .args(["-v", "error", "-ss", "1.8", "-i"])
+            .arg(directory.path().join("out.mp4"))
+            .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+            .launch_output()
+            .unwrap()
+            .stdout;
+        assert_eq!(frame.len(), 360 * 640 * 3);
+        let brightness = |top: usize, bottom: usize| {
+            let rows = &frame[top * 360 * 3..bottom * 360 * 3];
+            rows.iter().map(|value| f64::from(*value)).sum::<f64>() / rows.len() as f64
+        };
+        // The rays light the top of the frame and fade before the lower third.
+        assert!(brightness(0, 120) > brightness(560, 640) + 15.0);
+        // The accent word glows in orange below the card.
+        let accent = (470..530)
+            .flat_map(|y| (0..360).map(move |x| (y * 360 + x) * 3))
+            .filter(|at| frame[*at] > 180 && frame[at + 2] < 120)
+            .count();
+        assert!(accent > 50, "{accent}");
     }
 
     #[test]

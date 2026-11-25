@@ -53,6 +53,7 @@ pub use media_tools::{MediaToolsStatus, media_tools_status};
 mod media_worker;
 mod motion_artifacts;
 mod motion_design;
+mod motion_effects;
 mod motion_library;
 mod motion_renderer;
 mod motion_scratch;

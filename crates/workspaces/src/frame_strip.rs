@@ -16,7 +16,7 @@ use crate::WorkspaceStore;
 
 const TILE: u32 = 240;
 const WAVE_HEIGHT: u32 = 160;
-const MAX_SPAN: f64 = 120.0;
+pub(crate) const MAX_SPAN: f64 = 120.0;
 
 /// Which video to look at.
 #[derive(Debug, Clone, Copy)]

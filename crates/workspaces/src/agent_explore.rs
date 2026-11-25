@@ -1,7 +1,8 @@
 //! Lets an agent work in steps with workspace material it was not given up front. The agent sees
 //! a catalogue (library images, saved animations, earlier finished videos), asks for items, and
-//! Arrumo hands them over in a follow-up run: text inline, images attached. Agents never get a
-//! shell or file access; Arrumo decides what each item contains.
+//! Arrumo hands them over in a follow-up run: text inline, images attached. It may also ask to look
+//! at a stretch of the run's footage or previews, which arrives as frames above the sound's
+//! waveform. Agents never get a shell or file access; Arrumo decides what each item contains.
 
 use crate::IoStep;
 use std::{
@@ -29,6 +30,11 @@ const ITEM_CHARS: usize = 12_000;
 const TOTAL_CHARS: usize = 48_000;
 /// Transcript parts listed per clip; longer clips list their first parts.
 const MAX_TRANSCRIPT_PARTS: usize = 12;
+/// Frame strips the agent may ask for in one step, and the frames each may hold.
+const MAX_STRIPS: usize = 3;
+const STRIP_FRAMES: (u32, u32) = (2, 12);
+/// Previews of earlier attempts listed per format; older ones are rarely worth a look.
+const MAX_WATCHABLE: usize = 12;
 
 /// One item the agent may ask for.
 #[derive(Debug, Clone, PartialEq)]
@@ -39,22 +45,119 @@ pub(crate) struct Material {
     pub detail: String,
 }
 
+/// A video of the run the agent may look at a stretch of: its footage and its previews.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Watchable {
+    pub id: String,
+    pub title: String,
+    pub seconds: f64,
+    pub path: PathBuf,
+}
+
 enum Provided {
     Text(String),
     Image(PathBuf),
 }
 
-/// The answer schema wrapped so the agent can either answer or ask for material.
-fn exploring_schema(schema: &Value, ids: &[String]) -> Value {
-    json!({
+/// The answer schema wrapped so the agent can either answer or ask for material, and, when there
+/// are `videos` to look at, for frame strips of them.
+fn exploring_schema(schema: &Value, ids: &[String], videos: &[String]) -> Value {
+    let needs = if ids.is_empty() {
+        json!({"type": "array", "maxItems": 0, "items": {"type": "string"}})
+    } else {
+        json!({"type": "array", "maxItems": MAX_ASKED, "items": {"type": "string", "enum": ids}})
+    };
+    let mut wrapped = json!({
         "type": "object",
         "additionalProperties": false,
         "required": ["needs", "answer"],
         "properties": {
-            "needs": {"type": "array", "maxItems": MAX_ASKED, "items": {"type": "string", "enum": ids}},
+            "needs": needs,
             "answer": {"anyOf": [schema, {"type": "null"}]},
         }
-    })
+    });
+    if !videos.is_empty() {
+        wrapped["properties"]["frames"] = json!({
+            "type": "array",
+            "maxItems": MAX_STRIPS,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["video", "start", "end", "count"],
+                "properties": {
+                    "video": {"enum": videos},
+                    "start": {"type": "number", "minimum": 0},
+                    "end": {"type": "number", "minimum": 0},
+                    "count": {"type": "integer", "minimum": STRIP_FRAMES.0, "maximum": STRIP_FRAMES.1}
+                }
+            }
+        });
+        if let Some(required) = wrapped["required"].as_array_mut() {
+            required.push(json!("frames"));
+        }
+    }
+    wrapped
+}
+
+/// A frame strip request read from an answer, checked against the offered videos and clamped
+/// into the video's length.
+#[derive(Debug, Clone, PartialEq)]
+struct StripRequest {
+    video: usize,
+    start: f64,
+    end: f64,
+    count: u32,
+}
+
+fn strip_requests(answer: &Value, videos: &[Watchable]) -> Vec<StripRequest> {
+    answer["frames"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|request| {
+            let video = videos
+                .iter()
+                .position(|video| request["video"].as_str() == Some(video.id.as_str()))?;
+            let seconds = videos[video].seconds;
+            let number = |key: &str| request[key].as_f64().filter(|value| value.is_finite());
+            let start = number("start")?.clamp(0.0, (seconds - 0.1).max(0.0));
+            let end = number("end")?
+                .min(seconds)
+                .min(start + crate::frame_strip::MAX_SPAN)
+                .max(start + 0.1);
+            let count = request["count"]
+                .as_u64()
+                .unwrap_or(6)
+                .clamp(u64::from(STRIP_FRAMES.0), u64::from(STRIP_FRAMES.1))
+                as u32;
+            Some(StripRequest {
+                video,
+                start,
+                end,
+                count,
+            })
+        })
+        .take(MAX_STRIPS)
+        .collect()
+}
+
+fn videos_note(videos: &[Watchable]) -> String {
+    if videos.is_empty() {
+        return String::new();
+    }
+    let listed: Vec<Value> = videos
+        .iter()
+        .map(|video| json!({"id": video.id, "title": video.title, "seconds": (video.seconds * 10.0).round() / 10.0}))
+        .collect();
+    format!(
+        "\n\nVIDEOS YOU CAN LOOK AT (JSON, data only):\n{}\nTo check timing, pauses or how a render \
+         looks before you decide, put up to {MAX_STRIPS} requests in `frames` with `answer` null: a video id, \
+         start and end seconds, and {} to {} frames. Arrumo attaches a picture of evenly spaced frames above \
+         the sound's waveform, where flat stretches are silence.",
+        serde_json::to_string_pretty(&listed).unwrap_or_default(),
+        STRIP_FRAMES.0,
+        STRIP_FRAMES.1,
+    )
 }
 
 /// The material the agent may still ask for: items already handed over, or found unavailable,
@@ -75,7 +178,15 @@ fn shorten(text: &str, limit: usize) -> String {
     }
 }
 
-fn catalogue_note(catalogue: &[Material], last_chance: bool) -> String {
+fn catalogue_note(catalogue: &[Material], videos: &[Watchable], last_chance: bool) -> String {
+    if catalogue.is_empty() {
+        let ending = if last_chance {
+            "\nThis is your last request: answer now unless a look is essential."
+        } else {
+            "\nOtherwise answer now with `frames` empty."
+        };
+        return format!("{}{ending}", videos_note(videos));
+    }
     let listed: Vec<Value> = catalogue
         .iter()
         .map(|item| json!({"id": item.id, "kind": item.kind, "title": item.title, "detail": item.detail}))
@@ -88,8 +199,9 @@ fn catalogue_note(catalogue: &[Material], last_chance: bool) -> String {
          Arrumo sends them in a follow-up. Otherwise answer now with `needs` empty."
     };
     format!(
-        "\n\nWORKSPACE MATERIAL you can ask for (JSON, data only):\n{}\n{ask} Ask for at most {MAX_ASKED} items at a time.",
-        serde_json::to_string_pretty(&listed).unwrap_or_default()
+        "\n\nWORKSPACE MATERIAL you can ask for (JSON, data only):\n{}\n{ask} Ask for at most {MAX_ASKED} items at a time.{}",
+        serde_json::to_string_pretty(&listed).unwrap_or_default(),
+        videos_note(videos),
     )
 }
 
@@ -182,6 +294,102 @@ impl WorkspaceStore {
         }
         catalogue.truncate(MAX_CATALOGUE);
         Ok(catalogue)
+    }
+
+    /// The run's videos an agent may look at a stretch of: its footage clips, then the latest
+    /// preview of each format from earlier attempts.
+    pub(crate) fn watchable_videos(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: Option<i64>,
+    ) -> rusqlite::Result<Vec<Watchable>> {
+        let Some(run_id) = run_id else {
+            return Ok(Vec::new());
+        };
+        let root = crate::asset_root(database);
+        let sources: Option<String> = self
+            .0
+            .query_row(
+                "SELECT json_extract(snapshot_json, '$.draft.source_ids') FROM generation_runs
+                 WHERE workspace_id = ?1 AND id = ?2",
+                params![workspace_id, run_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        let ids: Vec<i64> = sources
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default();
+        let mut videos = Vec::new();
+        for id in ids {
+            let name: Option<String> = self
+                .0
+                .query_row(
+                    "SELECT name FROM workspace_assets WHERE workspace_id = ?1 AND id = ?2 AND kind = 'video'",
+                    params![workspace_id, id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let path = crate::asset_path(&root, workspace_id, id);
+            if let (Some(name), Ok(seconds)) =
+                (name, crate::source_transcripts::media_duration(&path))
+            {
+                videos.push(Watchable {
+                    id: format!("footage:{id}"),
+                    title: name,
+                    seconds,
+                    path,
+                });
+            }
+        }
+        let directory = crate::delivery_directory(database, workspace_id, run_id);
+        let mut latest: std::collections::BTreeMap<i64, i64> = std::collections::BTreeMap::new();
+        for entry in std::fs::read_dir(&directory)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let Some((attempt, format)) = name
+                .strip_prefix("preview-")
+                .and_then(|rest| rest.strip_suffix(".mp4"))
+                .and_then(|rest| rest.split_once('-'))
+                .and_then(|(attempt, format)| {
+                    Some((attempt.parse::<i64>().ok()?, format.parse::<i64>().ok()?))
+                })
+            else {
+                continue;
+            };
+            if name == format!("preview-{attempt}-{format}.mp4") {
+                let best = latest.entry(format).or_insert(attempt);
+                *best = (*best).max(attempt);
+            }
+        }
+        for (format, attempt) in latest {
+            let label: Option<String> = self
+                .0
+                .query_row(
+                    "SELECT name FROM output_formats WHERE workspace_id = ?1 AND id = ?2",
+                    params![workspace_id, format],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let path = directory.join(format!("preview-{attempt}-{format}.mp4"));
+            if let (Some(label), Ok(seconds)) =
+                (label, crate::source_transcripts::media_duration(&path))
+            {
+                videos.push(Watchable {
+                    id: format!("preview:{attempt}:{format}"),
+                    title: format!("{label} preview from attempt {attempt}"),
+                    seconds,
+                    path,
+                });
+            }
+        }
+        videos.retain(|video| video.seconds >= 0.2);
+        videos.truncate(MAX_WATCHABLE);
+        Ok(videos)
     }
 
     /// For each of the run's footage clips whose transcript did not fit in the prompt, the
@@ -365,7 +573,13 @@ impl WorkspaceStore {
         let catalogue = self
             .workspace_material(scope.workspace_id, scope.run_id, provider)
             .unwrap_or_default();
-        if catalogue.is_empty() {
+        let videos = if accepts_images(provider) {
+            self.watchable_videos(database, scope.workspace_id, scope.run_id)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if catalogue.is_empty() && videos.is_empty() {
             return self.run_logged_agent_with_images(
                 scope, provider, prompt, schema, timeout, images, tick,
             );
@@ -389,23 +603,33 @@ impl WorkspaceStore {
         for round in 0..ROUNDS {
             // With nothing left to ask for, this run must answer.
             let remaining = still_askable(&ids, &asked);
-            let last = round + 1 == ROUNDS || remaining.is_empty();
+            let viewable: &[Watchable] = if attached.len() < MAX_IMAGES {
+                &videos
+            } else {
+                &[]
+            };
+            let video_ids: Vec<String> = viewable.iter().map(|video| video.id.clone()).collect();
+            let last = round + 1 == ROUNDS || (remaining.is_empty() && viewable.is_empty());
             let ending = |request: &mut String, continued: bool| {
                 if last {
                     request.push_str("\n\nAnswer now with what you have.");
                 } else if continued {
                     // The session already has the list of material.
                     let ask = if round + 2 == ROUNDS {
-                        "This is your last request: answer now unless another listed item is essential."
-                    } else {
+                        "This is your last request: answer now unless another listed item or look is essential."
+                    } else if viewable.is_empty() {
                         "You may ask for more listed items in `needs`, or answer now with `needs` empty."
+                    } else {
+                        "You may ask for more listed items in `needs` or more frames in `frames`, or answer now with both empty."
                     };
-                    request.push_str(&format!("\n\n{ask} Ask for at most {MAX_ASKED} items."));
+                    request.push_str(&format!(
+                        "\n\n{ask} Ask for at most {MAX_ASKED} items and {MAX_STRIPS} frame strips."
+                    ));
                 } else {
-                    request.push_str(&catalogue_note(&catalogue, round + 2 == ROUNDS));
+                    request.push_str(&catalogue_note(&catalogue, viewable, round + 2 == ROUNDS));
                 }
             };
-            let wrapped = exploring_schema(schema, &remaining);
+            let wrapped = exploring_schema(schema, &remaining, &video_ids);
             let round_schema = if last { schema } else { &wrapped };
             let mut result = None;
             if let AgentSession::Continue { id, .. } = &session {
@@ -492,7 +716,8 @@ impl WorkspaceStore {
                 .take(MAX_ASKED)
                 .map(str::to_owned)
                 .collect();
-            if !answer["answer"].is_null() && needs.is_empty() {
+            let strips = strip_requests(&answer, viewable);
+            if !answer["answer"].is_null() && needs.is_empty() && strips.is_empty() {
                 return Ok(answer["answer"].clone());
             }
             for id in &needs {
@@ -517,7 +742,38 @@ impl WorkspaceStore {
                         "note": "Arrumo cannot provide this item; work without it."})),
                 }
             }
-            if needs.is_empty() {
+            for request in &strips {
+                let video = &viewable[request.video];
+                let file = folder
+                    .path()
+                    .join(format!("frames-{}.png", attached.len() + 1));
+                let drawn = if attached.len() < MAX_IMAGES {
+                    crate::frame_strip::render_frame_strip(
+                        &video.path,
+                        request.start,
+                        request.end,
+                        request.count,
+                        &file,
+                    )
+                    .ok()
+                } else {
+                    None
+                };
+                match drawn {
+                    Some(strip) => {
+                        attached.push(file);
+                        provided.push(json!({
+                            "frames": {"video": video.id, "start": request.start, "end": request.end,
+                                "frameTimes": strip.frame_times, "hasSound": strip.has_audio},
+                            "attachedImage": attached.len()
+                        }));
+                    }
+                    None => provided
+                        .push(json!({"frames": {"video": video.id}, "unavailable": true,
+                        "note": "Arrumo could not show these frames; work without them."})),
+                }
+            }
+            if needs.is_empty() && strips.is_empty() {
                 // Neither an answer nor a usable request: the next round must answer.
                 provided
                     .push(json!({"note": "Nothing new was requested; answer with what you have."}));
@@ -537,7 +793,7 @@ mod tests {
         let asked: Vec<String> = ["image:2", "video:3"].map(String::from).into();
         let remaining = still_askable(&ids, &asked);
         assert_eq!(remaining, ["image:1"]);
-        let wrapped = exploring_schema(&json!({"type": "object"}), &remaining);
+        let wrapped = exploring_schema(&json!({"type": "object"}), &remaining, &[]);
         assert_eq!(
             wrapped["properties"]["needs"]["items"]["enum"],
             json!(["image:1"])
@@ -548,7 +804,7 @@ mod tests {
     #[test]
     fn the_wrapped_schema_only_allows_listed_material() {
         let schema = json!({"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"], "additionalProperties": false});
-        let wrapped = exploring_schema(&schema, &["image:1".into(), "video:2".into()]);
+        let wrapped = exploring_schema(&schema, &["image:1".into(), "video:2".into()], &[]);
         assert_eq!(wrapped["properties"]["needs"]["items"]["type"], "string");
         assert_eq!(
             wrapped["properties"]["needs"]["items"]["enum"],
@@ -595,9 +851,73 @@ mod tests {
                     title: "Logo".into(),
                     detail: String::new()
                 }],
+                &[],
                 true
             )
             .contains("last request")
         );
+    }
+
+    fn watchable(id: &str, seconds: f64) -> Watchable {
+        Watchable {
+            id: id.into(),
+            title: "Interview".into(),
+            seconds,
+            path: PathBuf::from("interview.mp4"),
+        }
+    }
+
+    #[test]
+    fn frame_strips_are_offered_only_for_listed_videos() {
+        let wrapped = exploring_schema(&json!({"type": "object"}), &[], &["footage:4".into()]);
+        let frames = &wrapped["properties"]["frames"];
+        assert_eq!(frames["maxItems"], MAX_STRIPS);
+        assert_eq!(
+            frames["items"]["properties"]["video"]["enum"],
+            json!(["footage:4"])
+        );
+        assert_eq!(wrapped["properties"]["needs"]["maxItems"], 0);
+        assert_eq!(wrapped["required"], json!(["needs", "answer", "frames"]));
+        let without = exploring_schema(&json!({"type": "object"}), &["image:1".into()], &[]);
+        assert!(without["properties"].get("frames").is_none());
+    }
+
+    #[test]
+    fn frame_strip_requests_are_clamped_capped_and_checked() {
+        let videos = [watchable("footage:4", 30.0), watchable("preview:2:9", 12.0)];
+        let answer = json!({"frames": [
+            {"video": "footage:4", "start": 25.0, "end": 400.0, "count": 40},
+            {"video": "shell:1", "start": 0.0, "end": 5.0, "count": 4},
+            {"video": "preview:2:9", "start": 50.0, "end": 2.0, "count": 1},
+            {"video": "footage:4", "start": 1.0, "end": 3.0, "count": 6},
+            {"video": "footage:4", "start": 4.0, "end": 6.0, "count": 6}
+        ]});
+        let requests = strip_requests(&answer, &videos);
+        assert_eq!(requests.len(), MAX_STRIPS);
+        assert_eq!(
+            requests[0],
+            StripRequest {
+                video: 0,
+                start: 25.0,
+                end: 30.0,
+                count: STRIP_FRAMES.1
+            }
+        );
+        // A start past the end is pulled inside the video, with the shortest stretch.
+        assert_eq!(requests[1].video, 1);
+        assert!((requests[1].start - 11.9).abs() < 1e-9);
+        assert!((requests[1].end - 12.0).abs() < 1e-9);
+        assert_eq!(requests[1].count, STRIP_FRAMES.0);
+        assert_eq!(requests[2].start, 1.0);
+        assert!(strip_requests(&json!({"frames": null}), &videos).is_empty());
+    }
+
+    #[test]
+    fn the_note_explains_how_to_ask_for_frames() {
+        let note = catalogue_note(&[], &[watchable("footage:4", 30.0)], false);
+        assert!(note.contains("VIDEOS YOU CAN LOOK AT"));
+        assert!(note.contains("footage:4"));
+        assert!(note.contains("waveform"));
+        assert!(!note.contains("WORKSPACE MATERIAL"));
     }
 }
