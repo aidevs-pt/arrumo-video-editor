@@ -2,6 +2,18 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.7 (2026-11-25)
+
+### New
+
+- Install-box volume icon, Windows setup icon and a taller Retina disk image background (#52)
+
+### Fixes
+
+- Say what and where every failure happened; macOS scrollbars (#51)
+- Stop step restarts, keep one agent session per round (#50)
+- Let bundled provider adapters grow to 256 KiB (#49)
+
 ## 0.1.6 (2026-11-25)
 
 ### New
