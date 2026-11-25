@@ -1995,6 +1995,14 @@ mod tests {
 
     #[test]
     fn stored_built_in_sounds_load_but_never_play() {
+        // Box layers are drawn with FFmpeg while the command is built.
+        if crate::quiet_command(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
         let mut stored =
             serde_json::to_value(MotionSpec::from_answer(&answer(), |_| true).unwrap()).unwrap();
         stored["layers"][0]["sound"] = json!("whoosh");
