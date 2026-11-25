@@ -9,8 +9,6 @@ use serde_json::{Value, json};
 
 use crate::{AgentPlugin, WorkspaceStore, audio_generation::AudioKind};
 
-/// The most media one revision orders.
-const MAX_ORDERS: usize = 6;
 const MAX_PROMPT: usize = 1200;
 
 /// What the workspace's active providers and agent can make right now.
@@ -23,11 +21,17 @@ pub(crate) struct Orderable {
     pub animations: bool,
     /// The run's aspect ratio, for images.
     pub aspect_ratio: &'static str,
+    /// How many pieces one order may make, and how many of them clips (the app's limits).
+    pub max_media: usize,
+    pub max_clips: usize,
 }
 
 impl Orderable {
     pub(crate) fn kinds(&self) -> Vec<&'static str> {
         let mut kinds = Vec::new();
+        if self.max_media == 0 {
+            return kinds;
+        }
         if self.music {
             kinds.push("music");
         }
@@ -37,7 +41,7 @@ impl Orderable {
         if !self.image_order.is_empty() {
             kinds.push("image");
         }
-        if self.clips.is_some() {
+        if self.clips.is_some() && self.max_clips > 0 {
             kinds.push("clip");
         }
         if self.animations {
@@ -56,7 +60,7 @@ pub(crate) struct RevisionMedia {
     pub problem: Option<String>,
 }
 
-fn order_schema(kinds: &[&str]) -> Value {
+fn order_schema(kinds: &[&str], max_media: usize) -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
@@ -64,7 +68,7 @@ fn order_schema(kinds: &[&str]) -> Value {
         "properties": {
             "orders": {
                 "type": "array",
-                "maxItems": MAX_ORDERS,
+                "maxItems": max_media,
                 "items": {
                     "type": "object",
                     "additionalProperties": false,
@@ -147,9 +151,12 @@ fn order_prompt(
          yourself with tools or commands; voice-over is not ordered here, it is written in the edit.\n\
          Give each order a short name the creator will recognise, a prompt for the provider in \
          English, and its use: where and why it goes in the video.\n\
+         Order at most {max_media} pieces, of which at most {max_clips} clips.\n\
          {footage}Kinds you can order:\n{}\n\nBRIEF (JSON):\n{}",
         kind_guide(orderable, true),
         serde_json::to_string_pretty(&brief).unwrap_or_default(),
+        max_media = orderable.max_media,
+        max_clips = orderable.max_clips,
         footage = if footage {
             "This video is cut from recorded footage: an image or clip appears in it only inside an \
              animation, so order an animation that shows it along with any image or clip.\n"
@@ -199,6 +206,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         snapshot: &Value,
     ) -> Result<Orderable, Box<dyn Error>> {
+        let limits = self.media_order_limits()?;
         Ok(Orderable {
             music: !self
                 .current_providers(workspace_id, "music-generation", snapshot)?
@@ -210,6 +218,8 @@ impl WorkspaceStore {
             clips: self.clip_generation(workspace_id, snapshot)?,
             animations: true,
             aspect_ratio: crate::asset_plan::run_aspect_ratio(snapshot),
+            max_media: limits.max_media as usize,
+            max_clips: limits.max_clips as usize,
         })
     }
 
@@ -285,7 +295,7 @@ impl WorkspaceStore {
             },
             provider,
             &prompt,
-            &order_schema(&kinds),
+            &order_schema(&kinds, orderable.max_media),
             crate::script_stage::AGENT_TIMEOUT,
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
@@ -323,11 +333,18 @@ impl WorkspaceStore {
         };
         let mut orders: Vec<&Value> = orders
             .iter()
-            .take(MAX_ORDERS)
+            .take(orderable.max_media)
             .filter(|order| kinds.contains(&order["kind"].as_str().unwrap_or_default()))
             .collect();
         orders.sort_by_key(|order| rank(order["kind"].as_str().unwrap_or_default()));
+        let mut clips = 0;
         for order in orders {
+            if order["kind"] == "clip" {
+                if clips == orderable.max_clips {
+                    continue;
+                }
+                clips += 1;
+            }
             let text = |key: &str| order[key].as_str().unwrap_or_default().trim().to_owned();
             let (kind, name, prompt, use_) =
                 (text("kind"), text("name"), text("prompt"), text("use"));
@@ -645,10 +662,21 @@ mod tests {
             music: true,
             sound_effects: true,
             animations: true,
+            max_media: 12,
+            max_clips: 6,
             ..Orderable::default()
         };
+        assert!(
+            Orderable {
+                max_media: 0,
+                ..audio.clone()
+            }
+            .kinds()
+            .is_empty(),
+            "a limit of 0 orders nothing"
+        );
         assert_eq!(audio.kinds(), ["music", "soundEffect", "animation"]);
-        let schema = order_schema(&audio.kinds());
+        let schema = order_schema(&audio.kinds(), 12);
         assert_eq!(
             schema["properties"]["orders"]["items"]["properties"]["kind"]["enum"],
             json!(["music", "soundEffect", "animation"])

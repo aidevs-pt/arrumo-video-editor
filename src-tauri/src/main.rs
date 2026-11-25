@@ -55,6 +55,30 @@ fn set_preview_max_edge(
 }
 
 #[tauri::command]
+fn get_media_order_limits(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::MediaOrderLimits, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .media_order_limits()
+        .map_err(|_| "media_limits_failed")
+}
+
+#[tauri::command]
+fn set_media_order_limits(
+    max_media: Option<u32>,
+    max_clips: Option<u32>,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::MediaOrderLimits, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_media_order_limits(max_media, max_clips)
+        .map_err(|_| "media_limits_failed")
+}
+
+#[tauri::command]
 fn list_workspaces(store: State<'_, Store>) -> Result<Vec<Workspace>, &'static str> {
     store
         .lock()
@@ -1890,6 +1914,8 @@ fn main() {
             list_workspaces,
             get_preview_settings,
             set_preview_max_edge,
+            get_media_order_limits,
+            set_media_order_limits,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,
