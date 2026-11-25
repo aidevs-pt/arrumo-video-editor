@@ -91,8 +91,9 @@ fn main() {
                 archive
                     .validate_header_consistency()
                     .expect("verify default ZIP headers");
-                let bytes = read_release_entry(id, &mut archive, "manifest.json")
-                    .expect("verified default plugin ZIP must contain a root manifest");
+                let bytes =
+                    read_release_entry(id, &mut archive, "manifest.json", MAX_MANIFEST_BYTES)
+                        .expect("verified default plugin ZIP must contain a root manifest");
                 let packaged: Value =
                     serde_json::from_slice(&bytes).expect("parse verified manifest");
                 assert_eq!(
@@ -143,19 +144,23 @@ fn release_adapter(
     archive: &mut zip::ZipArchive<fs::File>,
     name: &str,
 ) -> String {
-    let Some(bytes) = read_release_entry(id, archive, name) else {
+    let Some(bytes) = read_release_entry(id, archive, name, MAX_ADAPTER_BYTES) else {
         return "None".into();
     };
     let snapshot = output.join(format!("default-{id}-{}", name.replace('/', "-")));
     fs::write(&snapshot, bytes).expect("write verified adapter snapshot");
     format!("Some(include_bytes!({snapshot:?}))")
 }
+const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
+// Provider adapters list every model a provider offers, so they outgrow a manifest.
+const MAX_ADAPTER_BYTES: u64 = 256 * 1024;
+
 fn read_release_entry(
     id: &str,
     archive: &mut zip::ZipArchive<fs::File>,
     name: &str,
+    max_bytes: u64,
 ) -> Option<Vec<u8>> {
-    const MAX_ENTRY_BYTES: u64 = 64 * 1024;
     let matches = (0..archive.len())
         .filter(|index| {
             let entry = archive
@@ -170,17 +175,17 @@ fn read_release_entry(
     assert_eq!(matches, 1, "Duplicate {id} entry {name}");
     let entry = archive.by_name(name).expect("open verified ZIP entry");
     assert!(
-        entry.is_file() && !entry.is_symlink() && entry.size() <= MAX_ENTRY_BYTES,
+        entry.is_file() && !entry.is_symlink() && entry.size() <= max_bytes,
         "Invalid {id} entry {name}"
     );
     let mut bytes = Vec::new();
     entry
-        .take(MAX_ENTRY_BYTES + 1)
+        .take(max_bytes + 1)
         .read_to_end(&mut bytes)
         .expect("read verified ZIP entry");
     assert!(
-        bytes.len() as u64 <= MAX_ENTRY_BYTES,
-        "Verified ZIP entry exceeds 64 KiB"
+        bytes.len() as u64 <= max_bytes,
+        "Verified {id} entry {name} exceeds {max_bytes} bytes"
     );
     Some(bytes)
 }
