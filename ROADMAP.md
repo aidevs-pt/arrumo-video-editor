@@ -4,8 +4,7 @@ Where Arrumo is heading. It's a direction, not a promise: priorities move with w
 
 ## Now: the first release
 
-- **Preview builds** for Windows, macOS and Linux, for early testers.
-- **Signed installers.** Windows and macOS builds signed and notarized, so they install without security warnings. Until then, preview builds explain how to open them.
+- **Signed Windows installers**, so Windows installs without security warnings. macOS builds are already signed and notarized. Until then, the release notes explain how to open the Windows installer.
 - **Tested on real machines**: installation, onboarding, a full video and updates, on every platform.
 
 ## Next
@@ -25,6 +24,13 @@ Where Arrumo is heading. It's a direction, not a promise: priorities move with w
 
 ## Done recently
 
+- Preview builds for Windows, macOS and Linux with every release, and signed, notarized macOS builds.
+- The agent can order music, sound effects, voice-over, images and clips from any step, within limits you set in Settings › Quality.
+- Voice-over and sound effects in every format, including portrait versions cut their own way.
+- New animations, like lower thirds, designed while the agent edits your footage, reviewed against a grid and a safe-area box.
+- The agent sees each whole clip and its sound waveform when cutting, and gets tips for the platform and formats you deliver.
+- Planned images, clips, sounds and animations can be previewed and played during generation.
+- Model, effort and web search settings for agents apply to runs already in progress.
 - Official plugins in the registry, installable and updatable from inside the app with checked releases.
 - Arrumo finds your agent even when it isn't on the usual path, or you can choose its program.
 - Licenses and open-source credits in Settings › About.
