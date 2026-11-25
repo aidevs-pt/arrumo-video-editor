@@ -1761,6 +1761,9 @@
     "reading": "Leyendo el briefing y planificando",
     "searching": "Ha buscado en la web",
     "lookingAtMaterial": "Revisando el material del espacio de trabajo que pidió",
+    "askedForMaterial": "Pidió material del espacio de trabajo",
+    "checkedAnimations": "Revisó los fotogramas de las animaciones: nada que cambiar",
+    "adjustedAnimations": "Revisó los fotogramas de las animaciones y las ajustó",
     "stageRound": "{stage}, ronda {round}, tras tus comentarios"
   },
   "providerOrder": {

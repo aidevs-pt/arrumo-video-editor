@@ -1761,6 +1761,9 @@
     "reading": "Reading the brief and planning",
     "searching": "Searched the web",
     "lookingAtMaterial": "Looking at the workspace material it asked for",
+    "askedForMaterial": "Asked for workspace material",
+    "checkedAnimations": "Checked the animations' frames: nothing to change",
+    "adjustedAnimations": "Checked the animations' frames and adjusted them",
     "stageRound": "{stage}, round {round}, after your feedback"
   },
   "providerOrder": {
