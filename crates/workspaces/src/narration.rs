@@ -39,18 +39,6 @@ fn written_voice_name(name: &str, prefix: &str) -> bool {
         })
 }
 
-/// The text-to-speech providers the run captured, in order.
-fn run_speech_providers(snapshot: &Value) -> Vec<String> {
-    snapshot["provider_orders"]["text-to-speech"]["effective"]
-        .as_array()
-        .map(|ids| {
-            ids.iter()
-                .filter_map(|id| id.as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 impl WorkspaceStore {
     /// Voices the storyboard in `edit` when the run has a configured speech provider. A failure
     /// leaves the storyboard silent and says why in its summary.
@@ -75,16 +63,11 @@ impl WorkspaceStore {
         if lines.iter().all(|line| line.trim().is_empty()) {
             return Ok(());
         }
-        let providers = self.without_inactive(run_speech_providers(snapshot))?;
-        let Some(plugin) = providers.first().map(String::as_str) else {
+        // The provider on now, so one turned on after the video was queued still reads it.
+        let Some(plugin) = self.speech_plugin(workspace_id, snapshot)? else {
             return Ok(());
         };
-        let configured = self
-            .speech_provider_status(workspace_id, plugin)
-            .is_ok_and(|status| status.credential_configured());
-        if !configured {
-            return Ok(());
-        }
+        let plugin = plugin.as_str();
         match self.synthesize_narration(
             database,
             workspace_id,
@@ -110,9 +93,24 @@ impl WorkspaceStore {
     pub(crate) fn current_voice(
         &self,
         workspace_id: i64,
+        snapshot: &Value,
     ) -> Result<Option<(String, String)>, Box<dyn Error>> {
+        let Some(plugin) = self.speech_plugin(workspace_id, snapshot)? else {
+            return Ok(None);
+        };
+        Ok(self
+            .narration_voice(workspace_id, &plugin)?
+            .map(|voice| (plugin, voice)))
+    }
+
+    /// The first speech provider on now (or chosen for this video) that has its key.
+    fn speech_plugin(
+        &self,
+        workspace_id: i64,
+        snapshot: &Value,
+    ) -> Result<Option<String>, Box<dyn Error>> {
         let Some(plugin) = self
-            .current_providers(workspace_id, "text-to-speech")?
+            .current_providers(workspace_id, "text-to-speech", snapshot)?
             .into_iter()
             .next()
         else {
@@ -121,12 +119,7 @@ impl WorkspaceStore {
         let configured = self
             .speech_provider_status(workspace_id, &plugin)
             .is_ok_and(|status| status.credential_configured());
-        if !configured {
-            return Ok(None);
-        }
-        Ok(self
-            .narration_voice(workspace_id, &plugin)?
-            .map(|voice| (plugin, voice)))
+        Ok(configured.then_some(plugin))
     }
 
     /// Voices each line in the edit's `voice_cues` and records its file. A failure drops the
@@ -270,13 +263,5 @@ mod tests {
         ] {
             assert!(!narration_file_name(name), "{name}");
         }
-    }
-
-    #[test]
-    fn the_first_captured_speech_provider_narrates() {
-        let snapshot =
-            json!({"provider_orders": {"text-to-speech": {"effective": ["elevenlabs", "x"]}}});
-        assert_eq!(run_speech_providers(&snapshot), ["elevenlabs", "x"]);
-        assert!(run_speech_providers(&json!({})).is_empty());
     }
 }

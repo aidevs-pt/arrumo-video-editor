@@ -49,7 +49,7 @@ impl Orderable {
 
 /// What a revision ordered: the new library media described for the edit's prompt, the specs of
 /// new animations, and a sentence for the creator when something could not be made.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct RevisionMedia {
     pub made: Vec<Value>,
     pub animations: Vec<Value>,
@@ -87,6 +87,7 @@ fn order_prompt(
     review: &Value,
     library: &Value,
     orderable: &Orderable,
+    footage: bool,
 ) -> String {
     let brief = json!({
         "video": {"title": snapshot["draft"]["title"], "intent": snapshot["draft"]["intent"]},
@@ -141,9 +142,15 @@ fn order_prompt(
          yourself with tools or commands; voice-over is not ordered here, it is written in the edit.\n\
          Give each order a short name the creator will recognise, a prompt for the provider in \
          English, and its use: where and why it goes in the video.\n\
-         Kinds you can order:\n{}\n\nBRIEF (JSON):\n{}",
+         {footage}Kinds you can order:\n{}\n\nBRIEF (JSON):\n{}",
         kinds.join("\n"),
         serde_json::to_string_pretty(&brief).unwrap_or_default(),
+        footage = if footage {
+            "This video is cut from recorded footage: an image or clip appears in it only inside an \
+             animation, so order an animation that shows it along with any image or clip.\n"
+        } else {
+            ""
+        },
     )
 }
 
@@ -151,23 +158,31 @@ fn order_prompt(
 /// it; `None` when there is nothing to revise.
 pub(crate) fn review_with_notes(earlier: &[Value]) -> Option<&Value> {
     let latest = earlier.last()?;
-    let written = |value: &Value| match value {
-        Value::String(text) => !text.trim().is_empty(),
-        Value::Null => false,
-        other => other.to_string().chars().any(char::is_alphanumeric),
-    };
-    (written(&latest["notes"]) || written(&latest["perFormat"])).then_some(latest)
+    let written = |value: &Value| value.as_str().is_some_and(|text| !text.trim().is_empty());
+    let per_format = latest["perFormat"]
+        .as_array()
+        .is_some_and(|formats| formats.iter().any(|format| written(&format["note"])));
+    (written(&latest["notes"]) || per_format).then_some(latest)
+}
+
+/// The provider choices the creator made for this one video, by capability.
+fn run_overrides(snapshot: &Value) -> BTreeMap<String, Vec<String>> {
+    serde_json::from_value(snapshot["options"]["provider_overrides"].clone()).unwrap_or_default()
 }
 
 impl WorkspaceStore {
-    /// The active providers for a capability in the workspace's current order.
+    /// The active providers for a capability in the workspace's current order, or the order
+    /// the creator chose for this video.
     pub(crate) fn current_providers(
         &self,
         workspace_id: i64,
         capability: &str,
+        snapshot: &Value,
     ) -> Result<Vec<String>, Box<dyn Error>> {
+        let mut overrides = run_overrides(snapshot);
+        overrides.retain(|key, _| key == capability);
         let order = self
-            .capture_provider_orders(workspace_id, &BTreeMap::new())?
+            .capture_provider_orders(workspace_id, &overrides)?
             .remove(capability)
             .map(|order| order.effective)
             .unwrap_or_default();
@@ -181,12 +196,12 @@ impl WorkspaceStore {
     ) -> Result<Orderable, Box<dyn Error>> {
         Ok(Orderable {
             music: !self
-                .current_providers(workspace_id, "music-generation")?
+                .current_providers(workspace_id, "music-generation", snapshot)?
                 .is_empty(),
             sound_effects: !self
-                .current_providers(workspace_id, "sound-effect-generation")?
+                .current_providers(workspace_id, "sound-effect-generation", snapshot)?
                 .is_empty(),
-            image_order: self.current_providers(workspace_id, "image-generation")?,
+            image_order: self.current_providers(workspace_id, "image-generation", snapshot)?,
             clips: self.clip_generation(workspace_id, snapshot)?,
             animations: true,
             aspect_ratio: crate::asset_plan::run_aspect_ratio(snapshot),
@@ -242,13 +257,21 @@ impl WorkspaceStore {
             return Ok(RevisionMedia::default());
         }
         let review = json!({"notes": review["notes"], "perFormat": review["perFormat"]});
+        let round = earlier.len();
+        if let Some(saved) = self.saved_revision_media(workspace_id, run_id, round)? {
+            return Ok(saved);
+        }
+        let footage = snapshot["draft"]["source_ids"]
+            .as_array()
+            .is_some_and(|ids| !ids.is_empty());
         let prompt = order_prompt(
             snapshot,
             &review,
             &self.library_overview(database, workspace_id)?,
             &orderable,
+            footage,
         );
-        let answer = self.run_logged_agent(
+        let answer = match self.run_logged_agent(
             crate::agent_logs::AgentLogScope {
                 workspace_id,
                 run_id: Some(run_id),
@@ -264,7 +287,24 @@ impl WorkspaceStore {
                     .map(|_| ())
                     .map_err(Into::into)
             },
-        )?;
+        ) {
+            Ok(answer) => answer,
+            // The revision goes on with the library as it is.
+            Err(error) => {
+                crate::report_failure_with(
+                    "revision_media",
+                    &"The agent could not order media for a revision",
+                    &[("cause", &crate::error_chain(&error))],
+                );
+                return Ok(RevisionMedia {
+                    problem: Some(
+                        "I could not order the new media the notes asked for, so this version uses the library as it is."
+                            .into(),
+                    ),
+                    ..RevisionMedia::default()
+                });
+            }
+        };
         let profile = snapshot["profile"]["id"].as_i64();
         let title = snapshot["draft"]["title"].as_str().unwrap_or_default();
         let mut media = RevisionMedia::default();
@@ -327,7 +367,50 @@ impl WorkspaceStore {
                 failed.join(", ")
             ));
         }
+        self.save_revision_media(workspace_id, run_id, attempt, round, &media)?;
         Ok(media)
+    }
+
+    /// What this revision already ordered, kept in the run's checkpoint so a retry of the same
+    /// revision reuses it instead of paying for it again. Submitting the stage clears it.
+    fn saved_revision_media(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        round: usize,
+    ) -> rusqlite::Result<Option<RevisionMedia>> {
+        let checkpoint: Option<String> = self.0.query_row(
+            "SELECT checkpoint_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+            rusqlite::params![workspace_id, run_id],
+            |row| row.get(0),
+        )?;
+        let saved = checkpoint
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .map(|checkpoint| checkpoint["revision_media"].clone())
+            .filter(|saved| saved["round"].as_u64() == Some(round as u64));
+        Ok(saved.and_then(|saved| serde_json::from_value(saved["media"].clone()).ok()))
+    }
+
+    fn save_revision_media(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        round: usize,
+        media: &RevisionMedia,
+    ) -> Result<(), Box<dyn Error>> {
+        let checkpoint: Option<String> = self.0.query_row(
+            "SELECT checkpoint_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+            rusqlite::params![workspace_id, run_id],
+            |row| row.get(0),
+        )?;
+        let mut checkpoint = checkpoint
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .filter(Value::is_object)
+            .unwrap_or_else(|| json!({}));
+        checkpoint["revision_media"] = json!({"round": round, "media": media});
+        self.checkpoint_generation(workspace_id, run_id, attempt, &checkpoint)?;
+        Ok(())
     }
 
     /// Makes one order. Returns how the edit's prompt describes it and, for an animation, its spec.
@@ -442,9 +525,80 @@ mod tests {
             review_with_notes(&[asked, quiet]).is_none(),
             "only the latest review counts"
         );
-        let per_format =
-            json!({"notes": null, "perFormat": {"3": {"notes": "Louder sound effects"}}});
+        let per_format = json!({"notes": null, "perFormat": [
+            {"format_id": 2, "decision": "approved"},
+            {"format_id": 3, "decision": "rejected", "note": "Louder sound effects"}
+        ]});
         assert!(review_with_notes(&[per_format]).is_some());
+        let approvals =
+            json!({"notes": null, "perFormat": [{"format_id": 2, "decision": "approved"}]});
+        assert!(
+            review_with_notes(&[approvals]).is_none(),
+            "a bare approval is not a note"
+        );
+    }
+
+    #[test]
+    fn a_retry_reuses_what_the_revision_already_ordered() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Launch".into(),
+                    intent: "Demo".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &crate::RunOptions::default())
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        store
+            .checkpoint_generation(workspace, run.id, claim.attempt, &json!({"step": 3}))
+            .unwrap();
+        assert!(
+            store
+                .saved_revision_media(workspace, run.id, 1)
+                .unwrap()
+                .is_none()
+        );
+        let media = RevisionMedia {
+            made: vec![json!({"kind": "music", "assetId": 9, "name": "Bed"})],
+            animations: Vec::new(),
+            problem: Some("I could not make Whoosh.".into()),
+        };
+        store
+            .save_revision_media(workspace, run.id, claim.attempt, 1, &media)
+            .unwrap();
+        let saved = store
+            .saved_revision_media(workspace, run.id, 1)
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.made, media.made);
+        assert_eq!(saved.problem, media.problem);
+        assert!(
+            store
+                .saved_revision_media(workspace, run.id, 2)
+                .unwrap()
+                .is_none(),
+            "a later review orders afresh"
+        );
+        let checkpoint: String = store
+            .0
+            .query_row(
+                "SELECT checkpoint_json FROM generation_runs WHERE id = ?1",
+                [run.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&checkpoint).unwrap()["step"],
+            3
+        );
     }
 
     #[test]
@@ -463,7 +617,13 @@ mod tests {
             schema["properties"]["orders"]["items"]["properties"]["kind"]["enum"],
             json!(["music", "soundEffect", "animation"])
         );
-        let prompt = order_prompt(&json!({}), &json!({"notes": "x"}), &json!({}), &audio);
+        let prompt = order_prompt(
+            &json!({}),
+            &json!({"notes": "x"}),
+            &json!({}),
+            &audio,
+            false,
+        );
         assert!(prompt.contains("- music:") && prompt.contains("- soundEffect:"));
         assert!(!prompt.contains("- image:") && !prompt.contains("- clip:"));
         assert!(prompt.contains("Never make media yourself"));

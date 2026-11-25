@@ -362,7 +362,9 @@ fn cue_mix(cues: &[(f64, bool)]) -> String {
     } else {
         let joined: String = voices.iter().map(|label| format!("[{label}]")).collect();
         graph.push_str(&format!(
-            "{joined}amix=inputs={}:normalize=0:duration=longest,asplit=2[voice][key];\
+            // Padded with silence: the compressor stops when its key ends, which would cut the
+            // footage's sound short after the last line.
+            "{joined}amix=inputs={}:normalize=0:duration=longest,apad,asplit=2[voice][key];\
              [base][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=400[ducked];",
             voices.len()
         ));
@@ -1952,8 +1954,171 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success());
-        let seconds = super::probe_duration(&dir.path().join("mixed.mp4")).unwrap();
+        // The audio itself, not just the container, lasts past the last voice line.
+        let probe = std::process::Command::new(crate::media_tools::ffprobe())
+            .args([
+                "-v",
+                "error",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=duration",
+            ])
+            .args(["-of", "csv=p=0"])
+            .arg(dir.path().join("mixed.mp4"))
+            .output()
+            .unwrap();
+        let seconds: f64 = String::from_utf8_lossy(&probe.stdout)
+            .trim()
+            .parse()
+            .unwrap();
         assert!((seconds - 3.0).abs() < 0.2, "{seconds}");
+    }
+
+    #[test]
+    fn a_preview_lays_voice_over_and_sound_effects_over_its_footage() {
+        use crate::{DraftSettings, RunOptions, WorkspaceStore, generation_plan::ProductionStage};
+        use serde_json::json;
+        use std::path::Path;
+        let ffmpeg = crate::media_tools::ffmpeg();
+        let dir = tempfile::tempdir().unwrap();
+        let make = |path: &Path, args: &[&str]| {
+            std::process::Command::new(ffmpeg)
+                .args(["-nostdin", "-v", "error"])
+                .args(args)
+                .arg(path)
+                .status()
+                .is_ok_and(|status| status.success())
+        };
+        let footage = dir.path().join("talk.mp4");
+        if !make(
+            &footage,
+            &[
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=gray:s=320x180:d=4",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=f=220:d=4",
+                "-shortest",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-y",
+            ],
+        ) {
+            eprintln!("FFmpeg is unavailable; skipping the render check");
+            return;
+        }
+        let effect = dir.path().join("whoosh.wav");
+        assert!(make(
+            &effect,
+            &["-f", "lavfi", "-i", "sine=f=1800:d=0.3", "-y"]
+        ));
+        let database = dir.path().join("arrumo.db");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let root = crate::asset_root(&database);
+        let footage = store.import_asset(&root, workspace, &footage).unwrap().id;
+        let effect = store.import_asset(&root, workspace, &effect).unwrap().id;
+        let profile = store
+            .create_profile(workspace, "Talks", "", None)
+            .unwrap()
+            .id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Talk".into(),
+                    intent: "A short talk".into(),
+                    profile_id: Some(profile),
+                    source_ids: vec![footage],
+                },
+            )
+            .unwrap();
+        let options = RunOptions {
+            autopilot: true,
+            ..RunOptions::default()
+        };
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &options)
+            .unwrap()
+            .id;
+        for (stage, result) in [
+            (ProductionStage::Script, json!({"markdown": "## Hello"})),
+            (
+                ProductionStage::Assets,
+                json!({"summary": "None", "asset_plan": []}),
+            ),
+        ] {
+            let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+            store
+                .submit_production_result(workspace, run, attempt, stage, &result)
+                .unwrap();
+        }
+        let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+        let delivery = crate::delivery_directory(&database, workspace, run);
+        std::fs::create_dir_all(&delivery).unwrap();
+        let voice = format!("voice-{attempt}-0.wav");
+        assert!(make(
+            &delivery.join(&voice),
+            &["-f", "lavfi", "-i", "sine=f=440:d=1", "-y"]
+        ));
+        let edit = json!({
+            "summary": "Cut",
+            "cuts": [{"asset_id": footage, "start_ms": 0, "end_ms": 4000}],
+            "sound_cues": [{"cut": 0, "at_ms": 500, "asset_id": effect}],
+            "voice_cues": [{"cut": 0, "at_ms": 1000, "text": "Hello", "file": voice}],
+        });
+        store
+            .render_preview_videos(&database, workspace, run, attempt, &edit)
+            .unwrap();
+        let previews: Vec<std::path::PathBuf> = std::fs::read_dir(&delivery)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("preview-") && name.ends_with(".mp4"))
+            })
+            .collect();
+        assert!(!previews.is_empty());
+        for preview in previews {
+            let probe = std::process::Command::new(crate::media_tools::ffprobe())
+                .args([
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "a:0",
+                    "-show_entries",
+                    "stream=duration",
+                ])
+                .args(["-of", "csv=p=0"])
+                .arg(&preview)
+                .output()
+                .unwrap();
+            let seconds: f64 = String::from_utf8_lossy(&probe.stdout)
+                .trim()
+                .parse()
+                .unwrap();
+            assert!(
+                (seconds - 4.0).abs() < 0.3,
+                "the sound runs to the end: {seconds}"
+            );
+        }
+        // A sound effect that is not this workspace's audio is refused.
+        let mut foreign = edit.clone();
+        foreign["sound_cues"][0]["asset_id"] = json!(footage + 100);
+        assert!(
+            store
+                .edit_cues(&database, workspace, run, &foreign)
+                .is_err()
+        );
     }
 
     #[test]

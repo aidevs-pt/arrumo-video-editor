@@ -493,7 +493,7 @@ impl WorkspaceStore {
         snapshot: &Value,
     ) -> Result<Option<ClipGeneration>, Box<dyn Error>> {
         if self
-            .current_providers(workspace_id, "video-generation")?
+            .current_providers(workspace_id, "video-generation", snapshot)?
             .is_empty()
         {
             return Ok(None);

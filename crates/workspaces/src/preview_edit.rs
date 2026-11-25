@@ -713,10 +713,7 @@ impl WorkspaceStore {
         animations.extend(ordered.animations.iter().cloned());
         let animations = json!(animations);
         // Designed effects replace the built-in synthesized sounds once the workspace has them.
-        let designed_sounds = !sounds.is_empty()
-            || !self
-                .current_providers(workspace_id, "sound-effect-generation")?
-                .is_empty();
+        let designed_sounds = !sounds.is_empty();
         let scene_schema = |schema: Value| {
             if designed_sounds {
                 crate::motion_spec::designed_sounds_only(schema)
@@ -1019,7 +1016,7 @@ impl WorkspaceStore {
         let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
         let sounds = self.workspace_sounds(database, workspace_id)?;
         let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
-        let voice = self.current_voice(workspace_id)?;
+        let voice = self.current_voice(workspace_id, snapshot)?;
         let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
         if !ordered.made.is_empty() {
             prompt.push_str(&format!(
@@ -1050,6 +1047,25 @@ impl WorkspaceStore {
                  such as a title arriving or a change of scene, and use them sparingly unless the creator asks \
                  for more. Return an empty list when none fits.\nSOUND EFFECTS (JSON):\n{}",
                 serde_json::to_string_pretty(&summaries).unwrap_or_default()
+            ));
+        }
+        let mut missing = Vec::new();
+        if tracks.is_empty() {
+            missing.push("music");
+        }
+        if sounds.is_empty() {
+            missing.push("sound effects");
+        }
+        if voice.is_none() {
+            missing
+                .push("a voice for voice-over (a speech provider with its key and a chosen voice)");
+        }
+        if !missing.is_empty() {
+            prompt.push_str(&format!(
+                "\n\nThis workspace has no {} to use. If the creator's notes ask for them, say in the \
+                 summary what is missing and that it can be added in Settings › Services and keys; never \
+                 make it yourself.",
+                missing.join(", ")
             ));
         }
         if voice.is_some() {

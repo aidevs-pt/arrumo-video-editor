@@ -4,7 +4,8 @@ How Arrumo mixes, so you choose with the result in mind. You never set volumes y
 
 - Every video is mastered to -14 LUFS with peaks at -1.5 dBTP, the level the main platforms play at.
 - Background music is levelled to about -30 LUFS and lowered further while anyone speaks. Featured music sits at about -19 LUFS and gives way harder under speech. Choose featured only when the music carries the video, as in a launch film or a montage with little talk.
-- Voice-over is levelled like speech, and the footage's own sound gives way under it. Sound effects play about 8 dB below their own level and stop after 8 seconds.
+- Over recorded footage, voice-over is levelled like speech and the footage's own sound gives way under it; sound effects play about 8 dB below their own level and stop after 8 seconds.
+- In an animation or storyboard scene, a layer's sound effect plays as the layer arrives and fades out after 4 seconds.
 
 Craft:
 
