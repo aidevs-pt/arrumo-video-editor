@@ -39,21 +39,36 @@ impl Launch for Command {
     #[track_caller]
     fn launch_output(&mut self) -> io::Result<Output> {
         let at = Location::caller();
-        self.output().map_err(|error| not_started(self, error, at))
+        let timing = time_program(self);
+        let output = self.output().map_err(|error| not_started(self, error, at));
+        timing.finish(output.as_ref().is_ok_and(|output| output.status.success()));
+        output
     }
 
     #[track_caller]
     fn launch_status(&mut self) -> io::Result<ExitStatus> {
         let at = Location::caller();
-        self.status().map_err(|error| not_started(self, error, at))
+        let timing = time_program(self);
+        let status = self.status().map_err(|error| not_started(self, error, at));
+        timing.finish(status.as_ref().is_ok_and(ExitStatus::success));
+        status
     }
 }
 
-fn not_started(command: &Command, error: io::Error, at: &Location<'_>) -> io::Error {
-    let program = Path::new(command.get_program())
+/// The program's file name, never its folder or arguments.
+fn program_name(command: &Command) -> String {
+    Path::new(command.get_program())
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+fn time_program(command: &Command) -> crate::telemetry::Timing {
+    crate::telemetry::time_part("process", &program_name(command), &[])
+}
+
+fn not_started(command: &Command, error: io::Error, at: &Location<'_>) -> io::Error {
+    let program = program_name(command);
     io::Error::new(
         error.kind(),
         format!("Could not run {program} ({}): {error}", place(at)),

@@ -65,9 +65,14 @@ impl WorkspaceStore {
         let Some(attempt) = attempt else {
             return Ok(None);
         };
-        match self.submit_motion_artifacts(database, workspace_id, run_id, attempt, artifacts) {
+        let timing = crate::telemetry::time_step("motion", &[]);
+        let outcome =
+            self.submit_motion_artifacts(database, workspace_id, run_id, attempt, artifacts);
+        timing.finish(outcome.is_ok());
+        match outcome {
             Ok(id) => Ok(Some(id)),
             Err(error) => {
+                crate::telemetry::warn("A generation step failed", &[("stage", "motion".into())]);
                 match self.fail_generation(
                     workspace_id,
                     run_id,

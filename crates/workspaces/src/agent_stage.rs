@@ -96,7 +96,9 @@ impl WorkspaceStore {
                 attempt,
             )
         });
+        let timing = crate::telemetry::time_step(stage, &[("agent", provider.id.clone().into())]);
         let outcome = work(&run, provider, attempt);
+        timing.finish(outcome.is_ok());
         drop(keeper);
         match outcome {
             Ok(id) => Ok(Some(id)),
@@ -116,6 +118,7 @@ impl WorkspaceStore {
                     .unwrap_or_else(|| fallback.to_owned());
                 let cause = crate::error_chain(&*error);
                 eprintln!("Arrumo: the {stage} step of run {run_id} failed: {reason}\n{cause}");
+                crate::telemetry::warn("A generation step failed", &[("stage", stage.into())]);
                 match self.fail_generation_because(
                     workspace_id,
                     run_id,

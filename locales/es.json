@@ -337,7 +337,7 @@
     "backupIntro": "Haz una copia de todo en un archivo, o restaura una copia.",
     "privacy": "Datos y privacidad",
     "usageData": "Datos de uso anónimos",
-    "usageDataHint": "Cuenta qué funciones se usan, ligado a esta instalación, no a ti. Sin cookies ni contenido.",
+    "usageDataHint": "Cuenta qué funciones se usan y cuánto tardan los pasos de generación, con los avisos de la app. Nunca ligado a ti. Sin cookies ni contenido.",
     "crashReports": "Informes de errores",
     "crashReportsHint": "Envía el error y la versión de la app cuando algo falla. Sin nombres de archivo ni contenido.",
     "notInThisBuild": "Esta compilación no tiene servicio de informes, así que no se envía nada.",

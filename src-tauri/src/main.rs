@@ -1834,6 +1834,7 @@ fn main() {
                 crash_reports::remember_choice(&data_dir, privacy.crash_reports);
             }
             if arrumo_workspaces::crash_dsn().is_some() {
+                arrumo_workspaces::set_diagnostics(crash_reports::SentryDiagnostics);
                 arrumo_workspaces::set_failure_sink(|area, message, details| {
                     sentry::with_scope(
                         |scope| {
