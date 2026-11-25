@@ -31,7 +31,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Its password |
    | `ARRUMO_CRASH_DSN` | The Sentry project DSN |
    | `ARRUMO_USAGE_KEY` | The Aptabase app key |
-   | `SENTRY_AUTH_TOKEN` | A Sentry organization token (Settings › Developer Settings › Organization Tokens). With it, each release uploads the app's debug files (dSYM, PDB) and the interface's source maps, so crash reports show file and line. Without it, nothing is uploaded and the source maps are still left out of the app. |
+   | `SENTRY_AUTH_TOKEN` | A Sentry organization token (Settings › Developer Settings › Organization Tokens). With it, each release uploads the app's debug files (dSYM, PDB) and the interface's source maps, so crash reports show file and line. Once the release is published, it is finalized in Sentry with its commits (linking commits needs Sentry's GitHub integration). Without it, nothing is uploaded and the source maps are still left out of the app. |
    | `ARRUMO_REPOS_TOKEN` | Only while the plugin and registry repositories are private: a fine-grained token with read access to them. Not needed once they are public. |
    | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` | The Developer ID Application certificate (base64 `.p12`), its password and its identity name |
    | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | For notarization; `APPLE_PASSWORD` is an app-specific password |
