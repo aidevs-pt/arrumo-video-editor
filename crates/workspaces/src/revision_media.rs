@@ -14,7 +14,7 @@ const MAX_ORDERS: usize = 6;
 const MAX_PROMPT: usize = 1200;
 
 /// What the workspace's active providers and agent can make right now.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Orderable {
     pub music: bool,
     pub sound_effects: bool,
@@ -26,7 +26,7 @@ pub(crate) struct Orderable {
 }
 
 impl Orderable {
-    fn kinds(&self) -> Vec<&'static str> {
+    pub(crate) fn kinds(&self) -> Vec<&'static str> {
         let mut kinds = Vec::new();
         if self.music {
             kinds.push("music");
@@ -82,6 +82,48 @@ fn order_schema(kinds: &[&str]) -> Value {
     })
 }
 
+/// How the agent describes each kind it can order, one line per kind.
+pub(crate) fn kind_guide(orderable: &Orderable, with_animations: bool) -> String {
+    let mut kinds: Vec<String> = Vec::new();
+    if orderable.music {
+        kinds.push(
+            "- music: describe genre, mood, tempo, instruments and how it develops; no artist or song \
+             names. seconds is the length the video needs (it loops if shorter)."
+                .into(),
+        );
+    }
+    if orderable.sound_effects {
+        kinds.push(
+            "- soundEffect: describe one sound precisely (source, material, size, distance), such as \
+             \"soft paper swoosh, close\". seconds is usually 1 to 4."
+                .into(),
+        );
+    }
+    if !orderable.image_order.is_empty() {
+        kinds.push(
+            "- image: describe the picture, its subject, composition, style and colours, with no text \
+             in it. It is made in the video's aspect. seconds is 0."
+                .into(),
+        );
+    }
+    if let Some(clips) = &orderable.clips {
+        kinds.push(format!(
+            "- clip: describe one shot as a camera sees it: subject, action, setting, camera move, \
+             light, with no text in the picture. It is made in {}, {} to {} seconds.",
+            clips.aspect_ratio, clips.min_seconds, clips.max_seconds
+        ));
+    }
+    if orderable.animations && with_animations {
+        kinds.push(
+            "- animation: describe what the animation shows, its text and its role (title card, lower \
+             third, callout, chart, end card). It may use a library image, clip or sound, or one you \
+             order here, by name. seconds is its length."
+                .into(),
+        );
+    }
+    kinds.join("\n")
+}
+
 fn order_prompt(
     snapshot: &Value,
     review: &Value,
@@ -94,43 +136,6 @@ fn order_prompt(
         "latestPreviewReview": review,
         "library": library,
     });
-    let mut kinds: Vec<String> = Vec::new();
-    if orderable.music {
-        kinds.push(
-            "- music: describe genre, mood, tempo, instruments and how it develops; no artist or song \
-             names. seconds is the length the video needs (it loops if shorter)."
-            .into(),
-        );
-    }
-    if orderable.sound_effects {
-        kinds.push(
-            "- soundEffect: describe one sound precisely (source, material, size, distance), such as \
-             \"soft paper swoosh, close\". seconds is usually 1 to 4."
-            .into(),
-        );
-    }
-    if !orderable.image_order.is_empty() {
-        kinds.push(
-            "- image: describe the picture, its subject, composition, style and colours, in the video's \
-             aspect. seconds is 0."
-            .into(),
-        );
-    }
-    if let Some(clips) = &orderable.clips {
-        kinds.push(format!(
-            "- clip: describe one shot as a camera sees it: subject, action, setting, camera move, \
-             light. It is made in {}, {} to {} seconds.",
-            clips.aspect_ratio, clips.min_seconds, clips.max_seconds
-        ));
-    }
-    if orderable.animations {
-        kinds.push(
-            "- animation: describe what the animation shows, its text and its role (title card, lower \
-             third, callout, chart, end card). It may use a library image, clip or sound, or one you \
-             order here, by name. seconds is its length."
-            .into(),
-        );
-    }
     format!(
         "You prepare a revision of one video in Arrumo. The creator reviewed the latest preview, and \
          their notes may ask for media the video does not have yet.\n\
@@ -143,7 +148,7 @@ fn order_prompt(
          Give each order a short name the creator will recognise, a prompt for the provider in \
          English, and its use: where and why it goes in the video.\n\
          {footage}Kinds you can order:\n{}\n\nBRIEF (JSON):\n{}",
-        kinds.join("\n"),
+        kind_guide(orderable, true),
         serde_json::to_string_pretty(&brief).unwrap_or_default(),
         footage = if footage {
             "This video is cut from recorded footage: an image or clip appears in it only inside an \
@@ -379,16 +384,7 @@ impl WorkspaceStore {
         run_id: i64,
         round: usize,
     ) -> rusqlite::Result<Option<RevisionMedia>> {
-        let checkpoint: Option<String> = self.0.query_row(
-            "SELECT checkpoint_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
-            rusqlite::params![workspace_id, run_id],
-            |row| row.get(0),
-        )?;
-        let saved = checkpoint
-            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-            .map(|checkpoint| checkpoint["revision_media"].clone())
-            .filter(|saved| saved["round"].as_u64() == Some(round as u64));
-        Ok(saved.and_then(|saved| serde_json::from_value(saved["media"].clone()).ok()))
+        self.saved_order(workspace_id, run_id, "revision_media", round)
     }
 
     fn save_revision_media(
@@ -399,6 +395,46 @@ impl WorkspaceStore {
         round: usize,
         media: &RevisionMedia,
     ) -> Result<(), Box<dyn Error>> {
+        self.save_order(
+            workspace_id,
+            run_id,
+            attempt,
+            "revision_media",
+            round,
+            media,
+        )
+    }
+
+    /// Media a step already ordered in this round of its review, from the run's checkpoint.
+    pub(crate) fn saved_order<T: serde::de::DeserializeOwned>(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        slot: &str,
+        round: usize,
+    ) -> rusqlite::Result<Option<T>> {
+        let checkpoint: Option<String> = self.0.query_row(
+            "SELECT checkpoint_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
+            rusqlite::params![workspace_id, run_id],
+            |row| row.get(0),
+        )?;
+        let saved = checkpoint
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .map(|checkpoint| checkpoint[slot].clone())
+            .filter(|saved| saved["round"].as_u64() == Some(round as u64));
+        Ok(saved.and_then(|saved| serde_json::from_value(saved["media"].clone()).ok()))
+    }
+
+    /// Keeps what a step ordered in the run's checkpoint, beside anything else saved there.
+    pub(crate) fn save_order<T: serde::Serialize>(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        slot: &str,
+        round: usize,
+        media: &T,
+    ) -> Result<(), Box<dyn Error>> {
         let checkpoint: Option<String> = self.0.query_row(
             "SELECT checkpoint_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
             rusqlite::params![workspace_id, run_id],
@@ -408,13 +444,13 @@ impl WorkspaceStore {
             .and_then(|text| serde_json::from_str::<Value>(&text).ok())
             .filter(Value::is_object)
             .unwrap_or_else(|| json!({}));
-        checkpoint["revision_media"] = json!({"round": round, "media": media});
+        checkpoint[slot] = json!({"round": round, "media": media});
         self.checkpoint_generation(workspace_id, run_id, attempt, &checkpoint)?;
         Ok(())
     }
 
     /// Makes one order. Returns how the edit's prompt describes it and, for an animation, its spec.
-    fn make_order(
+    pub(crate) fn make_order(
         &self,
         database: &Path,
         workspace_id: i64,
