@@ -23,6 +23,9 @@ pub fn start() -> (CrashReports, Option<tauri_plugin_sentry::Sentry>) {
         "release"
     }));
     options.send_default_pii = false;
+    // A stack shows which code reported a failure; symbols come from the debug files uploaded
+    // for each release.
+    options.attach_stacktrace = true;
     // Sessions are usage data, which the usage service counts under its own setting.
     options.auto_session_tracking = false;
     options.before_send = Some(std::sync::Arc::new(|mut event| {

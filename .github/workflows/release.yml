@@ -266,6 +266,10 @@ jobs:
           ARRUMO_UPDATER_PUBKEY: ${{ vars.ARRUMO_UPDATER_PUBKEY }}
           ARRUMO_CRASH_DSN: ${{ secrets.ARRUMO_CRASH_DSN }}
           ARRUMO_USAGE_KEY: ${{ secrets.ARRUMO_USAGE_KEY }}
+          # The frontend build uploads its source maps with these (scripts/sentry-source-maps.mjs).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -280,6 +284,24 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --config media-tools.json --config updater-key.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
+      # Without the app's debug files, crash reports show addresses instead of code locations.
+      - name: Upload debug files to the crash reporter
+        shell: bash
+        working-directory: video-editor
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "Crash reporter upload is not configured; skipping."
+            exit 0
+          fi
+          mapfile -t files < <(find target -maxdepth 4 -path '*/release/*' -not -path '*/bundle/*' -not -path '*/deps/*' \
+            \( -name 'arrumo-desktop' -o -name 'arrumo-desktop.exe' -o -name 'arrumo_desktop.pdb' -o -name 'arrumo-desktop.dSYM' \))
+          if [ ${#files[@]} -eq 0 ]; then echo "::error::No debug files were found to upload"; exit 1; fi
+          printf '%s\n' "${files[@]}"
+          pnpm dlx @sentry/cli@2.39.1 debug-files upload --wait "${files[@]}"
       # A signed build has to open without a Gatekeeper warning, so a bad certificate or a failed
       # notarization stops the release here instead of reaching users.
       - name: Check the macOS signature
