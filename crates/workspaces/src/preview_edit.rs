@@ -900,12 +900,14 @@ impl WorkspaceStore {
             stage: "preview",
             attempt: Some(attempt),
         };
-        let mut answer = self.run_logged_agent(
+        let mut answer = self.run_exploring_agent(
+            database,
             scope,
             provider,
             &prompt,
             &with_music_schema(schema, &track_ids, true),
             AGENT_TIMEOUT,
+            &[],
             || {
                 self.renew_generation_lease(workspace_id, run_id, attempt)
                     .map(|_| ())
@@ -1243,7 +1245,8 @@ impl WorkspaceStore {
             stage: "preview",
             attempt: Some(attempt),
         };
-        let mut answer = self.run_logged_agent_with_images(
+        let mut answer = self.run_exploring_agent(
+            database,
             scope,
             provider,
             &prompt,
