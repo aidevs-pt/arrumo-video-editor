@@ -125,18 +125,87 @@ fn draw_strip(
     Ok(frame_times)
 }
 
+/// Frame size in a clip overview: larger than a strip's, so the agent can judge colour.
+const OVERVIEW_TILE: u32 = 320;
+
 /// A whole clip at a glance for an agent choosing cuts: `frames` frames across its full length
-/// above its waveform, written to `output`. Returns each frame's time.
+/// above its waveform, written to `output`. Each frame is read with its own seek and the
+/// waveform from the sound alone, so a long recording is never decoded in full. Returns each
+/// frame's time.
 pub(crate) fn clip_overview(
     video: &Path,
     frames: u32,
     output: &Path,
 ) -> Result<Vec<f64>, Box<dyn Error>> {
     let (duration, has_video, has_audio) = probe(video)?;
-    if !has_video || duration < 0.1 {
+    if !has_video || duration < 0.1 || frames == 0 {
         return Err(io::Error::other("The clip has no picture to show").into());
     }
-    draw_strip(video, 0.0, duration, frames, has_audio, output)
+    let times: Vec<f64> = (0..frames)
+        .map(|index| {
+            (duration * (f64::from(index) + 0.5) / f64::from(frames) * 10.0).round() / 10.0
+        })
+        .collect();
+    let work = tempfile::tempdir()?;
+    let tile = format!(
+        "scale={OVERVIEW_TILE}:{OVERVIEW_TILE}:force_original_aspect_ratio=decrease,\
+         pad={OVERVIEW_TILE}:{OVERVIEW_TILE}:(ow-iw)/2:(oh-ih)/2:color=0x111111,format=rgb24"
+    );
+    for (index, at) in times.iter().enumerate() {
+        let status = crate::quiet_command(crate::media_tools::ffmpeg())
+            .args(["-nostdin", "-v", "error", "-ss", &format!("{at:.3}"), "-i"])
+            .arg(video)
+            .args(["-frames:v", "1", "-vf", &tile, "-y"])
+            .arg(work.path().join(format!("{index}.png")))
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .status()?;
+        if !status.success() {
+            return Err(io::Error::other("Could not read a frame of the clip").into());
+        }
+    }
+    let width = OVERVIEW_TILE * frames;
+    let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
+    command.args(["-nostdin", "-v", "error"]);
+    for index in 0..frames {
+        command
+            .arg("-i")
+            .arg(work.path().join(format!("{index}.png")));
+    }
+    let inputs: String = (0..frames).map(|index| format!("[{index}:v]")).collect();
+    let row = if frames == 1 {
+        format!("{inputs}null[frames]")
+    } else {
+        format!("{inputs}hstack=inputs={frames}[frames]")
+    };
+    let graph = if has_audio {
+        command.arg("-i").arg(video);
+        format!(
+            "{row};[{frames}:a]aformat=channel_layouts=mono,showwavespic=s={width}x{WAVE_HEIGHT}:colors=0x6fb3d2:scale=sqrt[wave];\
+             color=c=0x111111:s={width}x{WAVE_HEIGHT}:d=1[panel];[panel][wave]overlay=format=auto,format=rgb24[back];\
+             [frames][back]vstack[out]"
+        )
+    } else {
+        format!("{row};[frames]null[out]")
+    };
+    let status = command
+        .args([
+            "-filter_complex",
+            &graph,
+            "-map",
+            "[out]",
+            "-frames:v",
+            "1",
+            "-y",
+        ])
+        .arg(output)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
+    if !status.success() {
+        return Err(io::Error::other("Could not draw the clip overview").into());
+    }
+    Ok(times)
 }
 
 /// Draws `frames` frames between `start` and `end` seconds above the waveform into a new PNG.

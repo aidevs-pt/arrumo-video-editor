@@ -35,11 +35,12 @@ pub const EDITING_GUIDES: [EditingGuide; 10] = [
         "preview"
     ),
     guide!("sound", "Sound, music and voice", "preview"),
-    // Platform facts, checked 2026-11-25: three-minute Shorts (YouTube Help, "Understand
-    // three-minute YouTube Shorts"); Reels over three minutes not recommended to non-followers
-    // (Buffer's Reels length guide, reviewed 2026-11); end-screen elements in the last 5 to 20
-    // seconds (YouTube Help, "Add end screens to videos"); vertical feed overlays at the bottom
-    // and right edge (TikTok Ads safe-zone help and creator safe-zone templates).
+    // Platform facts, searched 2026-11-25. Official: three-minute Shorts (YouTube Help,
+    // "Understand three-minute YouTube Shorts"); end screens in the last 5 to 20 seconds of
+    // videos of 25 seconds or more (YouTube Help, "Add end screens to videos"). Reported, so
+    // the guide words them as tendencies: Reels over three minutes not recommended to
+    // non-followers (Buffer, reviewed 2026-11); vertical feed overlays at the bottom and right
+    // edge (TikTok Ads safe-zone help, creator templates); feeds autoplaying muted (vendor guides).
     guide!("platforms", "Platforms and formats", "preview"),
     guide!("portrait", "Choosing portrait cuts", "delivery"),
     guide!(

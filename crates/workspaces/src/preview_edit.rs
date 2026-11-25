@@ -583,7 +583,8 @@ fn preview_prompt(
         revision = if earlier.is_empty() {
             ""
         } else {
-            "Earlier cuts and the creator's review notes are included. Address every note.\n"
+            "Earlier cuts and the creator's review notes are included. Address every note. An earlier cut's \
+             animations are there too: to keep a new one the creator liked, copy it into newAnimations.\n"
         },
         brief = serde_json::to_string_pretty(&brief).unwrap_or_default(),
     )
@@ -1038,6 +1039,7 @@ impl WorkspaceStore {
             .map(|result| {
                 json!({
                     "cuts": result.result["cuts"],
+                    "animations": result.result["animations"],
                     "decision": result.decision,
                     "notes": result.review_notes,
                     "perFormat": result.preview_review,
@@ -1118,6 +1120,13 @@ impl WorkspaceStore {
                  keep each line short enough to finish within its cut. Return an empty list otherwise.",
             );
         }
+        prompt.push_str(
+            "\n\nAnimations are placed in two ways. A title card, end card or transition plays full screen \
+             as an insert before a cut (beforeCut counts your cuts from 0; use the number of cuts to play it \
+             at the end). A lower third or callout is drawn over a cut as an overlay starting atSeconds into \
+             that cut. Overlays draw their background colour too, so prefer inserts for animations designed as \
+             full scenes.",
+        );
         if !animations.is_empty() {
             let summaries: Vec<Value> = animations
                 .iter()
@@ -1130,36 +1139,53 @@ impl WorkspaceStore {
                 })
                 .collect();
             prompt.push_str(&format!(
-                "\n\nThe creator approved these animations for this video. Place each where its usage says: \
-                 a title card, end card or transition plays full screen as an insert before a cut (beforeCut \
-                 counts your cuts from 0; use the number of cuts to play it at the end), and a lower third or \
-                 callout is drawn over a cut as an overlay starting atSeconds into that cut. Overlays draw their \
-                 background colour too, so prefer inserts for animations designed as full scenes. Return empty \
-                 lists when an animation does not fit.\nAPPROVED ANIMATIONS (JSON):\n{}",
+                "\n\nThe creator approved these animations for this video. Place each where its usage says, \
+                 and return empty lists when an animation does not fit.\nAPPROVED ANIMATIONS (JSON):\n{}",
                 serde_json::to_string_pretty(&summaries).unwrap_or_default()
             ));
         }
         let frames_dir = tempfile::tempdir()?;
         let frames = if crate::agent_run::accepts_images(provider) {
-            clip_overviews(&root, workspace_id, &clips, frames_dir.path())
+            let keeper =
+                crate::lease_keeper::LeaseKeeper::start(database, workspace_id, run_id, attempt);
+            let overviews = clip_overviews(&root, workspace_id, &clips, frames_dir.path());
+            if !keeper.finish() {
+                return Err(
+                    io::Error::other("The run stopped while its clips were being read").into(),
+                );
+            }
+            overviews
         } else {
             Vec::new()
         };
         let images_for_new = self.workspace_images(workspace_id)?;
         let image_ids: Vec<i64> = images_for_new.iter().map(|image| image.id).collect();
-        // Sounds for new animations come from soundEffects, never the built-in synthesized ones.
+        let library_clips = self.workspace_clips(database, workspace_id)?;
+        let clip_ids: Vec<i64> = library_clips.iter().map(|clip| clip.id).collect();
+        let spec = crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids);
+        // Designed effects replace the built-in synthesized sounds once the workspace has them.
         let new_spec = if sound_ids.is_empty() {
-            crate::motion_spec::spec_schema(&image_ids)
+            spec
         } else {
-            crate::motion_spec::designed_sounds_only(crate::motion_spec::spec_schema(&image_ids))
+            crate::motion_spec::designed_sounds_only(spec)
         };
         prompt.push_str(&format!(
             "\n\nYou may also design up to {MAX_NEW_CUT_ANIMATIONS} new animations this cut needs that the \
              approved ones do not cover, such as a lower third naming a speaker, a callout for a key number or \
              a title the creator's notes ask for. Put them in newAnimations and place them like approved ones: \
              the first new one is animation {first}, the next {second}, and so on. Design for the footage's frame \
-             and keep them short. They may show the workspace images below by assetId. Return an empty list when \
-             the approved animations are enough. Each new animation: {guide}\nIMAGES (JSON):\n{images}",
+             and keep them short. They may show the workspace images and clips below, and play its sound \
+             effects, by assetId. Return an empty list when the approved animations are enough. Each new \
+             animation: {guide} {clip_guide}\nIMAGES (JSON):\n{images}\nCLIPS (JSON):\n{clips}",
+            clip_guide = if clip_ids.is_empty() { "" } else { crate::motion_spec::CLIP_GUIDE },
+            clips = serde_json::to_string(
+                &library_clips
+                    .iter()
+                    .map(|clip| json!({"assetId": clip.id, "name": clip.name, "notes": clip.notes,
+                                       "seconds": clip.seconds.map(|seconds| (seconds * 10.0).round() / 10.0)}))
+                    .collect::<Vec<_>>()
+            )
+            .unwrap_or_default(),
             first = animations.len(),
             second = animations.len() + 1,
             guide = crate::motion_spec::SPEC_GUIDE,
@@ -1224,7 +1250,14 @@ impl WorkspaceStore {
             },
         )?;
         // New animations are drawn and reviewed like planned ones before they are placed.
-        let image_allowed = |id: i64| image_ids.contains(&id);
+        let media_spec = |spec: &Value| {
+            crate::motion_spec::MotionSpec::from_answer_with_media(
+                spec,
+                |id| image_ids.contains(&id),
+                |id| clip_ids.contains(&id),
+                |id| sound_ids.contains(&id),
+            )
+        };
         let mut designed = answer["newAnimations"]
             .as_array()
             .cloned()
@@ -1237,7 +1270,7 @@ impl WorkspaceStore {
                 workspace_id,
                 &mut designed,
                 &new_spec,
-                &|spec| crate::motion_spec::MotionSpec::from_answer(spec, image_allowed).ok(),
+                &|spec| media_spec(spec).ok(),
                 &crate::motion_design::MotionReview {
                     scope,
                     provider,
@@ -1252,7 +1285,7 @@ impl WorkspaceStore {
         }
         let mut kept = Vec::with_capacity(designed.len());
         for spec in designed {
-            let valid = crate::motion_spec::MotionSpec::from_answer(&spec, image_allowed).is_ok();
+            let valid = media_spec(&spec).is_ok();
             kept.push(valid.then(|| {
                 animations.push(spec);
                 animations.len() - 1 - approved_count

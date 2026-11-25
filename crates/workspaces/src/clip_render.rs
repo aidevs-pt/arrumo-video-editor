@@ -334,13 +334,22 @@ fn cue_position(cue: &AudioCue, clips: &[RenderClip]) -> Option<(usize, f64)> {
     let Some((asset, moment)) = cue.source else {
         return Some((cue.cut, cue.at));
     };
-    clips.iter().enumerate().find_map(|(index, clip)| {
+    let here = |clip: &RenderClip| {
         let (start, end) = clip
             .cut
             .map_or((0, u32::MAX), |cut| (cut.start_ms, cut.end_ms));
         (clip.asset_id == asset && (start..end).contains(&moment))
-            .then(|| (index, f64::from(moment - start) / 1000.0))
-    })
+            .then(|| f64::from(moment - start) / 1000.0)
+    };
+    // The cut the agent named, when this format keeps it; footage used twice, such as a
+    // teaser, would otherwise send the cue to its first use.
+    if let Some(at) = clips.get(cue.cut).and_then(here) {
+        return Some((cue.cut, at));
+    }
+    clips
+        .iter()
+        .enumerate()
+        .find_map(|(index, clip)| here(clip).map(|at| (index, at)))
 }
 
 /// The most voice-over lines and sound effects one edit lays.
@@ -859,10 +868,28 @@ impl WorkspaceStore {
             .into_iter()
             .map(|image| image.id)
             .collect();
+        // Animations may show the workspace's clips and play its sounds, like storyboard scenes.
+        let media = |kind: &str| -> rusqlite::Result<Vec<i64>> {
+            self.0
+                .prepare(
+                    "SELECT id FROM workspace_assets
+                     WHERE workspace_id = ?1 AND kind = ?2 AND superseded = 0",
+                )?
+                .query_map(params![workspace_id, kind], |row| row.get(0))?
+                .collect()
+        };
+        let (clips, sounds) = (media("video")?, media("audio")?);
         let animations = animations
             .iter()
             .take(crate::motion_design::MAX_RUN_ANIMATIONS * 4)
-            .map(|spec| MotionSpec::from_answer(spec, |id| images.contains(&id)))
+            .map(|spec| {
+                MotionSpec::from_answer_with_media(
+                    spec,
+                    |id| images.contains(&id),
+                    |id| clips.contains(&id),
+                    |id| sounds.contains(&id),
+                )
+            })
             .collect::<Result<Vec<_>, _>>()
             .map_err(io::Error::other)?;
         let list = |key: &str| edit.get(key).cloned().unwrap_or(Value::Array(Vec::new()));
@@ -2095,11 +2122,27 @@ mod tests {
             &delivery.join(&voice),
             &["-f", "lavfi", "-i", "sine=f=440:d=1", "-y"]
         ));
+        // The second format is cut its own way, starting 0.8 s in: the voice line still plays
+        // there, and the effect, whose moment is cut, is left out.
+        let formats = store.list_profile_formats(workspace, profile).unwrap();
+        let own_cut = formats.last().unwrap().id;
         let edit = json!({
             "summary": "Cut",
             "cuts": [{"asset_id": footage, "start_ms": 0, "end_ms": 4000}],
+            "format_cuts": {own_cut.to_string(): [{"asset_id": footage, "start_ms": 800, "end_ms": 4000}]},
             "sound_cues": [{"cut": 0, "at_ms": 500, "asset_id": effect}],
             "voice_cues": [{"cut": 0, "at_ms": 1000, "text": "Hello", "file": voice}],
+            // An animation that only shows a workspace clip, drawn over the cut.
+            "animations": [{
+                "title": "Inset", "kind": "animation", "usage": "Picture in picture",
+                "durationSeconds": 2, "background": "#102030",
+                "layers": [{"type": "video", "text": null, "assetId": footage, "x": 0.75, "y": 0.25,
+                    "width": 0.3, "height": 0.3, "size": 0.05, "color": "#FFFFFF", "bold": false,
+                    "opacity": 1, "start": 0, "end": 2, "enter": "fade", "exit": "fade",
+                    "sound": "none", "clipStart": 0, "zoom": []}]
+            }],
+            "motion_inserts": [],
+            "motion_overlays": [{"cut": 0, "animation": 0, "at_ms": 500}],
         });
         store
             .render_preview_videos(&database, workspace, run, attempt, &edit)
@@ -2132,11 +2175,18 @@ mod tests {
                 .trim()
                 .parse()
                 .unwrap();
+            let own = preview
+                .to_string_lossy()
+                .ends_with(&format!("-{own_cut}.mp4"));
+            let expected = if own { 3.2 } else { 4.0 };
             assert!(
-                (seconds - 4.0).abs() < 0.3,
+                (seconds - expected).abs() < 0.3,
                 "the sound runs to the end: {seconds}"
             );
         }
+        let main = store.edit_cues(&database, workspace, run, &edit).unwrap();
+        assert_eq!(main.len(), 2);
+        assert!(main.iter().all(|cue| cue.source.is_some()));
         // A sound effect that is not this workspace's audio is refused.
         let mut foreign = edit.clone();
         foreign["sound_cues"][0]["asset_id"] = json!(footage + 100);
