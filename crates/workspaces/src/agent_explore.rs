@@ -56,6 +56,15 @@ fn exploring_schema(schema: &Value, ids: &[String]) -> Value {
     })
 }
 
+/// The material the agent may still ask for: items already handed over, or found unavailable,
+/// cannot be asked for again.
+fn still_askable(ids: &[String], asked: &[String]) -> Vec<String> {
+    ids.iter()
+        .filter(|id| !asked.contains(id))
+        .cloned()
+        .collect()
+}
+
 fn shorten(text: &str, limit: usize) -> String {
     let text = text.trim();
     if text.chars().count() <= limit {
@@ -377,13 +386,8 @@ impl WorkspaceStore {
         // What the running session has already been given.
         let (mut sent_material, mut sent_images) = (0, 0);
         for round in 0..ROUNDS {
-            // Items already handed over (or found unavailable) cannot be asked for again; with
-            // nothing left to ask for, this run must answer.
-            let remaining: Vec<String> = ids
-                .iter()
-                .filter(|id| !asked.contains(id))
-                .cloned()
-                .collect();
+            // With nothing left to ask for, this run must answer.
+            let remaining = still_askable(&ids, &asked);
             let last = round + 1 == ROUNDS || remaining.is_empty();
             let ending = |request: &mut String, continued: bool| {
                 if last {
@@ -525,6 +529,20 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn material_already_handed_over_cannot_be_asked_for_again() {
+        let ids: Vec<String> = ["image:1", "image:2", "video:3"].map(String::from).into();
+        let asked: Vec<String> = ["image:2", "video:3"].map(String::from).into();
+        let remaining = still_askable(&ids, &asked);
+        assert_eq!(remaining, ["image:1"]);
+        let wrapped = exploring_schema(&json!({"type": "object"}), &remaining);
+        assert_eq!(
+            wrapped["properties"]["needs"]["items"]["enum"],
+            json!(["image:1"])
+        );
+        assert!(still_askable(&ids, &ids).is_empty());
+    }
 
     #[test]
     fn the_wrapped_schema_only_allows_listed_material() {
