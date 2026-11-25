@@ -18,7 +18,7 @@ Add a stdio MCP server that runs `arrumo-workspaces <absolute-database-path> mcp
 3. **Review like a critic.** Each review note should name a moment (a time or script line), say what is wrong and what would fix it. "Make it better" teaches nothing.
 4. **Teach the workspace once.** Feedback that applies to every video (tone, pacing, words to avoid) belongs in `add_workspace_feedback`, not repeated in each review.
 5. **Never guess what kind of video it is.** Look first, ask second, edit last.
-6. **Read the craft notes.** `list_editing_guides` and `get_editing_guide` return the guides Arrumo's own agent follows at each stage (script, visuals, animation, cutting, storyboard, sound, portrait cuts, publishing text, review). Read the one for the stage you are reviewing so your notes and its work pull the same way.
+6. **Read the craft notes.** `list_editing_guides` and `get_editing_guide` return the guides Arrumo's own agent follows at each stage (script, visuals, animation, cutting, storyboard, sound, platforms, portrait cuts, publishing text, review). Read the one for the stage you are reviewing so your notes and its work pull the same way.
 
 ## The process
 

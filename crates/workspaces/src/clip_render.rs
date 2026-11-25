@@ -322,6 +322,25 @@ pub(crate) struct AudioCue {
     pub at: f64,
     pub path: PathBuf,
     pub voice: bool,
+    /// The source footage and the moment in it (ms) the cue lands on, so a format cut its own
+    /// way, such as a portrait version, plays it at the same moment.
+    pub source: Option<(i64, u32)>,
+}
+
+/// Where a cue plays in a format's clips: the clip's index and seconds into it. A cue anchored
+/// to footage plays wherever that moment survives in this format; a cue whose moment was cut
+/// from the format is left out.
+fn cue_position(cue: &AudioCue, clips: &[RenderClip]) -> Option<(usize, f64)> {
+    let Some((asset, moment)) = cue.source else {
+        return Some((cue.cut, cue.at));
+    };
+    clips.iter().enumerate().find_map(|(index, clip)| {
+        let (start, end) = clip
+            .cut
+            .map_or((0, u32::MAX), |cut| (cut.start_ms, cut.end_ms));
+        (clip.asset_id == asset && (start..end).contains(&moment))
+            .then(|| (index, f64::from(moment - start) / 1000.0))
+    })
 }
 
 /// The most voice-over lines and sound effects one edit lays.
@@ -458,6 +477,7 @@ fn cut_audio_filter(length_ms: u32) -> String {
 }
 
 struct RenderClip {
+    asset_id: i64,
     path: PathBuf,
     cut: Option<PreviewCut>,
     has_audio: bool,
@@ -697,11 +717,6 @@ impl WorkspaceStore {
                     clip_sets.push((cuts, clips));
                     clip_sets.len() - 1
                 };
-                // Cues follow the main cuts; a format cut its own way plays without them.
-                let own_cuts = edit
-                    .get("format_cuts")
-                    .and_then(|cuts| cuts.get(format.id.to_string()))
-                    .is_some();
                 let check = renderer.render_format(
                     &root,
                     &scratch,
@@ -709,7 +724,7 @@ impl WorkspaceStore {
                     &format,
                     &motion,
                     music.as_deref(),
-                    if own_cuts { &[] } else { &cues },
+                    &cues,
                 )?;
                 checks.insert(format.id.to_string(), check.to_json());
                 let filename = if stage == ProductionStage::Preview {
@@ -883,6 +898,13 @@ impl WorkspaceStore {
         let root = asset_root(database);
         let at = |entry: &Value| entry["at_ms"].as_u64().unwrap_or(0) as f64 / 1000.0;
         let cut = |entry: &Value| entry["cut"].as_u64().map(|cut| cut as usize);
+        // The moment in the source footage a cue lands on, from the main cut it names.
+        let source = |entry: &Value| -> Option<(i64, u32)> {
+            let main = &edit["cuts"][entry["cut"].as_u64()? as usize];
+            let (start, end) = (main["start_ms"].as_u64()?, main["end_ms"].as_u64()?);
+            let moment = (start + entry["at_ms"].as_u64().unwrap_or(0)).min(end.saturating_sub(1));
+            Some((main["asset_id"].as_i64()?, u32::try_from(moment).ok()?))
+        };
         let mut cues = Vec::new();
         for entry in edit["sound_cues"].as_array().into_iter().flatten() {
             let (Some(cut), Some(asset)) = (cut(entry), entry["asset_id"].as_i64()) else {
@@ -894,6 +916,7 @@ impl WorkspaceStore {
                 at: at(entry),
                 path,
                 voice: false,
+                source: source(entry),
             });
         }
         for entry in edit["voice_cues"].as_array().into_iter().flatten() {
@@ -916,6 +939,7 @@ impl WorkspaceStore {
                 at: at(entry),
                 path,
                 voice: true,
+                source: source(entry),
             });
         }
         if cues.len() > MAX_CUES {
@@ -1244,6 +1268,7 @@ impl ActiveRender<'_> {
                 let path = path.canonicalize()?;
                 let has_audio = self.inspect_source(&path, cut)?;
                 Ok(RenderClip {
+                    asset_id: id,
                     path,
                     cut: cut.copied(),
                     has_audio,
@@ -1577,8 +1602,9 @@ impl ActiveRender<'_> {
             .iter()
             .take(MAX_CUES)
             .filter_map(|cue| {
-                let &(start, length) = spans.get(cue.cut)?;
-                Some((start + cue.at.clamp(0.0, (length - 0.5).max(0.0)), cue))
+                let (cut, at) = cue_position(cue, clips)?;
+                let &(start, length) = spans.get(cut)?;
+                Some((start + at.clamp(0.0, (length - 0.5).max(0.0)), cue))
             })
             .collect();
         if !placed.is_empty() {
@@ -2118,6 +2144,42 @@ mod tests {
             store
                 .edit_cues(&database, workspace, run, &foreign)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn cues_land_on_the_same_moment_in_a_format_cut_its_own_way() {
+        use super::{AudioCue, PreviewCut, RenderClip, cue_position};
+        let clip = |asset_id: i64, start_ms: u32, end_ms: u32| RenderClip {
+            asset_id,
+            path: std::path::PathBuf::new(),
+            cut: Some(PreviewCut {
+                asset_id,
+                start_ms,
+                end_ms,
+                grade: None,
+            }),
+            has_audio: true,
+        };
+        // The main edit's cut 1 is footage 7 from 10 s; the line starts 1.5 s into it.
+        let cue = AudioCue {
+            cut: 1,
+            at: 1.5,
+            path: std::path::PathBuf::new(),
+            voice: true,
+            source: Some((7, 11_500)),
+        };
+        let portrait = [clip(7, 11_000, 14_000), clip(3, 0, 2_000)];
+        assert_eq!(cue_position(&cue, &portrait), Some((0, 0.5)));
+        let without_that_moment = [clip(7, 12_000, 14_000)];
+        assert_eq!(cue_position(&cue, &without_that_moment), None);
+        let unanchored = AudioCue {
+            source: None,
+            ..cue
+        };
+        assert_eq!(
+            cue_position(&unanchored, &without_that_moment),
+            Some((1, 1.5))
         );
     }
 

@@ -1849,6 +1849,37 @@ pub(crate) fn render_thumbnail(
     seconds: f64,
     output: &str,
 ) -> Result<(), Box<dyn Error>> {
+    render_summary(directory, video, seconds, output, false)
+}
+
+/// The frame guides an agent reviews an animation against: thirds, and the safe margin text
+/// must stay inside.
+const REVIEW_GUIDES: &str = "drawgrid=w=iw/3:h=ih/3:t=1:c=white@0.35,\
+     drawbox=x=iw*0.06:y=ih*0.06:w=iw*0.88:h=ih*0.88:c=yellow@0.8:t=2";
+
+/// Like `render_thumbnail`, with a thirds grid and the safe margin drawn on every frame, for an
+/// agent checking layout. Never shown to the creator.
+pub(crate) fn render_review_sheet(
+    directory: &Path,
+    video: &str,
+    seconds: f64,
+    output: &str,
+) -> Result<(), Box<dyn Error>> {
+    render_summary(directory, video, seconds, output, true)
+}
+
+fn render_summary(
+    directory: &Path,
+    video: &str,
+    seconds: f64,
+    output: &str,
+    guides: bool,
+) -> Result<(), Box<dyn Error>> {
+    let frame_filter = if guides {
+        format!("scale=480:-2,{REVIEW_GUIDES}")
+    } else {
+        "scale=480:-2".to_owned()
+    };
     // Sample the middle of each sixth so the first and last frames (often empty) are skipped.
     let step = seconds.max(0.1) / f64::from(SUMMARY_FRAMES);
     for frame in 0..SUMMARY_FRAMES {
@@ -1865,7 +1896,7 @@ pub(crate) fn render_thumbnail(
             "-frames:v",
             "1",
             "-vf",
-            "scale=480:-2",
+            &frame_filter,
             "-y",
             &name,
         ]

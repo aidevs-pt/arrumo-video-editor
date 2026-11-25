@@ -24,7 +24,7 @@ macro_rules! guide {
     };
 }
 
-pub const EDITING_GUIDES: [EditingGuide; 9] = [
+pub const EDITING_GUIDES: [EditingGuide; 10] = [
     guide!("script", "Writing the script", "script"),
     guide!("visuals", "Planning supporting visuals", "assets"),
     guide!("animation", "Designing animations", "assets"),
@@ -35,6 +35,12 @@ pub const EDITING_GUIDES: [EditingGuide; 9] = [
         "preview"
     ),
     guide!("sound", "Sound, music and voice", "preview"),
+    // Platform facts, checked 2026-11-25: three-minute Shorts (YouTube Help, "Understand
+    // three-minute YouTube Shorts"); Reels over three minutes not recommended to non-followers
+    // (Buffer's Reels length guide, reviewed 2026-11); end-screen elements in the last 5 to 20
+    // seconds (YouTube Help, "Add end screens to videos"); vertical feed overlays at the bottom
+    // and right edge (TikTok Ads safe-zone help and creator safe-zone templates).
+    guide!("platforms", "Platforms and formats", "preview"),
     guide!("portrait", "Choosing portrait cuts", "delivery"),
     guide!(
         "publishing",
@@ -46,6 +52,19 @@ pub const EDITING_GUIDES: [EditingGuide; 9] = [
 
 pub fn editing_guide(id: &str) -> Option<&'static EditingGuide> {
     EDITING_GUIDES.iter().find(|guide| guide.id == id)
+}
+
+/// Where the video goes, for a prompt's brief: the platform the creator named and the size of
+/// each format, so the platforms guide applies to them.
+pub(crate) fn delivery_brief(snapshot: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "platform": snapshot["options"]["platform"],
+        "formats": snapshot["formats"].as_array().map(|formats| formats.iter().map(|entry| serde_json::json!({
+            "name": entry["format"]["name"],
+            "width": entry["format"]["width"],
+            "height": entry["format"]["height"],
+        })).collect::<Vec<_>>()),
+    })
 }
 
 /// The guides for a prompt, as one section after the stage's instructions.

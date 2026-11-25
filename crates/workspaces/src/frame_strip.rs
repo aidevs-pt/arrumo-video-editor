@@ -63,6 +63,82 @@ fn probe(video: &Path) -> Result<(f64, bool, bool), Box<dyn Error>> {
     Ok((duration, has("video"), has("audio")))
 }
 
+/// Draws `frames` frames between `start` and `end` seconds above the waveform into `output`,
+/// returning each frame's time. Callers check the range.
+fn draw_strip(
+    video: &Path,
+    start: f64,
+    end: f64,
+    frames: u32,
+    has_audio: bool,
+    output: &Path,
+) -> Result<Vec<f64>, Box<dyn Error>> {
+    let span = end - start;
+    let frame_times: Vec<f64> = (0..frames)
+        .map(|index| {
+            ((start + span * (f64::from(index) + 0.5) / f64::from(frames)) * 1000.0).round()
+                / 1000.0
+        })
+        .collect();
+    let width = TILE * frames;
+    let strip = format!(
+        "[0:v]fps={frames}/{span:.6},scale={TILE}:{TILE}:force_original_aspect_ratio=decrease,\
+         pad={TILE}:{TILE}:(ow-iw)/2:(oh-ih)/2:color=0x111111,tile={frames}x1[strip]"
+    );
+    let graph = if has_audio {
+        format!(
+            "{strip};[0:a]aformat=channel_layouts=mono,showwavespic=s={width}x{WAVE_HEIGHT}:colors=0x6fb3d2[wave];\
+             color=c=0x111111:s={width}x{WAVE_HEIGHT}:d=1[panel];[panel][wave]overlay=format=auto,format=rgb24[back];\
+             [strip]format=rgb24[frames];[frames][back]vstack[out]"
+        )
+    } else {
+        format!("{strip};[strip]null[out]")
+    };
+    let status = crate::quiet_command(crate::media_tools::ffmpeg())
+        .args([
+            "-nostdin",
+            "-v",
+            "error",
+            "-ss",
+            &format!("{start:.3}"),
+            "-t",
+            &format!("{span:.3}"),
+            "-i",
+        ])
+        .arg(video)
+        .args([
+            "-filter_complex",
+            &graph,
+            "-map",
+            "[out]",
+            "-frames:v",
+            "1",
+            "-y",
+        ])
+        .arg(output)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
+    if !status.success() {
+        return Err(io::Error::other("Could not draw the frame strip").into());
+    }
+    Ok(frame_times)
+}
+
+/// A whole clip at a glance for an agent choosing cuts: `frames` frames across its full length
+/// above its waveform, written to `output`. Returns each frame's time.
+pub(crate) fn clip_overview(
+    video: &Path,
+    frames: u32,
+    output: &Path,
+) -> Result<Vec<f64>, Box<dyn Error>> {
+    let (duration, has_video, has_audio) = probe(video)?;
+    if !has_video || duration < 0.1 {
+        return Err(io::Error::other("The clip has no picture to show").into());
+    }
+    draw_strip(video, 0.0, duration, frames, has_audio, output)
+}
+
 /// Draws `frames` frames between `start` and `end` seconds above the waveform into a new PNG.
 pub fn render_frame_strip(
     video: &Path,
@@ -99,57 +175,9 @@ pub fn render_frame_strip(
         ))
         .into());
     }
-    let span = end - start;
-    let frame_times: Vec<f64> = (0..frames)
-        .map(|index| {
-            ((start + span * (f64::from(index) + 0.5) / f64::from(frames)) * 1000.0).round()
-                / 1000.0
-        })
-        .collect();
-    let width = TILE * frames;
-    let strip = format!(
-        "[0:v]fps={frames}/{span:.6},scale={TILE}:{TILE}:force_original_aspect_ratio=decrease,\
-         pad={TILE}:{TILE}:(ow-iw)/2:(oh-ih)/2:color=0x111111,tile={frames}x1[strip]"
-    );
-    let graph = if has_audio {
-        format!(
-            "{strip};[0:a]aformat=channel_layouts=mono,showwavespic=s={width}x{WAVE_HEIGHT}:colors=0x6fb3d2[wave];\
-             color=c=0x111111:s={width}x{WAVE_HEIGHT}:d=1[panel];[panel][wave]overlay=format=auto,format=rgb24[back];\
-             [strip]format=rgb24[frames];[frames][back]vstack[out]"
-        )
-    } else {
-        format!("{strip};[strip]null[out]")
-    };
     let work = tempfile::tempdir()?;
     let output: PathBuf = work.path().join("strip.png");
-    let status = crate::quiet_command(crate::media_tools::ffmpeg())
-        .args([
-            "-nostdin",
-            "-v",
-            "error",
-            "-ss",
-            &format!("{start:.3}"),
-            "-t",
-            &format!("{span:.3}"),
-            "-i",
-        ])
-        .arg(video)
-        .args([
-            "-filter_complex",
-            &graph,
-            "-map",
-            "[out]",
-            "-frames:v",
-            "1",
-            "-y",
-        ])
-        .arg(&output)
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
-    if !status.success() {
-        return Err(io::Error::other("Could not draw the frame strip").into());
-    }
+    let frame_times = draw_strip(video, start, end, frames, has_audio, &output)?;
     let png = std::fs::read(&output)?;
     std::io::Write::write_all(
         &mut std::fs::OpenOptions::new()
@@ -218,6 +246,44 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overviews_cover_a_whole_clip_longer_than_a_strip() {
+        let dir = tempfile::tempdir().unwrap();
+        let video = dir.path().join("long.mp4");
+        let made = std::process::Command::new(crate::media_tools::ffmpeg())
+            .args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=s=160x90:d=130:r=5",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=f=300:d=130",
+                "-shortest",
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "aac",
+                "-y",
+            ])
+            .arg(&video)
+            .status()
+            .is_ok_and(|status| status.success());
+        if !made {
+            eprintln!("FFmpeg is unavailable; skipping the overview check");
+            return;
+        }
+        let image = dir.path().join("overview.png");
+        let times = super::clip_overview(&video, 6, &image).unwrap();
+        assert_eq!(times.len(), 6);
+        assert!(times[5] > 110.0, "the frames reach the end: {times:?}");
+        assert!(image.is_file());
+    }
 
     #[test]
     fn draws_frames_above_the_waveform() {
