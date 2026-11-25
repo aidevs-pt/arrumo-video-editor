@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { BrainIcon, Clapperboard, FolderSearch, SearchIcon, SparklesIcon, TriangleAlert } from "lucide-react";
+import { BrainIcon, Clapperboard, FolderSearch, ImagesIcon, PackageSearch, SearchIcon, SparklesIcon, TriangleAlert } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -13,10 +13,23 @@ import { useLocale } from "@/lib/locale-provider";
 
 type Summary = { id: number; status: string; startedAt: number; stage: string; round: number | null; problem: string | null };
 type Step = { kind: "thinking" | "search" | "step"; text: string };
-type Log = Summary & { steps: Step[]; prompt: string };
+type Log = Summary & { steps: Step[]; prompt: string; answer: string | null };
 
 /** Follow-ups that hand over workspace material the agent asked for start with this line. */
 const MATERIAL_FOLLOW_UP = "MATERIAL YOU ASKED FOR";
+
+/** What a finished session that printed no steps did, read from Arrumo's own answer formats: a
+ * request for workspace material lists what it needs, and a check of rendered animations says
+ * whether it changed them. */
+function silentOutcome(answer: string | null): "material" | "checked" | "adjusted" | undefined {
+  try {
+    const parsed: unknown = JSON.parse(answer ?? "null");
+    if (!parsed || typeof parsed !== "object") return;
+    const { needs, changed } = parsed as { needs?: unknown; changed?: unknown };
+    if (Array.isArray(needs) && needs.length > 0) return "material";
+    if (typeof changed === "boolean") return changed ? "adjusted" : "checked";
+  } catch {}
+}
 
 const REFRESH_MS = 1500;
 
@@ -54,7 +67,7 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
         }));
         if (active) { setLogs(details.filter((entry): entry is Log => entry !== null)); setNow(Date.now()); }
       } catch {
-        if (active) setLogs([]);
+        // Keep what is shown; the next refresh tries again.
       }
       if (active) timer = setTimeout(refresh, REFRESH_MS);
     }
@@ -81,7 +94,7 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
 
   return (
     <section aria-label={copy.label} className="rounded-xl border bg-card p-4 text-card-foreground">
-      <ChainOfThought defaultOpen>
+      <ChainOfThought defaultOpen className="max-w-none">
         <ChainOfThoughtHeader>
           {reduceMotion ? heading : <Shimmer as="span" duration={2.4}>{heading}</Shimmer>}
         </ChainOfThoughtHeader>
@@ -98,10 +111,16 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
                   const live = log === running;
                   const searches = log.steps.filter((step) => step.kind === "search");
                   const others = log.steps.filter((step) => step.kind !== "search");
+                  const material = log.prompt.startsWith(MATERIAL_FOLLOW_UP);
+                  const failed = log.status === "failed" && log.problem;
+                  const outcome = !live && others.length === 0 && !failed ? silentOutcome(log.answer) : undefined;
+                  // A session with nothing to show adds no row, so it leaves no gap.
+                  if (!material && !live && !failed && !outcome && others.length === 0 && searches.length === 0) return null;
                   return (
-                    <div key={log.id} className="flex flex-col gap-3 pb-3 last:pb-0">
-                      {log.prompt.startsWith(MATERIAL_FOLLOW_UP) && <ChainOfThoughtStep icon={FolderSearch} label={copy.lookingAtMaterial} status="complete" />}
+                    <div key={log.id} className="flex flex-col gap-3">
+                      {material && <ChainOfThoughtStep icon={FolderSearch} label={copy.lookingAtMaterial} status="complete" />}
                       {others.length === 0 && live && <ChainOfThoughtStep icon={SparklesIcon} label={copy.reading} status="active" />}
+                      {outcome && <ChainOfThoughtStep icon={outcome === "material" ? PackageSearch : ImagesIcon} label={copy[outcome === "material" ? "askedForMaterial" : outcome === "adjusted" ? "adjustedAnimations" : "checkedAnimations"]} status="complete" />}
                       {others.map((step, index) => (
                         <ChainOfThoughtStep key={`${index}:${step.text}`} icon={step.kind === "thinking" ? BrainIcon : SparklesIcon}
                           label={step.text} status={live && index === others.length - 1 ? "active" : "complete"} />
