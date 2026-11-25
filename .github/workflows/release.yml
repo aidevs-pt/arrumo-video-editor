@@ -247,6 +247,16 @@ jobs:
               echo "$name<<$delimiter"; echo "$value"; echo "$delimiter"
             } >> "$GITHUB_ENV"
           done
+      # Line tables for crash reports: macOS writes them to a dSYM only when debug info is packed;
+      # on Linux they would stay inside the shipped binary and double the packages, so Linux keeps
+      # function names only.
+      - name: Choose where debug info goes
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            macOS) echo "CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=packed" >> "$GITHUB_ENV" ;;
+            Linux) echo "CARGO_PROFILE_RELEASE_DEBUG=0" >> "$GITHUB_ENV" ;;
+          esac
       # Finder shows the 2x background on Retina screens only from a multi-resolution TIFF.
       - name: Prepare the disk image background
         if: runner.os == 'macOS'
@@ -304,7 +314,7 @@ jobs:
             echo "Crash reporter upload is not configured; skipping."
             exit 0
           fi
-          find target -maxdepth 4 -path '*/release/*' -not -path '*/bundle/*' -not -path '*/deps/*' \
+          find target -maxdepth 4 -path '*/release/*' -not -path '*/bundle/*' -not -path '*/deps/*' -not -path '*/build/*' \
             \( -name 'arrumo-desktop' -o -name 'arrumo-desktop.exe' -o -name 'arrumo_desktop.pdb' -o -name 'arrumo-desktop.dSYM' \) \
             > debug-files.txt
           cat debug-files.txt
@@ -342,11 +352,15 @@ jobs:
             keychain="$work/sign.keychain-db"
             password=$(openssl rand -hex 16)
             security create-keychain -p "$password" "$keychain"
+            security set-keychain-settings -lut 3600 "$keychain"
             security unlock-keychain -p "$password" "$keychain"
+            # codesign only finds identities in keychains on the search list.
+            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | xargs)
             echo "$APPLE_CERTIFICATE" | base64 --decode > "$work/certificate.p12"
             security import "$work/certificate.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
             rm "$work/certificate.p12"
-            security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+            security find-identity -v -p codesigning "$keychain"
             codesign --force --timestamp --keychain "$keychain" --sign "$APPLE_SIGNING_IDENTITY" "$final"
             security delete-keychain "$keychain"
             codesign --verify --strict --verbose=2 "$final"

@@ -4,6 +4,7 @@ default-members = ["crates/workspaces"]
 resolver = "3"
 
 # Line tables let crash reports point at the file and line; they add no runtime cost. The release
-# workflow uploads them to the crash reporter (dSYM on macOS, PDB on Windows).
+# workflow uploads them to the crash reporter (dSYM on macOS, PDB on Windows) and leaves them out
+# of Linux builds, where they would stay inside the shipped binary.
 [profile.release]
 debug = "line-tables-only"
