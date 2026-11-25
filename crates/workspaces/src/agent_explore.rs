@@ -56,6 +56,15 @@ fn exploring_schema(schema: &Value, ids: &[String]) -> Value {
     })
 }
 
+/// The material the agent may still ask for: items already handed over, or found unavailable,
+/// cannot be asked for again.
+fn still_askable(ids: &[String], asked: &[String]) -> Vec<String> {
+    ids.iter()
+        .filter(|id| !asked.contains(id))
+        .cloned()
+        .collect()
+}
+
 fn shorten(text: &str, limit: usize) -> String {
     let text = text.trim();
     if text.chars().count() <= limit {
@@ -377,7 +386,9 @@ impl WorkspaceStore {
         // What the running session has already been given.
         let (mut sent_material, mut sent_images) = (0, 0);
         for round in 0..ROUNDS {
-            let last = round + 1 == ROUNDS;
+            // With nothing left to ask for, this run must answer.
+            let remaining = still_askable(&ids, &asked);
+            let last = round + 1 == ROUNDS || remaining.is_empty();
             let ending = |request: &mut String, continued: bool| {
                 if last {
                     request.push_str("\n\nAnswer now with what you have.");
@@ -393,7 +404,7 @@ impl WorkspaceStore {
                     request.push_str(&catalogue_note(&catalogue, round + 2 == ROUNDS));
                 }
             };
-            let wrapped = exploring_schema(schema, &ids);
+            let wrapped = exploring_schema(schema, &remaining);
             let round_schema = if last { schema } else { &wrapped };
             let mut result = None;
             if let AgentSession::Continue { id, .. } = &session {
@@ -476,9 +487,7 @@ impl WorkspaceStore {
                 .into_iter()
                 .flatten()
                 .filter_map(Value::as_str)
-                .filter(|id| {
-                    ids.iter().any(|known| known == id) && !asked.iter().any(|seen| seen == id)
-                })
+                .filter(|id| remaining.iter().any(|known| known == id))
                 .take(MAX_ASKED)
                 .map(str::to_owned)
                 .collect();
@@ -503,7 +512,8 @@ impl WorkspaceStore {
                         text_used += text.len();
                         provided.push(json!({"id": id, "content": text}));
                     }
-                    _ => provided.push(json!({"id": id, "unavailable": true})),
+                    _ => provided.push(json!({"id": id, "unavailable": true,
+                        "note": "Arrumo cannot provide this item; work without it."})),
                 }
             }
             if needs.is_empty() {
@@ -519,6 +529,20 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn material_already_handed_over_cannot_be_asked_for_again() {
+        let ids: Vec<String> = ["image:1", "image:2", "video:3"].map(String::from).into();
+        let asked: Vec<String> = ["image:2", "video:3"].map(String::from).into();
+        let remaining = still_askable(&ids, &asked);
+        assert_eq!(remaining, ["image:1"]);
+        let wrapped = exploring_schema(&json!({"type": "object"}), &remaining);
+        assert_eq!(
+            wrapped["properties"]["needs"]["items"]["enum"],
+            json!(["image:1"])
+        );
+        assert!(still_askable(&ids, &ids).is_empty());
+    }
 
     #[test]
     fn the_wrapped_schema_only_allows_listed_material() {

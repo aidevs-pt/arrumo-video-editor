@@ -6,6 +6,7 @@ license = "AGPL-3.0-only"
 
 [dependencies]
 regex = "1"
+dunce = "1"
 base64 = "0.23"
 ttf-parser = "0.25"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "multipart"] }

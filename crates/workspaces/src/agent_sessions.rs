@@ -16,6 +16,8 @@ use crate::{
 
 /// Sessions without a run that outlive this were left behind by an interrupted request.
 const ORPHAN_SECONDS: i64 = 6 * 60 * 60;
+/// How long a failed run, which can still be retried, keeps its sessions.
+const FAILED_RUN_SECONDS: i64 = 7 * 24 * 60 * 60;
 const MAX_DEPTH: usize = 6;
 const MAX_ENTRIES: usize = 50_000;
 
@@ -25,17 +27,51 @@ impl WorkspaceStore {
         scope: AgentLogScope<'_>,
         provider: &str,
         session: &str,
+        round: Option<i64>,
     ) {
         let _ = self.0.execute(
-            "INSERT OR IGNORE INTO agent_sessions (provider, session, workspace_id, run_id, stage)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT OR IGNORE INTO agent_sessions (provider, session, workspace_id, run_id, stage, round)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 provider,
                 session,
                 scope.workspace_id,
                 scope.run_id,
-                scope.stage
+                scope.stage,
+                round
             ],
+        );
+    }
+
+    /// The run's current round: 1, plus one for every review where the creator sent feedback
+    /// (asked for changes, rejected, or approved with notes).
+    pub(crate) fn run_round(&self, run_id: i64) -> rusqlite::Result<i64> {
+        self.0.query_row(
+            "SELECT 1 + count(*) FROM production_results
+             WHERE run_id = ?1 AND (decision IN ('revise', 'rejected')
+                OR (decision = 'approved' AND trim(coalesce(review_notes, '')) != ''))",
+            [run_id],
+            |row| row.get(0),
+        )
+    }
+
+    /// The session the run's agent has been using this round, if one was kept.
+    pub(crate) fn round_session(&self, run_id: i64, provider: &str, round: i64) -> Option<String> {
+        self.0
+            .query_row(
+                "SELECT session FROM agent_sessions WHERE run_id = ?1 AND provider = ?2 AND round = ?3
+                 ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                params![run_id, provider, round],
+                |row| row.get(0),
+            )
+            .ok()
+    }
+
+    /// Stops offering a session that could not be continued; it is still removed with the run.
+    pub(crate) fn forget_round_session(&self, provider: &str, session: &str) {
+        let _ = self.0.execute(
+            "UPDATE agent_sessions SET round = NULL WHERE provider = ?1 AND session = ?2",
+            params![provider, session],
         );
     }
 
@@ -52,14 +88,16 @@ impl WorkspaceStore {
     }
 
     /// Removes every kept session that nothing can need any more. Returns how many were removed.
+    /// A failed run keeps its sessions for a week, so retrying it continues the same session.
     pub fn sweep_agent_sessions(&self) -> rusqlite::Result<usize> {
         self.remove_agent_sessions(
             "SELECT session.provider, session.session FROM agent_sessions session
              LEFT JOIN generation_runs run ON run.id = session.run_id
              WHERE (session.run_id IS NOT NULL
-                    AND (run.id IS NULL OR run.state IN ('completed', 'failed', 'cancelled')))
+                    AND (run.id IS NULL OR run.state IN ('completed', 'cancelled')
+                         OR (run.state = 'failed' AND session.created_at < unixepoch() - ?2)))
                 OR (session.run_id IS NULL AND session.created_at < unixepoch() - ?1)",
-            params![ORPHAN_SECONDS],
+            params![ORPHAN_SECONDS, FAILED_RUN_SECONDS],
         )
     }
 
@@ -240,6 +278,96 @@ mod tests {
     }
 
     #[test]
+    fn a_round_lasts_until_the_creator_sends_feedback() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "request",
+                &crate::RunOptions::default(),
+            )
+            .unwrap()
+            .id;
+        let scope = AgentLogScope {
+            workspace_id: workspace,
+            run_id: Some(run),
+            stage: "script",
+            attempt: Some(1),
+        };
+        assert_eq!(store.run_round(run).unwrap(), 1);
+        assert_eq!(store.round_session(run, "test-agent", 1), None);
+        store.record_agent_session(scope, "test-agent", "first-session", Some(1));
+        assert_eq!(
+            store.round_session(run, "test-agent", 1).as_deref(),
+            Some("first-session")
+        );
+        assert_eq!(store.round_session(run, "other-agent", 1), None);
+        let review = |decision: &str, notes: &str| {
+            store
+                .0
+                .execute(
+                    "INSERT INTO production_results (run_id, attempt, stage_index, result_json, decision, review_notes)
+                     VALUES (?1, 1, 0, '{}', ?2, ?3)",
+                    params![run, decision, notes],
+                )
+                .unwrap();
+        };
+        // Approving without notes keeps the round; feedback of any kind starts the next one.
+        review("approved", "  ");
+        assert_eq!(store.run_round(run).unwrap(), 1);
+        review("approved", "Shorter intro");
+        assert_eq!(store.run_round(run).unwrap(), 2);
+        review("revise", "");
+        review("rejected", "");
+        assert_eq!(store.run_round(run).unwrap(), 4);
+        assert_eq!(store.round_session(run, "test-agent", 4), None);
+        // A session that could not be continued is no longer offered.
+        store.forget_round_session("test-agent", "first-session");
+        assert_eq!(store.round_session(run, "test-agent", 1), None);
+        // A failed run can be retried, so its session stays until a week has passed.
+        let sweep_session = |store: &WorkspaceStore| {
+            store.sweep_agent_sessions().unwrap();
+            store
+                .0
+                .query_row(
+                    "SELECT count(*) FROM agent_sessions WHERE run_id = ?1",
+                    [run],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap()
+        };
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET state = 'failed' WHERE id = ?1",
+                [run],
+            )
+            .unwrap();
+        assert_eq!(sweep_session(&store), 1);
+        store
+            .0
+            .execute(
+                "UPDATE agent_sessions SET created_at = unixepoch() - ?1 - 1",
+                [FAILED_RUN_SECONDS],
+            )
+            .unwrap();
+        assert_eq!(sweep_session(&store), 0);
+    }
+
+    #[test]
     fn sessions_go_when_their_run_is_over_or_they_have_no_run() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let scope = |run_id, stage| AgentLogScope {
@@ -248,8 +376,18 @@ mod tests {
             stage,
             attempt: None,
         };
-        store.record_agent_session(scope(None, "context"), "codex", "a".repeat(20).as_str());
-        store.record_agent_session(scope(Some(99), "script"), "codex", "b".repeat(20).as_str());
+        store.record_agent_session(
+            scope(None, "context"),
+            "codex",
+            "a".repeat(20).as_str(),
+            None,
+        );
+        store.record_agent_session(
+            scope(Some(99), "script"),
+            "codex",
+            "b".repeat(20).as_str(),
+            Some(1),
+        );
         store.release_agent_sessions(scope(Some(99), "script"));
         let count = |store: &WorkspaceStore| -> i64 {
             store

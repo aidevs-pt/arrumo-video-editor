@@ -17,7 +17,7 @@ type LogSummary = {
   id: number;
   runId: number | null;
   stage: string;
-  attempt: number | null;
+  round: number | null;
   provider: string;
   status: LogStatus;
   startedAt: number;
@@ -99,7 +99,7 @@ function AgentLogBrowser({ workspaceId, runId }: { workspaceId: number; runId?: 
                 <span className="font-medium">{copy.stages[log.stage as keyof typeof copy.stages] ?? log.stage}</span>
                 <StatusBadge status={log.status} />
               </span>
-              <span className="text-xs text-muted-foreground">{time(log.startedAt)}{log.attempt ? ` · ${copy.attempt.replace("{attempt}", String(log.attempt))}` : ""}</span>
+              <span className="text-xs text-muted-foreground">{time(log.startedAt)}{log.round ? ` · ${copy.round.replace("{round}", String(log.round))}` : ""}</span>
             </button>
           </li>
         ))}

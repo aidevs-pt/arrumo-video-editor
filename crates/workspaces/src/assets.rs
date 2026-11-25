@@ -95,7 +95,7 @@ impl WorkspaceStore {
             return Ok(None);
         }
         let path = asset_path(media_root, workspace_id, asset_id);
-        if !path.symlink_metadata()?.is_file() || path.canonicalize()? != path {
+        if !path.symlink_metadata()?.is_file() || !is_canonical(&path)? {
             return Err(io::Error::other("Image preview source is unavailable").into());
         }
         let mut bytes = Vec::new();
@@ -122,7 +122,7 @@ impl WorkspaceStore {
     ) -> Result<ImagePreview, Box<dyn Error>> {
         self.managed_asset_name(workspace_id, asset_id, "video")?;
         let source = asset_path(media_root, workspace_id, asset_id);
-        if !source.symlink_metadata()?.is_file() || source.canonicalize()? != source {
+        if !source.symlink_metadata()?.is_file() || !is_canonical(&source)? {
             return Err(io::Error::other("Video frame source is unavailable").into());
         }
         // The name follows the file, so a restored backup or replaced asset never reuses a frame.
@@ -404,6 +404,13 @@ pub fn frame_cache(database: &Path) -> PathBuf {
     PathBuf::from(root)
 }
 
+/// Whether `path` is already its own canonical form: no symlink, `..` or alias on the way.
+/// Windows writes the same canonical path with or without a `\\?\` prefix, so both sides are
+/// compared in the plain form wherever Windows can express it.
+pub fn is_canonical(path: &Path) -> io::Result<bool> {
+    Ok(dunce::canonicalize(path)? == dunce::simplified(path))
+}
+
 pub fn asset_path(media_root: &Path, workspace_id: i64, asset_id: i64) -> PathBuf {
     media_root
         .join(workspace_id.to_string())
@@ -449,6 +456,26 @@ pub fn image_type(bytes: &[u8]) -> Option<&'static str> {
         Some("image/webp")
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod canonical_tests {
+    use super::*;
+
+    #[test]
+    fn a_plain_path_to_a_real_file_counts_as_canonical() {
+        let temp = tempfile::tempdir().unwrap();
+        // Paths Arrumo builds are plain, never Windows' `\\?\` form.
+        let base = dunce::canonicalize(temp.path()).unwrap();
+        let file = base.join("image.png");
+        fs::write(&file, b"x").unwrap();
+        assert!(is_canonical(&file).unwrap());
+        fs::create_dir(base.join("folder")).unwrap();
+        assert!(!is_canonical(&base.join("folder").join("..").join("image.png")).unwrap());
+        assert!(is_canonical(&base.join("missing.png")).is_err());
+        // The prefixed form Windows' own canonicalize returns counts too.
+        assert!(is_canonical(&fs::canonicalize(&file).unwrap()).unwrap());
     }
 }
 

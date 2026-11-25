@@ -46,7 +46,7 @@ type Output = {
 type Format = { id: number; name: string; width: number; height: number };
 type Activity = {
   state: "queued" | "running" | "paused" | "failed" | "completed" | "cancelled";
-  kind: "submitted" | "claimed" | "transition";
+  kind: "submitted" | "claimed" | "resumed" | "transition";
   attempt: number;
   created_at: number;
   detail: string | null;

@@ -922,7 +922,10 @@
     "stopDescription": "The current work stops. The last result you approved opens again so you can change it; your earlier decision stays in the history.",
     "keepGoing": "Keep going",
     "profileFilter": "Profile",
-    "allProfiles": "All"
+    "allProfiles": "All",
+    "activityStartedStage": "Started: {stage}",
+    "activityResumed": "Picked up again after an interruption",
+    "resumed": "Picked up again"
   },
   "onboarding": {
     "tagline": "Messy footage in. Brilliant video out.",
@@ -1720,7 +1723,6 @@
     "loading": "Loading agent logs",
     "error": "Agent logs could not be read.",
     "empty": "The agent has not run yet.",
-    "attempt": "attempt {attempt}",
     "agent": "Agent",
     "duration": "Duration",
     "seconds": "{seconds} s",
@@ -1748,7 +1750,8 @@
       "preview": "Video previews",
       "supplemental_outputs": "Publishing extras",
       "motion_library": "Animation library"
-    }
+    },
+    "round": "round {round}"
   },
   "agentProgress": {
     "label": "What the agent is doing",
@@ -1758,7 +1761,7 @@
     "reading": "Reading the brief and planning",
     "searching": "Searched the web",
     "lookingAtMaterial": "Looking at the workspace material it asked for",
-    "stageAttempt": "{stage}, round {attempt}"
+    "stageRound": "{stage}, round {round}, after your feedback"
   },
   "providerOrder": {
     "title": "Which plugin does what, in order",

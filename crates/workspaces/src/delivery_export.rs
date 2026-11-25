@@ -131,7 +131,7 @@ impl WorkspaceStore {
                 let source = asset_path(&root, workspace_id, entry.asset_id);
                 let metadata = source.symlink_metadata()?;
                 if !metadata.is_file()
-                    || source.canonicalize()? != source
+                    || !crate::assets::is_canonical(&source)?
                     || metadata.len() != u64::try_from(entry.byte_size)?
                 {
                     return Err(io::Error::other("Supplemental media is unavailable").into());

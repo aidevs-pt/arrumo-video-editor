@@ -289,7 +289,7 @@ impl WorkspaceStore {
 
 fn check_asset_file(source: &Path) -> io::Result<bool> {
     match fs::symlink_metadata(source) {
-        Ok(metadata) if metadata.is_file() && source.canonicalize()? == source => Ok(true),
+        Ok(metadata) if metadata.is_file() && crate::assets::is_canonical(source)? => Ok(true),
         Ok(_) => Err(io::Error::other("Invalid managed asset file")),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
         Err(error) => Err(error),
