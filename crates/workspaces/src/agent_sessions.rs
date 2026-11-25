@@ -16,6 +16,8 @@ use crate::{
 
 /// Sessions without a run that outlive this were left behind by an interrupted request.
 const ORPHAN_SECONDS: i64 = 6 * 60 * 60;
+/// How long a failed run, which can still be retried, keeps its sessions.
+const FAILED_RUN_SECONDS: i64 = 7 * 24 * 60 * 60;
 const MAX_DEPTH: usize = 6;
 const MAX_ENTRIES: usize = 50_000;
 
@@ -86,14 +88,16 @@ impl WorkspaceStore {
     }
 
     /// Removes every kept session that nothing can need any more. Returns how many were removed.
+    /// A failed run keeps its sessions for a week, so retrying it continues the same session.
     pub fn sweep_agent_sessions(&self) -> rusqlite::Result<usize> {
         self.remove_agent_sessions(
             "SELECT session.provider, session.session FROM agent_sessions session
              LEFT JOIN generation_runs run ON run.id = session.run_id
              WHERE (session.run_id IS NOT NULL
-                    AND (run.id IS NULL OR run.state IN ('completed', 'failed', 'cancelled')))
+                    AND (run.id IS NULL OR run.state IN ('completed', 'cancelled')
+                         OR (run.state = 'failed' AND session.created_at < unixepoch() - ?2)))
                 OR (session.run_id IS NULL AND session.created_at < unixepoch() - ?1)",
-            params![ORPHAN_SECONDS],
+            params![ORPHAN_SECONDS, FAILED_RUN_SECONDS],
         )
     }
 
@@ -304,13 +308,13 @@ mod tests {
             attempt: Some(1),
         };
         assert_eq!(store.run_round(run).unwrap(), 1);
-        assert_eq!(store.round_session(run, "claude-code", 1), None);
-        store.record_agent_session(scope, "claude-code", "first-session", Some(1));
+        assert_eq!(store.round_session(run, "test-agent", 1), None);
+        store.record_agent_session(scope, "test-agent", "first-session", Some(1));
         assert_eq!(
-            store.round_session(run, "claude-code", 1).as_deref(),
+            store.round_session(run, "test-agent", 1).as_deref(),
             Some("first-session")
         );
-        assert_eq!(store.round_session(run, "codex", 1), None);
+        assert_eq!(store.round_session(run, "other-agent", 1), None);
         let review = |decision: &str, notes: &str| {
             store
                 .0
@@ -329,10 +333,38 @@ mod tests {
         review("revise", "");
         review("rejected", "");
         assert_eq!(store.run_round(run).unwrap(), 4);
-        assert_eq!(store.round_session(run, "claude-code", 4), None);
+        assert_eq!(store.round_session(run, "test-agent", 4), None);
         // A session that could not be continued is no longer offered.
-        store.forget_round_session("claude-code", "first-session");
-        assert_eq!(store.round_session(run, "claude-code", 1), None);
+        store.forget_round_session("test-agent", "first-session");
+        assert_eq!(store.round_session(run, "test-agent", 1), None);
+        // A failed run can be retried, so its session stays until a week has passed.
+        let sweep_session = |store: &WorkspaceStore| {
+            store.sweep_agent_sessions().unwrap();
+            store
+                .0
+                .query_row(
+                    "SELECT count(*) FROM agent_sessions WHERE run_id = ?1",
+                    [run],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap()
+        };
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET state = 'failed' WHERE id = ?1",
+                [run],
+            )
+            .unwrap();
+        assert_eq!(sweep_session(&store), 1);
+        store
+            .0
+            .execute(
+                "UPDATE agent_sessions SET created_at = unixepoch() - ?1 - 1",
+                [FAILED_RUN_SECONDS],
+            )
+            .unwrap();
+        assert_eq!(sweep_session(&store), 0);
     }
 
     #[test]
