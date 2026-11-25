@@ -3,6 +3,7 @@
 //! animation serves low-resolution previews, final renders and library previews without running
 //! agent-written code.
 
+use crate::{IoStep, Launch};
 use std::{
     error::Error,
     fmt::Write as _,
@@ -850,7 +851,8 @@ pub(crate) fn ensure_fonts(directory: &Path, fonts: &FontSet) -> io::Result<()> 
                     io::Error::other("No system font was found for animation text")
                 })?,
             };
-            fs::copy(source, directory.join(font_name(role, weight)))?;
+            fs::copy(source, directory.join(font_name(role, weight)))
+                .io_step("Copying a font for animation text")?;
         }
     }
     Ok(())
@@ -863,7 +865,7 @@ fn font_name(role: FontRole, weight: FontWeight) -> String {
 fn system_font(weight: &str) -> Option<PathBuf> {
     if let Ok(output) = crate::quiet_command("fc-match")
         .args(["-f", "%{file}", &format!("sans-serif:weight={weight}")])
-        .output()
+        .launch_output()
         && output.status.success()
     {
         let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
@@ -980,7 +982,7 @@ impl LayerTarget<'_> {
                     let mut line_input = current.clone();
                     for (number, line) in lines.iter().enumerate() {
                         let file = format!("{prefix}text-{index}-{number}.txt");
-                        fs::write(directory.join(&file), line)?;
+                        fs::write(directory.join(&file), line).io_step("Writing animation text")?;
                         if masked {
                             let output = if number + 1 == lines.len() {
                                 label.clone()
@@ -1121,7 +1123,8 @@ impl LayerTarget<'_> {
                         .asset_id
                         .and_then(images)
                         .ok_or_else(|| io::Error::other("An animation clip is missing"))?;
-                    let (clip_w, clip_h) = clip_size(&path)?;
+                    let (clip_w, clip_h) =
+                        clip_size(&path).io_step("Measuring an animation clip")?;
                     let fit = (layer.width * frame_w / clip_w).min(layer.height * frame_h / clip_h);
                     let even = |value: f64| ((value / 2.0).round() as u32).max(1) * 2;
                     let (view_w, view_h) = (even(clip_w * fit), even(clip_h * fit));
@@ -1390,7 +1393,7 @@ fn clip_size(path: &Path) -> io::Result<(f64, f64)> {
         .args(["stream=width,height", "-of", "csv=p=0:s=x"])
         .arg(path)
         .stdin(Stdio::null())
-        .output()?;
+        .launch_output()?;
     let text = String::from_utf8_lossy(&output.stdout);
     let (width, height) = text
         .trim()
@@ -1457,7 +1460,7 @@ fn spotlight_png(
         .args(["-frames:v", "1"])
         .arg(directory.join(file))
         .stdin(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if status.success() {
         Ok(())
     } else {
@@ -1538,7 +1541,7 @@ fn shape_png(directory: &Path, file: &str, fill: &Fill, shape: &Shape) -> io::Re
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if status.success() && directory.join(file).is_file() {
         Ok(())
     } else {
@@ -1770,7 +1773,7 @@ fn run_ffmpeg_once(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(fs::File::create(&log)?)
-        .spawn()
+        .launch()
         .map_err(|error| {
             io::Error::new(error.kind(), format!("FFmpeg could not start: {error}"))
         })?;
@@ -2184,7 +2187,7 @@ mod tests {
     fn clip_layers_render_rounded_and_zoomed() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
         {
             return;
@@ -2205,7 +2208,7 @@ mod tests {
             .arg("drawbox=x=160:y=0:w=160:h=100:color=red:t=fill")
             .args(["-pix_fmt", "yuv420p", "-y"])
             .arg(&clip)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(made.success());
         let mut value = answer();
@@ -2228,7 +2231,7 @@ mod tests {
                 .args(["-v", "error", "-ss", at, "-i"])
                 .arg(directory.path().join("out.mp4"))
                 .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
-                .output()
+                .launch_output()
                 .unwrap()
                 .stdout
         };
@@ -2263,7 +2266,7 @@ mod tests {
     fn spotlights_dim_all_but_their_area() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
         {
             return;
@@ -2281,7 +2284,7 @@ mod tests {
             ])
             .args(["-pix_fmt", "yuv420p", "-y"])
             .arg(&clip)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(made.success());
         let mut layer = clip_layer();
@@ -2326,7 +2329,7 @@ mod tests {
             .args(["-v", "error", "-ss", "2.0", "-i"])
             .arg(directory.path().join("out.mp4"))
             .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
-            .output()
+            .launch_output()
             .unwrap()
             .stdout;
         let green = |x: usize, y: usize| frame[(y * 640 + x) * 3 + 1];
@@ -2339,7 +2342,7 @@ mod tests {
     fn a_clip_started_past_its_end_holds_its_last_frame() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
         {
             return;
@@ -2357,7 +2360,7 @@ mod tests {
             ])
             .args(["-pix_fmt", "yuv420p", "-y"])
             .arg(&clip)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(made.success());
         let mut layer = clip_layer();
@@ -2384,7 +2387,7 @@ mod tests {
             .args(["-v", "error", "-ss", "1.0", "-i"])
             .arg(directory.path().join("out.mp4"))
             .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
-            .output()
+            .launch_output()
             .unwrap()
             .stdout;
         let at = (180 * 640 + 320) * 3;
@@ -2399,7 +2402,7 @@ mod tests {
     fn rounded_gradient_boxes_and_backgrounds_render() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
             || system_font("bold").is_none()
         {
@@ -2441,7 +2444,7 @@ mod tests {
             .args(["-v", "error", "-ss", "1", "-i"])
             .arg(directory.path().join("out.mp4"))
             .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
-            .output()
+            .launch_output()
             .unwrap()
             .stdout;
         let pixel = |x: usize, y: usize| {
@@ -2472,7 +2475,7 @@ mod tests {
     fn shaped_overlays_take_their_own_inputs_over_footage() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
             || system_font("bold").is_none()
         {
@@ -2535,7 +2538,7 @@ mod tests {
             ])
             .args(["-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
             .current_dir(directory.path())
-            .output()
+            .launch_output()
             .unwrap();
         assert!(
             frame.status.success(),
@@ -2551,7 +2554,7 @@ mod tests {
     fn renders_a_spec_with_ffmpeg() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
             || system_font("bold").is_none()
         {
@@ -2571,7 +2574,7 @@ mod tests {
                 "1",
             ])
             .arg(&image)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(made.success());
         let spec = MotionSpec::from_answer(&answer(), |_| true).unwrap();
@@ -2621,7 +2624,7 @@ mod tests {
                 .args(["-v", "info", "-i"])
                 .arg(directory.path().join(&name))
                 .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
-                .output()
+                .launch_output()
                 .unwrap();
             let report = String::from_utf8_lossy(&report.stderr);
             let peak: f64 = report
@@ -2637,7 +2640,7 @@ mod tests {
         let made = crate::quiet_command(crate::media_tools::ffmpeg())
             .args(["-v", "error", "-f", "lavfi", "-i", "sine=f=300:d=6"])
             .arg(&effect)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(made.success());
         let mut value = answer();
@@ -2668,7 +2671,7 @@ mod tests {
                 .args(["-v", "info", "-ss", &from.to_string(), "-t", "0.5", "-i"])
                 .arg(directory.path().join("effect.mp4"))
                 .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
-                .output()
+                .launch_output()
                 .unwrap();
             String::from_utf8_lossy(&report.stderr)
                 .lines()
@@ -2684,7 +2687,7 @@ mod tests {
     fn reveal_and_wipe_uncover_text_over_time() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
             || system_font("bold").is_none()
         {
@@ -2729,7 +2732,7 @@ mod tests {
                         "rawvideo",
                         "-",
                     ])
-                    .output()
+                    .launch_output()
                     .unwrap()
                     .stdout;
                 frame.iter().map(|&value| u64::from(value)).sum::<u64>()

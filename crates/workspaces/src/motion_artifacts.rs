@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::{
     error::Error,
     fs, io,
@@ -323,7 +324,7 @@ fn run_probe(command: &mut Command, timeout: Duration) -> io::Result<Output> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
+        .launch()?;
     let start = Instant::now();
     let failure = loop {
         match child.try_wait() {

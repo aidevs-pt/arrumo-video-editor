@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::collections::BTreeMap;
 
 use rusqlite::params;
@@ -103,7 +104,7 @@ impl WorkspaceStore {
                 .arg(&source)
                 .args(["-frames:v", "1", "-vf", "scale=480:-2", "-y"])
                 .arg(&pending)
-                .status()?;
+                .launch_status()?;
             if !made.success() {
                 return Err(std::io::Error::other("Could not take a frame of the video").into());
             }

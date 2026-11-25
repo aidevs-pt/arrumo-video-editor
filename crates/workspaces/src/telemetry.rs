@@ -95,7 +95,7 @@ pub fn error_chain(error: &(dyn std::error::Error + 'static)) -> String {
 }
 
 /// Redacts every line of a longer text, such as an error chain or tool output.
-fn redact_lines(text: &str) -> String {
+pub(crate) fn redact_lines(text: &str) -> String {
     text.lines()
         .filter(|line| !line.trim().is_empty())
         .take(12)

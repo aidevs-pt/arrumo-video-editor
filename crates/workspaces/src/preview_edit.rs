@@ -2,6 +2,7 @@
 //! to keep, following the approved script and the transcripts, and Arrumo renders the preview.
 //! A video without footage is storyboarded instead as animated scenes that Arrumo renders.
 
+use crate::Step;
 use std::{error::Error, io, path::Path};
 
 use rusqlite::OptionalExtension;
@@ -725,18 +726,26 @@ impl WorkspaceStore {
                 })
             })
             .collect();
-        let ordered = self.order_revision_media(
-            database,
-            (workspace_id, run_id, attempt),
-            snapshot,
-            provider,
-            &earlier,
-        )?;
-        let images = self.workspace_images(workspace_id)?;
+        let ordered = self
+            .order_revision_media(
+                database,
+                (workspace_id, run_id, attempt),
+                snapshot,
+                provider,
+                &earlier,
+            )
+            .step("Making the media the review notes asked for")?;
+        let images = self
+            .workspace_images(workspace_id)
+            .step("Listing the workspace images")?;
         let image_ids: Vec<i64> = images.iter().map(|image| image.id).collect();
-        let clips = self.workspace_clips(database, workspace_id)?;
+        let clips = self
+            .workspace_clips(database, workspace_id)
+            .step("Listing the workspace clips")?;
         let clip_ids: Vec<i64> = clips.iter().map(|clip| clip.id).collect();
-        let sounds = self.workspace_sounds(database, workspace_id)?;
+        let sounds = self
+            .workspace_sounds(database, workspace_id)
+            .step("Listing the workspace sound effects")?;
         let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
         let script = self.approved_stage_result(run_id, "script")?;
         let script = script
@@ -744,7 +753,9 @@ impl WorkspaceStore {
             .and_then(|result| result.get("markdown"))
             .and_then(Value::as_str);
         let approved = self.approved_stage_result(run_id, "assets")?;
-        let tracks = self.music_choices(database, workspace_id, approved.as_ref())?;
+        let tracks = self
+            .music_choices(database, workspace_id, approved.as_ref())
+            .step("Listing the music tracks")?;
         let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
         let mut animations = self.planned_animations(workspace_id, approved.as_ref())?;
         animations.extend(ordered.animations.iter().cloned());
@@ -908,7 +919,9 @@ impl WorkspaceStore {
             },
         )?;
         if let Some(scenes) = answer["scenes"].as_array_mut() {
-            let fonts = self.run_font_set(&crate::asset_root(database), workspace_id, run_id)?;
+            let fonts = self
+                .run_font_set(&crate::asset_root(database), workspace_id, run_id)
+                .step("Loading the brand fonts")?;
             self.review_motion_answers(
                 database,
                 workspace_id,
@@ -935,17 +948,22 @@ impl WorkspaceStore {
                     self.renew_generation_lease(workspace_id, run_id, attempt)?;
                     Ok(())
                 },
-            )?;
+            )
+            .step("Rendering and reviewing the scenes")?;
         }
         let mut edit = storyboard(&answer, &image_ids, &clip_ids, &sound_ids, &provider.id)
-            .map_err(io::Error::other)?;
+            .map_err(io::Error::other)
+            .step("Reading the storyboard")?;
         place_music(&mut edit, &answer, &track_ids);
         if let Some(problem) = &ordered.problem {
             add_to_summary(&mut edit, problem);
         }
-        self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)?;
+        self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)
+            .step("Recording the narration")?;
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
-        self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)
+        Ok(self
+            .render_preview_videos(database, workspace_id, run_id, attempt, &edit)
+            .step("Rendering the preview videos")?)
     }
 
     /// Lets the run's agent cut its queued Preview stage, or storyboard it when the video has no

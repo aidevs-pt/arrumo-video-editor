@@ -1,6 +1,7 @@
 //! Voice changing and voice isolation by a trusted provider plugin's `audio-transform.json`
 //! descriptor: a workspace audio or video asset goes in, a new audio asset comes out.
 
+use crate::Launch;
 use std::{
     collections::BTreeMap,
     io::{self, Read},
@@ -216,7 +217,7 @@ pub(crate) fn soundtrack_mp3(source: &Path, output: &Path) -> io::Result<()> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if !status.success() {
         return Err(io::Error::other(
             "The asset has no sound Arrumo can read, so there is nothing to process",

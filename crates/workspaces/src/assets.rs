@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::{
     collections::HashSet,
     error::Error,
@@ -149,7 +150,7 @@ impl WorkspaceStore {
                 .arg(&source)
                 .args(["-vf", "thumbnail=24,scale=480:-2", "-frames:v", "1", "-y"])
                 .arg(&pending)
-                .status()?;
+                .launch_status()?;
             if !made.success() {
                 return Err(io::Error::other("Could not take a frame of the video").into());
             }
@@ -662,7 +663,7 @@ mod frame_tests {
     fn video_assets_get_a_cached_still_and_images_do_not() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
         {
             return;
@@ -678,7 +679,7 @@ mod frame_tests {
             .args(["-nostdin", "-v", "error", "-f", "lavfi", "-i"])
             .args(["color=c=red:s=160x90:r=10:d=1", "-pix_fmt", "yuv420p"])
             .arg(&clip)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(made.success());
         let video = store.import_asset(&root, workspace, &clip).unwrap();

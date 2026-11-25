@@ -3,6 +3,7 @@
 //! executable. `ARRUMO_FFMPEG` and `ARRUMO_FFPROBE` override them; development builds fall back to
 //! the tools on the PATH.
 
+use crate::Launch;
 use serde::Serialize;
 use std::{
     env,
@@ -60,7 +61,7 @@ pub fn media_tools_status() -> MediaToolsStatus {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .status()
+            .launch_status()
             .is_ok_and(|status| status.success())
     };
     MediaToolsStatus {

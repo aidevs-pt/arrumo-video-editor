@@ -1,6 +1,7 @@
 //! Transcripts of source footage. Audio is extracted in bounded chunks, sent to the run's
 //! transcription providers in their captured order, and cached per managed asset.
 
+use crate::Launch;
 use std::{error::Error, fs, io, path::Path, process::Stdio};
 
 use rusqlite::{OptionalExtension, params};
@@ -311,7 +312,7 @@ pub(crate) fn media_duration(path: &Path) -> io::Result<f64> {
         .arg(path)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .output()?;
+        .launch_output()?;
     let duration: f64 = String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse()
@@ -352,7 +353,7 @@ fn extract_chunk(source: &Path, offset: f64, wave: &Path) -> io::Result<()> {
         .arg(wave)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if !status.success() || wave.metadata()?.len() >= crate::transcription::MAX_AUDIO_BYTES {
         return Err(io::Error::other("Could not extract the clip's audio"));
     }

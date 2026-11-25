@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::{
     error::Error,
     fs::File,
@@ -283,7 +284,7 @@ fn run_motion_worker(
         runner.arg("--toolchain").arg(path);
     }
     let reply = scratch.join("worker-reply.json");
-    let mut child = runner.stdout(File::create(&reply)?).spawn()?;
+    let mut child = runner.stdout(File::create(&reply)?).launch()?;
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,

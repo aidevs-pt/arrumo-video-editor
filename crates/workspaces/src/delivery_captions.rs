@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::{fmt::Write, io};
 
 use crate::transcription::TranscriptWord;
@@ -48,7 +49,7 @@ pub(crate) fn burn_captions(
         .current_dir(directory)
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
-        .status()?;
+        .launch_status()?;
     if !status.success() {
         return Err(io::Error::other("Could not draw the subtitles into the video").into());
     }

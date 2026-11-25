@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::{
     error::Error,
     fs,
@@ -237,7 +238,7 @@ fn probe(
         ])
         .args(selection)
         .arg(path.canonicalize()?)
-        .output()?;
+        .launch_output()?;
     if !output.status.success() || !output.stderr.is_empty() {
         return Err(io::Error::other(format!("Could not verify {filename}")));
     }
@@ -598,7 +599,7 @@ impl WorkspaceStore {
             .arg(&wave)
             .stdin(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
-            .status()?;
+            .launch_status()?;
         if !status.success() || wave.metadata()?.len() >= wave_limit {
             return Err(io::Error::other("Could not extract bounded delivery audio").into());
         }
@@ -768,7 +769,7 @@ mod transcription_tests {
                 "aac",
             ])
             .arg(video)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(status.success());
 

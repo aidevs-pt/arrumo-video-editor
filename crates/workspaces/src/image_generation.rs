@@ -1,6 +1,7 @@
 //! Generates images through the image providers' SDK adapters, in the run's captured order, and
 //! stores each image as a workspace asset. Provider specifics live in the plugins' descriptors.
 
+use crate::Launch;
 use std::{collections::BTreeMap, error::Error, io, io::Read, path::Path, time::Duration};
 
 use base64::Engine;
@@ -979,7 +980,7 @@ fn crop_to_ratio(
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
-        .status()
+        .launch_status()
         .ok()?;
     let cropped = folder.join(format!("{stem}.png"));
     (status.success() && std::fs::rename(&output, &cropped).is_ok()).then_some(cropped)
@@ -1324,7 +1325,7 @@ mod tests {
                 "1",
             ])
             .arg(&source)
-            .status();
+            .launch_status();
         if !made.is_ok_and(|status| status.success()) {
             return;
         }
@@ -1339,7 +1340,7 @@ mod tests {
                 "csv=p=0",
             ])
             .arg(&cropped)
-            .output()
+            .launch_output()
             .unwrap();
         assert_eq!(String::from_utf8_lossy(&probe.stdout).trim(), "1536,864");
         assert!(crop_to_ratio(&source, "wide", folder.path(), "x").is_none());

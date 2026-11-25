@@ -1,6 +1,7 @@
 //! Runs an agent provider's declared structured run: one non-interactive CLI call that answers a
 //! prompt with JSON following a schema. Provider flags come from the plugin manifest.
 
+use crate::Launch;
 use std::{
     collections::BTreeMap,
     error::Error,
@@ -307,7 +308,7 @@ pub(crate) fn run_agent_process(
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     let mut process = command
-        .spawn()
+        .launch()
         .map_err(|_| failed("Could not start the agent"))?;
     let mut stdin = process
         .stdin
