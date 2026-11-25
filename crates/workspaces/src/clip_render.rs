@@ -1,3 +1,4 @@
+use crate::{IoStep, Launch, Step};
 use std::{
     error::Error,
     fs, io,
@@ -604,7 +605,8 @@ impl WorkspaceStore {
         };
         let scenes = self.storyboard_scenes(workspace_id, &edit)?;
         let narration = match &scenes {
-            Some(scenes) => narration_tracks(database, workspace_id, run_id, &edit, scenes.len())?,
+            Some(scenes) => narration_tracks(database, workspace_id, run_id, &edit, scenes.len())
+                .step("Finding the narration audio")?,
             None => Vec::new(),
         };
         if (inputs.draft.source_ids.is_empty() && scenes.is_none()) || inputs.formats.is_empty() {
@@ -621,10 +623,18 @@ impl WorkspaceStore {
         if scenes.is_none() {
             validate_preview_edit(&edit, &inputs.draft.source_ids, &format_ids)?;
         }
-        let motion = self.edit_motion(workspace_id, &edit)?;
-        let cues = self.edit_cues(database, workspace_id, run_id, &edit)?;
-        let music = self.edit_music(&asset_root(database), workspace_id, &edit)?;
-        let music_changes = self.edit_music_changes(&asset_root(database), workspace_id, &edit)?;
+        let motion = self
+            .edit_motion(workspace_id, &edit)
+            .step("Reading the animations")?;
+        let cues = self
+            .edit_cues(database, workspace_id, run_id, &edit)
+            .step("Finding the sound effects")?;
+        let music = self
+            .edit_music(&asset_root(database), workspace_id, &edit)
+            .step("Finding the music")?;
+        let music_changes = self
+            .edit_music_changes(&asset_root(database), workspace_id, &edit)
+            .step("Finding the music changes")?;
 
         let revision = if stage == ProductionStage::Preview {
             crate::preview_review::preview_revision(&self.0, run_id, index)?
@@ -657,10 +667,12 @@ impl WorkspaceStore {
                 |_| Ok(()),
             )?;
             let delivery = delivery_directory(database, workspace_id, run_id);
-            fs::create_dir_all(&delivery)?;
-            let delivery = delivery.canonicalize()?;
+            fs::create_dir_all(&delivery).step("Creating the delivery folder")?;
+            let delivery = delivery
+                .canonicalize()
+                .step("Resolving the delivery folder")?;
             let scratch = delivery.join(format!("render-attempt-{attempt}"));
-            fs::create_dir(&scratch)?;
+            fs::create_dir(&scratch).step("Creating the render folder")?;
             tx.commit()?;
             (delivery, scratch)
         };
@@ -681,18 +693,20 @@ impl WorkspaceStore {
                     format.scale_preview(preview_max_edge);
                 }
                 if let Some(scenes) = &scenes {
-                    let check = renderer.render_scenes(
-                        &root,
-                        &scratch,
-                        scenes,
-                        &narration,
-                        &format,
-                        SceneMusic {
-                            first: music.as_deref(),
-                            changes: &music_changes,
-                            featured: edit["music_level"] == "featured",
-                        },
-                    )?;
+                    let check = renderer
+                        .render_scenes(
+                            &root,
+                            &scratch,
+                            scenes,
+                            &narration,
+                            &format,
+                            SceneMusic {
+                                first: music.as_deref(),
+                                changes: &music_changes,
+                                featured: edit["music_level"] == "featured",
+                            },
+                        )
+                        .step("Rendering the storyboard scenes")?;
                     checks.insert(format.id.to_string(), check.to_json());
                     if stage == ProductionStage::FinalRender {
                         // Storyboards have no speech to transcribe; caption their on-screen text.
@@ -716,25 +730,27 @@ impl WorkspaceStore {
                     continue;
                 }
                 let cuts = cuts_for_format(&edit, format.id, &inputs.draft.source_ids)?;
-                let clips_index = if let Some(index) =
-                    clip_sets.iter().position(|(cached, _)| cached == &cuts)
-                {
-                    index
-                } else {
-                    let clips =
-                        renderer.inspect_clips(&root, &inputs.draft.source_ids, cuts.as_deref())?;
-                    clip_sets.push((cuts, clips));
-                    clip_sets.len() - 1
-                };
-                let check = renderer.render_format(
-                    &root,
-                    &scratch,
-                    &clip_sets[clips_index].1,
-                    &format,
-                    &motion,
-                    music.as_deref(),
-                    &cues,
-                )?;
+                let clips_index =
+                    if let Some(index) = clip_sets.iter().position(|(cached, _)| cached == &cuts) {
+                        index
+                    } else {
+                        let clips = renderer
+                            .inspect_clips(&root, &inputs.draft.source_ids, cuts.as_deref())
+                            .step("Inspecting the source clips")?;
+                        clip_sets.push((cuts, clips));
+                        clip_sets.len() - 1
+                    };
+                let check = renderer
+                    .render_format(
+                        &root,
+                        &scratch,
+                        &clip_sets[clips_index].1,
+                        &format,
+                        &motion,
+                        music.as_deref(),
+                        &cues,
+                    )
+                    .step("Rendering the cut")?;
                 checks.insert(format.id.to_string(), check.to_json());
                 let filename = if stage == ProductionStage::Preview {
                     format!("preview-{attempt}-{}.mp4", format.id)
@@ -1006,7 +1022,9 @@ impl WorkspaceStore {
                 |_| Ok(()),
             )
             .map_err(|_| invalid())?;
-        Ok(asset_path(root, workspace_id, id).canonicalize()?)
+        Ok(asset_path(root, workspace_id, id)
+            .canonicalize()
+            .io_step("Finding an audio track's file")?)
     }
 
     /// The tracks a storyboard edit changes its music to, each with the scene it starts on.
@@ -1119,7 +1137,7 @@ impl ActiveRender<'_> {
         music: SceneMusic<'_>,
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
-        fs::create_dir(&directory)?;
+        fs::create_dir(&directory).io_step("Creating a folder")?;
         let images = |id: i64| asset_path(root, self.workspace_id, id).canonicalize().ok();
         let fonts = self
             .store
@@ -1152,7 +1170,7 @@ impl ActiveRender<'_> {
             parts.push(probe_duration(&directory.join(&name))?);
             manifest.push_str(&format!("file {name}\n"));
         }
-        fs::write(directory.join("scenes.ffconcat"), manifest)?;
+        fs::write(directory.join("scenes.ffconcat"), manifest).io_step("Writing a file")?;
         let output = scratch.join(format!("{}-joined.mp4", format.id));
         let transitions: Vec<_> = scenes.iter().map(|scene| scene.transition).collect();
         let args: Vec<String> = if transitions[..transitions.len().saturating_sub(1)]
@@ -1262,13 +1280,13 @@ impl ActiveRender<'_> {
             false if narration.iter().any(|(audio, _)| audio.is_some()) => {
                 self.master_audio(&output, &staged)?;
                 self.lay_music_tracks(&staged, &tracks, music.featured, &finished)?;
-                fs::remove_file(staged)?;
+                fs::remove_file(staged).io_step("Removing a file")?;
             }
             // Without one, the music is the whole soundtrack, so it is mastered to full level.
             false => {
                 self.lay_music_tracks(&output, &tracks, music.featured, &staged)?;
                 self.master_audio(&staged, &finished)?;
-                fs::remove_file(staged)?;
+                fs::remove_file(staged).io_step("Removing a file")?;
             }
             true => self.master_audio(&output, &finished)?,
         }
@@ -1289,10 +1307,14 @@ impl ActiveRender<'_> {
             .into_iter()
             .map(|(id, cut)| {
                 let path = asset_path(root, self.workspace_id, id);
-                if !path.symlink_metadata()?.is_file() {
+                if !path
+                    .symlink_metadata()
+                    .io_step("Checking a file")?
+                    .is_file()
+                {
                     return Err(io::Error::other("A managed source video is missing").into());
                 }
-                let path = path.canonicalize()?;
+                let path = path.canonicalize().io_step("Resolving a path")?;
                 let has_audio = self.inspect_source(&path, cut)?;
                 Ok(RenderClip {
                     asset_id: id,
@@ -1324,7 +1346,7 @@ impl ActiveRender<'_> {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
-            .spawn()?;
+            .launch()?;
         // FFmpeg runs with `-v error`, so its error output stays small.
         let errors = process.stderr.take().map(|mut stderr| {
             thread::spawn(move || {
@@ -1381,7 +1403,7 @@ impl ActiveRender<'_> {
             "measuring loudness",
         )?;
         let Some(filter) = loudness_pass(&measured) else {
-            fs::rename(input, output)?;
+            fs::rename(input, output).io_step("Moving a file")?;
             return Ok(());
         };
         self.run(
@@ -1402,7 +1424,7 @@ impl ActiveRender<'_> {
                 .arg(output),
             "evening out the loudness",
         )?;
-        fs::remove_file(input)?;
+        fs::remove_file(input).io_step("Removing a file")?;
         Ok(())
     }
 
@@ -1424,7 +1446,7 @@ impl ActiveRender<'_> {
                 "json",
             ])
             .arg(path)
-            .output()?;
+            .launch_output()?;
         if !output.status.success() {
             return Err(io::Error::other("Could not inspect a source video").into());
         }
@@ -1603,7 +1625,7 @@ impl ActiveRender<'_> {
         }
         insert(clips.len(), &mut manifest, &mut parts)?;
         let list = scratch.join(format!("{id}.ffconcat"));
-        fs::write(&list, manifest)?;
+        fs::write(&list, manifest).io_step("Writing a file")?;
         let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
         command
             .args([
@@ -1644,7 +1666,7 @@ impl ActiveRender<'_> {
                 let mastered = scratch.join(format!("{id}-mastered.mp4"));
                 self.master_audio(&joined, &mastered)?;
                 self.lay_music(&mastered, music, &output)?;
-                fs::remove_file(mastered)?;
+                fs::remove_file(mastered).io_step("Removing a file")?;
             }
             None => self.master_audio(&joined, &output)?,
         }
@@ -1801,7 +1823,7 @@ fn probe_duration(path: &Path) -> Result<f64, Box<dyn Error>> {
         .args(["-v", "error", "-protocol_whitelist", "file"])
         .args(["-show_entries", "format=duration", "-of", "csv=p=0"])
         .arg(path)
-        .output()
+        .launch_output()
         .map_err(|error| {
             io::Error::new(error.kind(), format!("ffprobe could not start: {error}"))
         })?;

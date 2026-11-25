@@ -266,6 +266,10 @@ jobs:
           ARRUMO_UPDATER_PUBKEY: ${{ vars.ARRUMO_UPDATER_PUBKEY }}
           ARRUMO_CRASH_DSN: ${{ secrets.ARRUMO_CRASH_DSN }}
           ARRUMO_USAGE_KEY: ${{ secrets.ARRUMO_USAGE_KEY }}
+          # The frontend build uploads its source maps with these (scripts/sentry-source-maps.mjs).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -280,6 +284,29 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --config media-tools.json --config updater-key.json --config '{"bundle":{"active":true,"createUpdaterArtifacts":true}}'
+      # Without the app's debug files, crash reports show addresses instead of code locations.
+      - name: Upload debug files to the crash reporter
+        shell: bash
+        working-directory: video-editor
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "Crash reporter upload is not configured; skipping."
+            exit 0
+          fi
+          find target -maxdepth 4 -path '*/release/*' -not -path '*/bundle/*' -not -path '*/deps/*' \
+            \( -name 'arrumo-desktop' -o -name 'arrumo-desktop.exe' -o -name 'arrumo_desktop.pdb' -o -name 'arrumo-desktop.dSYM' \) \
+            > debug-files.txt
+          cat debug-files.txt
+          # A crash reporter problem must not hold back a signed release.
+          if [ ! -s debug-files.txt ]; then
+            echo "::warning::No debug files were found to upload"
+          elif ! tr '\n' '\0' < debug-files.txt | xargs -0 pnpm dlx @sentry/cli@2.39.1 debug-files upload --wait; then
+            echo "::warning::The debug files could not be uploaded to the crash reporter"
+          fi
       # A signed build has to open without a Gatekeeper warning, so a bad certificate or a failed
       # notarization stops the release here instead of reaching users.
       - name: Check the macOS signature
@@ -319,3 +346,30 @@ jobs:
           else
             gh release edit "v${{ needs.prepare.outputs.version }}" --repo "${{ github.repository }}" --draft=false --latest
           fi
+      # Tells the crash reporter the release is out: it then marks issues as new or regressed in
+      # this version and links the commits that went into it. Events from the app already carry
+      # the same name (sentry::release_name!), so this only adds the release's dates and commits.
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.prepare.outputs.version }}
+          fetch-depth: 0
+          path: video-editor
+      - name: Finalize the release in the crash reporter
+        working-directory: video-editor
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "Crash reporter upload is not configured; skipping."
+            exit 0
+          fi
+          release="arrumo-desktop@$VERSION"
+          sentry() { npx --yes @sentry/cli@2.39.1 "$@"; }
+          # The release is already public, so a crash reporter problem only warns.
+          sentry releases new "$release" || echo "::warning::Could not create $release in the crash reporter"
+          sentry releases set-commits "$release" --auto --ignore-missing \
+            || echo "::warning::Could not link commits to $release (is the GitHub integration set up in Sentry?)"
+          sentry releases finalize "$release" || echo "::warning::Could not finalize $release in the crash reporter"

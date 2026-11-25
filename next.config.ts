@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 // ARRUMO_HIDE_DEV_INDICATOR=1 hides it for screenshots and recordings.
 const config: NextConfig = {
   output: "export",
+  // Maps are uploaded to the crash reporter and removed before bundling (scripts/sentry-source-maps.mjs).
+  productionBrowserSourceMaps: true,
   devIndicators: process.env.ARRUMO_HIDE_DEV_INDICATOR ? false : { position: "bottom-right" },
 };
 

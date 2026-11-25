@@ -1,6 +1,8 @@
 //! A picture of a stretch of video for agents and reviewers: evenly spaced frames above the
 //! sound's waveform, to check a cut, a join or an overlay without watching the whole video.
 
+use crate::IoStep;
+use crate::Launch;
 use std::{
     error::Error,
     io,
@@ -49,7 +51,7 @@ fn probe(video: &Path) -> Result<(f64, bool, bool), Box<dyn Error>> {
         ])
         .arg(video)
         .stdin(Stdio::null())
-        .output()?;
+        .launch_output()?;
     let value: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     let duration = value["format"]["duration"]
         .as_str()
@@ -118,7 +120,7 @@ fn draw_strip(
         .arg(output)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if !status.success() {
         return Err(io::Error::other("Could not draw the frame strip").into());
     }
@@ -159,7 +161,7 @@ pub(crate) fn clip_overview(
             .arg(work.path().join(format!("{index}.png")))
             .stdin(Stdio::null())
             .stderr(Stdio::null())
-            .status()?;
+            .launch_status()?;
         if !status.success() {
             return Err(io::Error::other("Could not read a frame of the clip").into());
         }
@@ -201,7 +203,7 @@ pub(crate) fn clip_overview(
         .arg(output)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if !status.success() {
         return Err(io::Error::other("Could not draw the clip overview").into());
     }
@@ -247,7 +249,7 @@ pub fn render_frame_strip(
     let work = tempfile::tempdir()?;
     let output: PathBuf = work.path().join("strip.png");
     let frame_times = draw_strip(video, start, end, frames, has_audio, &output)?;
-    let png = std::fs::read(&output)?;
+    let png = std::fs::read(&output).io_step("Reading a file")?;
     std::io::Write::write_all(
         &mut std::fs::OpenOptions::new()
             .write(true)
@@ -341,7 +343,7 @@ mod tests {
                 "-y",
             ])
             .arg(&video)
-            .status()
+            .launch_status()
             .is_ok_and(|status| status.success());
         if !made {
             eprintln!("FFmpeg is unavailable; skipping the overview check");
@@ -358,7 +360,7 @@ mod tests {
     fn draws_frames_above_the_waveform() {
         if crate::quiet_command(crate::media_tools::ffmpeg())
             .arg("-version")
-            .output()
+            .launch_output()
             .is_err()
         {
             return;
@@ -381,7 +383,7 @@ mod tests {
                 "-y",
             ])
             .arg(&video)
-            .status()
+            .launch_status()
             .unwrap();
         assert!(status.success());
         let destination = work.path().join("view.png");

@@ -1,3 +1,4 @@
+use crate::IoStep;
 use std::{error::Error, fs, io, path::Path};
 
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
@@ -157,7 +158,7 @@ impl WorkspaceStore {
         asset_id: i64,
         confirmed_name: &str,
     ) -> Result<AssetRemoval, Box<dyn Error>> {
-        let root = asset_root(&database.canonicalize()?);
+        let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
         let source = asset_path(&root, workspace_id, asset_id);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let pending: bool = tx.query_row(
@@ -225,7 +226,7 @@ impl WorkspaceStore {
     }
 
     pub fn recover_asset_cleanup(&self, database: &Path) -> Result<usize, Box<dyn Error>> {
-        let root = asset_root(&database.canonicalize()?);
+        let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
         let pending: Vec<(i64, i64)> = self
             .0
             .prepare("SELECT workspace_id, asset_id FROM pending_asset_cleanup")?

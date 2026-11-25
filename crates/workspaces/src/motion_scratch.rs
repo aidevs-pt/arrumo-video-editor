@@ -1,3 +1,4 @@
+use crate::IoStep;
 use std::{
     fs::{self, File, TryLockError},
     io,
@@ -28,7 +29,7 @@ impl MotionScratch {
             }
         }
         #[cfg(not(target_os = "linux"))]
-        fs::create_dir_all(&root)?;
+        fs::create_dir_all(&root).io_step("Creating a folder")?;
         let root_lock = open_directory(&root)?;
         root_lock.lock()?;
         let directory = tempfile::Builder::new()
@@ -89,7 +90,7 @@ pub fn recover_motion_scratch(database: &Path) -> io::Result<()> {
         Err(error) => return Err(error),
     };
     root_lock.lock()?;
-    for entry in fs::read_dir(&root)? {
+    for entry in fs::read_dir(&root).io_step("Listing a folder")? {
         let entry = entry?;
         let name = entry.file_name();
         let owned_name = name

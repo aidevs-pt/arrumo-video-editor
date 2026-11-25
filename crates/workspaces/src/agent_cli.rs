@@ -1,3 +1,4 @@
+use crate::Launch;
 use std::{
     collections::BTreeMap,
     env,
@@ -111,7 +112,7 @@ pub fn check_agent_login(provider: &str) -> AgentLoginStatus {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let Ok(mut process) = command.spawn() else {
+    let Ok(mut process) = command.launch() else {
         return AgentLoginStatus::Failed;
     };
 
@@ -239,7 +240,7 @@ pub(crate) fn read_agent_usage(plugin: &AgentPlugin) -> Option<std::io::Result<A
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
-        let mut process = command.spawn().map_err(|_| failed("it did not start"))?;
+        let mut process = command.launch().map_err(|_| failed("it did not start"))?;
         let stdout = process.stdout.take().ok_or_else(|| failed("no output"))?;
         let (sender, receiver) = std::sync::mpsc::channel();
         let wanted = run.response_id.clone();

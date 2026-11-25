@@ -2019,5 +2019,10 @@
     "cancel": "Cancelar",
     "choose": "Usar selección",
     "limit": "hasta {count} {kind}"
+  },
+  "errorBoundary": {
+    "title": "Esta página ha tenido un problema",
+    "body": "Se ha registrado el error. Vuelve a intentarlo o ve a otra página.",
+    "retry": "Volver a intentarlo"
   }
 }

@@ -2,6 +2,7 @@
 //! image itself, a frame of a video, or the transcript Arrumo already has of its speech. What it
 //! cannot look at is left out up front and named, so the rest still gets described.
 
+use crate::IoStep;
 use std::{
     collections::{BTreeSet, HashMap},
     error::Error,
@@ -352,7 +353,7 @@ impl WorkspaceStore {
             )?;
             (frame.bytes, "jpg")
         } else {
-            let bytes = fs::read(source)?;
+            let bytes = fs::read(source).io_step("Reading a file")?;
             let extension = match image_type(&bytes) {
                 Some("image/png") => "png",
                 Some("image/webp") => "webp",
@@ -361,7 +362,7 @@ impl WorkspaceStore {
             (bytes, extension)
         };
         let path = folder.join(format!("asset-{}.{extension}", asset.id));
-        fs::write(&path, bytes)?;
+        fs::write(&path, bytes).io_step("Writing a file")?;
         Ok(path)
     }
 

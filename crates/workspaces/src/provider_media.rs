@@ -1,6 +1,7 @@
 //! Reference media for generation providers: workspace assets read by ID, checked by their bytes,
 //! and uploaded through a provider's presigned-upload flow described in its SDK descriptor.
 
+use crate::IoStep;
 use std::{
     io::{self, Read},
     path::Path,
@@ -89,7 +90,8 @@ impl WorkspaceStore {
                 }
             };
             let mut bytes = Vec::new();
-            std::fs::File::open(crate::asset_path(&root, workspace_id, *id))?
+            std::fs::File::open(crate::asset_path(&root, workspace_id, *id))
+                .io_step("Opening a file")?
                 .take(limit + 1)
                 .read_to_end(&mut bytes)?;
             if bytes.len() as u64 > limit {

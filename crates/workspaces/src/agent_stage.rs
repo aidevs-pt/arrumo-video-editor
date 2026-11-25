@@ -101,14 +101,21 @@ impl WorkspaceStore {
         match outcome {
             Ok(id) => Ok(Some(id)),
             Err(error) => {
-                let reason = if let Some(agent) = error.downcast_ref::<AgentRunError>() {
-                    agent.to_string()
-                } else if let Some(failure) = error.downcast_ref::<StageFailure>() {
-                    failure.to_string()
-                } else {
-                    fallback.to_owned()
-                };
+                // Steps wrap what failed, so the reason may be anywhere in the chain.
+                let reason = crate::quiet_process::error_sources(&*error)
+                    .find_map(|error| {
+                        error
+                            .downcast_ref::<AgentRunError>()
+                            .map(ToString::to_string)
+                            .or_else(|| {
+                                error
+                                    .downcast_ref::<StageFailure>()
+                                    .map(ToString::to_string)
+                            })
+                    })
+                    .unwrap_or_else(|| fallback.to_owned());
                 let cause = crate::error_chain(&*error);
+                eprintln!("Arrumo: the {stage} step of run {run_id} failed: {reason}\n{cause}");
                 match self.fail_generation_because(
                     workspace_id,
                     run_id,

@@ -1,3 +1,5 @@
+use crate::IoStep;
+use crate::Launch;
 use std::{
     error::Error,
     fs, io,
@@ -116,7 +118,7 @@ impl WorkspaceStore {
             )
             .into());
         }
-        let root = asset_root(&database.canonicalize()?);
+        let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         tx.query_row(
             "SELECT id FROM generation_runs
@@ -207,7 +209,7 @@ impl WorkspaceStore {
         artifact: &MotionArtifact,
         spec: &crate::motion_spec::MotionSpec,
     ) -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
-        let root = asset_root(&database.canonicalize()?);
+        let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let mut copied = Vec::new();
         let result = (|| -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
@@ -323,7 +325,7 @@ fn run_probe(command: &mut Command, timeout: Duration) -> io::Result<Output> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
+        .launch()?;
     let start = Instant::now();
     let failure = loop {
         match child.try_wait() {

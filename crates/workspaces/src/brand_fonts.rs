@@ -3,6 +3,7 @@
 //! or OpenType fonts that draw accented Latin letters and common symbols, and their average letter
 //! width is measured so text wraps to fit.
 
+use crate::IoStep;
 use std::{
     error::Error,
     fs, io,
@@ -237,7 +238,8 @@ impl WorkspaceStore {
             .take(255)
             .collect();
         let mut bytes = Vec::new();
-        fs::File::open(source)?
+        fs::File::open(source)
+            .io_step("Opening a file")?
             .take(MAX_FONT_BYTES + 1)
             .read_to_end(&mut bytes)?;
         if bytes.len() as u64 > MAX_FONT_BYTES {
@@ -256,8 +258,8 @@ impl WorkspaceStore {
                     .ok_or_else(|| io::Error::other("Bad path"))?,
             )?;
             let partial = destination.with_extension("partial");
-            fs::write(&partial, &bytes)?;
-            fs::rename(&partial, &destination)?;
+            fs::write(&partial, &bytes).io_step("Writing a file")?;
+            fs::rename(&partial, &destination).io_step("Moving a file")?;
         }
         let font = BrandFont {
             role,
@@ -316,7 +318,7 @@ impl WorkspaceStore {
         if !saved {
             return Err(io::Error::new(io::ErrorKind::NotFound, "Font not found").into());
         }
-        Ok(fs::read(font_file(media_root, workspace_id, sha256))?)
+        Ok(fs::read(font_file(media_root, workspace_id, sha256)).io_step("Reading a file")?)
     }
 
     /// The fonts a run's snapshot chose, so re-renders match the first render.

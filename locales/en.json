@@ -2019,5 +2019,10 @@
     "cancel": "Cancel",
     "choose": "Use selected",
     "limit": "up to {count} {kind}"
+  },
+  "errorBoundary": {
+    "title": "This page hit a problem",
+    "body": "The error was recorded. Try again, or go to another page.",
+    "retry": "Try again"
   }
 }

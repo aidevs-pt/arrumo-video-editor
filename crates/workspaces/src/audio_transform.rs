@@ -1,6 +1,8 @@
 //! Voice changing and voice isolation by a trusted provider plugin's `audio-transform.json`
 //! descriptor: a workspace audio or video asset goes in, a new audio asset comes out.
 
+use crate::IoStep;
+use crate::Launch;
 use std::{
     collections::BTreeMap,
     io::{self, Read},
@@ -216,7 +218,7 @@ pub(crate) fn soundtrack_mp3(source: &Path, output: &Path) -> io::Result<()> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()?;
+        .launch_status()?;
     if !status.success() {
         return Err(io::Error::other(
             "The asset has no sound Arrumo can read, so there is nothing to process",
@@ -400,7 +402,7 @@ impl WorkspaceStore {
             ))
             .into());
         }
-        let bytes = std::fs::read(&input)?;
+        let bytes = std::fs::read(&input).io_step("Reading a file")?;
         if bytes.len() as u64 > entry.max_input_bytes {
             return Err(io::Error::other("The sound is too large for this provider").into());
         }
@@ -488,7 +490,7 @@ impl WorkspaceStore {
             "{}.{extension}",
             result_stem(&source.name, transform)
         ));
-        std::fs::write(&file, &output)?;
+        std::fs::write(&file, &output).io_step("Writing a file")?;
         crate::source_transcripts::media_duration(&file)
             .map_err(|_| io::Error::other("The provider's audio could not be read"))?;
 

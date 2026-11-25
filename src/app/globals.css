@@ -183,6 +183,10 @@
     font-size: 15px;
     font-variant-numeric: tabular-nums;
     caret-color: var(--primary);
+  }
+  /* Any scrollbar-color turns macOS's overlay scrollbars into permanent classic ones, so macOS
+     keeps its own; elsewhere they take the theme's colors. */
+  html:not([data-platform="mac"]) body {
     scrollbar-color: var(--input) transparent;
   }
   h1, h2 {

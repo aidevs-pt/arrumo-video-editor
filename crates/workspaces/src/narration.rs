@@ -1,6 +1,7 @@
 //! Voice-over for storyboarded videos: the run's text-to-speech provider reads each scene's
 //! narration once, at the preview, and scenes grow to fit it. The final render reuses the audio.
 
+use crate::IoStep;
 use std::{error::Error, fs, io, path::Path};
 
 use serde_json::{Value, json};
@@ -135,7 +136,7 @@ impl WorkspaceStore {
             return Ok(());
         };
         let directory = delivery_directory(database, workspace_id, run_id);
-        fs::create_dir_all(&directory)?;
+        fs::create_dir_all(&directory).io_step("Creating a folder")?;
         let mut written = Vec::new();
         let result = (|| -> Result<Vec<Value>, Box<dyn Error>> {
             let extension = speech_extension(plugin)?;
@@ -204,7 +205,7 @@ impl WorkspaceStore {
         let extension = speech_extension(plugin)?;
         let mut scenes: Vec<MotionSpec> = serde_json::from_value(edit["scenes"].clone())?;
         let directory = delivery_directory(database, workspace_id, run_id);
-        fs::create_dir_all(&directory)?;
+        fs::create_dir_all(&directory).io_step("Creating a folder")?;
         let mut written = Vec::new();
         let result = (|| -> Result<Vec<Option<String>>, Box<dyn Error>> {
             let mut files = Vec::with_capacity(scenes.len());

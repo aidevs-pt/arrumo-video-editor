@@ -2,6 +2,7 @@
 //! format asks for, plus one image prompt per thumbnail, from the approved script and the frozen
 //! brief. Arrumo turns the prompts into images through the run's image providers.
 
+use crate::IoStep;
 use std::{collections::BTreeMap, error::Error, io, path::Path};
 
 use serde_json::{Value, json};
@@ -587,7 +588,7 @@ impl WorkspaceStore {
                         let extension = preview.mime.trim_start_matches("image/");
                         let path =
                             folder.join(format!("reference-{}.{extension}", attached.len() + 1));
-                        std::fs::write(&path, &preview.bytes)?;
+                        std::fs::write(&path, &preview.bytes).io_step("Writing a file")?;
                         attached.insert(asset, (attached.len() + 1, path));
                         shown = Some(attached.len());
                     }

@@ -1,3 +1,4 @@
+use crate::IoStep;
 use std::{
     error::Error,
     io::{self, Read, Seek},
@@ -34,7 +35,11 @@ impl WorkspaceStore {
 
         // SQLite leaves syncing the VACUUM INTO output to the caller.
         pending.as_file().sync_all()?;
-        let byte_length = pending.as_file().metadata()?.len();
+        let byte_length = pending
+            .as_file()
+            .metadata()
+            .io_step("Checking a file")?
+            .len();
         pending.rewind()?;
         let mut digest = Sha256::new();
         let mut buffer = [0; 64 * 1024];

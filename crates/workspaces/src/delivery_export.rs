@@ -1,3 +1,4 @@
+use crate::IoStep;
 use std::{
     error::Error,
     fs::{self, File},
@@ -78,13 +79,13 @@ impl WorkspaceStore {
                     continue;
                 }
                 let source = source_dir.join(&filename);
-                let metadata = fs::symlink_metadata(&source)?;
+                let metadata = fs::symlink_metadata(&source).io_step("Checking a file")?;
                 if !metadata.is_file() || metadata.len() == 0 {
                     return Err(
                         io::Error::other(format!("Invalid delivery file: {filename}")).into(),
                     );
                 }
-                let mut file = File::open(source)?;
+                let mut file = File::open(source).io_step("Opening a file")?;
                 // ZIP64 supports source videos that exceed the ZIP32 size limit.
                 archive.start_file(
                     filename,
@@ -106,12 +107,15 @@ impl WorkspaceStore {
                     style,
                     &captioned,
                 )?;
-                let length = captioned.metadata()?.len();
+                let length = captioned.metadata().io_step("Checking a file")?.len();
                 archive.start_file(
                     format!("{}-captioned.mp4", output.format_id),
                     SimpleFileOptions::default().large_file(length >= u32::MAX.into()),
                 )?;
-                io::copy(&mut File::open(&captioned)?, &mut archive)?;
+                io::copy(
+                    &mut File::open(&captioned).io_step("Opening a file")?,
+                    &mut archive,
+                )?;
             }
             for (language, revision) in translations {
                 archive.start_file(
@@ -126,17 +130,17 @@ impl WorkspaceStore {
             archive.write_all(entry.text.as_bytes())?;
         }
         if !media.is_empty() {
-            let root = asset_root(&database.canonicalize()?);
+            let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
             for (index, entry) in media.iter().enumerate() {
                 let source = asset_path(&root, workspace_id, entry.asset_id);
-                let metadata = source.symlink_metadata()?;
+                let metadata = source.symlink_metadata().io_step("Checking a file")?;
                 if !metadata.is_file()
                     || !crate::assets::is_canonical(&source)?
                     || metadata.len() != u64::try_from(entry.byte_size)?
                 {
                     return Err(io::Error::other("Supplemental media is unavailable").into());
                 }
-                let mut file = File::open(source)?;
+                let mut file = File::open(source).io_step("Opening a file")?;
                 archive.start_file(
                     entry.filename(index),
                     SimpleFileOptions::default().large_file(metadata.len() >= u32::MAX.into()),
@@ -208,7 +212,7 @@ impl WorkspaceStore {
         match fs::hard_link(&captioned, destination) {
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => return Err(error.into()),
             Err(_) => {
-                fs::copy(&captioned, destination)?;
+                fs::copy(&captioned, destination).io_step("Copying a file")?;
             }
             Ok(()) => {}
         }
@@ -227,10 +231,14 @@ fn burn_output(
 ) -> Result<(), Box<dyn Error>> {
     let subtitles = match edited {
         Some(latest) => latest.to_owned(),
-        None => fs::read_to_string(source_dir.join(format!("{format_id}.srt")))?,
+        None => fs::read_to_string(source_dir.join(format!("{format_id}.srt")))
+            .io_step("Reading a file")?,
     };
     crate::delivery_captions::burn_captions(
-        &source_dir.join(format!("{format_id}.mp4")).canonicalize()?,
+        &source_dir
+            .join(format!("{format_id}.mp4"))
+            .canonicalize()
+            .io_step("Resolving a path")?,
         &subtitles,
         dimensions,
         style,
