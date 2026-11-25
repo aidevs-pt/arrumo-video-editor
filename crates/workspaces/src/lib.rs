@@ -7,6 +7,7 @@ mod a2a;
 mod agent_cli;
 mod lease_keeper;
 mod quiet_process;
+mod revision_media;
 pub(crate) use quiet_process::quiet_command;
 mod agent_explore;
 mod agent_images;

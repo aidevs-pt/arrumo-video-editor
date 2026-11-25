@@ -222,6 +222,13 @@ pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
 }
 
 /// Like `spec_schema_with_clips`, also letting layers play the workspace sound effects in `sounds`.
+/// An animation schema whose layers play no built-in synthesized sounds, for workspaces with
+/// designed sound effects or a provider that makes them.
+pub(crate) fn designed_sounds_only(mut schema: Value) -> Value {
+    schema["properties"]["layers"]["items"]["properties"]["sound"] = json!({"enum": ["none"]});
+    schema
+}
+
 pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i64]) -> Value {
     let assets: Vec<i64> = images.iter().chain(clips).copied().collect();
     let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right", "reveal", "wipe"]});
@@ -1965,6 +1972,14 @@ mod tests {
                  "start": 0, "end": 3, "enter": "fade", "exit": "fade"}
             ]
         })
+    }
+
+    #[test]
+    fn designed_sounds_replace_the_built_in_ones() {
+        let schema = designed_sounds_only(spec_schema_with_media(&[], &[], &[4]));
+        let layer = &schema["properties"]["layers"]["items"]["properties"];
+        assert_eq!(layer["sound"]["enum"], json!(["none"]));
+        assert!(layer.get("soundAssetId").is_some());
     }
 
     #[test]

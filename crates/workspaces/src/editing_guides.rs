@@ -24,7 +24,7 @@ macro_rules! guide {
     };
 }
 
-pub const EDITING_GUIDES: [EditingGuide; 8] = [
+pub const EDITING_GUIDES: [EditingGuide; 9] = [
     guide!("script", "Writing the script", "script"),
     guide!("visuals", "Planning supporting visuals", "assets"),
     guide!("animation", "Designing animations", "assets"),
@@ -34,6 +34,7 @@ pub const EDITING_GUIDES: [EditingGuide; 8] = [
         "Storyboarding a video without footage",
         "preview"
     ),
+    guide!("sound", "Sound, music and voice", "preview"),
     guide!("portrait", "Choosing portrait cuts", "delivery"),
     guide!(
         "publishing",

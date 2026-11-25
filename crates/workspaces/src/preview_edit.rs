@@ -300,6 +300,103 @@ fn approved_tracks(plan: Option<&Value>) -> Vec<(i64, Value)> {
     tracks
 }
 
+/// The most voice-over lines one edit of recorded footage has.
+const MAX_VOICE_LINES: usize = 20;
+
+/// Lets the agent lay sound effects and voice-over lines over the cuts of recorded footage.
+fn with_cue_schema(mut schema: Value, sounds: &[i64], voice: bool) -> Value {
+    let mut add = |key: &str, items: usize, fields: Value| {
+        let mut required = vec![json!("cut"), json!("atSeconds")];
+        required.extend(
+            fields
+                .as_object()
+                .into_iter()
+                .flatten()
+                .map(|(key, _)| json!(key)),
+        );
+        let mut properties = json!({"cut": {"type": "integer", "minimum": 0},
+                                    "atSeconds": {"type": "number", "minimum": 0}});
+        for (name, field) in fields.as_object().into_iter().flatten() {
+            properties[name] = field.clone();
+        }
+        schema["properties"][key] = json!({"type": "array", "maxItems": items, "items": {
+            "type": "object", "additionalProperties": false,
+            "required": required, "properties": properties,
+        }});
+        if let Some(required) = schema["required"].as_array_mut() {
+            required.push(json!(key));
+        }
+    };
+    if !sounds.is_empty() {
+        add(
+            "soundEffects",
+            crate::clip_render::MAX_CUES - MAX_VOICE_LINES,
+            json!({"assetId": {"enum": sounds}}),
+        );
+    }
+    if voice {
+        add(
+            "voiceOver",
+            MAX_VOICE_LINES,
+            json!({"text": {"type": "string", "maxLength": MAX_NARRATION}}),
+        );
+    }
+    schema
+}
+
+/// Adds the agent's sound effects and voice-over lines to `edit`, renumbering cuts it dropped.
+/// Entries on dropped cuts or with unknown sounds are skipped.
+fn place_cues(edit: &mut Value, answer: &Value, sounds: &[i64]) {
+    let origins: Vec<usize> =
+        serde_json::from_value(edit["cut_origins"].clone()).unwrap_or_default();
+    let place = |entry: &Value| -> Option<(usize, u64)> {
+        let cut = origins
+            .iter()
+            .position(|&origin| Some(origin as u64) == entry["cut"].as_u64())?;
+        let at = entry["atSeconds"]
+            .as_f64()
+            .filter(|at| at.is_finite())?
+            .clamp(0.0, 3600.0);
+        Some((cut, (at * 1000.0).round() as u64))
+    };
+    let list = |key: &str| answer[key].as_array().cloned().unwrap_or_default();
+    let effects: Vec<Value> = list("soundEffects")
+        .iter()
+        .take(crate::clip_render::MAX_CUES - MAX_VOICE_LINES)
+        .filter_map(|entry| {
+            let asset = entry["assetId"].as_i64().filter(|id| sounds.contains(id))?;
+            let (cut, at_ms) = place(entry)?;
+            Some(json!({"cut": cut, "at_ms": at_ms, "asset_id": asset}))
+        })
+        .collect();
+    let lines: Vec<Value> = list("voiceOver")
+        .iter()
+        .take(MAX_VOICE_LINES)
+        .filter_map(|entry| {
+            let text: String = entry["text"]
+                .as_str()?
+                .trim()
+                .chars()
+                .take(MAX_NARRATION)
+                .collect();
+            let (cut, at_ms) = place(entry).filter(|_| !text.is_empty())?;
+            Some(json!({"cut": cut, "at_ms": at_ms, "text": text}))
+        })
+        .collect();
+    if !effects.is_empty() {
+        edit["sound_cues"] = json!(effects);
+    }
+    if !lines.is_empty() {
+        edit["voice_cues"] = json!(lines);
+    }
+}
+
+/// Appends a sentence for the creator to the edit's summary.
+fn add_to_summary(edit: &mut Value, sentence: &str) {
+    let summary = edit["summary"].as_str().unwrap_or("").trim().to_owned();
+    edit["summary"] = json!(format!("{summary} {sentence}").trim().to_owned());
+}
+
 /// Adds the agent's animation placements to `edit`, renumbering cuts it dropped. Placements on
 /// dropped cuts or unknown animations are skipped.
 fn place_motion(edit: &mut Value, answer: &Value, animations: &[Value]) {
@@ -446,7 +543,7 @@ fn preview_prompt(
          {revision}\
          The summary is one sentence to the creator about this cut, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides = crate::editing_guides::guide_section(&["cutting"]),
+        guides = crate::editing_guides::guide_section(&["cutting", "sound"]),
         revision = if earlier.is_empty() {
             ""
         } else {
@@ -457,6 +554,30 @@ fn preview_prompt(
 }
 
 impl WorkspaceStore {
+    /// Background music candidates: the approved plan's audio, then the library's longer audio,
+    /// such as music made since the plan was approved.
+    fn music_choices(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        approved: Option<&Value>,
+    ) -> rusqlite::Result<Vec<(i64, Value)>> {
+        let mut tracks = approved_tracks(approved.map(|result| &result["asset_plan"]));
+        for audio in self.workspace_audio(database, workspace_id)? {
+            let long = audio
+                .seconds
+                .is_some_and(|seconds| seconds > crate::motion_design::MAX_SOUND_SECONDS);
+            if long && tracks.len() < 12 && !tracks.iter().any(|(id, _)| *id == audio.id) {
+                tracks.push((
+                    audio.id,
+                    json!({"assetId": audio.id, "name": audio.name, "notes": audio.notes,
+                           "seconds": audio.seconds.map(|seconds| seconds.round())}),
+                ));
+            }
+        }
+        Ok(tracks)
+    }
+
     /// The run's approved animations followed by the saved library animations its asset plan
     /// names, so a planned library item is reused as it is instead of being designed again.
     fn planned_animations(
@@ -551,21 +672,6 @@ impl WorkspaceStore {
         snapshot: &Value,
         provider: &AgentPlugin,
     ) -> Result<i64, Box<dyn Error>> {
-        let images = self.workspace_images(workspace_id)?;
-        let image_ids: Vec<i64> = images.iter().map(|image| image.id).collect();
-        let clips = self.workspace_clips(database, workspace_id)?;
-        let clip_ids: Vec<i64> = clips.iter().map(|clip| clip.id).collect();
-        let sounds = self.workspace_sounds(database, workspace_id)?;
-        let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
-        let script = self.approved_stage_result(run_id, "script")?;
-        let script = script
-            .as_ref()
-            .and_then(|result| result.get("markdown"))
-            .and_then(Value::as_str);
-        let approved = self.approved_stage_result(run_id, "assets")?;
-        let tracks = approved_tracks(approved.as_ref().map(|result| &result["asset_plan"]));
-        let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
-        let animations = json!(self.planned_animations(workspace_id, approved.as_ref())?);
         let progress = self.production_progress(workspace_id, run_id)?;
         let earlier: Vec<Value> = progress
             .results
@@ -582,6 +688,39 @@ impl WorkspaceStore {
                 })
             })
             .collect();
+        let ordered = self.order_revision_media(
+            database,
+            (workspace_id, run_id, attempt),
+            snapshot,
+            provider,
+            &earlier,
+        )?;
+        let images = self.workspace_images(workspace_id)?;
+        let image_ids: Vec<i64> = images.iter().map(|image| image.id).collect();
+        let clips = self.workspace_clips(database, workspace_id)?;
+        let clip_ids: Vec<i64> = clips.iter().map(|clip| clip.id).collect();
+        let sounds = self.workspace_sounds(database, workspace_id)?;
+        let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
+        let script = self.approved_stage_result(run_id, "script")?;
+        let script = script
+            .as_ref()
+            .and_then(|result| result.get("markdown"))
+            .and_then(Value::as_str);
+        let approved = self.approved_stage_result(run_id, "assets")?;
+        let tracks = self.music_choices(database, workspace_id, approved.as_ref())?;
+        let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
+        let mut animations = self.planned_animations(workspace_id, approved.as_ref())?;
+        animations.extend(ordered.animations.iter().cloned());
+        let animations = json!(animations);
+        // Designed effects replace the built-in synthesized sounds once the workspace has them.
+        let designed_sounds = !sounds.is_empty();
+        let scene_schema = |schema: Value| {
+            if designed_sounds {
+                crate::motion_spec::designed_sounds_only(schema)
+            } else {
+                schema
+            }
+        };
         let mut brief = json!({
             "video": {"title": snapshot["draft"]["title"], "intent": snapshot["draft"]["intent"]},
             "approvedScript": script,
@@ -599,6 +738,9 @@ impl WorkspaceStore {
         });
         if !earlier.is_empty() {
             brief["earlierStoryboards"] = json!(earlier);
+        }
+        if !ordered.made.is_empty() {
+            brief["madeForThisRevision"] = json!(ordered.made);
         }
         if !clips.is_empty() {
             brief["clips"] = json!(
@@ -638,21 +780,28 @@ impl WorkspaceStore {
              pace, a 3D turn marks a change of chapter; the last scene's transition is ignored.\n\
              Each scene is an animation: {guide}{clip_guide}{sound_guide}\n\
              {revision}\
+             {made}\
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
              {guides}BRIEF (JSON):\n{brief}",
-            guides = crate::editing_guides::guide_section(&["storyboard", "animation"]),
+            guides = crate::editing_guides::guide_section(&["storyboard", "animation", "sound"]),
+            made = if ordered.made.is_empty() {
+                ""
+            } else {
+                "For this revision Arrumo made the media in madeForThisRevision, as the creator's notes asked: \
+                 use each where its use says. A new animation is in approvedAnimations.\n"
+            },
             music = if tracks.is_empty() {
                 String::new()
             } else {
                 format!(
-                    "The creator approved these audio tracks. If one is meant as background music, return it in \
-                     music with fromScene 0 and Arrumo plays it under every scene, quieter while the narration \
+                    "These audio tracks are in the creator's library, approved ones first. If one is meant as \
+                     background music, return it in music with fromScene 0 and Arrumo plays it under every scene, quieter while the narration \
                      speaks. To change the music at a new chapter, add another track with the index of the scene \
                      it starts on; Arrumo crossfades between them. Set musicLevel to featured when the music carries the \
                      video (a launch film or montage with little narration) so it plays near full level between lines, \
                      or background to keep it low under a mostly spoken video. Return an empty list when none is \
-                     background music.\nAPPROVED AUDIO (JSON):\n{}\n",
+                     background music.\nAUDIO TRACKS (JSON):\n{}\n",
                     serde_json::to_string(
                         &tracks
                             .iter()
@@ -667,9 +816,8 @@ impl WorkspaceStore {
                 ""
             } else {
                 " A layer can play one of the workspace's sound effects (soundEffects in the brief) as it arrives: \
-                 set soundAssetId to its asset ID, and it replaces the layer's built-in sound. Prefer these designed \
-                 effects to the built-in sounds, pick one whose notes fit the moment, and use them sparingly. \
-                 Otherwise set soundAssetId to null."
+                 set soundAssetId to its asset ID. Pick one whose notes fit the moment, and use them sparingly \
+                 unless the creator asks for more. Otherwise set soundAssetId to null."
             },
             clip_guide = if clips.is_empty() {
                 String::new()
@@ -694,7 +842,7 @@ impl WorkspaceStore {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": MAX_SCENES,
-                    "items": with_narration(crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids))
+                    "items": with_narration(scene_schema(crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids)))
                 }
             }
         });
@@ -722,9 +870,9 @@ impl WorkspaceStore {
                 database,
                 workspace_id,
                 scenes,
-                &with_narration(crate::motion_spec::spec_schema_with_media(
+                &with_narration(scene_schema(crate::motion_spec::spec_schema_with_media(
                     &image_ids, &clip_ids, &sound_ids,
-                )),
+                ))),
                 &|scene| {
                     crate::motion_spec::MotionSpec::from_answer_with_media(
                         scene,
@@ -749,6 +897,9 @@ impl WorkspaceStore {
         let mut edit = storyboard(&answer, &image_ids, &clip_ids, &sound_ids, &provider.id)
             .map_err(io::Error::other)?;
         place_music(&mut edit, &answer, &track_ids);
+        if let Some(problem) = &ordered.problem {
+            add_to_summary(&mut edit, problem);
+        }
         self.narrate_storyboard(database, workspace_id, run_id, attempt, snapshot, &mut edit)?;
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
         self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)
@@ -851,19 +1002,79 @@ impl WorkspaceStore {
                 })
             })
             .collect();
+        let ordered = self.order_revision_media(
+            database,
+            (workspace_id, run_id, attempt),
+            snapshot,
+            provider,
+            &earlier,
+        )?;
         let assets = self.approved_stage_result(run_id, "assets")?;
-        let animations = self.planned_animations(workspace_id, assets.as_ref())?;
-        let tracks = approved_tracks(assets.as_ref().map(|result| &result["asset_plan"]));
+        let mut animations = self.planned_animations(workspace_id, assets.as_ref())?;
+        animations.extend(ordered.animations.iter().cloned());
+        let tracks = self.music_choices(database, workspace_id, assets.as_ref())?;
         let track_ids: Vec<i64> = tracks.iter().map(|(id, _)| *id).collect();
+        let sounds = self.workspace_sounds(database, workspace_id)?;
+        let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
+        let voice = self.current_voice(workspace_id, snapshot)?;
         let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
+        if !ordered.made.is_empty() {
+            prompt.push_str(&format!(
+                "\n\nFor this revision Arrumo made the media below, as the creator's notes asked. Use each \
+                 where its use says.\nMADE FOR THIS REVISION (JSON):\n{}",
+                serde_json::to_string_pretty(&ordered.made).unwrap_or_default()
+            ));
+        }
         if !tracks.is_empty() {
             let summaries: Vec<&Value> = tracks.iter().map(|(_, summary)| summary).collect();
             prompt.push_str(&format!(
-                "\n\nThe creator approved these audio tracks for this video. If one is meant as background \
-                 music, return it in music and Arrumo plays it under the whole video, quieter while anyone \
-                 speaks. Return an empty list when none is music for the whole video.\nAPPROVED AUDIO (JSON):\n{}",
+                "\n\nThese audio tracks are in the creator's library, approved ones first. If one is meant as \
+                 background music, return it in music and Arrumo plays it under the whole video, quieter \
+                 while anyone speaks. Return an empty list when none is music for the whole video.\n\
+                 AUDIO TRACKS (JSON):\n{}",
                 serde_json::to_string_pretty(&summaries).unwrap_or_default()
             ));
+        }
+        if !sounds.is_empty() {
+            let summaries: Vec<Value> = sounds
+                .iter()
+                .map(|sound| json!({"assetId": sound.id, "name": sound.name, "notes": sound.notes,
+                                    "seconds": sound.seconds.map(|seconds| (seconds * 10.0).round() / 10.0)}))
+                .collect();
+            prompt.push_str(&format!(
+                "\n\nSound effects in the creator's library can play over a cut: return each in soundEffects \
+                 with the cut (counted from 0) and atSeconds into it. Land an effect on the moment it marks, \
+                 such as a title arriving or a change of scene, and use them sparingly unless the creator asks \
+                 for more. Return an empty list when none fits.\nSOUND EFFECTS (JSON):\n{}",
+                serde_json::to_string_pretty(&summaries).unwrap_or_default()
+            ));
+        }
+        let mut missing = Vec::new();
+        if tracks.is_empty() {
+            missing.push("music");
+        }
+        if sounds.is_empty() {
+            missing.push("sound effects");
+        }
+        if voice.is_none() {
+            missing
+                .push("a voice for voice-over (a speech provider with its key and a chosen voice)");
+        }
+        if !missing.is_empty() {
+            prompt.push_str(&format!(
+                "\n\nThis workspace has no {} to use. If the creator's notes ask for them, say in the \
+                 summary what is missing and that it can be added in Settings › Services and keys; never \
+                 make it yourself.",
+                missing.join(", ")
+            ));
+        }
+        if voice.is_some() {
+            prompt.push_str(
+                "\n\nA voice can read lines over the footage: return each in voiceOver with the cut and \
+                 atSeconds where it starts, and its text exactly as it is spoken. Use voice-over when the \
+                 script or the creator's notes ask for it, start lines in pauses of the footage's speech, and \
+                 keep each line short enough to finish within its cut. Return an empty list otherwise.",
+            );
         }
         if !animations.is_empty() {
             let summaries: Vec<Value> = animations
@@ -892,10 +1103,14 @@ impl WorkspaceStore {
         } else {
             Vec::new()
         };
-        let mut schema = with_music_schema(
-            with_motion_schema(answer_schema(&sources), animations.len()),
-            &track_ids,
-            false,
+        let mut schema = with_cue_schema(
+            with_music_schema(
+                with_motion_schema(answer_schema(&sources), animations.len()),
+                &track_ids,
+                false,
+            ),
+            &sound_ids,
+            voice.is_some(),
         );
         if !frames.is_empty() {
             schema = with_grade_schema(schema);
@@ -927,8 +1142,20 @@ impl WorkspaceStore {
         )?;
         let mut edit =
             preview_edit(&answer, &clips, &spoken, &provider.id).map_err(io::Error::other)?;
+        place_cues(&mut edit, &answer, &sound_ids);
         place_motion(&mut edit, &answer, &animations);
         place_music(&mut edit, &answer, &track_ids);
+        if let Some((plugin, voice)) = &voice {
+            self.voice_cut_lines(
+                database,
+                (workspace_id, run_id, attempt),
+                (plugin, voice),
+                &mut edit,
+            )?;
+        }
+        if let Some(problem) = &ordered.problem {
+            add_to_summary(&mut edit, problem);
+        }
         self.renew_generation_lease(workspace_id, run_id, attempt)?;
         let result_id =
             self.render_preview_videos(database, workspace_id, run_id, attempt, &edit)?;
@@ -1165,6 +1392,48 @@ mod tests {
             &[json!({"notes": "Tighter hook"})],
         );
         assert!(revised.contains("Tighter hook") && revised.contains("Address every note"));
+    }
+
+    #[test]
+    fn sound_effects_and_voice_over_follow_the_cuts_that_were_kept() {
+        let clips = [(1, 10.0, "take1.mp4".to_owned())];
+        let answer = json!({"summary": "Cut", "cuts": [
+            {"clipId": 1, "startSeconds": 0, "endSeconds": 2, "purpose": "a"},
+            {"clipId": 1, "startSeconds": 3, "endSeconds": 3.01, "purpose": "too short"},
+            {"clipId": 1, "startSeconds": 4, "endSeconds": 6, "purpose": "b"}
+        ],
+        "soundEffects": [{"cut": 2, "atSeconds": 0.25, "assetId": 7},
+                         {"cut": 1, "atSeconds": 0, "assetId": 7},
+                         {"cut": 0, "atSeconds": 1, "assetId": 99}],
+        "voiceOver": [{"cut": 0, "atSeconds": 0.5, "text": "  Welcome back. "},
+                      {"cut": 2, "atSeconds": 0, "text": " "}]});
+        let mut edit = preview_edit(&answer, &clips, &Default::default(), "codex").unwrap();
+        place_cues(&mut edit, &answer, &[7]);
+        assert_eq!(
+            edit["sound_cues"],
+            json!([{"cut": 1, "at_ms": 250, "asset_id": 7}]),
+            "dropped cuts and unknown sounds are skipped"
+        );
+        assert_eq!(
+            edit["voice_cues"],
+            json!([{"cut": 0, "at_ms": 500, "text": "Welcome back."}])
+        );
+        place_motion(&mut edit, &answer, &[]);
+        assert!(edit.get("cut_origins").is_none());
+        let schema = with_cue_schema(answer_schema(&[1]), &[7], true);
+        assert_eq!(
+            schema["required"],
+            json!(["summary", "cuts", "soundEffects", "voiceOver"])
+        );
+        assert_eq!(
+            schema["properties"]["voiceOver"]["items"]["required"],
+            json!(["cut", "atSeconds", "text"])
+        );
+        let silent = with_cue_schema(answer_schema(&[1]), &[], false);
+        assert!(silent["properties"].get("soundEffects").is_none());
+        assert!(silent["properties"].get("voiceOver").is_none());
+        add_to_summary(&mut edit, "I could not make the music.");
+        assert_eq!(edit["summary"], "Cut I could not make the music.");
     }
 
     #[test]
