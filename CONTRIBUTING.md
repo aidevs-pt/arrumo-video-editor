@@ -58,6 +58,25 @@ pnpm build
 5. A maintainer reviews the change. We squash-merge, so the pull request title becomes the commit
    message.
 
+## Labels
+
+Maintainers label issues and pull requests so you can find work and see where things stand:
+
+- **Kind:** `bug`, `enhancement`, `documentation`, `refactor`, `tests`, `ci`, `security`,
+  `performance`, and `breaking change` for changes to a public contract. `dependencies` marks
+  automated dependency updates.
+- **Platform:** `platform: windows`, `platform: macos` or `platform: linux` when only one system is
+  affected.
+- **Area:** `area: generation`, `area: agents`, `area: interface`, `area: media`, `area: plugins`,
+  `area: crash reports`, `area: installers` and `area: release`, matching the parts of the app.
+- **Status:** `status: stacked` builds on another open pull request, so merge that one first;
+  `status: blocked` waits on something outside it; `status: needs maintainer` needs an action only
+  a maintainer can take.
+- **Getting started:** `good first issue` and `help wanted` mark work that is ready to pick up.
+
+You don't need to label your own pull request. If you think a label applies, say so in the
+description.
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) and owned by DEVS.AI UNIPESSOAL LDA. The [CLA](CLA.md) lets DEVS AI distribute your contribution under this
