@@ -1678,11 +1678,15 @@ impl LayerTarget<'_> {
                 }
                 let file = format!("{prefix}glow-{index}-{number}.txt");
                 write_text(&file, &piece.text)?;
-                let (a, x, y) = if words {
+                let (mut a, x, y) = if words {
                     word_expressions(piece, 0.5)
                 } else {
                     plain_expressions(piece, 0.5)
                 };
+                if masked {
+                    // A revealed line glows once its letters are uncovered, never before.
+                    a = format!("clip((t-{:.3})/0.5,0,1)*{exit_alpha}", piece.start + 0.3);
+                }
                 let tint = if piece.marked { &accent } else { text.color };
                 write!(
                     canvas,
