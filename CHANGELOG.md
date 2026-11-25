@@ -2,6 +2,18 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.8 (2026-11-25)
+
+### New
+
+- Step timings and warnings under the usage data setting (#70)
+
+### Fixes
+
+- Stop storyboards with music and no voice from failing at cleanup (#73)
+- Give macOS the same themed scrollbars as Windows (#72)
+- Apply the setting and scrubbing to unparsed interface reports (#68)
+
 ## 0.1.7 (2026-11-25)
 
 ### New
