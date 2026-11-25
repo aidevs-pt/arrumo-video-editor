@@ -185,6 +185,7 @@ fn plan_prompt(
         "brandFonts": crate::brand_fonts::families(&snapshot["brand_fonts"]),
         "library": entries,
         "images": images,
+        "delivery": crate::editing_guides::delivery_brief(snapshot),
     });
     if !earlier.is_empty() {
         brief["earlierPlans"] = json!(earlier);
@@ -210,7 +211,7 @@ fn plan_prompt(
          {revision}\
          The summary is one sentence to the creator about the plan, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides = crate::editing_guides::guide_section(&["visuals", "animation"]),
+        guides = crate::editing_guides::guide_section(&["visuals", "animation", "platforms"]),
         max = crate::motion_design::MAX_RUN_ANIMATIONS,
         footage = if recorded {
             "They play over or between the recorded footage, so design for the footage's frame. Return none when the footage alone is better. "

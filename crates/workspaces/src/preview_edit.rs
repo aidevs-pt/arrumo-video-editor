@@ -125,41 +125,35 @@ fn preview_edit(
     }))
 }
 
-/// The middle frame of each clip with a picture, as small JPEGs the agent can look at.
-fn middle_frames(
+/// Frames in each overview of a clip.
+const OVERVIEW_FRAMES: u32 = 6;
+
+/// Each clip with a picture at a glance: frames across its whole length above its sound's
+/// waveform, so the agent sees what happens and where the pauses are. Returns each clip's image
+/// and the times of its frames.
+fn clip_overviews(
     root: &Path,
     workspace_id: i64,
     clips: &[(i64, f64, String)],
     directory: &Path,
-) -> Vec<(i64, std::path::PathBuf)> {
+) -> Vec<(i64, std::path::PathBuf, Vec<f64>)> {
     clips
         .iter()
         .take(crate::agent_run::MAX_IMAGES)
-        .filter_map(|(id, duration, _)| {
-            let frame = directory.join(format!("clip-{id}.jpg"));
-            let made = crate::quiet_command(crate::media_tools::ffmpeg())
-                .args([
-                    "-nostdin",
-                    "-v",
-                    "error",
-                    "-ss",
-                    &format!("{:.3}", duration / 2.0),
-                    "-i",
-                ])
-                .arg(asset_path(root, workspace_id, *id))
-                .args(["-vf", "scale=640:-2", "-frames:v", "1", "-q:v", "4", "-y"])
-                .arg(&frame)
-                .stdin(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .is_ok_and(|status| status.success())
-                && frame.is_file();
-            made.then_some((*id, frame))
+        .filter_map(|(id, _, _)| {
+            let image = directory.join(format!("clip-{id}.png"));
+            let times = crate::frame_strip::clip_overview(
+                &asset_path(root, workspace_id, *id),
+                OVERVIEW_FRAMES,
+                &image,
+            )
+            .ok()?;
+            Some((*id, image, times))
         })
         .collect()
 }
 
-/// Lets an agent that sees each clip's middle frame set a light colour grade per cut.
+/// Lets an agent that sees each clip's frames set a light colour grade per cut.
 fn with_grade_schema(mut schema: Value) -> Value {
     let item = &mut schema["properties"]["cuts"]["items"];
     item["properties"]["grade"] = json!({
@@ -179,10 +173,50 @@ fn with_grade_schema(mut schema: Value) -> Value {
     schema
 }
 
-const GRADE_GUIDE: &str = "Each attached image is the middle frame of one clip, in the footage's order. Give every cut a \
+const GRADE_GUIDE: &str = "Each attached image shows one clip, in the footage's order: frames across its whole length, \
+     left to right at the times listed below, above the waveform of its sound over the same length. Flat stretches of \
+     the waveform are pauses, the best places to start and end cuts and to lay voice-over. Give every cut a \
      grade. Keep it neutral (brightness 0, contrast 100, saturation 100, warmth 0) unless the picture clearly needs \
      correcting: too dark or bright, flat, washed out or with a colour cast. Correct gently, keep skin tones natural, \
      and give cuts from the same clip and light the same grade so the video looks consistent.";
+
+/// The most new animations one edit of recorded footage designs for itself.
+const MAX_NEW_CUT_ANIMATIONS: usize = 4;
+
+/// Lets the agent design new animations the approved ones do not cover, numbered after them.
+fn with_new_animations_schema(mut schema: Value, spec: Value) -> Value {
+    schema["properties"]["newAnimations"] =
+        json!({"type": "array", "maxItems": MAX_NEW_CUT_ANIMATIONS, "items": spec});
+    if let Some(required) = schema["required"].as_array_mut() {
+        required.push(json!("newAnimations"));
+    }
+    schema
+}
+
+/// Keeps the new animations that survived review after the approved ones and renumbers the
+/// answer's placements to match; placements of a new animation that was dropped are removed.
+fn renumber_new_animations(answer: &mut Value, approved: usize, kept: &[Option<usize>]) {
+    for key in ["inserts", "overlays"] {
+        let Some(list) = answer[key].as_array_mut() else {
+            continue;
+        };
+        list.retain_mut(|entry| {
+            let Some(index) = entry["animation"].as_u64().map(|index| index as usize) else {
+                return false;
+            };
+            if index < approved {
+                return true;
+            }
+            match kept.get(index - approved).copied().flatten() {
+                Some(position) => {
+                    entry["animation"] = json!(approved + position);
+                    true
+                }
+                None => false,
+            }
+        });
+    }
+}
 
 /// Lets the agent place the run's approved animations: full-frame inserts before a cut (or after
 /// the last one) and overlays drawn over a cut.
@@ -525,6 +559,7 @@ fn preview_prompt(
         "workspaceContext": snapshot["workspace_context"],
         "learnedFeedback": snapshot["feedback"],
         "profile": snapshot["profile"],
+        "delivery": crate::editing_guides::delivery_brief(snapshot),
         "footage": footage,
     });
     if !earlier.is_empty() {
@@ -543,11 +578,13 @@ fn preview_prompt(
          {revision}\
          The summary is one sentence to the creator about this cut, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides = crate::editing_guides::guide_section(&["cutting", "sound"]),
+        guides =
+            crate::editing_guides::guide_section(&["cutting", "sound", "animation", "platforms"]),
         revision = if earlier.is_empty() {
             ""
         } else {
-            "Earlier cuts and the creator's review notes are included. Address every note.\n"
+            "Earlier cuts and the creator's review notes are included. Address every note. An earlier cut's \
+             animations are there too: to keep a new one the creator liked, copy it into newAnimations.\n"
         },
         brief = serde_json::to_string_pretty(&brief).unwrap_or_default(),
     )
@@ -731,6 +768,7 @@ impl WorkspaceStore {
             "profile": snapshot["profile"],
             "brandColors": snapshot["brand_colors"],
             "brandFonts": crate::brand_fonts::families(&snapshot["brand_fonts"]),
+            "platform": snapshot["options"]["platform"],
             "formats": snapshot["formats"].as_array().map(|formats| formats.iter().map(|entry| json!({
                 "width": entry["format"]["width"], "height": entry["format"]["height"],
             })).collect::<Vec<_>>()),
@@ -784,7 +822,12 @@ impl WorkspaceStore {
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
              {guides}BRIEF (JSON):\n{brief}",
-            guides = crate::editing_guides::guide_section(&["storyboard", "animation", "sound"]),
+            guides = crate::editing_guides::guide_section(&[
+                "storyboard",
+                "animation",
+                "sound",
+                "platforms"
+            ]),
             made = if ordered.made.is_empty() {
                 ""
             } else {
@@ -996,6 +1039,7 @@ impl WorkspaceStore {
             .map(|result| {
                 json!({
                     "cuts": result.result["cuts"],
+                    "animations": result.result["animations"],
                     "decision": result.decision,
                     "notes": result.review_notes,
                     "perFormat": result.preview_review,
@@ -1076,6 +1120,13 @@ impl WorkspaceStore {
                  keep each line short enough to finish within its cut. Return an empty list otherwise.",
             );
         }
+        prompt.push_str(
+            "\n\nAnimations are placed in two ways. A title card, end card or transition plays full screen \
+             as an insert before a cut (beforeCut counts your cuts from 0; use the number of cuts to play it \
+             at the end). A lower third or callout is drawn over a cut as an overlay starting atSeconds into \
+             that cut. Overlays draw their background colour too, so prefer inserts for animations designed as \
+             full scenes.",
+        );
         if !animations.is_empty() {
             let summaries: Vec<Value> = animations
                 .iter()
@@ -1088,24 +1139,74 @@ impl WorkspaceStore {
                 })
                 .collect();
             prompt.push_str(&format!(
-                "\n\nThe creator approved these animations for this video. Place each where its usage says: \
-                 a title card, end card or transition plays full screen as an insert before a cut (beforeCut \
-                 counts your cuts from 0; use the number of cuts to play it at the end), and a lower third or \
-                 callout is drawn over a cut as an overlay starting atSeconds into that cut. Overlays draw their \
-                 background colour too, so prefer inserts for animations designed as full scenes. Return empty \
-                 lists when an animation does not fit.\nAPPROVED ANIMATIONS (JSON):\n{}",
+                "\n\nThe creator approved these animations for this video. Place each where its usage says, \
+                 and return empty lists when an animation does not fit.\nAPPROVED ANIMATIONS (JSON):\n{}",
                 serde_json::to_string_pretty(&summaries).unwrap_or_default()
             ));
         }
         let frames_dir = tempfile::tempdir()?;
         let frames = if crate::agent_run::accepts_images(provider) {
-            middle_frames(&root, workspace_id, &clips, frames_dir.path())
+            let keeper =
+                crate::lease_keeper::LeaseKeeper::start(database, workspace_id, run_id, attempt);
+            let overviews = clip_overviews(&root, workspace_id, &clips, frames_dir.path());
+            if !keeper.finish() {
+                return Err(
+                    io::Error::other("The run stopped while its clips were being read").into(),
+                );
+            }
+            overviews
         } else {
             Vec::new()
         };
+        let images_for_new = self.workspace_images(workspace_id)?;
+        let image_ids: Vec<i64> = images_for_new.iter().map(|image| image.id).collect();
+        let library_clips = self.workspace_clips(database, workspace_id)?;
+        let clip_ids: Vec<i64> = library_clips.iter().map(|clip| clip.id).collect();
+        let spec = crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids);
+        // Designed effects replace the built-in synthesized sounds once the workspace has them.
+        let new_spec = if sound_ids.is_empty() {
+            spec
+        } else {
+            crate::motion_spec::designed_sounds_only(spec)
+        };
+        prompt.push_str(&format!(
+            "\n\nYou may also design up to {MAX_NEW_CUT_ANIMATIONS} new animations this cut needs that the \
+             approved ones do not cover, such as a lower third naming a speaker, a callout for a key number or \
+             a title the creator's notes ask for. Put them in newAnimations and place them like approved ones: \
+             the first new one is animation {first}, the next {second}, and so on. Design for the footage's frame \
+             and keep them short. They may show the workspace images and clips below, and play its sound \
+             effects, by assetId. Return an empty list when the approved animations are enough. Each new \
+             animation: {guide} {clip_guide}\nIMAGES (JSON):\n{images}\nCLIPS (JSON):\n{clips}",
+            clip_guide = if clip_ids.is_empty() { "" } else { crate::motion_spec::CLIP_GUIDE },
+            clips = serde_json::to_string(
+                &library_clips
+                    .iter()
+                    .map(|clip| json!({"assetId": clip.id, "name": clip.name, "notes": clip.notes,
+                                       "seconds": clip.seconds.map(|seconds| (seconds * 10.0).round() / 10.0)}))
+                    .collect::<Vec<_>>()
+            )
+            .unwrap_or_default(),
+            first = animations.len(),
+            second = animations.len() + 1,
+            guide = crate::motion_spec::SPEC_GUIDE,
+            images = serde_json::to_string(
+                &images_for_new
+                    .iter()
+                    .map(|image| json!({"assetId": image.id, "name": image.name, "notes": image.notes}))
+                    .collect::<Vec<_>>()
+            )
+            .unwrap_or_default(),
+        ));
+        let approved_count = animations.len();
         let mut schema = with_cue_schema(
             with_music_schema(
-                with_motion_schema(answer_schema(&sources), animations.len()),
+                with_new_animations_schema(
+                    with_motion_schema(
+                        answer_schema(&sources),
+                        approved_count + MAX_NEW_CUT_ANIMATIONS,
+                    ),
+                    new_spec.clone(),
+                ),
                 &track_ids,
                 false,
             ),
@@ -1117,18 +1218,26 @@ impl WorkspaceStore {
             let labels: Vec<String> = frames
                 .iter()
                 .enumerate()
-                .map(|(index, (clip, _))| format!("Image {}: clipId {clip}", index + 1))
+                .map(|(index, (clip, _, times))| {
+                    let times: Vec<String> = times.iter().map(|at| format!("{at:.1}")).collect();
+                    format!(
+                        "Image {}: clipId {clip}, frames at {} seconds",
+                        index + 1,
+                        times.join(", ")
+                    )
+                })
                 .collect();
             prompt.push_str(&format!("\n\n{GRADE_GUIDE}\n{}", labels.join("\n")));
         }
-        let images: Vec<std::path::PathBuf> = frames.into_iter().map(|(_, path)| path).collect();
-        let answer = self.run_logged_agent_with_images(
-            crate::agent_logs::AgentLogScope {
-                workspace_id,
-                run_id: Some(run_id),
-                stage: "preview",
-                attempt: Some(attempt),
-            },
+        let images: Vec<std::path::PathBuf> = frames.into_iter().map(|(_, path, _)| path).collect();
+        let scope = crate::agent_logs::AgentLogScope {
+            workspace_id,
+            run_id: Some(run_id),
+            stage: "preview",
+            attempt: Some(attempt),
+        };
+        let mut answer = self.run_logged_agent_with_images(
+            scope,
             provider,
             &prompt,
             &schema,
@@ -1140,6 +1249,49 @@ impl WorkspaceStore {
                     .map_err(Into::into)
             },
         )?;
+        // New animations are drawn and reviewed like planned ones before they are placed.
+        let media_spec = |spec: &Value| {
+            crate::motion_spec::MotionSpec::from_answer_with_media(
+                spec,
+                |id| image_ids.contains(&id),
+                |id| clip_ids.contains(&id),
+                |id| sound_ids.contains(&id),
+            )
+        };
+        let mut designed = answer["newAnimations"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        designed.truncate(MAX_NEW_CUT_ANIMATIONS);
+        if !designed.is_empty() {
+            let fonts = self.run_font_set(&root, workspace_id, run_id)?;
+            self.review_motion_answers(
+                database,
+                workspace_id,
+                &mut designed,
+                &new_spec,
+                &|spec| media_spec(spec).ok(),
+                &crate::motion_design::MotionReview {
+                    scope,
+                    provider,
+                    size: crate::motion_design::run_preview_size(snapshot),
+                    fonts: &fonts,
+                },
+                &mut || {
+                    self.renew_generation_lease(workspace_id, run_id, attempt)?;
+                    Ok(())
+                },
+            )?;
+        }
+        let mut kept = Vec::with_capacity(designed.len());
+        for spec in designed {
+            let valid = media_spec(&spec).is_ok();
+            kept.push(valid.then(|| {
+                animations.push(spec);
+                animations.len() - 1 - approved_count
+            }));
+        }
+        renumber_new_animations(&mut answer, approved_count, &kept);
         let mut edit =
             preview_edit(&answer, &clips, &spoken, &provider.id).map_err(io::Error::other)?;
         place_cues(&mut edit, &answer, &sound_ids);
@@ -1434,6 +1586,38 @@ mod tests {
         assert!(silent["properties"].get("voiceOver").is_none());
         add_to_summary(&mut edit, "I could not make the music.");
         assert_eq!(edit["summary"], "Cut I could not make the music.");
+    }
+
+    #[test]
+    fn new_animations_are_numbered_after_the_approved_ones_that_survived() {
+        let mut answer = json!({
+            "inserts": [{"animation": 0, "beforeCut": 0}, {"animation": 2, "beforeCut": 1},
+                        {"animation": 3, "beforeCut": 2}],
+            "overlays": [{"animation": 4, "cut": 0, "atSeconds": 1}, {"animation": 9, "cut": 0, "atSeconds": 0}]
+        });
+        // Two approved animations; of three new ones the first was dropped by review.
+        renumber_new_animations(&mut answer, 2, &[None, Some(0), Some(1)]);
+        assert_eq!(
+            answer["inserts"],
+            json!([
+                {"animation": 0, "beforeCut": 0}, {"animation": 2, "beforeCut": 2}
+            ])
+        );
+        assert_eq!(
+            answer["overlays"],
+            json!([{"animation": 3, "cut": 0, "atSeconds": 1}])
+        );
+        let schema = with_new_animations_schema(answer_schema(&[1]), json!({"type": "object"}));
+        assert_eq!(
+            schema["properties"]["newAnimations"]["maxItems"],
+            json!(MAX_NEW_CUT_ANIMATIONS)
+        );
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("newAnimations"))
+        );
     }
 
     #[test]

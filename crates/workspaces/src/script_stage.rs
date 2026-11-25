@@ -141,7 +141,7 @@ fn script_prompt(
          Write in the language the creator's context and brief are written in. \
          The summary is one sentence to the creator about this draft, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides = crate::editing_guides::guide_section(&["script"]),
+        guides = crate::editing_guides::guide_section(&["script", "platforms"]),
         clips = if clips.is_empty() {
             ""
         } else {

@@ -419,7 +419,10 @@ fn review_size((width, height): (u32, u32)) -> (u32, u32) {
 fn review_prompt(items: &[&Value]) -> String {
     format!(
         "You designed the animations below for a creator in Arrumo. Each attached image shows one of them at \
-         six moments, left to right and top to bottom, in the order they are listed.\n\
+         six moments, left to right and top to bottom, in the order they are listed. Every frame carries \
+         review guides that are not part of the animation: thin white lines dividing it into thirds, and a \
+         yellow box at the safe margin. Keep all text inside the yellow box, and use the lines to check that \
+         what should be centred or aligned is.\n\
          Check each one for what a viewer would notice: text running outside the box or card behind it or \
          past the frame's safe margin, text overlapping other text or images, lines sitting off-centre in \
          their shape, words cut off, text hard to read against what is behind it, and layers that never \
@@ -476,7 +479,12 @@ impl WorkspaceStore {
                         review.fonts,
                         check,
                     )?;
-                    render_thumbnail(scratch.path(), &video, spec.duration_seconds, &still)?;
+                    crate::motion_spec::render_review_sheet(
+                        scratch.path(),
+                        &video,
+                        spec.duration_seconds,
+                        &still,
+                    )?;
                     sheets.push(scratch.path().join(&still));
                     shown.push(index);
                 }
