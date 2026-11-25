@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Source of setup-icon.ico, the Windows installer's icon: the disk image's install box without its tile,
+     since Windows icons are free-form. Render it at 1024 × 1024 with a transparent background and
+     convert it with Pillow: Image.open("icon.png").save("setup-icon.ico", sizes=[(16, 16), (24, 24),
+     (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]). -->
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;width:1024px;height:1024px;overflow:hidden;background:transparent}svg{display:block}</style>
+</head><body>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f8fd"/><stop offset="1" stop-color="#dde1f1"/></linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a50d2"/><stop offset="1" stop-color="#2a3db8"/></linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2335a8"/><stop offset="1" stop-color="#18257f"/></linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1757"/><stop offset="1" stop-color="#1b2786"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9ecf7"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#10185a" flood-opacity=".22"/></filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#0a1040" flood-opacity=".35"/></filter>
+    <clipPath id="face-clip"><rect x="156" y="156" width="712" height="712" rx="204"/></clipPath>
+    <g id="tile-motif">
+      <circle r="58" fill="none" stroke="white" stroke-opacity=".3" stroke-width="8"/>
+      <g fill="white" fill-opacity=".3"><rect x="-7" y="-46" width="14" height="26" rx="7"/><rect x="-7" y="20" width="14" height="26" rx="7"/><rect x="-46" y="-7" width="26" height="14" rx="7"/><rect x="20" y="-7" width="26" height="14" rx="7"/></g>
+      <circle r="9" fill="#f2c230"/>
+    </g>
+  </defs>
+  <g transform="translate(512 520) scale(1.24) translate(-512 -508)">
+  <!-- shadow under the box -->
+  <ellipse cx="512" cy="812" rx="250" ry="46" fill="#10185a" opacity=".1"/>
+  <!-- back flaps, open -->
+  <polygon points="252,450 512,300 434,196 174,346" fill="#4459d4"/>
+  <polygon points="512,300 772,450 850,346 590,196" fill="#3448c6"/>
+  <!-- inside of the box -->
+  <polygon points="252,450 512,300 772,450 512,600" fill="url(#inside)"/>
+  <!-- card with the Arrumo face, rising out of the box -->
+  <g filter="url(#soft)"><rect x="344" y="186" width="336" height="470" rx="48" fill="url(#card)"/></g>
+  <g transform="translate(402 236) scale(0.2148)">
+    <rect width="1024" height="1024" rx="264" fill="black"/>
+    <g clip-path="url(#face-clip)" fill="white">
+      <rect x="156" y="156" width="458.667" height="205.333" rx="102.667" id="long-left-eyebrow"/>
+      <rect x="662.667" y="156" width="205.333" height="205.333" rx="64" id="short-right-eyebrow"/>
+      <rect x="156" y="409.333" width="205.333" height="205.333" rx="64" id="left-eye"/>
+      <rect x="409.333" y="409.333" width="205.333" height="458.667" rx="102.667" id="long-nose"/>
+      <rect x="662.667" y="409.333" width="205.333" height="205.333" rx="64" id="right-eye"/>
+      <rect x="156" y="662.667" width="205.333" height="205.333" rx="64" id="left-cheek"/>
+      <rect x="662.667" y="662.667" width="205.333" height="205.333" rx="64" id="right-cheek"/>
+    </g>
+  </g>
+  <!-- sides -->
+  <polygon points="252,450 512,600 512,830 252,680" fill="url(#left)"/>
+  <polygon points="512,600 772,450 772,680 512,830" fill="url(#right)"/>
+  <use href="#tile-motif" transform="matrix(0.866 0.5 0 1 382.0 678.0)"/>
+  <use href="#tile-motif" transform="matrix(0.866 -0.5 0 1 642.0 678.0)"/>
+  <polyline points="252,450 512,600 772,450" fill="none" stroke="#f2c230" stroke-width="12" stroke-linejoin="round"/>
+  <!-- front flaps, folded out -->
+  <polygon points="252,450 512,600 380,604 120,454" fill="#5266dc"/>
+  <polygon points="512,600 772,450 904,454 644,604" fill="#2d40b8"/>
+  </g>
+</svg></body></html>

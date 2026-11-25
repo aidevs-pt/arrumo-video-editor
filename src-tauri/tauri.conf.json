@@ -50,7 +50,7 @@
     "windows": {
       "nsis": {
         "languages": ["English", "Spanish", "Portuguese"],
-        "installerIcon": "icons/icon.ico",
+        "installerIcon": "installer/setup-icon.ico",
         "headerImage": "installer/nsis-header.bmp",
         "sidebarImage": "installer/nsis-sidebar.bmp",
         "installerHooks": "installer/hooks.nsh"
