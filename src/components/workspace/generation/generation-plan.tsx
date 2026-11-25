@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { motion, useReducedMotionConfig } from "motion/react";
 import { useLocale } from "@/lib/locale-provider";
-import { AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
+import { AssetPlayer, AssetThumbnail } from "@/components/workspace/assets/asset-thumbnail";
 import { MotionPreviewDialog } from "@/components/workspace/motion-library/motion-preview-dialog";
 import { GuidedPreview, previewFiles } from "./guided-preview";
 import type { DeliveryFormat } from "./delivery-subtitles";
@@ -563,12 +563,12 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             {hasPreviewReview && reviewControls("media", index, formats.find((format) => format.id === formatId)?.name ?? filename)}
           </div>
         ))}</div>}
-        {stage === "assets" && <AssetPlan plan={result.result.asset_plan} agent={agent} />}
+        {stage === "assets" && <AssetPlan workspaceId={workspaceId} plan={result.result.asset_plan} agent={agent} />}
         {previews.length > 0 && <CutList cuts={result.result.cuts} notes={result.result.cut_notes} agent={agent} />}
         {previews.length > 0 && <JoinReview review={result.result.join_review} agent={agent} notes={draft.notes}
           onAdd={reviewing || result.decision ? undefined : (line) => updateDraft({ ...draft, notes: [draft.notes.trim(), line].filter(Boolean).join("\n") })} />}
         {Object.keys(source).length > 0 && (
-          <Collapsible defaultOpen={!markdown && !hasSupplemental && previews.length === 0}>
+          <Collapsible defaultOpen={false}>
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" size="sm" className="group">
                 {copy.resultDetails}<ChevronDown data-icon="inline-end" className="group-data-[state=open]:rotate-180" />
@@ -628,7 +628,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   );
 }
 
-type Placement = { section: string; name: string; kind: string; use: string };
+type Placement = { section: string; name: string; kind: string; use: string; reference?: string };
 
 function isAssetPlan(value: unknown): value is Placement[] {
   return Array.isArray(value) && value.every((entry) => entry && typeof entry.name === "string" && typeof entry.kind === "string");
@@ -636,7 +636,34 @@ function isAssetPlan(value: unknown): value is Placement[] {
 
 const placementIcons: Record<string, typeof Film> = { image: ImageIcon, video: Film, audio: Music };
 
-function AssetPlan({ plan, agent }: { plan: unknown; agent?: string }) {
+/** Shows a planned library item as it is: an image to enlarge, a clip or sound to play, or an animation's preview. */
+function PlacementPreview({ workspaceId, entry }: { workspaceId: number; entry: Placement }) {
+  const { messages: { productionPlan: copy } } = useLocale();
+  const [open, setOpen] = useState(false);
+  const motionItem = /^motion-(\d+)$/.exec(entry.reference ?? "");
+  const assetItem = /^asset-(\d+)$/.exec(entry.reference ?? "");
+  const kind = entry.kind === "image" || entry.kind === "video" || entry.kind === "audio" ? entry.kind : undefined;
+  if (motionItem) {
+    return <MotionPreviewDialog workspaceId={workspaceId} profileId={null} itemId={Number(motionItem[1])} title={entry.name} />;
+  }
+  if (!assetItem || !kind) return null;
+  const assetId = Number(assetItem[1]);
+  if (kind === "audio") return <AssetPlayer workspaceId={workspaceId} assetId={assetId} kind="audio" label={entry.name} />;
+  const label = (open ? copy.hideAssetPreview : copy.showAssetPreview).replace("{name}", entry.name);
+  return (
+    <div className="flex flex-col gap-2">
+      <button type="button" aria-expanded={open} aria-label={label} title={label} onClick={() => setOpen(!open)}
+        className="w-28 rounded-thumb focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <AssetThumbnail workspaceId={workspaceId} assetId={assetId} kind={kind} className="w-28" />
+      </button>
+      {open && (kind === "video"
+        ? <AssetPlayer workspaceId={workspaceId} assetId={assetId} kind="video" label={entry.name} />
+        : <AssetThumbnail workspaceId={workspaceId} assetId={assetId} kind="image" fit="contain" className="w-full max-w-xl" />)}
+    </div>
+  );
+}
+
+function AssetPlan({ workspaceId, plan, agent }: { workspaceId: number; plan: unknown; agent?: string }) {
   const { messages: { productionPlan: copy } } = useLocale();
   if (!isAssetPlan(plan)) return null;
   if (plan.length === 0) return <p className="rounded-lg bg-secondary px-3 py-2.5 text-sm">{copy.assetPlanEmpty}</p>;
@@ -651,10 +678,13 @@ function AssetPlan({ plan, agent }: { plan: unknown; agent?: string }) {
             {plan.filter((entry) => (entry.section || copy.assetPlanAnywhere) === section).map((entry, index) => {
               const Icon = placementIcons[entry.kind] ?? Sparkles;
               return (
-                <li key={index} className="flex items-start gap-3 px-3 py-2 text-sm">
-                  <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="min-w-0 flex-1"><span className="font-semibold wrap-anywhere">{entry.name}</span>
-                    {entry.use && <span className="block text-muted-foreground wrap-anywhere">{entry.use}</span>}</span>
+                <li key={index} className="flex flex-col gap-2 px-3 py-2 text-sm">
+                  <div className="flex items-start gap-3">
+                    <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="min-w-0 flex-1"><span className="font-semibold wrap-anywhere">{entry.name}</span>
+                      {entry.use && <span className="block text-muted-foreground wrap-anywhere">{entry.use}</span>}</span>
+                  </div>
+                  <div className="ps-7"><PlacementPreview workspaceId={workspaceId} entry={entry} /></div>
                 </li>
               );
             })}

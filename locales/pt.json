@@ -1297,6 +1297,8 @@
     "assetPlanTitle": "O que {agent} acrescentaria",
     "assetPlanTitleFallback": "O que o agente acrescentaria",
     "assetPlanAnywhere": "Em qualquer parte",
+    "showAssetPreview": "Ver {name} em grande ou reproduzi-lo",
+    "hideAssetPreview": "Ocultar a pré-visualização de {name}",
     "assetPlanEmpty": "Nada na tua biblioteca encaixa neste vídeo, por isso uso só as tuas gravações.",
     "captionNeedsSubtitles": "Adiciona legendas para cada formato e verifico cada ficheiro antes da entrega.",
     "captionSubtitling": "A escrever as legendas; depois verifico cada ficheiro antes da entrega.",

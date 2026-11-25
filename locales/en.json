@@ -1297,6 +1297,8 @@
     "assetPlanTitle": "What {agent} would add",
     "assetPlanTitleFallback": "What the agent would add",
     "assetPlanAnywhere": "Anywhere",
+    "showAssetPreview": "Show {name} larger or play it",
+    "hideAssetPreview": "Hide the preview of {name}",
     "assetPlanEmpty": "Nothing in your library fits this video, so it uses only your footage.",
     "captionNeedsSubtitles": "Add subtitles for every format, then I'll check each file before delivery.",
     "captionSubtitling": "Writing the subtitles, then I'll check each file before delivery.",
