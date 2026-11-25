@@ -199,6 +199,13 @@ impl WorkspaceStore {
         options
     }
 
+    /// The settings one agent step runs with: the current ones, not the run's snapshot, so a
+    /// change of model, effort or web access reaches the next step of a run already under way,
+    /// such as an edit to its preview.
+    fn step_options(&self, scope: AgentLogScope<'_>, plugin_id: &str) -> BTreeMap<String, Value> {
+        self.agent_options(scope.workspace_id, plugin_id)
+    }
+
     /// Runs the agent once and records the run in the workspace's agent logs.
     /// Logging problems never fail the run itself.
     pub(crate) fn run_logged_agent(
@@ -274,9 +281,7 @@ impl WorkspaceStore {
                 |row| row.get(0),
             )
             .ok();
-        // Current settings, not the run's snapshot: a change of model, effort or web access must
-        // reach the next step of a run already under way, such as an edit to its preview.
-        let options = self.agent_options(scope.workspace_id, &provider.id);
+        let options = self.step_options(scope, &provider.id);
         let work_folder = provider
             .cli
             .structured_run
@@ -454,6 +459,7 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn logs_are_scoped_to_their_workspace_and_run() {
@@ -488,6 +494,60 @@ mod tests {
         assert_eq!(status(&Err(AgentRunError::TimedOut)), "timed_out");
         assert_eq!(status(&Err(AgentRunError::Unavailable)), "unavailable");
         assert_eq!(status(&Err(AgentRunError::Failed("x"))), "failed");
+    }
+
+    #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
+    fn settings_changed_after_queuing_reach_the_runs_next_step() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        store
+            .set_agent_provider(Some(workspace), Some("claude-code"))
+            .unwrap();
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Explainer".into(),
+                    profile_id: None,
+                    intent: "Explain the cube".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "first", &crate::RunOptions::default())
+            .unwrap();
+        assert_eq!(run.snapshot["agent_options"]["reasoning-effort"], "medium");
+        // The owner's case: values chosen for the whole app while a preview awaits review.
+        for (id, value) in [
+            ("model", json!("fable")),
+            ("reasoning-effort", json!("high")),
+            ("web-search", json!(true)),
+        ] {
+            store
+                .set_plugin_setting("claude-code", id, None, Some(&value))
+                .unwrap();
+        }
+        let scope = AgentLogScope {
+            workspace_id: workspace,
+            run_id: Some(run.id),
+            stage: "preview",
+            attempt: Some(1),
+        };
+        let options = store.step_options(scope, "claude-code");
+        let claude = crate::agent_plugin("claude-code").unwrap();
+        let args = crate::agent_run::setting_arguments(
+            claude.cli.structured_run.as_ref().unwrap(),
+            &options,
+        );
+        let joined = args.join(" ");
+        assert!(joined.contains("--model fable"), "{joined}");
+        assert!(joined.contains("--effort high"), "{joined}");
+        assert!(
+            joined.contains("WebSearch") && !joined.contains("--disallowedTools WebSearch"),
+            "{joined}"
+        );
     }
 
     #[test]
