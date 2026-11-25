@@ -23,6 +23,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { PluginCatalog } from "./plugin-catalog";
 import { PluginDetail } from "@/components/workspace/plugins/plugin-detail";
 import { PluginActions } from "@/components/workspace/plugins/plugin-actions";
@@ -113,7 +114,7 @@ export function AgentSettingsPage() {
               {tab === "general" && <AgentSummary workspaceId={studioWorkspace ? Number(studioWorkspace) : undefined} href={settingsHref("agent")} />}
               {tab === "general" && <PrivacySettings />}
               {tab === "general" && <UpdateSettings />}
-              {tab === "quality" && <QualitySettings />}
+              {tab === "quality" && <div className="flex flex-col gap-4"><QualitySettings /><MediaOrderLimitSettings /></div>}
               {tab === "backup" && <BackupSettings />}
               {tab === "about" && <AboutSettings />}
               {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
@@ -347,6 +348,79 @@ function QualitySettings() {
       </SettingRow>
       {state !== "idle" && <p role="status" className={cn("px-5 py-3 text-sm", state === "error" ? "text-destructive" : "text-muted-foreground")}>
         {state === "error" ? text.previewError : text.previewSaved.replace("{size}", String(settings.effective_max_edge))}
+      </p>}
+    </section>
+  );
+}
+
+type MediaOrderLimits = { max_media: number; max_clips: number; default_max_media: number; default_max_clips: number };
+const MAX_MEDIA_LIMIT = 50;
+
+/** How much new media one plan or preview revision may order from providers; each piece costs credits. */
+function MediaOrderLimitSettings() {
+  const { messages: { settings: text } } = useLocale();
+  const [limits, setLimits] = useState<MediaOrderLimits>();
+  const [draft, setDraft] = useState({ media: "", clips: "" });
+  const [state, setState] = useState<"idle" | "saved" | "error">("idle");
+
+  function show(value: MediaOrderLimits) {
+    setLimits(value);
+    setDraft({ media: String(value.max_media), clips: String(value.max_clips) });
+  }
+
+  useEffect(() => {
+    let active = true;
+    invoke<MediaOrderLimits>("get_media_order_limits").then((value) => { if (active) show(value); }, () => { if (active) setState("error"); });
+    return () => { active = false; };
+  }, []);
+
+  async function save(media: string, clips: string) {
+    if (!limits) return;
+    const maxMedia = Math.min(MAX_MEDIA_LIMIT, Math.max(0, Math.round(Number(media))));
+    const maxClips = Math.min(maxMedia, Math.max(0, Math.round(Number(clips))));
+    if (!Number.isFinite(maxMedia) || !Number.isFinite(maxClips) || media.trim() === "" || clips.trim() === "") {
+      show(limits);
+      return;
+    }
+    if (maxMedia === limits.max_media && maxClips === limits.max_clips) {
+      show(limits);
+      return;
+    }
+    try {
+      show(await invoke<MediaOrderLimits>("set_media_order_limits", { maxMedia, maxClips }));
+      setState("saved");
+    } catch {
+      show(limits);
+      setState("error");
+    }
+  }
+
+  if (!limits) return state === "error" ? <Alert variant="destructive"><AlertDescription>{text.mediaLimitsError}</AlertDescription></Alert>
+    : <Skeleton className="h-32" />;
+  const field = (key: "media" | "clips", labelId: string) => (
+    <Input aria-labelledby={labelId} type="number" inputMode="numeric" min={0} max={key === "media" ? MAX_MEDIA_LIMIT : Number(draft.media) || 0}
+      className="w-24" value={draft[key]}
+      onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}
+      onBlur={() => void save(draft.media, draft.clips)}
+      onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+  );
+  return (
+    <section aria-labelledby="settings-media-limits" className="divide-y rounded-xl border bg-card">
+      <div className="px-5 py-4">
+        <h3 id="settings-media-limits" className="font-bold">{text.mediaLimits}</h3>
+        <p className="text-sm text-muted-foreground">{text.mediaLimitsIntro}</p>
+      </div>
+      <SettingRow label={text.mediaLimitPieces} labelId="settings-media-pieces"
+        hint={text.mediaLimitPiecesHint.replace("{default}", String(limits.default_max_media))}>
+        {field("media", "settings-media-pieces")}
+      </SettingRow>
+      <SettingRow label={text.mediaLimitClips} labelId="settings-media-clips"
+        hint={text.mediaLimitClipsHint.replace("{default}", String(limits.default_max_clips))}>
+        {field("clips", "settings-media-clips")}
+      </SettingRow>
+      {state !== "idle" && <p role="status" className={cn("px-5 py-3 text-sm", state === "error" ? "text-destructive" : "text-muted-foreground")}>
+        {state === "error" ? text.mediaLimitsError
+          : text.mediaLimitsSaved.replace("{media}", String(limits.max_media)).replace("{clips}", String(limits.max_clips))}
       </p>}
     </section>
   );

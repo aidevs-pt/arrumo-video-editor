@@ -47,6 +47,13 @@ struct PreviewInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MediaLimitsInput {
+    max_media: Option<u32>,
+    max_clips: Option<u32>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct WorkspaceInput {
     workspace_id: i64,
 }
@@ -111,7 +118,7 @@ struct RemovePackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 21] {
+pub(super) fn definitions() -> [Value; 23] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -150,6 +157,15 @@ pub(super) fn definitions() -> [Value; 21] {
             "inputSchema": {"type": "object", "properties": {
                 "maxEdge": {"type": ["integer", "null"], "minimum": 144, "maximum": 2160}
             }, "required": ["maxEdge"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "get_media_order_limits", "description": "Read how much new media one asset plan or preview revision may order from providers: pieces of any kind, and how many of them may be video clips.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_media_order_limits", "description": "Set the app-wide limits on new media one asset plan or preview revision may order. Each piece costs provider credits. Pass null to restore a default (12 pieces, 6 clips). Clips may not exceed pieces.",
+            "inputSchema": {"type": "object", "properties": {
+                "maxMedia": {"type": ["integer", "null"], "minimum": 0, "maximum": 50},
+                "maxClips": {"type": ["integer", "null"], "minimum": 0, "maximum": 50}
+            }, "required": ["maxMedia", "maxClips"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
         json!({"name": "list_plugin_catalog", "description": "List bundled and installed plugins with declared capabilities, settings metadata, and package information.",
             "inputSchema": {"type": "object", "additionalProperties": false},
@@ -251,6 +267,17 @@ pub(super) fn call(
                 .set_preview_max_edge(max_edge)
                 .map(|()| json!({"saved": true}))
                 .map_err(|_| "Could not save preview edge. Use 144 to 2160 pixels or null")
+        }),
+        "get_media_order_limits" if arguments.is_empty() => store
+            .media_order_limits()
+            .map(|limits| json!({"limits": limits}))
+            .map_err(|_| "Could not read media order limits"),
+        "get_media_order_limits" => Err("This tool takes no arguments"),
+        "set_media_order_limits" => parse(arguments).and_then(|args: MediaLimitsInput| {
+            store
+                .set_media_order_limits(args.max_media, args.max_clips)
+                .map(|limits| json!({"limits": limits}))
+                .map_err(|_| "Could not save the limits. Use 0 to 50, with clips no more than pieces")
         }),
         "list_plugin_catalog" if arguments.is_empty() => store
             .plugin_catalog()

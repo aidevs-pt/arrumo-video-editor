@@ -71,6 +71,7 @@ mod dubbing;
 mod editing_guides;
 mod frame_strip;
 mod join_review;
+mod media_order_limits;
 mod plugin_catalog;
 mod plugin_credentials;
 mod plugin_grants;
@@ -87,6 +88,7 @@ mod portrait_cuts;
 mod preview_edit;
 mod preview_review;
 mod preview_settings;
+pub use media_order_limits::MediaOrderLimits;
 mod production_progress;
 mod profile_deliveries;
 mod profile_drafting;
@@ -347,6 +349,7 @@ impl WorkspaceStore {
             include_str!("../migrations/067-agent-executables.sql"),
             include_str!("../migrations/068-plugin-tour-for-new-installs.sql"),
             include_str!("../migrations/069-install-event.sql"),
+            include_str!("../migrations/070-media-order-limits.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

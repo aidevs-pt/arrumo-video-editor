@@ -469,6 +469,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             store.set_preview_max_edge(max_edge)?;
             println!("{}", serde_json::to_string(&store.preview_settings()?)?);
         }
+        [database, command] if command == "media-order-limits" => {
+            let limits = WorkspaceStore::open(Path::new(database))?.media_order_limits()?;
+            println!("{}", serde_json::to_string(&limits)?);
+        }
+        [database, command, media, clips] if command == "set-media-order-limits" => {
+            let limit = |value: &str| -> Result<Option<u32>, Box<dyn std::error::Error>> {
+                Ok(match value {
+                    "default" => None,
+                    value => Some(value.parse()?),
+                })
+            };
+            let limits = WorkspaceStore::open(Path::new(database))?
+                .set_media_order_limits(limit(utf8(media)?)?, limit(utf8(clips)?)?)?;
+            println!("{}", serde_json::to_string(&limits)?);
+        }
         [database, command, name] if command == "create" => {
             let name = utf8(name)?;
             let workspace = WorkspaceStore::open(Path::new(database))?.create(name)?;
@@ -1751,6 +1766,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "agent-plugins | agent-login-status <plugin-id> | ",
                 "agent-settings <app|workspace-id> | set-agent-provider <app|workspace-id> <plugin-id|unset> | ",
                 "preview-settings | set-preview-max-edge <pixels|auto> | ",
+                "media-order-limits | set-media-order-limits <pieces|default> <clips|default> | ",
                 "snapshot-database <new-sqlite-file> | watch-delivery-queue | process-script-stage <workspace-id> <run-id> | process-supplemental-writing <workspace-id> <run-id> | generate-image <workspace-id> <16:9|9:16|1:1> <providers-json> [reference-asset-ids-json] (prompt on stdin) | process-asset-plan <workspace-id> <run-id> | process-preview-edit <workspace-id> <run-id> | process-media-stage <workspace-id> <run-id> [preview-edit-json] | ",
                 "scheduled-outputs <workspace-id> <start-date> <end-date> [profile-id] | set-output-schedule <workspace-id> <run-id> <format-id> <date|clear> | ",
                 "delete-generation <workspace-id> <run-id> <confirmed-title> | recover-delivery-cleanup <workspace-id> | delete-completed-video <workspace-id> <run-id> <confirmed-title> | completed-video <workspace-id> <run-id> | verified-video-source <workspace-id> <run-id> <format-id> | import-completed-video-variant <workspace-id> <run-id> <format-id> <source.mp4> | attach-completed-media <workspace-id> <run-id> <format-id> <asset-id> | detach-completed-media <workspace-id> <run-id> <attachment-id> | ",

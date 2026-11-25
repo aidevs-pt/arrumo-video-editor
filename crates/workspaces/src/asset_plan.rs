@@ -22,8 +22,6 @@ const MAX_PLACEMENTS: usize = 100;
 const MAX_DESIGNS: usize = 6;
 /// A saved design longer than this is left out rather than crowding the prompt.
 const MAX_DESIGN_BYTES: usize = 12_000;
-/// New clips the agent may order for one plan; each costs the creator provider credits.
-const MAX_NEW_CLIPS: usize = 3;
 
 /// What the run's video provider can make, offered to the agent when one is on.
 #[derive(Debug, Clone, PartialEq)]
@@ -43,16 +41,13 @@ pub(crate) fn run_aspect_ratio(snapshot: &Value) -> &'static str {
     }
 }
 
-/// The most new media one asset plan orders.
-const MAX_NEW_MEDIA: usize = 6;
-
 /// Adds the new media the agent may order to its answer schema: every kind a provider makes
 /// now, except animations, which the plan designs itself. Every property stays required, as
 /// strict output checks expect; an empty list orders none.
-fn with_media_schema(mut schema: Value, kinds: &[&str]) -> Value {
+fn with_media_schema(mut schema: Value, kinds: &[&str], max_media: usize) -> Value {
     schema["properties"]["newMedia"] = json!({
         "type": "array",
-        "maxItems": MAX_NEW_MEDIA,
+        "maxItems": max_media,
         "items": {
             "type": "object",
             "additionalProperties": false,
@@ -227,17 +222,19 @@ fn plan_prompt(
             String::new()
         } else {
             format!(
-                "You can also order up to {MAX_NEW_MEDIA} new pieces of media the library lacks, which Arrumo makes \
+                "You can also order up to {max_media} new pieces of media the library lacks, which Arrumo makes \
                  with the creator's providers and adds to the library and this plan, in newMedia. Order what the \
                  brief, the script or the creator's notes ask for, such as music, sound effects, a picture or \
                  footage, and otherwise only what carries a beat better than the library or an animation. Each \
-                 order costs the creator provider credits. Order at most {MAX_NEW_CLIPS} clips, only where \
+                 order costs the creator provider credits. Order at most {max_clips} clips, only where \
                  real-looking footage helps, such as b-roll of a place, a product in use or an atmosphere, and \
                  never for text, logos, screens or charts. Reuse media made for earlier plans, which is in the \
                  library, instead of ordering it again, and never make media yourself with tools or commands. \
                  Give each order its kind, the script section it serves, a short name, a prompt for the provider \
                  in English, and its use. Return an empty list when none is needed.\nKinds you can order:\n{}\n",
-                crate::revision_media::kind_guide(orderable, false)
+                crate::revision_media::kind_guide(orderable, false),
+                max_media = orderable.max_media,
+                max_clips = orderable.max_clips,
             )
         },
         revision = if earlier.is_empty() {
@@ -437,7 +434,7 @@ impl WorkspaceStore {
             .collect();
         let mut schema = assets_answer_schema(&references, &image_ids);
         if !kinds.is_empty() {
-            schema = with_media_schema(schema, &kinds);
+            schema = with_media_schema(schema, &kinds, orderable.max_media);
         }
         let scope = crate::agent_logs::AgentLogScope {
             workspace_id,
@@ -618,7 +615,7 @@ impl WorkspaceStore {
             .as_array()
             .into_iter()
             .flatten()
-            .take(MAX_NEW_MEDIA)
+            .take(orderable.max_media)
         {
             let text = |key: &str| order[key].as_str().unwrap_or_default().trim().to_owned();
             let (kind, name, prompt, use_) =
@@ -627,7 +624,7 @@ impl WorkspaceStore {
                 continue;
             }
             if kind == "clip" {
-                if clips == MAX_NEW_CLIPS {
+                if clips == orderable.max_clips {
                     continue;
                 }
                 clips += 1;
@@ -773,6 +770,8 @@ mod tests {
             }),
             animations: false,
             aspect_ratio: "9:16",
+            max_media: 12,
+            max_clips: 6,
         };
         let kinds = plan_kinds(&Orderable {
             animations: true,
@@ -783,7 +782,7 @@ mod tests {
             ["music", "soundEffect", "image", "clip"],
             "animations are designed, not ordered"
         );
-        let schema = with_media_schema(assets_answer_schema(&[], &[]), &kinds);
+        let schema = with_media_schema(assets_answer_schema(&[], &[]), &kinds, 12);
         assert!(
             schema["required"]
                 .as_array()
@@ -791,7 +790,7 @@ mod tests {
                 .contains(&json!("newMedia"))
         );
         let media = &schema["properties"]["newMedia"];
-        assert_eq!(media["maxItems"], json!(MAX_NEW_MEDIA));
+        assert_eq!(media["maxItems"], json!(12));
         assert_eq!(media["items"]["properties"]["kind"]["enum"], json!(kinds));
         let portrait = json!({"formats": [{"format": {"width": 1080, "height": 1920}}]});
         assert_eq!(run_aspect_ratio(&portrait), "9:16");
@@ -802,7 +801,11 @@ mod tests {
                 && with.contains("- soundEffect:")
                 && with.contains("- image:")
         );
-        assert!(with.contains("9:16, 3 to 10 seconds") && with.contains("at most 3 clips"));
+        assert!(
+            with.contains("9:16, 3 to 10 seconds")
+                && with.contains("at most 6 clips")
+                && with.contains("up to 12 new pieces")
+        );
         assert!(!with.contains("- animation:"));
         let without = plan_prompt(&portrait, None, &[], &[], &[], &[], &Orderable::default());
         assert!(!without.contains("newMedia"));
