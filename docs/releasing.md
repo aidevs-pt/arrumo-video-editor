@@ -22,7 +22,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
 4. **Add the variables** (Settings › Secrets and variables › Actions › Variables):
    - `RELEASE_ACTORS`: the GitHub accounts allowed to release, separated by commas (for example `IAntonioDev`).
    - `ARRUMO_UPDATER_PUBKEY`: the contents of `~/.tauri/arrumo-updater.key.pub`. The public key is not secret.
-   - `SENTRY_ORG` and `SENTRY_PROJECT`: the Sentry organization and project slugs (`arrumo-video-editor`), for uploading debug files and source maps.
+   - `SENTRY_ORG` and `SENTRY_PROJECT`: the Sentry organization and project slugs (`arrumo-video-editor`), for uploading debug files and source maps. Secrets with these names work too.
 5. **Add the secrets**:
 
    | Secret | What it is |
