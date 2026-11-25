@@ -427,9 +427,13 @@ fn review_prompt(items: &[&Value]) -> String {
          Check each one for what a viewer would notice: text running outside the box or card behind it or \
          past the frame's safe margin, text overlapping other text or images, lines sitting off-centre in \
          their shape, words cut off, text hard to read against what is behind it, and layers that never \
-         appear. Fix them by moving, resizing or rewording layers, or by enlarging the shape behind the \
-         text. Change only what is wrong and keep everything that works, including all wording that fits, \
-         narration, timing and transitions.\n\
+         appear. Then judge the craft: each moment should have one clear focal point, a strong hierarchy \
+         of a few text sizes, emphasis on one word or phrase at a time rather than many, text on a calm \
+         area rather than over busy light or shapes, and something made for the topic rather than text \
+         alone where the idea allows it. Fix them by moving, resizing or rewording layers, by enlarging the \
+         shape behind the text, or by toning down what competes with the focal point. Change only what is \
+         wrong and keep everything that works, including all wording that fits, narration, timing and \
+         transitions.\n\
          Return every item in the same order. Set changed to false and return them as they are when all of \
          them look right.\n\nANIMATIONS (JSON):\n{}",
         serde_json::to_string_pretty(items).unwrap_or_default()
