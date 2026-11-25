@@ -324,6 +324,28 @@ impl WorkspaceStore {
         timeout: Duration,
         images: &[std::path::PathBuf],
         session: &mut AgentSession,
+        tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+    ) -> Result<Value, AgentRunError> {
+        let timing =
+            crate::telemetry::time_part("agent.session", &provider.id, &[("round", round.into())]);
+        let result = self.run_logged_agent_attempt(
+            scope, round, provider, prompt, schema, timeout, images, session, tick,
+        );
+        timing.finish(result.is_ok());
+        result
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run_logged_agent_attempt(
+        &self,
+        scope: AgentLogScope<'_>,
+        round: Option<i64>,
+        provider: &AgentPlugin,
+        prompt: &str,
+        schema: &Value,
+        timeout: Duration,
+        images: &[std::path::PathBuf],
+        session: &mut AgentSession,
         mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
     ) -> Result<Value, AgentRunError> {
         // An earlier attempt that never finished was interrupted by a crash or restart.

@@ -109,6 +109,7 @@ impl WorkspaceStore {
         };
 
         let attempt = work.attempt;
+        let timing = crate::telemetry::time_step(&work.stage, &[]);
         let result = match preview_edit {
             Some(edit) => self
                 .render_preview_videos(database, workspace_id, run_id, attempt, edit)
@@ -120,7 +121,12 @@ impl WorkspaceStore {
                 .verify_generation_delivery(database, workspace_id, run_id, attempt)
                 .map(|_| ()),
         };
+        timing.finish(result.is_ok());
         if let Err(error) = result {
+            crate::telemetry::warn(
+                "A generation step failed",
+                &[("stage", work.stage.clone().into())],
+            );
             // Keep native paths and external command details out of persisted activity.
             let detail = match work.stage.as_str() {
                 "preview" => {

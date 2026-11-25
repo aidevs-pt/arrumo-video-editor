@@ -7,8 +7,12 @@
 //! The desktop app sends usage through the Aptabase Tauri plugin (see [`set_usage_sink`]) and
 //! crashes through the Sentry SDK, which checks [`crash_reports_allowed`]. Headless processes
 //! (CLI, MCP, A2A) fall back to small adapters (`usage_request`, `crash_request`).
+//!
+//! Usage data also covers step timings and warnings ([`time_step`], [`warn`]), which the desktop
+//! app sends through [`set_diagnostics`]; headless processes send none.
 
 use std::{
+    cell::Cell,
     collections::BTreeMap,
     error::Error,
     sync::{
@@ -32,6 +36,99 @@ const CRASH_DSN: Option<&str> = option_env!("ARRUMO_CRASH_DSN");
 type UsageSink = Box<dyn Fn(&str, Value) + Send + Sync>;
 static USAGE_SINK: OnceLock<UsageSink> = OnceLock::new();
 static CRASH_ALLOWED: AtomicBool = AtomicBool::new(false);
+static USAGE_ALLOWED: AtomicBool = AtomicBool::new(false);
+
+/// Receives timings and warnings while the creator allows usage data. Names and attributes are
+/// fixed values, such as a stage, a program's file name, a plugin ID or a round, never a title,
+/// path, prompt or message from a provider.
+pub trait Diagnostics: Send + Sync {
+    /// Starts timing `name`, inside the timing already running on this thread, if any.
+    fn start(
+        &self,
+        op: &'static str,
+        name: &str,
+        attributes: &[(&'static str, Value)],
+    ) -> Box<dyn TimingEnd>;
+    fn warn(&self, message: &'static str, attributes: &[(&'static str, Value)]);
+}
+
+pub trait TimingEnd {
+    fn end(self: Box<Self>, ok: bool);
+}
+
+static DIAGNOSTICS: OnceLock<Box<dyn Diagnostics>> = OnceLock::new();
+
+thread_local! {
+    static OPEN_TIMINGS: Cell<u32> = const { Cell::new(0) };
+}
+
+/// Sends timings and warnings through `diagnostics`, such as the desktop app's crash reporter.
+pub fn set_diagnostics(diagnostics: impl Diagnostics + 'static) {
+    let _ = DIAGNOSTICS.set(Box::new(diagnostics));
+}
+
+/// Whether the creator currently allows usage data, for SDKs to check before sending.
+pub fn usage_data_allowed() -> bool {
+    USAGE_ALLOWED.load(Ordering::Relaxed)
+}
+
+/// Times a piece of work until [`Timing::finish`]; dropping it unfinished counts as a failure.
+#[must_use]
+pub struct Timing(Option<Box<dyn TimingEnd>>);
+
+impl Timing {
+    pub fn finish(mut self, ok: bool) {
+        self.end(ok);
+    }
+
+    fn end(&mut self, ok: bool) {
+        if let Some(end) = self.0.take() {
+            OPEN_TIMINGS.with(|open| open.set(open.get().saturating_sub(1)));
+            end.end(ok);
+        }
+    }
+}
+
+impl Drop for Timing {
+    fn drop(&mut self) {
+        self.end(false);
+    }
+}
+
+/// Times a generation step. Call it only once the step is claimed, so idle polling sends nothing.
+pub fn time_step(stage: &str, attributes: &[(&'static str, Value)]) -> Timing {
+    time("generation.step", stage, attributes)
+}
+
+/// Times part of a step, such as a program run or an agent session. Outside a step it times
+/// nothing, so checks that run on their own are not sent.
+pub(crate) fn time_part(
+    op: &'static str,
+    name: &str,
+    attributes: &[(&'static str, Value)],
+) -> Timing {
+    if OPEN_TIMINGS.with(Cell::get) == 0 {
+        return Timing(None);
+    }
+    time(op, name, attributes)
+}
+
+fn time(op: &'static str, name: &str, attributes: &[(&'static str, Value)]) -> Timing {
+    match DIAGNOSTICS.get() {
+        Some(diagnostics) if usage_data_allowed() => {
+            OPEN_TIMINGS.with(|open| open.set(open.get() + 1));
+            Timing(Some(diagnostics.start(op, name, attributes)))
+        }
+        _ => Timing(None),
+    }
+}
+
+/// Records a warning for diagnostics. The message is a fixed sentence; details go in attributes.
+pub fn warn(message: &'static str, attributes: &[(&'static str, Value)]) {
+    if let Some(diagnostics) = DIAGNOSTICS.get().filter(|_| usage_data_allowed()) {
+        diagnostics.warn(message, attributes);
+    }
+}
 
 /// The usage service key this build was given, if any.
 pub fn usage_key() -> Option<&'static str> {
@@ -157,10 +254,12 @@ impl WorkspaceStore {
             "SELECT usage_data, crash_reports FROM privacy_settings WHERE id = 1",
             [],
             |row| {
+                let usage_data = row.get(0)?;
                 let crash_reports = row.get(1)?;
+                USAGE_ALLOWED.store(usage_data, Ordering::Relaxed);
                 CRASH_ALLOWED.store(crash_reports, Ordering::Relaxed);
                 Ok(PrivacySettings {
-                    usage_data: row.get(0)?,
+                    usage_data,
                     crash_reports,
                     usage_available: USAGE_KEY.is_some(),
                     crash_available: CRASH_DSN.is_some(),
@@ -428,8 +527,14 @@ mod tests {
         assert_eq!(without_quotes("Unclosed \"name"), "Unclosed [redacted]");
     }
 
+    /// Held by tests that turn usage data off or rely on it being on.
+    static USAGE_SETTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn privacy_settings_default_on_and_persist() {
+        let _usage = USAGE_SETTING
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         let store = WorkspaceStore::open(":memory:").unwrap();
         let settings = store.privacy_settings().unwrap();
         assert!(settings.usage_data && settings.crash_reports);
@@ -438,6 +543,60 @@ mod tests {
         assert!(!off.usage_data && off.crash_reports);
         // Contributor builds have no keys, so tracking is a no-op.
         store.track_usage("app_installed", &[]);
+    }
+
+    #[test]
+    fn only_claimed_steps_and_the_work_inside_them_are_timed() {
+        use std::cell::RefCell;
+        thread_local! {
+            static SEEN: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+        }
+        struct Record;
+        struct End(String);
+        impl Diagnostics for Record {
+            fn start(
+                &self,
+                op: &'static str,
+                name: &str,
+                _: &[(&'static str, Value)],
+            ) -> Box<dyn TimingEnd> {
+                SEEN.with(|seen| seen.borrow_mut().push(format!("start {op} {name}")));
+                Box::new(End(name.to_owned()))
+            }
+            fn warn(&self, message: &'static str, _: &[(&'static str, Value)]) {
+                SEEN.with(|seen| seen.borrow_mut().push(message.to_owned()));
+            }
+        }
+        impl TimingEnd for End {
+            fn end(self: Box<Self>, ok: bool) {
+                SEEN.with(|seen| seen.borrow_mut().push(format!("end {} {ok}", self.0)));
+            }
+        }
+        let _usage = USAGE_SETTING
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        set_diagnostics(Record);
+        USAGE_ALLOWED.store(true, Ordering::Relaxed);
+        time_part("process", "arrumo-ffprobe", &[]).finish(true);
+        let step = time_step("preview", &[]);
+        time_part("process", "arrumo-ffmpeg", &[]).finish(false);
+        warn("A generation step failed", &[]);
+        drop(step);
+        time_part("process", "arrumo-ffprobe", &[]).finish(true);
+        USAGE_ALLOWED.store(false, Ordering::Relaxed);
+        time_step("script", &[]).finish(true);
+        warn("A generation step failed", &[]);
+        USAGE_ALLOWED.store(true, Ordering::Relaxed);
+        assert_eq!(
+            SEEN.with(|seen| seen.take()),
+            [
+                "start generation.step preview",
+                "start process arrumo-ffmpeg",
+                "end arrumo-ffmpeg false",
+                "A generation step failed",
+                "end preview false",
+            ]
+        );
     }
 
     #[test]
