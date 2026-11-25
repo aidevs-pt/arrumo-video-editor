@@ -496,7 +496,7 @@ impl WorkspaceStore {
             .transpose()?
             .flatten();
         let agent_settings = self.agent_settings(Some(workspace_id))?;
-        // Freeze the agent's plugin settings so the run reproduces with the same capabilities.
+        // Records the agent's plugin settings at queue time. Agent steps use the current ones.
         let agent_options = agent_settings
             .effective_provider
             .as_deref()

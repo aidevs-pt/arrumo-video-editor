@@ -199,28 +199,6 @@ impl WorkspaceStore {
         options
     }
 
-    /// The options a run froze when it was queued, or the workspace's current ones.
-    fn run_agent_options(
-        &self,
-        scope: AgentLogScope<'_>,
-        plugin_id: &str,
-    ) -> BTreeMap<String, Value> {
-        let frozen = scope.run_id.and_then(|run_id| {
-            let text: String = self
-                .0
-                .query_row(
-                    "SELECT json_extract(snapshot_json, '$.agent_options') FROM generation_runs
-                     WHERE workspace_id = ?1 AND id = ?2
-                       AND json_extract(snapshot_json, '$.agent_settings.effective_provider') = ?3",
-                    params![scope.workspace_id, run_id, plugin_id],
-                    |row| row.get(0),
-                )
-                .ok()?;
-            serde_json::from_str(&text).ok()
-        });
-        frozen.unwrap_or_else(|| self.agent_options(scope.workspace_id, plugin_id))
-    }
-
     /// Runs the agent once and records the run in the workspace's agent logs.
     /// Logging problems never fail the run itself.
     pub(crate) fn run_logged_agent(
@@ -296,7 +274,9 @@ impl WorkspaceStore {
                 |row| row.get(0),
             )
             .ok();
-        let options = self.run_agent_options(scope, &provider.id);
+        // Current settings, not the run's snapshot: a change of model, effort or web access must
+        // reach the next step of a run already under way, such as an edit to its preview.
+        let options = self.agent_options(scope.workspace_id, &provider.id);
         let work_folder = provider
             .cli
             .structured_run
