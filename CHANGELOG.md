@@ -2,6 +2,19 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.4 (2026-11-24)
+
+### New
+
+- Let the agent order generated clips for a video (#40)
+
+### Fixes
+
+- Correct text layout and review animations before showing them (#41)
+- Dark theme selections and sidebar, and wide windows (#42)
+- Send the agent's model and effort, finish publishing text, detailed failure reports (#39)
+- Count an install only when its database is created (#38)
+
 ## 0.1.3 (2026-11-24)
 
 ### New
