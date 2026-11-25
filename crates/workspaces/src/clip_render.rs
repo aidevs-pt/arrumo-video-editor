@@ -1275,22 +1275,38 @@ impl ActiveRender<'_> {
                     .map(|start| (path.as_path(), *start))
             }))
             .collect();
+        let voiced = narration.iter().any(|(audio, _)| audio.is_some());
+        self.add_soundtrack(&output, &staged, &finished, &tracks, music.featured, voiced)?;
+        self.check_render(&finished, &parts)
+    }
+
+    /// Masters the joined scenes' audio with their music into `finished`. `master_audio` uses up
+    /// its input, so only a file it did not read is removed here.
+    fn add_soundtrack(
+        &self,
+        joined: &Path,
+        staged: &Path,
+        finished: &Path,
+        tracks: &[(&Path, f64)],
+        featured: bool,
+        voiced: bool,
+    ) -> Result<(), Box<dyn Error>> {
         match tracks.is_empty() {
             // With a voice, the music sits under the mastered narration as it does under speech.
-            false if narration.iter().any(|(audio, _)| audio.is_some()) => {
-                self.master_audio(&output, &staged)?;
-                self.lay_music_tracks(&staged, &tracks, music.featured, &finished)?;
+            false if voiced => {
+                self.master_audio(joined, staged)?;
+                self.lay_music_tracks(staged, tracks, featured, finished)?;
                 fs::remove_file(staged).io_step("Removing a file")?;
             }
             // Without one, the music is the whole soundtrack, so it is mastered to full level.
             false => {
-                self.lay_music_tracks(&output, &tracks, music.featured, &staged)?;
-                self.master_audio(&staged, &finished)?;
-                fs::remove_file(staged).io_step("Removing a file")?;
+                self.lay_music_tracks(joined, tracks, featured, staged)?;
+                self.master_audio(staged, finished)?;
+                fs::remove_file(joined).io_step("Removing a file")?;
             }
-            true => self.master_audio(&output, &finished)?,
+            true => self.master_audio(joined, finished)?,
         }
-        self.check_render(&finished, &parts)
+        Ok(())
     }
 
     fn inspect_clips(
@@ -1867,6 +1883,83 @@ mod tests {
         assert!(made.success());
         let seconds = crate::source_transcripts::media_duration(&output).unwrap();
         assert!((seconds - 2.1).abs() < 0.08, "{seconds}");
+    }
+
+    #[test]
+    fn storyboard_scenes_get_their_music_with_or_without_a_voice() {
+        use crate::{DraftSettings, RunOptions, WorkspaceStore};
+        let dir = tempfile::tempdir().unwrap();
+        let make = |path: &std::path::Path, args: &[&str]| {
+            crate::quiet_command(crate::media_tools::ffmpeg())
+                .args(["-nostdin", "-v", "error"])
+                .args(args)
+                .arg(path)
+                .status()
+                .is_ok_and(|status| status.success())
+        };
+        let scenes = [
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=gray:s=160x90:d=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=f=220:d=2",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-y",
+        ];
+        let music = dir.path().join("music.wav");
+        if !make(&music, &["-f", "lavfi", "-i", "sine=f=660:d=2", "-y"]) {
+            eprintln!("FFmpeg is unavailable; skipping the soundtrack check");
+            return;
+        }
+        let database = dir.path().join("arrumo.db");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let profile = store
+            .create_profile(workspace, "Shorts", "", None)
+            .unwrap()
+            .id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Story".into(),
+                    intent: "A storyboard".into(),
+                    profile_id: Some(profile),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &RunOptions::default())
+            .unwrap()
+            .id;
+        let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+        let renderer = super::ActiveRender {
+            store: &store,
+            workspace_id: workspace,
+            run_id: run,
+            attempt,
+        };
+        for voiced in [false, true] {
+            let joined = dir.path().join(format!("joined-{voiced}.mp4"));
+            let staged = dir.path().join(format!("staged-{voiced}.mp4"));
+            let finished = dir.path().join(format!("finished-{voiced}.mp4"));
+            assert!(make(&joined, &scenes));
+            renderer
+                .add_soundtrack(&joined, &staged, &finished, &[(&music, 0.0)], false, voiced)
+                .unwrap();
+            assert!(finished.is_file(), "voiced: {voiced}");
+            assert!(!staged.exists() && !joined.exists(), "voiced: {voiced}");
+        }
     }
 
     #[test]
