@@ -763,15 +763,6 @@ impl WorkspaceStore {
         let mut animations = self.planned_animations(workspace_id, approved.as_ref())?;
         animations.extend(ordered.animations.iter().cloned());
         let animations = json!(animations);
-        // Designed effects replace the built-in synthesized sounds once the workspace has them.
-        let designed_sounds = !sounds.is_empty();
-        let scene_schema = |schema: Value| {
-            if designed_sounds {
-                crate::motion_spec::designed_sounds_only(schema)
-            } else {
-                schema
-            }
-        };
         let mut brief = json!({
             "video": {"title": snapshot["draft"]["title"], "intent": snapshot["draft"]["intent"]},
             "approvedScript": script,
@@ -899,7 +890,7 @@ impl WorkspaceStore {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": MAX_SCENES,
-                    "items": with_narration(scene_schema(crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids)))
+                    "items": with_narration(crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids))
                 }
             }
         });
@@ -929,9 +920,9 @@ impl WorkspaceStore {
                 database,
                 workspace_id,
                 scenes,
-                &with_narration(scene_schema(crate::motion_spec::spec_schema_with_media(
+                &with_narration(crate::motion_spec::spec_schema_with_media(
                     &image_ids, &clip_ids, &sound_ids,
-                ))),
+                )),
                 &|scene| {
                     crate::motion_spec::MotionSpec::from_answer_with_media(
                         scene,
@@ -1183,13 +1174,8 @@ impl WorkspaceStore {
         let image_ids: Vec<i64> = images_for_new.iter().map(|image| image.id).collect();
         let library_clips = self.workspace_clips(database, workspace_id)?;
         let clip_ids: Vec<i64> = library_clips.iter().map(|clip| clip.id).collect();
-        let spec = crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids);
-        // Designed effects replace the built-in synthesized sounds once the workspace has them.
-        let new_spec = if sound_ids.is_empty() {
-            spec
-        } else {
-            crate::motion_spec::designed_sounds_only(spec)
-        };
+        let new_spec =
+            crate::motion_spec::spec_schema_with_media(&image_ids, &clip_ids, &sound_ids);
         prompt.push_str(&format!(
             "\n\nYou may also design up to {MAX_NEW_CUT_ANIMATIONS} new animations this cut needs that the \
              approved ones do not cover, such as a lower third naming a speaker, a callout for a key number or \

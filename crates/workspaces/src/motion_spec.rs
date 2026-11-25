@@ -82,10 +82,10 @@ pub(crate) struct Layer {
     pub end: f64,
     pub enter: Motion,
     pub exit: Motion,
-    /// A sound effect played as the layer arrives.
+    /// No longer played; see [`Sound`].
     #[serde(default)]
     pub sound: Sound,
-    /// A workspace sound-effect file played as the layer arrives, in place of `sound`.
+    /// A workspace sound-effect file played as the layer arrives.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sound_asset_id: Option<i64>,
     /// How text lines sit inside the layer's width.
@@ -159,6 +159,9 @@ impl Align {
     }
 }
 
+/// Built-in sounds that earlier versions synthesized with FFmpeg. Stored animations may still name
+/// one, so they keep loading, but nothing plays them: sound effects come from workspace audio
+/// files (`sound_asset_id`), such as those a sound-effect provider made.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Sound {
@@ -169,26 +172,6 @@ pub(crate) enum Sound {
     Click,
     Chime,
     Rise,
-}
-
-impl Sound {
-    /// An FFmpeg source graph producing the effect as 48 kHz stereo, or `None` for silence.
-    fn source(self) -> Option<&'static str> {
-        Some(match self {
-            Self::None => return None,
-            Self::Whoosh => {
-                "anoisesrc=d=0.5:c=pink:a=0.6,highpass=f=300,lowpass=f=3500,afade=t=in:d=0.2,afade=t=out:st=0.2:d=0.3,volume=0.5"
-            }
-            Self::Pop => "sine=f=520:d=0.12,afade=t=out:st=0.02:d=0.1,volume=0.6",
-            Self::Click => "sine=f=1800:d=0.04,afade=t=out:st=0.005:d=0.035,volume=0.5",
-            Self::Chime => {
-                "aevalsrc=0.3*sin(2*PI*880*t)*exp(-4*t)+0.2*sin(2*PI*1320*t)*exp(-5*t):d=0.9"
-            }
-            Self::Rise => {
-                "aevalsrc=0.35*sin(2*PI*(260+520*t)*t)*min(1\\,t*8):d=0.5,afade=t=out:st=0.35:d=0.15"
-            }
-        })
-    }
 }
 
 /// A validated animation, stored with results and library items so it can be rendered again.
@@ -223,13 +206,6 @@ pub(crate) fn spec_schema_with_clips(images: &[i64], clips: &[i64]) -> Value {
 }
 
 /// Like `spec_schema_with_clips`, also letting layers play the workspace sound effects in `sounds`.
-/// An animation schema whose layers play no built-in synthesized sounds, for workspaces with
-/// designed sound effects or a provider that makes them.
-pub(crate) fn designed_sounds_only(mut schema: Value) -> Value {
-    schema["properties"]["layers"]["items"]["properties"]["sound"] = json!({"enum": ["none"]});
-    schema
-}
-
 pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i64]) -> Value {
     let assets: Vec<i64> = images.iter().chain(clips).copied().collect();
     let motion = json!({"enum": ["none", "fade", "rise", "drop", "slide-left", "slide-right", "reveal", "wipe"]});
@@ -245,7 +221,7 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
         "type": "object",
         "additionalProperties": false,
         "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
-            "color", "bold", "opacity", "start", "end", "enter", "exit", "sound",
+            "color", "bold", "opacity", "start", "end", "enter", "exit",
             "align", "radius", "gradientTo", "shadow", "font"],
         "properties": {
             "type": {"enum": ["text", "box", "image"]},
@@ -260,7 +236,6 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
             "end": {"type": "number", "minimum": 0},
             "enter": motion,
             "exit": motion,
-            "sound": {"enum": ["none", "whoosh", "pop", "click", "chime", "rise"]},
             "align": {"enum": ["left", "center", "right"]},
             "radius": {"type": "number", "minimum": 0, "maximum": 0.5},
             "gradientTo": optional_color,
@@ -344,9 +319,9 @@ and leaves; for text, reveal raises each line from behind its baseline one after
 uncovers lines from left to right, the polished choices for headlines (a reveal or wipe exit fades). \
 Use the brand colours, keep strong contrast between text and what is behind it, keep \
 text short and inside the frame with a safe margin of 0.06, and stagger entrances so the motion \
-reads clearly. A layer can play a short sound as it arrives (a whoosh for slides, a pop or click for \
-items appearing, a chime for a reveal, a rise for a build-up); use them sparingly, on the beats that \
-matter, and none when the animation will sit under speech. Text is set in the brand's heading or body \
+reads clearly. Where soundAssetId is offered, a layer can play one of the workspace's sound effects \
+as it arrives; use them sparingly, on the beats that matter, and none when the animation will sit \
+under speech. Text is set in the brand's heading or body \
 font (font; a plain sans-serif when the brand has none), with no emoji, pictographs or arrows, so \
 write only letters, digits and common punctuation; use the heading font for titles and big numbers, and draw shapes, grids, bars and diagrams with box \
 layers. Leave text null for boxes and images and assetId null for text and boxes. \
@@ -475,9 +450,7 @@ impl MotionSpec {
         spec.layers.truncate(MAX_LAYERS);
         spec.layers.retain_mut(|layer| {
             layer.sound_asset_id = layer.sound_asset_id.filter(|id| sound_allowed(*id));
-            if layer.sound_asset_id.is_some() {
-                layer.sound = Sound::None;
-            }
+            layer.sound = Sound::None;
             let unit = |value: f64| {
                 if value.is_finite() {
                     value.clamp(0.0, 1.0)
@@ -1669,14 +1642,6 @@ fn render_arguments(
             )
             .ok();
             inputs.push(format!("[fx{index}]"));
-        } else if let Some(source) = layer.sound.source() {
-            let delay = (layer.start * 1000.0).round() as u64;
-            write!(
-                mix,
-                ";{source},aformat=sample_rates=48000:channel_layouts=stereo,adelay={delay}:all=1[fx{index}]"
-            )
-            .ok();
-            inputs.push(format!("[fx{index}]"));
         }
     }
     if inputs.len() == 1 {
@@ -2009,11 +1974,74 @@ mod tests {
     }
 
     #[test]
-    fn designed_sounds_replace_the_built_in_ones() {
-        let schema = designed_sounds_only(spec_schema_with_media(&[], &[], &[4]));
-        let layer = &schema["properties"]["layers"]["items"]["properties"];
-        assert_eq!(layer["sound"]["enum"], json!(["none"]));
-        assert!(layer.get("soundAssetId").is_some());
+    fn no_schema_offers_built_in_sounds() {
+        for schema in [spec_schema(&[]), spec_schema_with_media(&[], &[], &[4])] {
+            let layer = &schema["properties"]["layers"]["items"];
+            assert!(layer["properties"].get("sound").is_none());
+            assert!(
+                !layer["required"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("sound"))
+            );
+        }
+        let offered = spec_schema_with_media(&[], &[], &[4]);
+        assert!(
+            offered["properties"]["layers"]["items"]["properties"]
+                .get("soundAssetId")
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn stored_built_in_sounds_load_but_never_play() {
+        // Box layers are drawn with FFmpeg while the command is built.
+        if crate::quiet_command(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        let mut stored =
+            serde_json::to_value(MotionSpec::from_answer(&answer(), |_| true).unwrap()).unwrap();
+        stored["layers"][0]["sound"] = json!("whoosh");
+        stored["layers"][1]["sound"] = json!("chime");
+        let spec: MotionSpec = serde_json::from_value(stored).unwrap();
+        assert_eq!(spec.layers[0].sound, Sound::Whoosh);
+        let graph = |spec: &MotionSpec| {
+            render_arguments(
+                spec,
+                160,
+                90,
+                Path::new("/tmp"),
+                "out.mp4",
+                &|id| {
+                    Some(PathBuf::from(if id == 9 {
+                        "/media/effect.wav"
+                    } else {
+                        "/media/image.png"
+                    }))
+                },
+                &FontSet::default(),
+                None,
+            )
+            .unwrap()
+            .join(" ")
+        };
+        let silent = graph(&spec);
+        for generator in ["anoisesrc", "sine=", "aevalsrc"] {
+            assert!(!silent.contains(generator), "{generator} in {silent}");
+        }
+        assert!(!silent.contains("[fx"), "{silent}");
+        // A workspace sound effect still plays as its layer arrives.
+        let mut with_effect = spec.clone();
+        with_effect.layers[0].sound_asset_id = Some(9);
+        let mixed = graph(&with_effect);
+        assert!(
+            mixed.contains("/media/effect.wav") && mixed.contains("[fx0]"),
+            "{mixed}"
+        );
     }
 
     #[test]
@@ -2601,41 +2629,7 @@ mod tests {
         assert!((duration - 3.0).abs() < 0.2, "{duration}");
         assert!(directory.path().join("thumb.png").is_file());
 
-        // Every effect renders and is audible.
-        for (number, sound) in ["pop", "click", "chime", "rise", "whoosh"]
-            .iter()
-            .enumerate()
-        {
-            let mut value = answer();
-            value["layers"][0]["sound"] = json!(sound);
-            let spec = MotionSpec::from_answer(&value, |_| true).unwrap();
-            let name = format!("sound-{number}.mp4");
-            render_spec(
-                &spec,
-                (160, 90),
-                directory.path(),
-                &name,
-                &resolve,
-                &FontSet::default(),
-                &mut || Ok(()),
-            )
-            .unwrap();
-            let report = crate::quiet_command(crate::media_tools::ffmpeg())
-                .args(["-v", "info", "-i"])
-                .arg(directory.path().join(&name))
-                .args(["-af", "volumedetect", "-vn", "-f", "null", "-"])
-                .launch_output()
-                .unwrap();
-            let report = String::from_utf8_lossy(&report.stderr);
-            let peak: f64 = report
-                .lines()
-                .find_map(|line| line.split("max_volume: ").nth(1))
-                .and_then(|value| value.trim_end_matches(" dB").parse().ok())
-                .unwrap();
-            assert!(peak > -30.0, "{sound} peaked at {peak} dB");
-        }
-
-        // A layer's sound-effect file plays in place of the built-in sound, cut after a few seconds.
+        // A layer's sound-effect file plays as the layer arrives, cut after a few seconds.
         let effect = directory.path().join("effect.wav");
         let made = crate::quiet_command(crate::media_tools::ffmpeg())
             .args(["-v", "error", "-f", "lavfi", "-i", "sine=f=300:d=6"])
@@ -2768,7 +2762,11 @@ mod tests {
         let refused =
             MotionSpec::from_answer_with_media(&value, |_| true, |_| false, |_| false).unwrap();
         assert_eq!(refused.layers[0].sound_asset_id, None);
-        assert_eq!(refused.layers[0].sound, Sound::Chime);
+        assert_eq!(
+            refused.layers[0].sound,
+            Sound::None,
+            "built-in sounds are never kept"
+        );
         let kept =
             MotionSpec::from_answer_with_media(&value, |_| true, |_| false, |id| id == 4).unwrap();
         assert_eq!(kept.layers[0].sound_asset_id, Some(4));
