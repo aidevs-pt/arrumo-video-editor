@@ -2,6 +2,13 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.6 (2026-11-25)
+
+### New
+
+- Portrait voice-over, new animations in cuts, review aids, platform notes (#47)
+- Let creators set how much media the agent may order (#46)
+
 ## 0.1.5 (2026-11-25)
 
 ### New
