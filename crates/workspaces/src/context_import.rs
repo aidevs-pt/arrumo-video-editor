@@ -2,6 +2,7 @@
 //! images (downloaded from their public pages, described, grouped and labelled), brand marks,
 //! thumbnail references and profiles.
 
+use crate::IoStep;
 use std::{error::Error, fs, path::Path};
 
 use serde::{Deserialize, Serialize};
@@ -117,7 +118,7 @@ impl WorkspaceStore {
                 let (bytes, extension) = fetch_image(&url)
                     .map_err(|problem| std::io::Error::other(problem.to_string()))?;
                 let file = scratch.path().join(image_file_name(&image.name, extension));
-                fs::write(&file, bytes)?;
+                fs::write(&file, bytes).io_step("Writing a file")?;
                 let asset = if image.purpose == "thumbnail_reference" {
                     self.import_thumbnail_reference(&root, workspace_id, &file)
                 } else {

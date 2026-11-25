@@ -3,6 +3,7 @@
 //! Arrumo hands them over in a follow-up run: text inline, images attached. Agents never get a
 //! shell or file access; Arrumo decides what each item contains.
 
+use crate::IoStep;
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -258,7 +259,7 @@ impl WorkspaceStore {
                             "material-{number}.{}",
                             preview.mime.trim_start_matches("image/")
                         ));
-                        std::fs::write(&path, preview.bytes)?;
+                        std::fs::write(&path, preview.bytes).io_step("Writing a file")?;
                         Some(Provided::Image(path))
                     }
                     None => None,

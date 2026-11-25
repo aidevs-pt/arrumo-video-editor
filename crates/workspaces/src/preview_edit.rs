@@ -613,6 +613,9 @@ impl WorkspaceStore {
                 ));
             }
         }
+        // A track whose file is gone (an interrupted download or a partial backup) cannot play.
+        let root = asset_root(database);
+        tracks.retain(|(id, _)| asset_path(&root, workspace_id, *id).is_file());
         Ok(tracks)
     }
 

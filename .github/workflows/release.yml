@@ -297,11 +297,16 @@ jobs:
             echo "Crash reporter upload is not configured; skipping."
             exit 0
           fi
-          mapfile -t files < <(find target -maxdepth 4 -path '*/release/*' -not -path '*/bundle/*' -not -path '*/deps/*' \
-            \( -name 'arrumo-desktop' -o -name 'arrumo-desktop.exe' -o -name 'arrumo_desktop.pdb' -o -name 'arrumo-desktop.dSYM' \))
-          if [ ${#files[@]} -eq 0 ]; then echo "::error::No debug files were found to upload"; exit 1; fi
-          printf '%s\n' "${files[@]}"
-          pnpm dlx @sentry/cli@2.39.1 debug-files upload --wait "${files[@]}"
+          find target -maxdepth 4 -path '*/release/*' -not -path '*/bundle/*' -not -path '*/deps/*' \
+            \( -name 'arrumo-desktop' -o -name 'arrumo-desktop.exe' -o -name 'arrumo_desktop.pdb' -o -name 'arrumo-desktop.dSYM' \) \
+            > debug-files.txt
+          cat debug-files.txt
+          # A crash reporter problem must not hold back a signed release.
+          if [ ! -s debug-files.txt ]; then
+            echo "::warning::No debug files were found to upload"
+          elif ! tr '\n' '\0' < debug-files.txt | xargs -0 pnpm dlx @sentry/cli@2.39.1 debug-files upload --wait; then
+            echo "::warning::The debug files could not be uploaded to the crash reporter"
+          fi
       # A signed build has to open without a Gatekeeper warning, so a bad certificate or a failed
       # notarization stops the release here instead of reaching users.
       - name: Check the macOS signature

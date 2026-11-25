@@ -1,6 +1,7 @@
 //! How burned-in subtitles look: one style per output format, overridden field by field by a
 //! profile and then by a single video, and drawn by libass for both the export and its preview.
 
+use crate::IoStep;
 use crate::Launch;
 use std::io;
 
@@ -252,7 +253,7 @@ pub fn caption_preview(
     if !status.success() {
         return Err(io::Error::other("Could not draw the subtitle preview").into());
     }
-    Ok(std::fs::read(work.path().join("preview.png"))?)
+    Ok(std::fs::read(work.path().join("preview.png")).io_step("Reading a file")?)
 }
 
 #[cfg(test)]

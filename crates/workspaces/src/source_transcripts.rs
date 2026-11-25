@@ -1,6 +1,7 @@
 //! Transcripts of source footage. Audio is extracted in bounded chunks, sent to the run's
 //! transcription providers in their captured order, and cached per managed asset.
 
+use crate::IoStep;
 use crate::Launch;
 use std::{error::Error, fs, io, path::Path, process::Stdio};
 
@@ -257,7 +258,7 @@ impl WorkspaceStore {
             let transcript = self.transcribe_ordered_wav(
                 workspace_id,
                 providers.to_vec(),
-                fs::File::open(&wave)?,
+                fs::File::open(&wave).io_step("Opening a file")?,
                 false,
             )?;
             provider = transcript.provider;
@@ -274,7 +275,7 @@ impl WorkspaceStore {
                         ..word
                     }),
             );
-            fs::remove_file(&wave)?;
+            fs::remove_file(&wave).io_step("Removing a file")?;
             offset += CHUNK_SECONDS;
         }
         let stored = SourceTranscript {
@@ -354,7 +355,10 @@ fn extract_chunk(source: &Path, offset: f64, wave: &Path) -> io::Result<()> {
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .launch_status()?;
-    if !status.success() || wave.metadata()?.len() >= crate::transcription::MAX_AUDIO_BYTES {
+    if !status.success()
+        || wave.metadata().io_step("Checking a file")?.len()
+            >= crate::transcription::MAX_AUDIO_BYTES
+    {
         return Err(io::Error::other("Could not extract the clip's audio"));
     }
     Ok(())

@@ -1,3 +1,4 @@
+use crate::IoStep;
 use std::{error::Error, fs, io, path::Path};
 
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
@@ -41,7 +42,7 @@ impl WorkspaceStore {
         confirmed_title: &str,
         completed_only: bool,
     ) -> Result<bool, Box<dyn Error>> {
-        let database = database.canonicalize()?;
+        let database = database.canonicalize().io_step("Resolving a path")?;
         let directory = delivery_directory(&database, workspace_id, run_id);
         let transaction = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let already_pending = transaction
@@ -102,7 +103,7 @@ impl WorkspaceStore {
         database: &Path,
         workspace_id: Option<i64>,
     ) -> Result<DeliveryCleanupReport, Box<dyn Error>> {
-        let database = database.canonicalize()?;
+        let database = database.canonicalize().io_step("Resolving a path")?;
         let ids: Vec<(i64, i64)> = self
             .0
             .prepare(

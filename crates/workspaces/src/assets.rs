@@ -1,3 +1,4 @@
+use crate::IoStep;
 use crate::Launch;
 use std::{
     collections::HashSet,
@@ -96,11 +97,17 @@ impl WorkspaceStore {
             return Ok(None);
         }
         let path = asset_path(media_root, workspace_id, asset_id);
-        if !path.symlink_metadata()?.is_file() || !is_canonical(&path)? {
+        if !path
+            .symlink_metadata()
+            .io_step("Checking a file")?
+            .is_file()
+            || !is_canonical(&path)?
+        {
             return Err(io::Error::other("Image preview source is unavailable").into());
         }
         let mut bytes = Vec::new();
-        File::open(path)?
+        File::open(path)
+            .io_step("Opening a file")?
             .take(MAX_BYTES + 1)
             .read_to_end(&mut bytes)?;
         if bytes.len() as u64 > MAX_BYTES {
@@ -123,11 +130,16 @@ impl WorkspaceStore {
     ) -> Result<ImagePreview, Box<dyn Error>> {
         self.managed_asset_name(workspace_id, asset_id, "video")?;
         let source = asset_path(media_root, workspace_id, asset_id);
-        if !source.symlink_metadata()?.is_file() || !is_canonical(&source)? {
+        if !source
+            .symlink_metadata()
+            .io_step("Checking a file")?
+            .is_file()
+            || !is_canonical(&source)?
+        {
             return Err(io::Error::other("Video frame source is unavailable").into());
         }
         // The name follows the file, so a restored backup or replaced asset never reuses a frame.
-        let metadata = source.metadata()?;
+        let metadata = source.metadata().io_step("Checking a file")?;
         let modified = metadata
             .modified()?
             .duration_since(std::time::UNIX_EPOCH)
@@ -136,7 +148,7 @@ impl WorkspaceStore {
         let directory = cache.join(workspace_id.to_string());
         let frame = directory.join(format!("{asset_id}-{}-{modified}.jpg", metadata.len()));
         if !frame.is_file() {
-            fs::create_dir_all(&directory)?;
+            fs::create_dir_all(&directory).io_step("Creating a folder")?;
             let pending = directory.join(format!("{asset_id}-pending.jpg"));
             let made = crate::quiet_command(crate::media_tools::ffmpeg())
                 .args([
@@ -154,11 +166,11 @@ impl WorkspaceStore {
             if !made.success() {
                 return Err(io::Error::other("Could not take a frame of the video").into());
             }
-            fs::rename(&pending, &frame)?;
+            fs::rename(&pending, &frame).io_step("Moving a file")?;
         }
         Ok(ImagePreview {
             mime: "image/jpeg",
-            bytes: fs::read(frame)?,
+            bytes: fs::read(frame).io_step("Reading a file")?,
         })
     }
 
@@ -286,11 +298,11 @@ pub(crate) fn copy_asset_in(
     } else {
         ""
     };
-    if !source.metadata()?.is_file() {
+    if !source.metadata().io_step("Checking a file")?.is_file() {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "Asset must be a file").into());
     }
-    let mut input = File::open(source)?;
-    let length = i64::try_from(input.metadata()?.len())?;
+    let mut input = File::open(source).io_step("Opening a file")?;
+    let length = i64::try_from(input.metadata().io_step("Checking a file")?.len())?;
     let previous_notes: String;
     let notes = if let Some(asset_id) = replacing {
         previous_notes = transaction.query_row(
@@ -313,7 +325,7 @@ pub(crate) fn copy_asset_in(
         replace_live_references(transaction, workspace_id, previous, asset.id)?;
     }
     let directory = media_root.join(workspace_id.to_string());
-    fs::create_dir_all(&directory)?;
+    fs::create_dir_all(&directory).io_step("Creating a folder")?;
     let target = asset_path(media_root, workspace_id, asset.id);
     // This ID has no committed row. An interrupted import may have left its file here.
     match fs::remove_file(&target) {
@@ -329,7 +341,9 @@ pub(crate) fn copy_asset_in(
         }
         output.sync_all()?;
         #[cfg(unix)]
-        File::open(&directory)?.sync_all()?;
+        File::open(&directory)
+            .io_step("Opening a file")?
+            .sync_all()?;
         Ok(())
     })();
     drop(output);

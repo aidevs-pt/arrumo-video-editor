@@ -1,6 +1,7 @@
 //! A picture of a stretch of video for agents and reviewers: evenly spaced frames above the
 //! sound's waveform, to check a cut, a join or an overlay without watching the whole video.
 
+use crate::IoStep;
 use crate::Launch;
 use std::{
     error::Error,
@@ -248,7 +249,7 @@ pub fn render_frame_strip(
     let work = tempfile::tempdir()?;
     let output: PathBuf = work.path().join("strip.png");
     let frame_times = draw_strip(video, start, end, frames, has_audio, &output)?;
-    let png = std::fs::read(&output)?;
+    let png = std::fs::read(&output).io_step("Reading a file")?;
     std::io::Write::write_all(
         &mut std::fs::OpenOptions::new()
             .write(true)

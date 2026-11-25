@@ -3,6 +3,7 @@
 //! anything is restored. Restoring replaces everything, so it is staged beside the database and
 //! applied at the next start, before anything opens the database; the replaced data is kept.
 
+use crate::IoStep;
 use std::{
     error::Error,
     fs::{self, File},
@@ -89,8 +90,8 @@ fn hex(digest: impl AsRef<[u8]>) -> String {
 
 /// Copies `source` into the archive entry, returning its size and digest.
 fn add_file(archive: &mut ZipWriter<File>, name: &str, source: &Path) -> io::Result<BackupFile> {
-    let mut file = File::open(source)?;
-    let size = file.metadata()?.len();
+    let mut file = File::open(source).io_step("Opening a file")?;
+    let size = file.metadata().io_step("Checking a file")?.len();
     // Media is already compressed; storing it keeps exports fast.
     let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Stored)
@@ -231,7 +232,7 @@ fn check_backup(
     extract_to: Option<&Path>,
 ) -> Result<BackupManifest, Box<dyn Error>> {
     let invalid = |reason: &str| io::Error::new(io::ErrorKind::InvalidData, reason.to_owned());
-    let mut zip = ZipArchive::new(File::open(archive)?)
+    let mut zip = ZipArchive::new(File::open(archive).io_step("Opening a file")?)
         .map_err(|_| invalid("This is not an Arrumo backup"))?;
     let manifest: BackupManifest = {
         let entry = zip
@@ -262,7 +263,7 @@ fn check_backup(
         let mut output = match extract_to {
             Some(root) => {
                 let path = root.join(&relative);
-                fs::create_dir_all(path.parent().unwrap_or(root))?;
+                fs::create_dir_all(path.parent().unwrap_or(root)).io_step("Creating a folder")?;
                 Some(File::create_new(path)?)
             }
             None => None,
@@ -306,7 +307,7 @@ pub fn stage_backup_import(
 ) -> Result<BackupSummary, Box<dyn Error>> {
     let pending = pending_folder(database);
     if pending.exists() {
-        fs::remove_dir_all(&pending)?;
+        fs::remove_dir_all(&pending).io_step("Removing a folder")?;
     }
     let parent = database.parent().unwrap_or_else(|| Path::new("."));
     let staging = tempfile::tempdir_in(parent)?;
@@ -317,7 +318,7 @@ pub fn stage_backup_import(
             "This backup needs a newer version of Arrumo",
         )
     })?;
-    fs::rename(staging.keep(), &pending)?;
+    fs::rename(staging.keep(), &pending).io_step("Moving a file")?;
     Ok(BackupSummary::from(&manifest))
 }
 
@@ -344,7 +345,7 @@ pub fn apply_pending_import(database: &Path) -> io::Result<Option<PathBuf>> {
         .map(|time| time.as_secs())
         .unwrap_or_default();
     let kept = sibling(database, &format!(".before-import-{stamp}"));
-    fs::create_dir(&kept)?;
+    fs::create_dir(&kept).io_step("Creating a folder")?;
     // What exists now, where it goes while kept, and what replaces it.
     let mut moves = vec![(
         database.to_path_buf(),
@@ -370,13 +371,13 @@ pub fn apply_pending_import(database: &Path) -> io::Result<Option<PathBuf>> {
     let result = (|| -> io::Result<()> {
         for (current, keep, _) in &moves {
             if current.symlink_metadata().is_ok() {
-                fs::rename(current, keep)?;
+                fs::rename(current, keep).io_step("Moving a file")?;
                 kept_moves.push((keep.clone(), current.clone()));
             }
         }
         for (current, _, replacement) in &moves {
             if !replacement.as_os_str().is_empty() && replacement.exists() {
-                fs::rename(replacement, current)?;
+                fs::rename(replacement, current).io_step("Moving a file")?;
                 placed.push((current.clone(), replacement.clone()));
             }
         }

@@ -2,6 +2,7 @@
 //! every stage so scripts and notes the agent makes stay available, and removed once the run is
 //! finished.
 
+use crate::IoStep;
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -45,7 +46,10 @@ impl WorkspaceStore {
             let Some(workspace_id) = number(&workspace.path()) else {
                 continue;
             };
-            for run in fs::read_dir(workspace.path())?.flatten() {
+            for run in fs::read_dir(workspace.path())
+                .io_step("Listing a folder")?
+                .flatten()
+            {
                 let Some(run_id) = number(&run.path()) else {
                     continue;
                 };
@@ -61,7 +65,7 @@ impl WorkspaceStore {
                     .as_deref()
                     .is_none_or(|state| matches!(state, "completed" | "failed" | "cancelled"))
                 {
-                    fs::remove_dir_all(run.path())?;
+                    fs::remove_dir_all(run.path()).io_step("Removing a folder")?;
                     removed += 1;
                 }
             }

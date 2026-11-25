@@ -1,3 +1,4 @@
+use crate::IoStep;
 use crate::Launch;
 use std::{
     error::Error,
@@ -260,18 +261,21 @@ fn run_motion_worker(
     if !cfg!(target_os = "linux") {
         return Err(io::Error::other("The local motion renderer worker requires Linux").into());
     }
-    let worker = paths.worker.canonicalize()?;
+    let worker = paths.worker.canonicalize().io_step("Resolving a path")?;
     if !worker.is_file() {
         return Err(io::Error::other("The SDK worker must be a regular script file").into());
     }
     let package = scratch.join("renderer.zip");
-    std::fs::write(&package, bytes)?;
+    std::fs::write(&package, bytes).io_step("Writing a file")?;
     let mut runner = crate::quiet_command("python3");
     #[cfg(target_os = "linux")]
     stop_worker_on_host_exit(&mut runner);
     runner
         .args(["-E", "-B"])
-        .env("TMPDIR", scratch.canonicalize()?)
+        .env(
+            "TMPDIR",
+            scratch.canonicalize().io_step("Resolving a path")?,
+        )
         .arg(worker)
         .arg(package)
         .arg("--sha256")
@@ -284,7 +288,9 @@ fn run_motion_worker(
         runner.arg("--toolchain").arg(path);
     }
     let reply = scratch.join("worker-reply.json");
-    let mut child = runner.stdout(File::create(&reply)?).launch()?;
+    let mut child = runner
+        .stdout(File::create(&reply).io_step("Creating a file")?)
+        .launch()?;
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
@@ -313,7 +319,8 @@ fn run_motion_worker(
     }
     const MAX_WORKER_RESPONSE: u64 = 1024 * 1024;
     let mut bytes = Vec::new();
-    File::open(reply)?
+    File::open(reply)
+        .io_step("Opening a file")?
         .take(MAX_WORKER_RESPONSE + 1)
         .read_to_end(&mut bytes)?;
     if bytes.len() as u64 > MAX_WORKER_RESPONSE {

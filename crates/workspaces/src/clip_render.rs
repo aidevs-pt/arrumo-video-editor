@@ -1,4 +1,4 @@
-use crate::{Launch, Step};
+use crate::{IoStep, Launch, Step};
 use std::{
     error::Error,
     fs, io,
@@ -1022,7 +1022,9 @@ impl WorkspaceStore {
                 |_| Ok(()),
             )
             .map_err(|_| invalid())?;
-        Ok(asset_path(root, workspace_id, id).canonicalize()?)
+        Ok(asset_path(root, workspace_id, id)
+            .canonicalize()
+            .io_step("Finding an audio track's file")?)
     }
 
     /// The tracks a storyboard edit changes its music to, each with the scene it starts on.
@@ -1135,7 +1137,7 @@ impl ActiveRender<'_> {
         music: SceneMusic<'_>,
     ) -> Result<RenderCheck, Box<dyn Error>> {
         let directory = scratch.join(format!("scenes-{}", format.id));
-        fs::create_dir(&directory)?;
+        fs::create_dir(&directory).io_step("Creating a folder")?;
         let images = |id: i64| asset_path(root, self.workspace_id, id).canonicalize().ok();
         let fonts = self
             .store
@@ -1168,7 +1170,7 @@ impl ActiveRender<'_> {
             parts.push(probe_duration(&directory.join(&name))?);
             manifest.push_str(&format!("file {name}\n"));
         }
-        fs::write(directory.join("scenes.ffconcat"), manifest)?;
+        fs::write(directory.join("scenes.ffconcat"), manifest).io_step("Writing a file")?;
         let output = scratch.join(format!("{}-joined.mp4", format.id));
         let transitions: Vec<_> = scenes.iter().map(|scene| scene.transition).collect();
         let args: Vec<String> = if transitions[..transitions.len().saturating_sub(1)]
@@ -1278,13 +1280,13 @@ impl ActiveRender<'_> {
             false if narration.iter().any(|(audio, _)| audio.is_some()) => {
                 self.master_audio(&output, &staged)?;
                 self.lay_music_tracks(&staged, &tracks, music.featured, &finished)?;
-                fs::remove_file(staged)?;
+                fs::remove_file(staged).io_step("Removing a file")?;
             }
             // Without one, the music is the whole soundtrack, so it is mastered to full level.
             false => {
                 self.lay_music_tracks(&output, &tracks, music.featured, &staged)?;
                 self.master_audio(&staged, &finished)?;
-                fs::remove_file(staged)?;
+                fs::remove_file(staged).io_step("Removing a file")?;
             }
             true => self.master_audio(&output, &finished)?,
         }
@@ -1305,10 +1307,14 @@ impl ActiveRender<'_> {
             .into_iter()
             .map(|(id, cut)| {
                 let path = asset_path(root, self.workspace_id, id);
-                if !path.symlink_metadata()?.is_file() {
+                if !path
+                    .symlink_metadata()
+                    .io_step("Checking a file")?
+                    .is_file()
+                {
                     return Err(io::Error::other("A managed source video is missing").into());
                 }
-                let path = path.canonicalize()?;
+                let path = path.canonicalize().io_step("Resolving a path")?;
                 let has_audio = self.inspect_source(&path, cut)?;
                 Ok(RenderClip {
                     asset_id: id,
@@ -1397,7 +1403,7 @@ impl ActiveRender<'_> {
             "measuring loudness",
         )?;
         let Some(filter) = loudness_pass(&measured) else {
-            fs::rename(input, output)?;
+            fs::rename(input, output).io_step("Moving a file")?;
             return Ok(());
         };
         self.run(
@@ -1418,7 +1424,7 @@ impl ActiveRender<'_> {
                 .arg(output),
             "evening out the loudness",
         )?;
-        fs::remove_file(input)?;
+        fs::remove_file(input).io_step("Removing a file")?;
         Ok(())
     }
 
@@ -1619,7 +1625,7 @@ impl ActiveRender<'_> {
         }
         insert(clips.len(), &mut manifest, &mut parts)?;
         let list = scratch.join(format!("{id}.ffconcat"));
-        fs::write(&list, manifest)?;
+        fs::write(&list, manifest).io_step("Writing a file")?;
         let mut command = crate::quiet_command(crate::media_tools::ffmpeg());
         command
             .args([
@@ -1660,7 +1666,7 @@ impl ActiveRender<'_> {
                 let mastered = scratch.join(format!("{id}-mastered.mp4"));
                 self.master_audio(&joined, &mastered)?;
                 self.lay_music(&mastered, music, &output)?;
-                fs::remove_file(mastered)?;
+                fs::remove_file(mastered).io_step("Removing a file")?;
             }
             None => self.master_audio(&joined, &output)?,
         }

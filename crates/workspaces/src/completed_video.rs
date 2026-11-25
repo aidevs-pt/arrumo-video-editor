@@ -1,3 +1,4 @@
+use crate::IoStep;
 use crate::Launch;
 use std::collections::BTreeMap;
 
@@ -108,7 +109,7 @@ impl WorkspaceStore {
             if !made.success() {
                 return Err(std::io::Error::other("Could not take a frame of the video").into());
             }
-            std::fs::rename(&pending, &poster)?;
+            std::fs::rename(&pending, &poster).io_step("Moving a file")?;
         }
         Ok((poster, "image/jpeg"))
     }

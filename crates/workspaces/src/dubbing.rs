@@ -2,6 +2,7 @@
 //! asset is uploaded as a job, polled until the provider finishes, and the dub for one language
 //! is stored as a new audio asset.
 
+use crate::IoStep;
 use std::{
     collections::BTreeMap,
     io::{self, Read},
@@ -371,7 +372,7 @@ impl WorkspaceStore {
             ))
             .into());
         }
-        let bytes = std::fs::read(&input)?;
+        let bytes = std::fs::read(&input).io_step("Reading a file")?;
         if bytes.len() as u64 > adapter.max_input_bytes {
             return Err(io::Error::other("The sound is too large for this provider").into());
         }
@@ -470,7 +471,7 @@ impl WorkspaceStore {
             "{}-dub-{language}.{extension}",
             if stem.is_empty() { "audio" } else { stem }
         ));
-        std::fs::write(&file, &output)?;
+        std::fs::write(&file, &output).io_step("Writing a file")?;
         crate::source_transcripts::media_duration(&file)
             .map_err(|_| io::Error::other("The dub could not be read"))?;
 

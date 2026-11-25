@@ -1772,7 +1772,7 @@ fn run_ffmpeg_once(
         .current_dir(directory)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(fs::File::create(&log)?)
+        .stderr(fs::File::create(&log).io_step("Creating a file")?)
         .launch()
         .map_err(|error| {
             io::Error::new(error.kind(), format!("FFmpeg could not start: {error}"))

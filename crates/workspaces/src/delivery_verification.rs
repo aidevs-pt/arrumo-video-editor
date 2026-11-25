@@ -1,3 +1,4 @@
+use crate::IoStep;
 use crate::Launch;
 use std::{
     error::Error,
@@ -217,7 +218,7 @@ fn probe(
     selection: &[&str],
 ) -> io::Result<Vec<u8>> {
     let path = directory.join(filename);
-    let metadata = fs::symlink_metadata(&path)?;
+    let metadata = fs::symlink_metadata(&path).io_step("Checking a file")?;
     if !metadata.is_file() || metadata.len() == 0 {
         return Err(io::Error::other(format!(
             "Missing or empty delivery file: {filename}"
@@ -237,7 +238,7 @@ fn probe(
             "json",
         ])
         .args(selection)
-        .arg(path.canonicalize()?)
+        .arg(path.canonicalize().io_step("Resolving a path")?)
         .launch_output()?;
     if !output.status.success() || !output.stderr.is_empty() {
         return Err(io::Error::other(format!("Could not verify {filename}")));
@@ -326,12 +327,15 @@ impl WorkspaceStore {
         source: &Path,
     ) -> Result<crate::WorkspaceAsset, Box<dyn Error + Send + Sync>> {
         if source.extension().and_then(|extension| extension.to_str()) != Some("mp4")
-            || !source.symlink_metadata()?.is_file()
+            || !source
+                .symlink_metadata()
+                .io_step("Checking a file")?
+                .is_file()
         {
             return Err(io::Error::other("Expected a regular MP4 variant file").into());
         }
         let digest = variant_digest(source)?;
-        let database = database.canonicalize()?;
+        let database = database.canonicalize().io_step("Resolving a path")?;
         let media_root = crate::asset_root(&database);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let delivery = self.verified_delivery(workspace_id, run_id)?;
@@ -443,8 +447,13 @@ pub(crate) fn managed_delivery_file(
     run_id: i64,
     filename: &str,
 ) -> io::Result<PathBuf> {
-    let path = delivery_directory(&database.canonicalize()?, workspace_id, run_id).join(filename);
-    let metadata = path.symlink_metadata()?;
+    let path = delivery_directory(
+        &database.canonicalize().io_step("Resolving a path")?,
+        workspace_id,
+        run_id,
+    )
+    .join(filename);
+    let metadata = path.symlink_metadata().io_step("Checking a file")?;
     if !metadata.is_file() || metadata.len() == 0 || !crate::assets::is_canonical(&path)? {
         return Err(io::Error::other("Invalid managed delivery file"));
     }
@@ -452,10 +461,14 @@ pub(crate) fn managed_delivery_file(
 }
 
 fn variant_digest(path: &Path) -> io::Result<[u8; 32]> {
-    if !path.symlink_metadata()?.is_file() {
+    if !path
+        .symlink_metadata()
+        .io_step("Checking a file")?
+        .is_file()
+    {
         return Err(io::Error::other("Video variant must be a regular file"));
     }
-    let mut file = fs::File::open(path)?;
+    let mut file = fs::File::open(path).io_step("Opening a file")?;
     let mut digest = Sha256::new();
     let mut buffer = [0; 64 * 1024];
     loop {
@@ -600,10 +613,10 @@ impl WorkspaceStore {
             .stdin(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .launch_status()?;
-        if !status.success() || wave.metadata()?.len() >= wave_limit {
+        if !status.success() || wave.metadata().io_step("Checking a file")?.len() >= wave_limit {
             return Err(io::Error::other("Could not extract bounded delivery audio").into());
         }
-        let transcript = transcribe(order, fs::File::open(wave)?)?;
+        let transcript = transcribe(order, fs::File::open(wave).io_step("Opening a file")?)?;
         let subtitles = crate::delivery_captions::render_srt(&transcript.words, duration)?;
         self.publish_delivery_subtitles(
             [workspace_id, run_id, format_id],
@@ -631,7 +644,7 @@ impl WorkspaceStore {
             .ok_or_else(|| io::Error::other("Missing delivery directory"))?;
         let duration = verified_video_duration(directory, &video, &format)?;
 
-        if !source.metadata()?.is_file() {
+        if !source.metadata().io_step("Checking a file")?.is_file() {
             return Err(io::Error::other("Choose an SRT file").into());
         }
         let subtitles = crate::read_subtitle_file(source)?;
@@ -797,7 +810,7 @@ mod transcription_tests {
                     audio.read_exact(&mut header)?;
                     assert_eq!(&header[0..4], b"RIFF");
                     assert_eq!(&header[8..12], b"WAVE");
-                    assert!(audio.metadata()?.len() > 30_000);
+                    assert!(audio.metadata().io_step("Checking a file")?.len() > 30_000);
                     Ok(Transcript {
                         language_code: "en".into(),
                         text: "Fixture audio".into(),

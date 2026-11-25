@@ -1,3 +1,4 @@
+use crate::IoStep;
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -91,11 +92,11 @@ impl SupplementalMedia {
         workspace_id: i64,
     ) -> std::io::Result<std::path::PathBuf> {
         let file = crate::asset_path(
-            &crate::asset_root(&database.canonicalize()?),
+            &crate::asset_root(&database.canonicalize().io_step("Resolving a path")?),
             workspace_id,
             self.asset_id,
         );
-        let metadata = file.symlink_metadata()?;
+        let metadata = file.symlink_metadata().io_step("Checking a file")?;
         if !metadata.is_file()
             || !crate::assets::is_canonical(&file)?
             || Some(metadata.len()) != u64::try_from(self.byte_size).ok()

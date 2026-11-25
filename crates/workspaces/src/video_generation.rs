@@ -2,6 +2,7 @@
 //! status on the same host, then download the finished clip without credentials. Provider
 //! specifics live in each plugin's `video-generation.json`.
 
+use crate::IoStep;
 use std::{collections::BTreeMap, error::Error, io, path::Path, time::Duration};
 
 use reqwest::{
@@ -784,7 +785,7 @@ impl WorkspaceStore {
                     let scratch = tempfile::tempdir()?;
                     let name = format!("{}.{extension}", clip_stem(prompt));
                     let file = scratch.path().join(&name);
-                    std::fs::write(&file, &bytes)?;
+                    std::fs::write(&file, &bytes).io_step("Writing a file")?;
                     crate::motion_artifacts::validate_motion_file(&file, &name, "video").map_err(
                         |_| io::Error::other("The provider's video could not be verified"),
                     )?;

@@ -22,8 +22,13 @@ if (SENTRY_AUTH_TOKEN && SENTRY_ORG && SENTRY_PROJECT) {
   const version = readFileSync("src-tauri/Cargo.toml", "utf8").match(/^version = "([^"]+)"/m)?.[1];
   if (!version) throw new Error("No version in src-tauri/Cargo.toml");
   const cli = (...args) => execFileSync("pnpm", ["dlx", SENTRY_CLI, ...args], { stdio: "inherit", shell: process.platform === "win32" });
-  cli("sourcemaps", "inject", OUT);
-  cli("sourcemaps", "upload", "--release", `arrumo-desktop@${version}`, OUT);
+  try {
+    cli("sourcemaps", "inject", OUT);
+    cli("sourcemaps", "upload", "--release", `arrumo-desktop@${version}`, OUT);
+  } catch (error) {
+    // A crash reporter problem must not hold back a release.
+    console.warn(`::warning::The source maps could not be uploaded: ${error.message}`);
+  }
 }
 const maps = mapFiles(OUT);
 for (const map of maps) rmSync(map);

@@ -1,3 +1,4 @@
+use crate::IoStep;
 use std::{
     error::Error,
     fs::File,
@@ -123,7 +124,9 @@ impl WorkspaceStore {
             .ok_or(rusqlite::Error::QueryReturnedNoRows)?
             .duration_seconds;
         let temporary = tempfile::tempdir()?;
-        File::create(temporary.path().join("revision.srt"))?.write_all(subtitles.as_bytes())?;
+        File::create(temporary.path().join("revision.srt"))
+            .io_step("Creating a file")?
+            .write_all(subtitles.as_bytes())?;
         let cue_count = i64::try_from(verify_subtitle_cues(
             temporary.path(),
             "revision.srt",
@@ -203,7 +206,8 @@ fn subtitle_language(language: Option<&str>) -> io::Result<String> {
 
 pub fn read_subtitle_file(path: &Path) -> io::Result<String> {
     let mut subtitles = String::new();
-    File::open(path)?
+    File::open(path)
+        .io_step("Opening a file")?
         .take(MAX_SUBTITLE_BYTES + 1)
         .read_to_string(&mut subtitles)?;
     if subtitles.is_empty() || subtitles.len() as u64 > MAX_SUBTITLE_BYTES {

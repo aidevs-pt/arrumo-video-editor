@@ -1,6 +1,7 @@
 //! Generates images through the image providers' SDK adapters, in the run's captured order, and
 //! stores each image as a workspace asset. Provider specifics live in the plugins' descriptors.
 
+use crate::IoStep;
 use crate::Launch;
 use std::{collections::BTreeMap, error::Error, io, io::Read, path::Path, time::Duration};
 
@@ -647,7 +648,7 @@ fn agent_image(
             "reference-{index}.{}",
             reference.mime.trim_start_matches("image/")
         ));
-        std::fs::write(&path, &reference.bytes)?;
+        std::fs::write(&path, &reference.bytes).io_step("Writing a file")?;
         paths.push(path);
     }
     let (bytes, extension) = crate::agent_images::generate_with_agent(
@@ -926,7 +927,7 @@ impl WorkspaceStore {
         )?;
         let scratch = tempfile::tempdir()?;
         let downloaded = scratch.path().join(format!("{stem}.{}", image.extension));
-        std::fs::write(&downloaded, &image.bytes)?;
+        std::fs::write(&downloaded, &image.bytes).io_step("Writing a file")?;
         let file =
             crop_to_ratio(&downloaded, aspect_ratio, scratch.path(), stem).unwrap_or(downloaded);
         let extension = file

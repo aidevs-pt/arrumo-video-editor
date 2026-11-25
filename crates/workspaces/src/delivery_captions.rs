@@ -1,3 +1,4 @@
+use crate::IoStep;
 use crate::Launch;
 use std::{fmt::Write, io};
 
@@ -25,7 +26,7 @@ pub(crate) fn burn_captions(
     let directory = output
         .parent()
         .ok_or_else(|| io::Error::other("The captioned copy needs a directory"))?;
-    std::fs::write(directory.join("captions.srt"), subtitles)?;
+    std::fs::write(directory.join("captions.srt"), subtitles).io_step("Writing a file")?;
     let status = crate::quiet_command(crate::media_tools::ffmpeg())
         .args([
             "-nostdin",

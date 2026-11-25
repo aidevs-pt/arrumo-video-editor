@@ -1,6 +1,7 @@
 //! Animations designed by the agent as specs and rendered by Arrumo: during a run's Assets stage,
 //! and on request in the workspace's animation library.
 
+use crate::IoStep;
 use std::{
     error::Error,
     io,
@@ -197,7 +198,7 @@ impl WorkspaceStore {
             let still = format!("animation-{index}.png");
             render_spec(spec, size, scratch, &video, &images, &fonts, check)?;
             render_thumbnail(scratch, &video, spec.duration_seconds, &still)?;
-            let directory = scratch.canonicalize()?;
+            let directory = scratch.canonicalize().io_step("Resolving a path")?;
             artifacts.push(MotionArtifact {
                 kind: spec.kind,
                 title: spec.title.clone(),
