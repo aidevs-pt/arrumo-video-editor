@@ -36,7 +36,7 @@ export type Run = {
 };
 
 export type RunAction = "pause" | "resume" | "retry" | "cancel" | "stop";
-type Activity = { state: RunState; kind: "submitted" | "claimed" | "transition"; created_at: number; detail: string | null };
+type Activity = { state: RunState; kind: "submitted" | "claimed" | "resumed" | "transition"; created_at: number; detail: string | null; stage: string | null };
 
 export function runNeedsReview(run: Run) {
   return run.state === "paused" && run.pending_review_id !== null;
@@ -218,7 +218,7 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
   const [activity, setActivity] = useState<Activity[]>();
   const [historyError, setHistoryError] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const { locale, messages: { queue: copy } } = useLocale();
+  const { locale, messages: { queue: copy, productionPlan } } = useLocale();
 
   useEffect(() => {
     let active = true;
@@ -240,7 +240,12 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
 
   function activityLabel(event: Activity, awaitingReview: boolean) {
     if (event.kind === "submitted") return copy.activitySubmitted;
-    if (event.kind === "claimed") return copy.activityStarted;
+    if (event.kind === "resumed") return copy.activityResumed;
+    if (event.kind === "claimed") {
+      return event.stage && event.stage in productionPlan
+        ? copy.activityStartedStage.replace("{stage}", productionPlan[event.stage as keyof typeof productionPlan] as string)
+        : copy.activityStarted;
+    }
     switch (event.state) {
       case "queued": return copy.activityQueued;
       case "running": return copy.activityRunning;
@@ -269,7 +274,7 @@ function GenerationActivity({ run, workspaceId }: { run: Run; workspaceId: numbe
                   <span className="absolute inset-s-0 top-2.5 -bottom-1.5 w-px -translate-x-1/2 bg-white/30 group-last/event:hidden rtl:translate-x-1/2" aria-hidden="true" />
                   <span className="absolute inset-s-0 top-1.5 size-2 -translate-x-1/2 rounded-sm bg-[color-mix(in_oklch,white_65%,var(--agent))] ring-4 ring-agent rtl:translate-x-1/2" aria-hidden="true" />
                   <p className="font-medium">{activityLabel(event,
-                    (index === 0 && run.pending_review_id !== null) || newestFirst[index + 1]?.kind === "claimed")}</p>
+                    (index === 0 && run.pending_review_id !== null) || ["claimed", "resumed"].includes(newestFirst[index + 1]?.kind ?? ""))}</p>
                   <p className="text-xs text-white/75"><time dateTime={date.toISOString()}>
                     {new Intl.DateTimeFormat(locale, sameDay(date) ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }).format(date)}
                   </time></p>

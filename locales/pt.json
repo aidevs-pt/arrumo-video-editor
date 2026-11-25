@@ -922,7 +922,10 @@
     "stopDescription": "O trabalho atual para. O último resultado que aprovaste volta a abrir para o poderes alterar; a tua decisão anterior fica no histórico.",
     "keepGoing": "Continuar",
     "profileFilter": "Perfil",
-    "allProfiles": "Todos"
+    "allProfiles": "Todos",
+    "activityStartedStage": "Começou: {stage}",
+    "activityResumed": "Retomado depois de uma interrupção",
+    "resumed": "Retomada"
   },
   "onboarding": {
     "tagline": "De filmagens em bruto a vídeos brilhantes.",
@@ -1720,7 +1723,6 @@
     "loading": "A carregar os registos do agente",
     "error": "Não foi possível ler os registos do agente.",
     "empty": "O agente ainda não foi executado.",
-    "attempt": "tentativa {attempt}",
     "agent": "Agente",
     "duration": "Duração",
     "seconds": "{seconds} s",
@@ -1748,7 +1750,8 @@
       "preview": "Pré-visualizações",
       "supplemental_outputs": "Extras de publicação",
       "motion_library": "Biblioteca de animações"
-    }
+    },
+    "round": "ronda {round}"
   },
   "agentProgress": {
     "label": "O que o agente está a fazer",
@@ -1758,7 +1761,7 @@
     "reading": "A ler o briefing e a planear",
     "searching": "Pesquisou na web",
     "lookingAtMaterial": "A analisar o material do espaço de trabalho que pediu",
-    "stageAttempt": "{stage}, ronda {attempt}"
+    "stageRound": "{stage}, ronda {round}, depois dos teus comentários"
   },
   "providerOrder": {
     "title": "Que plugin faz o quê, por ordem",

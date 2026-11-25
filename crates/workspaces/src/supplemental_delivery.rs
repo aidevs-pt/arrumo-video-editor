@@ -97,7 +97,7 @@ impl SupplementalMedia {
         );
         let metadata = file.symlink_metadata()?;
         if !metadata.is_file()
-            || file.canonicalize()? != file
+            || !crate::assets::is_canonical(&file)?
             || Some(metadata.len()) != u64::try_from(self.byte_size).ok()
         {
             return Err(std::io::Error::other("Supplemental media is unavailable"));

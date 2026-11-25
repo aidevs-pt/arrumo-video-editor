@@ -922,7 +922,10 @@
     "stopDescription": "El trabajo actual se detiene. El último resultado que aprobaste se vuelve a abrir para que puedas cambiarlo; tu decisión anterior queda en el historial.",
     "keepGoing": "Continuar",
     "profileFilter": "Perfil",
-    "allProfiles": "Todos"
+    "allProfiles": "Todos",
+    "activityStartedStage": "Empezó: {stage}",
+    "activityResumed": "Retomado tras una interrupción",
+    "resumed": "Retomada"
   },
   "onboarding": {
     "tagline": "De material en bruto a vídeos brillantes.",
@@ -1720,7 +1723,6 @@
     "loading": "Cargando registros del agente",
     "error": "No se pudieron leer los registros del agente.",
     "empty": "El agente aún no se ha ejecutado.",
-    "attempt": "intento {attempt}",
     "agent": "Agente",
     "duration": "Duración",
     "seconds": "{seconds} s",
@@ -1748,7 +1750,8 @@
       "preview": "Vistas previas",
       "supplemental_outputs": "Extras de publicación",
       "motion_library": "Biblioteca de animaciones"
-    }
+    },
+    "round": "ronda {round}"
   },
   "agentProgress": {
     "label": "Qué está haciendo el agente",
@@ -1758,7 +1761,7 @@
     "reading": "Leyendo el briefing y planificando",
     "searching": "Ha buscado en la web",
     "lookingAtMaterial": "Revisando el material del espacio de trabajo que pidió",
-    "stageAttempt": "{stage}, ronda {attempt}"
+    "stageRound": "{stage}, ronda {round}, tras tus comentarios"
   },
   "providerOrder": {
     "title": "Qué complemento hace cada cosa, en orden",

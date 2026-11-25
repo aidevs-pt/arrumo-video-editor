@@ -467,6 +467,9 @@ mod tests {
             .0
             .execute_batch(
                 "ALTER TABLE privacy_settings DROP COLUMN install_reported;
+                 DROP TRIGGER generation_activity_transition;
+                 ALTER TABLE generation_activity DROP COLUMN stage;
+                 ALTER TABLE agent_logs DROP COLUMN round; ALTER TABLE agent_sessions DROP COLUMN round;
                  PRAGMA user_version = 68;",
             )
             .unwrap();

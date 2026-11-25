@@ -444,7 +444,7 @@ pub(crate) fn managed_delivery_file(
 ) -> io::Result<PathBuf> {
     let path = delivery_directory(&database.canonicalize()?, workspace_id, run_id).join(filename);
     let metadata = path.symlink_metadata()?;
-    if !metadata.is_file() || metadata.len() == 0 || path.canonicalize()? != path {
+    if !metadata.is_file() || metadata.len() == 0 || !crate::assets::is_canonical(&path)? {
         return Err(io::Error::other("Invalid managed delivery file"));
     }
     Ok(path)

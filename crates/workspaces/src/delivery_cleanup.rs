@@ -160,7 +160,7 @@ impl WorkspaceStore {
 
 fn check_delivery_directory(directory: &Path) -> io::Result<bool> {
     match fs::symlink_metadata(directory) {
-        Ok(metadata) if metadata.is_dir() && directory.canonicalize()? == directory => Ok(true),
+        Ok(metadata) if metadata.is_dir() && crate::assets::is_canonical(directory)? => Ok(true),
         Ok(_) => Err(io::Error::other("Invalid managed delivery directory")),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
         Err(error) => Err(error),

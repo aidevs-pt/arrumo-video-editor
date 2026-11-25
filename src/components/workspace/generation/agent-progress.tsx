@@ -11,15 +11,19 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { useLocale } from "@/lib/locale-provider";
 
-type Summary = { id: number; status: string; startedAt: number; stage: string; attempt: number | null; problem: string | null };
+type Summary = { id: number; status: string; startedAt: number; stage: string; round: number | null; problem: string | null };
 type Step = { kind: "thinking" | "search" | "step"; text: string };
-type Log = Summary & { steps: Step[] };
+type Log = Summary & { steps: Step[]; prompt: string };
+
+/** Follow-ups that hand over workspace material the agent asked for start with this line. */
+const MATERIAL_FOLLOW_UP = "MATERIAL YOU ASKED FOR";
 
 const REFRESH_MS = 1500;
 
-/** Everything the run's agent has done so far, as a log grouped by stage attempt, oldest first:
- * every step of every agent run (including rounds where it asked for workspace material) and what
- * it answered, then the host's own work (such as rendering) once the agent has answered. */
+/** Everything the run's agent has done so far, oldest first, grouped by step and round (a new
+ * round starts when the creator sends feedback): every step of every agent run, including the
+ * follow-ups that hand over workspace material it asked for, then the host's own work (such as
+ * rendering) once the agent has answered. */
 export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: {
   workspaceId: number;
   runId: number;
@@ -59,12 +63,12 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
   }, [workspaceId, runId]);
 
   const running = logs.at(-1)?.status === "running" ? logs.at(-1) : undefined;
-  // `attempt` counts the run's claims, not revisions, so a stage's rounds are numbered here.
   const groups = logs.reduce<{ key: string; stage: string; round: number; logs: Log[] }[]>((all, log) => {
-    const key = `${log.stage}:${log.attempt ?? ""}`;
+    const round = log.round ?? 1;
+    const key = `${log.stage}:${round}`;
     const last = all.at(-1);
     if (last?.key === key) last.logs.push(log);
-    else all.push({ key, stage: log.stage, round: all.filter((group) => group.stage === log.stage).length + 1, logs: [log] });
+    else all.push({ key, stage: log.stage, round, logs: [log] });
     return all;
   }, []);
   const stepCount = logs.reduce((total, log) => total + log.steps.length, 0);
@@ -87,16 +91,16 @@ export function AgentProgress({ workspaceId, runId, agent, stage, stageLabel }: 
               <div key={group.key} className="flex flex-col gap-3 pb-4 last:pb-0">
                 <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
                   {group.round > 1
-                    ? copy.stageAttempt.replace("{stage}", stageLabel(group.stage)).replace("{attempt}", String(group.round))
+                    ? copy.stageRound.replace("{stage}", stageLabel(group.stage)).replace("{round}", String(group.round))
                     : stageLabel(group.stage)}
                 </p>
-                {group.logs.map((log, round) => {
+                {group.logs.map((log) => {
                   const live = log === running;
                   const searches = log.steps.filter((step) => step.kind === "search");
                   const others = log.steps.filter((step) => step.kind !== "search");
                   return (
                     <div key={log.id} className="flex flex-col gap-3 pb-3 last:pb-0">
-                      {round > 0 && <ChainOfThoughtStep icon={FolderSearch} label={copy.lookingAtMaterial} status="complete" />}
+                      {log.prompt.startsWith(MATERIAL_FOLLOW_UP) && <ChainOfThoughtStep icon={FolderSearch} label={copy.lookingAtMaterial} status="complete" />}
                       {others.length === 0 && live && <ChainOfThoughtStep icon={SparklesIcon} label={copy.reading} status="active" />}
                       {others.map((step, index) => (
                         <ChainOfThoughtStep key={`${index}:${step.text}`} icon={step.kind === "thinking" ? BrainIcon : SparklesIcon}

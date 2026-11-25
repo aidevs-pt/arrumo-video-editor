@@ -86,7 +86,19 @@ impl WorkspaceStore {
             }
             return Err(io::Error::other(reason).into());
         }
-        match work(&run, provider, attempt) {
+        // Thumbnails, cuts and clips can outlast the lease between the agent's own renewals; a
+        // lapsed lease would let the step be claimed again and start over.
+        let keeper = self.0.path().filter(|path| !path.is_empty()).map(|path| {
+            crate::lease_keeper::LeaseKeeper::start(
+                std::path::Path::new(path),
+                workspace_id,
+                run_id,
+                attempt,
+            )
+        });
+        let outcome = work(&run, provider, attempt);
+        drop(keeper);
+        match outcome {
             Ok(id) => Ok(Some(id)),
             Err(error) => {
                 let reason = if let Some(agent) = error.downcast_ref::<AgentRunError>() {

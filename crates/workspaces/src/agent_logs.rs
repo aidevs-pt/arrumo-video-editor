@@ -16,6 +16,9 @@ use crate::{
     agent_run::{AgentSession, AgentTranscript, run_structured_session},
 };
 
+/// What a continued run reports when its session could not be opened.
+const SESSION_LOST: &str = "The agent exited with an error";
+
 /// How often a running log is updated with the agent's latest output.
 const FLUSH_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -40,6 +43,8 @@ pub struct AgentLogSummary {
     pub started_at: i64,
     pub duration_ms: Option<i64>,
     pub problem: Option<String>,
+    /// The run's round when the agent ran: 1, plus one for each time the creator sent feedback.
+    pub round: Option<i64>,
 }
 
 /// Something the agent did while it worked, read from its output with its plugin's patterns.
@@ -143,7 +148,7 @@ fn status(result: &Result<Value, AgentRunError>) -> &'static str {
 }
 
 const SUMMARY_COLUMNS: &str =
-    "id, run_id, stage, attempt, provider, status, started_at, duration_ms, problem";
+    "id, run_id, stage, attempt, provider, status, started_at, duration_ms, problem, round";
 
 fn read_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentLogSummary> {
     Ok(AgentLogSummary {
@@ -156,6 +161,7 @@ fn read_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentLogSummary> {
         started_at: row.get(6)?,
         duration_ms: row.get(7)?,
         problem: row.get(8)?,
+        round: row.get(9)?,
     })
 }
 
@@ -247,10 +253,71 @@ impl WorkspaceStore {
 
     /// Runs the agent like `run_logged_agent_with_images`, keeping or continuing its session as
     /// `session` says (see `run_structured_session`).
+    ///
+    /// Within a video run, an agent that can continue sessions works in one session per round
+    /// (everything until the creator sends feedback): a request that would start afresh continues
+    /// the round's session instead, and every session is kept for the rest of the round. When the
+    /// round's session cannot be continued, the request starts a new one, which the round then uses.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn run_logged_agent_session(
         &self,
         scope: AgentLogScope<'_>,
+        provider: &AgentPlugin,
+        prompt: &str,
+        schema: &Value,
+        timeout: Duration,
+        images: &[std::path::PathBuf],
+        session: &mut AgentSession,
+        mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
+    ) -> Result<Value, AgentRunError> {
+        let round = scope.run_id.and_then(|run| self.run_round(run).ok());
+        let pinned = match (scope.run_id, round) {
+            (Some(run_id), Some(round)) if crate::agent_run::resumes_sessions(provider) => {
+                Some((run_id, round))
+            }
+            _ => None,
+        };
+        let mut joined = None;
+        if let Some((run_id, round)) = pinned {
+            match session {
+                AgentSession::Continue { keep, .. } => *keep = true,
+                AgentSession::Ephemeral | AgentSession::Keep => {
+                    *session = match self.round_session(run_id, &provider.id, round) {
+                        Some(id) => {
+                            joined = Some(id.clone());
+                            AgentSession::Continue { id, keep: true }
+                        }
+                        None => AgentSession::Keep,
+                    };
+                }
+            }
+        }
+        let continued = match &*session {
+            AgentSession::Continue { id, .. } if pinned.is_some() => Some(id.clone()),
+            _ => None,
+        };
+        let result = self.run_logged_agent_once(
+            scope, round, provider, prompt, schema, timeout, images, session, &mut tick,
+        );
+        // A session the agent can no longer open makes it exit with an error.
+        if let (Some(id), Err(AgentRunError::Failed(SESSION_LOST))) = (&continued, &result) {
+            self.forget_round_session(&provider.id, id);
+            // This request carried a whole brief, so it can start the round's new session.
+            if joined.is_some() {
+                *session = AgentSession::Keep;
+                return self.run_logged_agent_once(
+                    scope, round, provider, prompt, schema, timeout, images, session, &mut tick,
+                );
+            }
+        }
+        result
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run_logged_agent_once(
+        &self,
+        scope: AgentLogScope<'_>,
+        round: Option<i64>,
         provider: &AgentPlugin,
         prompt: &str,
         schema: &Value,
@@ -268,15 +335,16 @@ impl WorkspaceStore {
         let log: Option<i64> = self
             .0
             .query_row(
-                "INSERT INTO agent_logs (workspace_id, run_id, stage, attempt, provider, prompt)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id",
+                "INSERT INTO agent_logs (workspace_id, run_id, stage, attempt, provider, prompt, round)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) RETURNING id",
                 params![
                     scope.workspace_id,
                     scope.run_id,
                     scope.stage,
                     scope.attempt,
                     provider.id,
-                    prompt
+                    prompt,
+                    round
                 ],
                 |row| row.get(0),
             )
@@ -371,7 +439,7 @@ impl WorkspaceStore {
                 .into_iter()
                 .chain(continued)
             {
-                self.record_agent_session(scope, &provider.id, &kept);
+                self.record_agent_session(scope, &provider.id, &kept, round);
             }
         }
         if let Some(id) = log {
@@ -435,12 +503,12 @@ impl WorkspaceStore {
                 |row| {
                     Ok(AgentLog {
                         summary: read_summary(row)?,
-                        exit_code: row.get(9)?,
-                        command: row.get(10)?,
-                        prompt: row.get(11)?,
-                        output: row.get(12)?,
-                        errors: row.get(13)?,
-                        answer: row.get(14)?,
+                        exit_code: row.get("exit_code")?,
+                        command: row.get("command")?,
+                        prompt: row.get("prompt")?,
+                        output: row.get("output")?,
+                        errors: row.get("errors")?,
+                        answer: row.get("answer")?,
                         steps: Vec::new(),
                     })
                 },

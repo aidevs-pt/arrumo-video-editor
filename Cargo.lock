@@ -270,6 +270,7 @@ name = "arrumo-workspaces"
 version = "0.1.6"
 dependencies = [
  "base64 0.23.1",
+ "dunce",
  "keyring",
  "libc",
  "rcgen",

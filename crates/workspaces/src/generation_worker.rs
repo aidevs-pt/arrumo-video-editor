@@ -31,6 +31,9 @@ pub struct GenerationActivity {
     pub kind: String,
     pub created_at: i64,
     pub detail: Option<String>,
+    /// For claims: the step the worker started (`claimed`) or picked up again after an
+    /// interrupted attempt (`resumed`).
+    pub stage: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -106,9 +109,11 @@ impl WorkspaceStore {
         attempt: i64,
     ) -> rusqlite::Result<i64> {
         self.0.query_row(
+            // The attempt is the fence: a claim of an expired lease starts a new attempt, so a
+            // worker whose lease lapsed while nobody took over may still renew it.
             "UPDATE generation_runs SET lease_until = unixepoch() + ?4
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
-             AND state = 'running' AND lease_until > unixepoch() RETURNING lease_until",
+             AND state = 'running' RETURNING lease_until",
             params![workspace_id, run_id, attempt, LEASE_SECONDS],
             |row| row.get(0),
         )
@@ -174,9 +179,11 @@ impl WorkspaceStore {
             .optional()?
             .unwrap_or_default();
         let run = tx.query_row(
+            // Fenced by attempt only: a failure after the lease lapsed must still stop the run, or
+            // the next claim would quietly start the same step again.
             "UPDATE generation_runs SET state = 'failed', lease_until = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND attempt = ?3
-               AND state = 'running' AND lease_until > unixepoch()
+               AND state = 'running'
              RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
             params![workspace_id, run_id, attempt],
             read_run,
@@ -297,7 +304,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<Vec<GenerationActivity>> {
         self.0
             .prepare(
-                "SELECT event.attempt, event.state, event.kind, event.created_at, event.detail
+                "SELECT event.attempt, event.state, event.kind, event.created_at, event.detail, event.stage
              FROM generation_activity AS event JOIN generation_runs AS run ON run.id = event.run_id
              WHERE run.workspace_id = ?1 AND run.id = ?2 ORDER BY event.id",
             )?
@@ -308,6 +315,7 @@ impl WorkspaceStore {
                     kind: row.get(2)?,
                     created_at: row.get(3)?,
                     detail: row.get(4)?,
+                    stage: row.get(5)?,
                 })
             })?
             .collect()
@@ -408,6 +416,92 @@ mod tests {
             ]
         );
         assert!(store.generation_activity(other, run.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_step_that_fails_after_its_lease_lapsed_still_stops_the_run() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "request", &RunOptions::default())
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        let lapse = |store: &WorkspaceStore| {
+            store
+                .0
+                .execute(
+                    "UPDATE generation_runs SET lease_until = unixepoch() - 1 WHERE id = ?1",
+                    [run.id],
+                )
+                .unwrap();
+        };
+        // Long work let the lease lapse, but nobody took over: the worker may renew it.
+        lapse(&store);
+        store
+            .renew_generation_lease(workspace, run.id, claim.attempt)
+            .unwrap();
+        // A failure after the lease lapsed stops the run instead of leaving it to be claimed
+        // again, which restarted the same step forever.
+        lapse(&store);
+        let failed = store
+            .fail_generation(workspace, run.id, claim.attempt, "Thumbnails failed")
+            .unwrap();
+        assert_eq!(failed.state, "failed");
+        assert!(store.claim_generation(workspace).unwrap().is_none());
+        let kinds: Vec<String> = store
+            .generation_activity(workspace, run.id)
+            .unwrap()
+            .into_iter()
+            .map(|event| event.kind)
+            .collect();
+        assert_eq!(kinds, ["submitted", "claimed", "transition"]);
+    }
+
+    #[test]
+    fn a_claim_of_a_lapsed_attempt_is_shown_as_picked_up_again() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "request", &RunOptions::default())
+            .unwrap();
+        store.claim_generation(workspace).unwrap().unwrap();
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET lease_until = unixepoch() - 1 WHERE id = ?1",
+                [run.id],
+            )
+            .unwrap();
+        store.claim_generation(workspace).unwrap().unwrap();
+        let kinds: Vec<String> = store
+            .generation_activity(workspace, run.id)
+            .unwrap()
+            .into_iter()
+            .map(|event| event.kind)
+            .collect();
+        assert_eq!(kinds, ["submitted", "claimed", "resumed"]);
     }
 
     #[test]

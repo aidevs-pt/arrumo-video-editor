@@ -25,17 +25,51 @@ impl WorkspaceStore {
         scope: AgentLogScope<'_>,
         provider: &str,
         session: &str,
+        round: Option<i64>,
     ) {
         let _ = self.0.execute(
-            "INSERT OR IGNORE INTO agent_sessions (provider, session, workspace_id, run_id, stage)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT OR IGNORE INTO agent_sessions (provider, session, workspace_id, run_id, stage, round)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 provider,
                 session,
                 scope.workspace_id,
                 scope.run_id,
-                scope.stage
+                scope.stage,
+                round
             ],
+        );
+    }
+
+    /// The run's current round: 1, plus one for every review where the creator sent feedback
+    /// (asked for changes, rejected, or approved with notes).
+    pub(crate) fn run_round(&self, run_id: i64) -> rusqlite::Result<i64> {
+        self.0.query_row(
+            "SELECT 1 + count(*) FROM production_results
+             WHERE run_id = ?1 AND (decision IN ('revise', 'rejected')
+                OR (decision = 'approved' AND trim(coalesce(review_notes, '')) != ''))",
+            [run_id],
+            |row| row.get(0),
+        )
+    }
+
+    /// The session the run's agent has been using this round, if one was kept.
+    pub(crate) fn round_session(&self, run_id: i64, provider: &str, round: i64) -> Option<String> {
+        self.0
+            .query_row(
+                "SELECT session FROM agent_sessions WHERE run_id = ?1 AND provider = ?2 AND round = ?3
+                 ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                params![run_id, provider, round],
+                |row| row.get(0),
+            )
+            .ok()
+    }
+
+    /// Stops offering a session that could not be continued; it is still removed with the run.
+    pub(crate) fn forget_round_session(&self, provider: &str, session: &str) {
+        let _ = self.0.execute(
+            "UPDATE agent_sessions SET round = NULL WHERE provider = ?1 AND session = ?2",
+            params![provider, session],
         );
     }
 
@@ -240,6 +274,68 @@ mod tests {
     }
 
     #[test]
+    fn a_round_lasts_until_the_creator_sends_feedback() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(
+                workspace,
+                draft.id,
+                "request",
+                &crate::RunOptions::default(),
+            )
+            .unwrap()
+            .id;
+        let scope = AgentLogScope {
+            workspace_id: workspace,
+            run_id: Some(run),
+            stage: "script",
+            attempt: Some(1),
+        };
+        assert_eq!(store.run_round(run).unwrap(), 1);
+        assert_eq!(store.round_session(run, "claude-code", 1), None);
+        store.record_agent_session(scope, "claude-code", "first-session", Some(1));
+        assert_eq!(
+            store.round_session(run, "claude-code", 1).as_deref(),
+            Some("first-session")
+        );
+        assert_eq!(store.round_session(run, "codex", 1), None);
+        let review = |decision: &str, notes: &str| {
+            store
+                .0
+                .execute(
+                    "INSERT INTO production_results (run_id, attempt, stage_index, result_json, decision, review_notes)
+                     VALUES (?1, 1, 0, '{}', ?2, ?3)",
+                    params![run, decision, notes],
+                )
+                .unwrap();
+        };
+        // Approving without notes keeps the round; feedback of any kind starts the next one.
+        review("approved", "  ");
+        assert_eq!(store.run_round(run).unwrap(), 1);
+        review("approved", "Shorter intro");
+        assert_eq!(store.run_round(run).unwrap(), 2);
+        review("revise", "");
+        review("rejected", "");
+        assert_eq!(store.run_round(run).unwrap(), 4);
+        assert_eq!(store.round_session(run, "claude-code", 4), None);
+        // A session that could not be continued is no longer offered.
+        store.forget_round_session("claude-code", "first-session");
+        assert_eq!(store.round_session(run, "claude-code", 1), None);
+    }
+
+    #[test]
     fn sessions_go_when_their_run_is_over_or_they_have_no_run() {
         let store = WorkspaceStore::open(":memory:").unwrap();
         let scope = |run_id, stage| AgentLogScope {
@@ -248,8 +344,18 @@ mod tests {
             stage,
             attempt: None,
         };
-        store.record_agent_session(scope(None, "context"), "codex", "a".repeat(20).as_str());
-        store.record_agent_session(scope(Some(99), "script"), "codex", "b".repeat(20).as_str());
+        store.record_agent_session(
+            scope(None, "context"),
+            "codex",
+            "a".repeat(20).as_str(),
+            None,
+        );
+        store.record_agent_session(
+            scope(Some(99), "script"),
+            "codex",
+            "b".repeat(20).as_str(),
+            Some(1),
+        );
         store.release_agent_sessions(scope(Some(99), "script"));
         let count = |store: &WorkspaceStore| -> i64 {
             store

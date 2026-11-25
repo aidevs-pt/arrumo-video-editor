@@ -109,7 +109,7 @@ fn respond(request: Request, StreamFile { path, content_type }: StreamFile) {
         return;
     }
     let file = (|| -> io::Result<File> {
-        if !path.symlink_metadata()?.is_file() || path.canonicalize()? != path {
+        if !path.symlink_metadata()?.is_file() || !arrumo_workspaces::is_canonical(&path)? {
             return Err(io::Error::other("Delivery file unavailable"));
         }
         File::open(&path)

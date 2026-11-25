@@ -128,7 +128,9 @@ pub use agent_run::AgentRunError;
 pub use agent_settings::{AgentProviderSource, AgentSettings};
 pub use agent_work::agent_work_root;
 pub use asset_organization::AssetOrganization;
-pub use assets::{ImagePreview, WorkspaceAsset, asset_path, asset_root, frame_cache, image_type};
+pub use assets::{
+    ImagePreview, WorkspaceAsset, asset_path, asset_root, frame_cache, image_type, is_canonical,
+};
 pub use audio_generation::AudioKind;
 pub use audio_transform::{AudioTransform, AudioTransformProvider};
 pub use backup::{
@@ -350,6 +352,7 @@ impl WorkspaceStore {
             include_str!("../migrations/068-plugin-tour-for-new-installs.sql"),
             include_str!("../migrations/069-install-event.sql"),
             include_str!("../migrations/070-media-order-limits.sql"),
+            include_str!("../migrations/071-agent-rounds.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()
