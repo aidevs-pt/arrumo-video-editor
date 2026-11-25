@@ -2,6 +2,17 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.5 (2026-11-25)
+
+### New
+
+- Preview planned assets and fold the agent's raw output (#45)
+- Order media from any step, and add voice-over and sound effects to previews (#44)
+
+### Fixes
+
+- Use the current model, effort and web access in every agent step (#43)
+
 ## 0.1.4 (2026-11-24)
 
 ### New
