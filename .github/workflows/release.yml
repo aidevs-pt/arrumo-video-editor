@@ -225,8 +225,8 @@ jobs:
           # Microsoft's signing client for signtool, checked against the version this was tested with.
           $client = Join-Path $env:RUNNER_TEMP 'artifact-signing'
           $package = "$client.nupkg"
-          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/1.0.146' -OutFile $package
-          if ((Get-FileHash $package -Algorithm SHA256).Hash -ne '7761E5D8F31E54B764DA21D33CD8B0A2940E1B05526C7DFCB5E94B0431426F70') {
+          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/1.0.151' -OutFile $package
+          if ((Get-FileHash $package -Algorithm SHA256).Hash -ne '35375A4BC4E1102DA729FC3D8D9925F774C3BAAE6B8B7FF6398D948CA9AB0D8A') {
             throw 'The Artifact Signing client does not match its expected checksum'
           }
           Expand-Archive $package -DestinationPath $client
