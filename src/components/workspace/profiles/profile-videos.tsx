@@ -16,6 +16,7 @@ import { VideoThumbnail } from "@/components/workspace/video-thumbnail";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import type { Profile } from "./profile-route";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 type Draft = { id: number; title: string; intent: string; profile_id: number | null; source_ids: number[] };
 type ProfileFormat = { id: number; name: string; width: number; height: number; overrides: { width: number | null; height: number | null } };
@@ -54,6 +55,7 @@ export function ProfileVideos({ workspaceId, profile }: { workspaceId: number; p
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     const today = new Date();
@@ -80,7 +82,7 @@ export function ProfileVideos({ workspaceId, profile }: { workspaceId: number; p
       });
     }, () => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [attempt, profile.id, workspaceId]);
+  }, [attempt, profile.id, workspaceId, agentChanges]);
 
   if (failed) return (
     <Alert variant="destructive">

@@ -20,6 +20,7 @@ import { UsageNotice } from "@/components/workspace/usage/provider-usage";
 import { profileHref, workspaceHref } from "@/components/workspace/home/workspace-links";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { useLocale } from "@/lib/locale-provider";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 export type DraftSettings = { title: string; intent: string; profile_id: number | null; source_ids: number[] };
 export type SavedDraft = DraftSettings & { id: number };
@@ -78,6 +79,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
   const position = draftId === null ? -1 : queue.findIndex((entry) => entry.id === draftId);
   const next = queue.find((entry, index) => entry.id !== draftId && (position === -1 || index > position)) ?? null;
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -94,7 +96,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
       setAgent(label);
     }, () => {});
     return () => { active = false; };
-  }, [workspaceId, draftId]);
+  }, [workspaceId, draftId, agentChanges]);
 
   async function save(): Promise<SavedDraft | null> {
     if (!draft.title.trim()) { setMessage("needsTitle"); return null; }

@@ -232,7 +232,8 @@ impl WorkspaceStore {
             RunControl::Resume => ("queued", ["paused", "queued", "queued"]),
             RunControl::Cancel => ("cancelled", ["queued", "running", "paused"]),
         };
-        self.0.query_row(
+        let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
+        let run = tx.query_row(
             "UPDATE generation_runs SET state = ?3, lease_until = NULL
              WHERE workspace_id = ?1 AND id = ?2 AND state IN (?4, ?5, ?6)
                AND (?3 != 'queued' OR pending_review_id IS NULL)
@@ -246,7 +247,12 @@ impl WorkspaceStore {
                 allowed[2]
             ],
             read_run,
-        )
+        )?;
+        if target == "queued" {
+            self.adopt_current_agent(workspace_id, run_id)?;
+        }
+        tx.commit()?;
+        Ok(run)
     }
 
     /// Reopens the most recent result of an earlier stage for review and pauses the run there.

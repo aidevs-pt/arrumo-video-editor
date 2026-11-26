@@ -22,6 +22,7 @@ import { UsageBanner } from "@/components/workspace/usage/provider-usage";
 import { WorkspaceMark } from "../workspaces/workspace-mark";
 import { WorkspaceProfileNavigation } from "./workspace-profile-navigation";
 import { workspaceHref, type Workspace, type WorkspaceView } from "./workspace-links";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 export type { Workspace, WorkspaceView } from "./workspace-links";
 
@@ -248,6 +249,7 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
   const [agent, setAgent] = useState<string | null>();
   const [agentId, setAgentId] = useState<string | null>(null);
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -258,7 +260,7 @@ function AgentStatus({ workspaceId, working }: { workspaceId: number; working: n
       if (active) { setAgent(plugin?.label ?? null); setAgentId(plugin?.id ?? null); }
     }, () => { if (active) setAgent(null); });
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, agentChanges]);
 
   if (agent === undefined) return null;
   const title = !agent ? copy.agentMissing

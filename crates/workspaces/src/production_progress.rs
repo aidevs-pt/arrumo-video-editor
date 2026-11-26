@@ -267,6 +267,7 @@ impl WorkspaceStore {
             ],
             |_| Ok(()),
         )?;
+        self.adopt_current_agent(workspace_id, run_id)?;
         tx.query_row(
             "UPDATE production_results SET decision = ?3, review_notes = ?4
              WHERE run_id = ?1 AND id = ?2 AND decision IS NULL RETURNING id",

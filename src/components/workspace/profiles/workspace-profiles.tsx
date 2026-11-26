@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceCatalog } from "../home/workspace-router";
 import Link from "next/link";
 import { profileHref } from "../home/workspace-links";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
 type Draft = { name: string; guidance: string; color: string };
@@ -84,6 +85,7 @@ export function WorkspaceProfiles({
     }
   }
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -93,7 +95,7 @@ export function WorkspaceProfiles({
       if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider));
     }, () => {});
     return () => { active = false; };
-  }, [workspace.id]);
+  }, [workspace.id, agentChanges]);
 
   async function draftNewProfile() {
     setSaving(true);

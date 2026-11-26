@@ -32,6 +32,7 @@ import { AgentCapabilities, ScopedPluginPreferences } from "./plugin-preferences
 import { UpdateSettings } from "@/components/app-updates";
 import { UsagePanel } from "@/components/workspace/usage/provider-usage";
 import { BackupSettings } from "./backup-settings";
+import { announceAgentChange, useAgentChanges } from "@/lib/agent-changes";
 
 type AgentPlugin = { id: string; label: string };
 type Settings = {
@@ -238,6 +239,7 @@ function AgentSummary({ workspaceId, href }: { workspaceId?: number; href: strin
   const { messages: { settings: text } } = useLocale();
   const [agent, setAgent] = useState<{ name: string | null; source: Settings["source"]; others: number }>();
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -252,7 +254,7 @@ function AgentSummary({ workspaceId, href }: { workspaceId?: number; href: strin
       });
     }, () => { if (active) setAgent({ name: null, source: null, others: 0 }); });
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, agentChanges]);
 
   return (
     <section aria-labelledby="settings-agent-summary">
@@ -470,6 +472,7 @@ function ProviderForm({ workspaceId }: { workspaceId: number | null }) {
       setSettings(result);
       setChoice(selected(result));
       setSaved(true);
+      announceAgentChange();
     } catch {
       setError("saveError");
     } finally {
