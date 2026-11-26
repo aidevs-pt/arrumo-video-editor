@@ -118,7 +118,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     const summary = awaiting?.result.summary;
     if (awaiting) return typeof summary === "string" && summary.trim() ? summary : copy.captionReview.replace("{stage}", stageName(stage));
     if (runState === "completed") return copy.captionDone;
-    if (stage === "verify_delivery" && runState === "queued") {
+    if (stage === "verify_delivery" && runState === "queued" && formats.some((format) => format.subtitles !== false)) {
       const automatic = Object.values(progress?.automatic_subtitles ?? {});
       if (automatic.includes("started")) return copy.captionSubtitling;
       return automatic.includes("failed") ? copy.captionSubtitlesFailed : copy.captionNeedsSubtitles;

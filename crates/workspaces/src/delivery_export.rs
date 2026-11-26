@@ -68,15 +68,20 @@ impl WorkspaceStore {
         let mut pending = NamedTempFile::new_in(parent)?;
         let mut archive = ZipWriter::new(pending.as_file_mut());
         for (output, edited, translations) in outputs {
-            for (recorded, extension) in [(output.video, "mp4"), (output.subtitles, "srt")] {
+            let has_subtitles = output.subtitles.is_some() || edited.is_some();
+            for (recorded, extension) in [(Some(output.video), "mp4"), (output.subtitles, "srt")] {
                 let filename = format!("{}.{extension}", output.format_id);
-                if recorded != filename {
-                    return Err(io::Error::other("Unexpected filename in verified delivery").into());
-                }
                 if let Some(latest) = edited.as_ref().filter(|_| extension == "srt") {
                     archive.start_file(filename, SimpleFileOptions::default())?;
                     archive.write_all(latest.subtitles.as_bytes())?;
                     continue;
+                }
+                // Delivered without subtitles.
+                let Some(recorded) = recorded else {
+                    continue;
+                };
+                if recorded != filename {
+                    return Err(io::Error::other("Unexpected filename in verified delivery").into());
                 }
                 let source = source_dir.join(&filename);
                 let metadata = fs::symlink_metadata(&source).io_step("Checking a file")?;
@@ -96,7 +101,9 @@ impl WorkspaceStore {
                     return Err(io::Error::other("A delivery file changed during export").into());
                 }
             }
-            if let Some((dimensions, style)) = burned.get(&output.format_id) {
+            if let Some((dimensions, style)) =
+                burned.get(&output.format_id).filter(|_| has_subtitles)
+            {
                 let work = tempfile::tempdir()?;
                 let captioned = work.path().join("captioned.mp4");
                 burn_output(
@@ -188,6 +195,13 @@ impl WorkspaceStore {
             })?;
         let edited = self.read_edited_subtitles(run_id, format_id, "", None)?;
         snapshot.commit()?;
+        let delivered_subtitles = delivery
+            .verified_outputs
+            .iter()
+            .any(|output| output.format_id == format_id && output.subtitles.is_some());
+        if edited.is_none() && !delivered_subtitles {
+            return Err(io::Error::other("That video was delivered without subtitles").into());
+        }
         if destination.symlink_metadata().is_ok() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,

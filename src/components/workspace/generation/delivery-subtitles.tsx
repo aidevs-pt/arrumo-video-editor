@@ -12,9 +12,10 @@ const automaticStatus = {
   completed: "automaticSubtitlesCompleted",
 } as const;
 
-export type DeliveryFormat = { id: number; name: string };
+/** `subtitles` is false for a format delivered without them. */
+export type DeliveryFormat = { id: number; name: string; subtitles?: boolean };
 
-export function DeliverySubtitles({ workspaceId, runId, formats, automatic, disabled, onBusy }: {
+export function DeliverySubtitles({ workspaceId, runId, formats: allFormats, automatic, disabled, onBusy }: {
   workspaceId: number;
   runId: number;
   formats: DeliveryFormat[];
@@ -24,6 +25,7 @@ export function DeliverySubtitles({ workspaceId, runId, formats, automatic, disa
 }) {
   const { messages: { productionPlan: copy } } = useLocale();
   const hintId = useId();
+  const formats = allFormats.filter((format) => format.subtitles !== false);
   const [saved, setSaved] = useState<Record<number, "subtitlesImported" | "subtitlesGenerated">>({});
   const [pending, setPending] = useState<{ formatId: number; action: "import" | "generate" }>();
   const [error, setError] = useState<{ formatId: number; key: "subtitleImportError" | "subtitleGenerationError" }>();
@@ -55,6 +57,7 @@ export function DeliverySubtitles({ workspaceId, runId, formats, automatic, disa
   const working = formats.some((format) => automatic?.[format.id] === "started");
   const waiting = formats.length > 0 && !working && !formats.every(ready);
 
+  if (!formats.length) return null;
   return (
     <div className="flex flex-col gap-2">
       {waiting && (

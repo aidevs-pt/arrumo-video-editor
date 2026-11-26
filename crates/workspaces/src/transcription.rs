@@ -114,12 +114,21 @@ impl WorkspaceStore {
 
     /// Whether automatic subtitles can run in the workspace: a transcription provider in its
     /// order is on, returns word timings and has its key. Checked before a video is queued so
-    /// the creator can set one up instead of finding out at delivery.
-    pub fn subtitle_provider_ready(&self, workspace_id: i64) -> Result<bool, Box<dyn Error>> {
-        let order = self.without_inactive(
-            self.provider_preferences("transcription", Some(workspace_id))?
-                .effective,
-        )?;
+    /// the creator can set one up instead of finding out at delivery. `order` is the video's own
+    /// provider order when it overrides the workspace's.
+    pub fn subtitle_provider_ready(
+        &self,
+        workspace_id: i64,
+        order: Option<Vec<String>>,
+    ) -> Result<bool, Box<dyn Error>> {
+        let order = match order {
+            Some(order) => order,
+            None => {
+                self.provider_preferences("transcription", Some(workspace_id))?
+                    .effective
+            }
+        };
+        let order = self.without_inactive(order)?;
         for provider in order {
             let Some(adapter) = find_bundled_transcription_adapter(&provider, true)? else {
                 continue;
@@ -419,7 +428,12 @@ mod tests {
         store
             .set_provider_preferences("transcription", Some(workspace), Some(&[]))
             .unwrap();
-        assert!(!store.subtitle_provider_ready(workspace).unwrap());
+        assert!(!store.subtitle_provider_ready(workspace, None).unwrap());
+        assert!(
+            !store
+                .subtitle_provider_ready(workspace, Some(vec!["unknown".into()]))
+                .unwrap()
+        );
     }
 
     fn fixture() -> TranscriptionAdapter {

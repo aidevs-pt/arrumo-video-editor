@@ -47,8 +47,10 @@ export function outputOptions(choice: OutputChoice, plan: OutputPlan[]) {
   };
 }
 
-export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disabled }: {
+export function VideoOutputs({ workspaceId, images, plan, choice, onChange, subtitles = true, disabled }: {
   workspaceId: number;
+  /** Whether the video is delivered with subtitles. */
+  subtitles?: boolean;
   images: ReferenceImage[];
   plan: OutputPlan[];
   choice: OutputChoice;
@@ -102,7 +104,7 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
         const lines: { icon: typeof Icon; text: string; previews?: ReferenceImage[] }[] = [];
         if (value.thumbnails) lines.push({ icon: ImageIcon, text: copy.makeThumbnails.replace("{count}", String(value.thumbnails)).replace("{format}", format.name.toLowerCase()), previews: references });
         if (value.portrait) lines.push({ icon: RectangleVertical, text: copy.makePortrait.replace("{count}", String(value.portrait)) });
-        if (value.captioned) lines.push({ icon: Captions, text: copy.makeCaptioned });
+        if (value.captioned && subtitles) lines.push({ icon: Captions, text: copy.makeCaptioned });
         if (value.titles || value.descriptions || value.tags) lines.push({ icon: FileText, text: [
           value.titles || value.descriptions ? copy.makeText.replace("{titles}", String(value.titles)).replace("{descriptions}", String(value.descriptions)) : "",
           value.tags ? copy.makeTags : "",
@@ -112,7 +114,7 @@ export function VideoOutputs({ workspaceId, images, plan, choice, onChange, disa
             <div className="flex items-center justify-between gap-3">
               <span className={cn("flex min-w-0 items-center gap-2.5 text-sm font-semibold", skipped && "text-muted-foreground line-through")}>
                 <Icon className="size-4 shrink-0" aria-hidden="true" />
-                {copy.makeVideo.replace("{format}", format.name.toLowerCase())}
+                {(subtitles ? copy.makeVideo : copy.makeVideoOnly).replace("{format}", format.name.toLowerCase())}
               </span>
               <Switch checked={!skipped} disabled={disabled || (!skipped && produced === 1)}
                 aria-label={copy.produceFormat.replace("{format}", format.name)}

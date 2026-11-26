@@ -39,7 +39,8 @@ import { CompletedVideoReplay } from "./completed-video-replay";
 type Output = {
   format_id: number;
   video: string;
-  subtitles: string;
+  /** Null when the video was delivered without subtitles. */
+  subtitles: string | null;
   duration_seconds: number;
   subtitle_cues: number;
 };
@@ -138,7 +139,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
   const finished = [...video.activity].reverse().find((entry) => entry.state === "completed");
   const completedAt = finished ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(finished.created_at * 1000)) : null;
   const crumbOutput = video.delivery.verified_outputs.find((output) => output.format_id === initialFormatId) ?? video.delivery.verified_outputs[0];
-  const fileCrumb = file === "subtitles" ? crumbOutput?.subtitles : undefined;
+  const fileCrumb = file === "subtitles" ? crumbOutput?.subtitles ?? copy.subtitleText : undefined;
   useStudioTrail([
     { label: studio.videos, href: workspaceHref("videos", workspaceId) },
     { label: savedTitle, href: fileCrumb ? completedVideoHref(workspaceId, runId, crumbOutput?.format_id) : undefined },
@@ -264,7 +265,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
     return <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <WorkspaceHeading className="mb-0">
-          <h1>{selected.subtitles}</h1>
+          <h1>{selected.subtitles ?? copy.subtitleText}</h1>
           <p>{copy.subtitlesIntro.replace("{video}", savedTitle).replace("{output}", outputName(selected))}</p>
         </WorkspaceHeading>
         <Button asChild variant="outline" size="sm">
@@ -272,7 +273,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
         </Button>
       </div>
       <CompletedOutputPreview key={selected.format_id} workspaceId={workspaceId} runId={runId}
-        formatId={selected.format_id} label={outputName(selected)} subtitleName={selected.subtitles} showTranscript />
+        formatId={selected.format_id} label={outputName(selected)} subtitleName={selected.subtitles ?? `${selected.format_id}.srt`} showTranscript />
       <section className="mt-6 border-t pt-4">
         <h2 className="mb-2 text-[1.3125rem]">{copy.otherFiles}</h2>
         <div className="flex flex-wrap gap-2">
@@ -283,7 +284,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
               </Link>
             </Button>
           ))}
-          {video.delivery.verified_outputs.filter((output) => output.format_id !== selected.format_id).map((output) => (
+          {video.delivery.verified_outputs.filter((output) => output.format_id !== selected.format_id && output.subtitles).map((output) => (
             <Button key={output.format_id} asChild variant="outline" size="sm">
               <Link href={completedVideoHref(workspaceId, runId, output.format_id, "subtitles")}>
                 <Captions data-icon="inline-start" />{output.subtitles}
@@ -366,11 +367,11 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
                       style: "unit", unit: "second", maximumFractionDigits: 1,
                     }).format(selected.duration_seconds)} />
                     <Metadata name={copy.videoFile} value={selected.video} />
-                    <Metadata name={copy.subtitleFile} value={selected.subtitles} />
+                    <Metadata name={copy.subtitleFile} value={selected.subtitles ?? copy.noSubtitleFile} />
                   </dl>
                   <Button asChild size="sm" variant="outline">
                     <Link href={completedVideoHref(workspaceId, runId, selected.format_id, "subtitles")}>
-                      <Captions data-icon="inline-start" />{copy.subtitleText}
+                      <Captions data-icon="inline-start" />{selected.subtitles ? copy.subtitleText : copy.addSubtitles}
                     </Link>
                   </Button>
                   {burnsCaptions && <>

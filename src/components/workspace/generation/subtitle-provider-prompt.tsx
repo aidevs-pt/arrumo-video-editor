@@ -22,10 +22,10 @@ export function useSubtitleProviderPrompt(workspaceId: number) {
   const [open, setOpen] = useState(false);
   const resolver = useRef<(choice: SubtitleChoice) => void>(undefined);
 
-  const confirm = useCallback(async (wanted: boolean): Promise<SubtitleChoice> => {
+  const confirm = useCallback(async (wanted: boolean, transcriptionOrder?: string[]): Promise<SubtitleChoice> => {
     if (!wanted) return "continue";
     try {
-      if (await invoke<boolean>("subtitle_provider_ready", { workspaceId })) return "continue";
+      if (await invoke<boolean>("subtitle_provider_ready", { workspaceId, transcriptionOrder: transcriptionOrder ?? null })) return "continue";
     } catch {
       // The check is advice; a video can still be queued and its subtitles added later.
       return "continue";

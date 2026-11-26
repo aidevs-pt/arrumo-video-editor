@@ -79,7 +79,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
       skip_hooks: JSON.parse(String(fields.get("skip-hooks") ?? "[]")) as string[],
     };
-    const subtitleChoice = await subtitles.confirm(options.generate_delivery_subtitles);
+    const subtitleChoice = await subtitles.confirm(options.generate_delivery_subtitles, options.provider_overrides.transcription);
     if (subtitleChoice === "cancel") return;
     if (subtitleChoice === "without") options.generate_delivery_subtitles = false;
     const payload = JSON.stringify({ draftId: selected.id, options });
