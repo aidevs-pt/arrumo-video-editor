@@ -284,14 +284,16 @@ fn verify_output(
     let video = format!("{}.mp4", format.id);
     let duration = verified_video_duration(directory, &video, format)?;
     let srt = format!("{}.srt", format.id);
-    // Subtitles that exist are always checked, such as a storyboard's own captions.
-    let (subtitles, subtitle_cues) =
-        if entry.needs_subtitles() || directory.join(&srt).symlink_metadata().is_ok() {
-            let cues = verify_subtitle_cues(directory, &srt, duration)?;
-            (Some(srt), cues)
-        } else {
-            (None, 0)
-        };
+    // Optional subtitles, such as a storyboard's own captions, ship only when they are valid.
+    let (subtitles, subtitle_cues) = if entry.needs_subtitles() {
+        let cues = verify_subtitle_cues(directory, &srt, duration)?;
+        (Some(srt), cues)
+    } else {
+        match verify_subtitle_cues(directory, &srt, duration) {
+            Ok(cues) => (Some(srt), cues),
+            Err(_) => (None, 0),
+        }
+    };
     Ok(VerifiedOutput {
         format_id: format.id,
         video,
@@ -974,19 +976,23 @@ mod transcription_tests {
                 },
             )
             .unwrap();
+        let options = RunOptions {
+            generate_delivery_subtitles: false,
+            ..RunOptions::default()
+        };
         let run = store
-            .enqueue_video_draft(workspace, draft.id, "key", &RunOptions::default())
+            .enqueue_video_draft(workspace, draft.id, "key", &options)
             .unwrap();
-        let snapshot = json!({"formats": [{
-            "format": {"id": 5, "width": 160, "height": 90},
-            "delivery": {"required": ["final_video"]}
-        }]});
+        // Keep the snapshot enqueue wrote; only shrink the first format for a fast fixture.
+        let format_id = run.snapshot["formats"][0]["format"]["id"].as_i64().unwrap();
         let plan = json!({"steps": [{"stage": "verify_delivery", "review_required": false}]});
         store
             .0
             .execute(
-                "UPDATE generation_runs SET snapshot_json = ?1, plan_json = ?2 WHERE id = ?3",
-                params![snapshot.to_string(), plan.to_string(), run.id],
+                "UPDATE generation_runs SET plan_json = ?1, snapshot_json = json_set(snapshot_json,
+                   '$.formats', json_array(json_set(json_extract(snapshot_json, '$.formats[0]'),
+                   '$.format.width', 160, '$.format.height', 90))) WHERE id = ?2",
+                params![plan.to_string(), run.id],
             )
             .unwrap();
         let directory = delivery_directory(&database, workspace, run.id);
@@ -1007,11 +1013,12 @@ mod transcription_tests {
                 "-threads",
                 "1",
             ])
-            .arg(directory.join("5.mp4"))
+            .arg(directory.join(format!("{format_id}.mp4")))
             .launch_status()
             .unwrap();
         assert!(status.success());
 
+        fs::write(directory.join(format!("{format_id}.srt")), b"not subtitles").unwrap();
         assert!(store.process_next_ready_delivery(&database).unwrap());
         let output = &store
             .verified_delivery(workspace, run.id)
@@ -1023,7 +1030,7 @@ mod transcription_tests {
         );
         assert_eq!(
             store
-                .completed_subtitle_track(&database, workspace, run.id, 5, None, None)
+                .completed_subtitle_track(&database, workspace, run.id, format_id, None, None)
                 .unwrap()
                 .subtitles,
             ""
@@ -1037,7 +1044,7 @@ mod transcription_tests {
             .file_names()
             .map(|name| name.unwrap().to_string())
             .collect();
-        assert_eq!(names, ["5.mp4"]);
+        assert_eq!(names, [format!("{format_id}.mp4")]);
     }
 }
 

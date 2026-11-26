@@ -1273,7 +1273,7 @@
     "renderFinalVideo": "Generar vídeo final",
     "verifyFiles": "Verificar archivos de entrega",
     "processingMedia": "Procesando archivos…",
-    "verifyHint": "La verificación requiere un archivo SRT para cada formato de salida.",
+    "verifyHint": "Cada formato necesita su vídeo, y un SRT salvo que el vídeo se pusiera en cola sin subtítulos.",
     "mediaUnavailable": "Esta etapa ya no está disponible. Comprueba el paso actual.",
     "mediaFailed": "El procesamiento no terminó. Consulta la actividad del proceso.",
     "deliveryFilesMissing": "Primero añade subtítulos para cada formato. Genéralos o importa un SRT arriba y luego verifica.",
