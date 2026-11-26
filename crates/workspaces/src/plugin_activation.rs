@@ -253,6 +253,7 @@ mod tests {
                     "DROP TABLE plugin_activation; DROP TABLE agent_usage_observations;
                      DROP TABLE brand_fonts; DROP TABLE agent_executables;
                      ALTER TABLE privacy_settings DROP COLUMN install_reported;
+                     ALTER TABLE privacy_settings DROP COLUMN crash_report_id;
                      DROP TRIGGER generation_activity_transition;
                      ALTER TABLE generation_activity DROP COLUMN stage;
                      ALTER TABLE agent_logs DROP COLUMN round; ALTER TABLE agent_sessions DROP COLUMN round;
