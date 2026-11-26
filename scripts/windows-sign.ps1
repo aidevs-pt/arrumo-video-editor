@@ -11,6 +11,11 @@ $tokenFile = Join-Path $env:RUNNER_TEMP 'azure-federated-token'
 Set-Content -Path $tokenFile -Value $token -NoNewline
 $env:AZURE_FEDERATED_TOKEN_FILE = $tokenFile
 
-& $env:ARRUMO_SIGNTOOL sign /v /fd SHA256 /tr 'http://timestamp.acs.microsoft.com' /td SHA256 `
-  /d 'Arrumo AI Video Editor' /dlib $env:ARRUMO_SIGNING_DLIB /dmdf $env:ARRUMO_SIGNING_METADATA $File
-exit $LASTEXITCODE
+# Windows PowerShell stops on a native command's error output under 'Stop', which would hide it.
+$ErrorActionPreference = 'Continue'
+$output = & $env:ARRUMO_SIGNTOOL sign /v /fd SHA256 /tr 'http://timestamp.acs.microsoft.com' /td SHA256 `
+  /d 'Arrumo AI Video Editor' /dlib $env:ARRUMO_SIGNING_DLIB /dmdf $env:ARRUMO_SIGNING_METADATA $File 2>&1
+$code = $LASTEXITCODE
+# Tauri only shows a failed command's error stream, so the signing client's details go there.
+if ($code -ne 0) { [Console]::Error.WriteLine(($output | Out-String)) } else { $output | Out-String | Write-Output }
+exit $code
