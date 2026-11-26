@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Captions } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/locale-provider";
@@ -22,10 +23,10 @@ export function useSubtitleProviderPrompt(workspaceId: number) {
   const [open, setOpen] = useState(false);
   const resolver = useRef<(choice: SubtitleChoice) => void>(undefined);
 
-  const confirm = useCallback(async (wanted: boolean): Promise<SubtitleChoice> => {
+  const confirm = useCallback(async (wanted: boolean, transcriptionOrder?: string[]): Promise<SubtitleChoice> => {
     if (!wanted) return "continue";
     try {
-      if (await invoke<boolean>("subtitle_provider_ready", { workspaceId })) return "continue";
+      if (await invoke<boolean>("subtitle_provider_ready", { workspaceId, transcriptionOrder: transcriptionOrder ?? null })) return "continue";
     } catch {
       // The check is advice; a video can still be queued and its subtitles added later.
       return "continue";
@@ -49,13 +50,14 @@ export function useSubtitleProviderPrompt(workspaceId: number) {
 
   const dialog = (
     <AlertDialog open={open} onOpenChange={(next) => { if (!next) finish("cancel"); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{copy.subtitleProviderTitle}</AlertDialogTitle>
-          <AlertDialogDescription>{copy.subtitleProviderDescription}</AlertDialogDescription>
+      <AlertDialogContent className="gap-5 p-6 data-[size=default]:max-w-[calc(100vw-2rem)] data-[size=default]:sm:max-w-lg">
+        <AlertDialogHeader className="gap-2">
+          <AlertDialogMedia className="bg-primary/10 text-primary"><Captions aria-hidden="true" /></AlertDialogMedia>
+          <AlertDialogTitle className="text-lg">{copy.subtitleProviderTitle}</AlertDialogTitle>
+          <AlertDialogDescription className="text-pretty">{copy.subtitleProviderDescription}</AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="sm:flex-wrap">
-          <AlertDialogCancel className="sm:me-auto">{copy.subtitleProviderCancel}</AlertDialogCancel>
+        <AlertDialogFooter className="-mx-6 -mb-6 px-6 py-4 sm:items-center">
+          <AlertDialogCancel variant="ghost" className="sm:me-auto">{copy.subtitleProviderCancel}</AlertDialogCancel>
           <Button type="button" variant="outline" onClick={() => finish("without")}>{copy.subtitleProviderWithout}</Button>
           <AlertDialogAction onClick={setUp}>{copy.subtitleProviderSetUp}</AlertDialogAction>
         </AlertDialogFooter>

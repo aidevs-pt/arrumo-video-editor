@@ -37,6 +37,7 @@ pub async fn process_desktop_media_stage(
 #[tauri::command]
 pub async fn subtitle_provider_ready(
     workspace_id: i64,
+    transcription_order: Option<Vec<String>>,
     app: AppHandle,
 ) -> Result<bool, &'static str> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -47,7 +48,7 @@ pub async fn subtitle_provider_ready(
             .join("workspaces.sqlite");
         WorkspaceStore::open(&database)
             .map_err(|_| "store_unavailable")?
-            .subtitle_provider_ready(workspace_id)
+            .subtitle_provider_ready(workspace_id, transcription_order)
             .map_err(|_| "provider_check_failed")
     })
     .await

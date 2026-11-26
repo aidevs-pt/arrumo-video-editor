@@ -168,9 +168,9 @@ export function CompletedOutputPreview({ workspaceId, runId, formatId, label, su
       {showTranscript && preview && track && <section className="min-w-0" aria-labelledby="delivery-transcript">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 id="delivery-transcript" className="text-[1.3125rem]">{copy.subtitleText}</h2>
-          <Button type="button" variant="outline" size="sm" disabled={saving === "saving"} onClick={() => void downloadTrack()}>
+          {displayed?.subtitles && <Button type="button" variant="outline" size="sm" disabled={saving === "saving"} onClick={() => void downloadTrack()}>
             <Download data-icon="inline-start" />{saving === "saving" ? copy.downloading : copy.download}
-          </Button>
+          </Button>}
         </div>
         {preview.languages.length > 0 && preview.languages.length <= 3 ? (
           <ToggleGroup type="single" variant="outline" className="mb-3 w-full" aria-label={tracks.language}

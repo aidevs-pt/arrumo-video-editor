@@ -15,8 +15,9 @@ export async function completedSubtitleTracks(workspaceId: number, runId: number
   const formatName = (output: Output) =>
     video.run.snapshot.formats?.find(({ format }) => format.id === output.format_id)?.format.name ?? output.video;
   const outputs = await Promise.all(video.delivery.verified_outputs.map(async (output) => {
-    const preview = await invoke<{ languages: string[] }>("preview_completed_output", { workspaceId, runId, formatId: output.format_id });
-    return ["", ...preview.languages].map((language) => ({
+    const preview = await invoke<{ languages: string[]; subtitles: string }>("preview_completed_output", { workspaceId, runId, formatId: output.format_id });
+    // A video delivered without subtitles has no primary track until someone writes one.
+    return [...(preview.subtitles ? [""] : []), ...preview.languages].map((language) => ({
       id: `${output.format_id}:${language}`,
       label: `${formatName(output)} · ${language ? (names.of(language) ?? language) : primary}`,
       load: async () => (await invoke<{ subtitles: string }>("read_completed_subtitle_revision", {

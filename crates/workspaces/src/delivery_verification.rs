@@ -23,6 +23,32 @@ struct Snapshot {
 #[derive(Deserialize)]
 struct DeliveryFormat {
     format: Format,
+    #[serde(default)]
+    delivery: DeliveryContract,
+}
+
+/// What a format's delivery must contain, captured when the video was queued.
+#[derive(Deserialize)]
+struct DeliveryContract {
+    required: Vec<String>,
+}
+
+impl Default for DeliveryContract {
+    /// Runs captured before the contract was recorded always needed subtitles.
+    fn default() -> Self {
+        Self {
+            required: vec!["final_video".into(), "subtitles".into()],
+        }
+    }
+}
+
+impl DeliveryFormat {
+    fn needs_subtitles(&self) -> bool {
+        self.delivery
+            .required
+            .iter()
+            .any(|item| item == "subtitles")
+    }
 }
 
 #[derive(Deserialize)]
@@ -70,8 +96,11 @@ pub struct VerifiedDelivery {
 pub struct VerifiedOutput {
     pub format_id: i64,
     pub video: String,
-    pub subtitles: String,
+    /// None when the video was delivered without subtitles.
+    #[serde(default)]
+    pub subtitles: Option<String>,
     pub(crate) duration_seconds: f64,
+    #[serde(default)]
     subtitle_cues: usize,
 }
 
@@ -165,7 +194,7 @@ impl WorkspaceStore {
         let outputs = snapshot
             .formats
             .into_iter()
-            .map(|entry| verify_output(&directory, entry.format))
+            .map(|entry| verify_output(&directory, &entry))
             .collect::<Result<Vec<_>, _>>()?;
         let result = serde_json::to_string(&VerifiedDelivery {
             verified_outputs: outputs,
@@ -247,11 +276,24 @@ fn probe(
     Ok(output.stdout)
 }
 
-fn verify_output(directory: &Path, format: Format) -> Result<VerifiedOutput, Box<dyn Error>> {
+fn verify_output(
+    directory: &Path,
+    entry: &DeliveryFormat,
+) -> Result<VerifiedOutput, Box<dyn Error>> {
+    let format = &entry.format;
     let video = format!("{}.mp4", format.id);
-    let subtitles = format!("{}.srt", format.id);
-    let duration = verified_video_duration(directory, &video, &format)?;
-    let subtitle_cues = verify_subtitle_cues(directory, &subtitles, duration)?;
+    let duration = verified_video_duration(directory, &video, format)?;
+    let srt = format!("{}.srt", format.id);
+    // Optional subtitles, such as a storyboard's own captions, ship only when they are valid.
+    let (subtitles, subtitle_cues) = if entry.needs_subtitles() {
+        let cues = verify_subtitle_cues(directory, &srt, duration)?;
+        (Some(srt), cues)
+    } else {
+        match verify_subtitle_cues(directory, &srt, duration) {
+            Ok(cues) => (Some(srt), cues),
+            Err(_) => (None, 0),
+        }
+    };
     Ok(VerifiedOutput {
         format_id: format.id,
         video,
@@ -425,7 +467,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         run_id: i64,
         format_id: i64,
-    ) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    ) -> Result<(PathBuf, Option<PathBuf>), Box<dyn Error>> {
         let output = self
             .verified_delivery(workspace_id, run_id)?
             .verified_outputs
@@ -438,7 +480,10 @@ impl WorkspaceStore {
             }
             managed_delivery_file(database, workspace_id, run_id, &name)
         };
-        Ok((file(output.video, "mp4")?, file(output.subtitles, "srt")?))
+        Ok((
+            file(output.video, "mp4")?,
+            output.subtitles.map(|name| file(name, "srt")).transpose()?,
+        ))
     }
 }
 
@@ -453,7 +498,11 @@ fn missing_delivery_files(
         .iter()
         .flat_map(|entry| {
             let id = entry.format.id;
-            [format!("{id}.mp4"), format!("{id}.srt")]
+            let mut files = vec![format!("{id}.mp4")];
+            if entry.needs_subtitles() {
+                files.push(format!("{id}.srt"));
+            }
+            files
         })
         .filter(|name| managed_delivery_file(database, workspace_id, run_id, name).is_err())
         .collect()
@@ -904,7 +953,98 @@ mod transcription_tests {
         assert!(store.process_next_ready_delivery(&database).unwrap());
         let verified = store.verified_delivery(workspace, run.id).unwrap();
         assert_eq!(verified.verified_outputs[0].subtitle_cues, 1);
-        assert_eq!(verified.verified_outputs[0].subtitles, "5.srt");
+        assert_eq!(
+            verified.verified_outputs[0].subtitles.as_deref(),
+            Some("5.srt")
+        );
+    }
+
+    #[test]
+    fn a_video_queued_without_subtitles_is_delivered_without_them() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspace.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "No subtitles".into(),
+                    intent: "A short".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let options = RunOptions {
+            generate_delivery_subtitles: false,
+            ..RunOptions::default()
+        };
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &options)
+            .unwrap();
+        // Keep the snapshot enqueue wrote; only shrink the first format for a fast fixture.
+        let format_id = run.snapshot["formats"][0]["format"]["id"].as_i64().unwrap();
+        let plan = json!({"steps": [{"stage": "verify_delivery", "review_required": false}]});
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET plan_json = ?1, snapshot_json = json_set(snapshot_json,
+                   '$.formats', json_array(json_set(json_extract(snapshot_json, '$.formats[0]'),
+                   '$.format.width', 160, '$.format.height', 90))) WHERE id = ?2",
+                params![plan.to_string(), run.id],
+            )
+            .unwrap();
+        let directory = delivery_directory(&database, workspace, run.id);
+        fs::create_dir_all(&directory).unwrap();
+        let status = crate::quiet_command(crate::media_tools::ffmpeg())
+            .args([
+                "-nostdin",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=s=160x90:r=15",
+                "-t",
+                "1",
+                "-c:v",
+                "mpeg4",
+                "-threads",
+                "1",
+            ])
+            .arg(directory.join(format!("{format_id}.mp4")))
+            .launch_status()
+            .unwrap();
+        assert!(status.success());
+
+        fs::write(directory.join(format!("{format_id}.srt")), b"not subtitles").unwrap();
+        assert!(store.process_next_ready_delivery(&database).unwrap());
+        let output = &store
+            .verified_delivery(workspace, run.id)
+            .unwrap()
+            .verified_outputs[0];
+        assert_eq!(
+            (output.subtitles.as_deref(), output.subtitle_cues),
+            (None, 0)
+        );
+        assert_eq!(
+            store
+                .completed_subtitle_track(&database, workspace, run.id, format_id, None, None)
+                .unwrap()
+                .subtitles,
+            ""
+        );
+        let zip = temp.path().join("delivery.zip");
+        store
+            .export_generation_delivery(&database, workspace, run.id, &zip)
+            .unwrap();
+        let archive = zip::ZipArchive::new(fs::File::open(zip).unwrap()).unwrap();
+        let names: Vec<String> = archive
+            .file_names()
+            .map(|name| name.unwrap().to_string())
+            .collect();
+        assert_eq!(names, [format!("{format_id}.mp4")]);
     }
 }
 
@@ -958,6 +1098,35 @@ mod readiness_tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn queueing_without_automatic_subtitles_drops_them_from_the_delivery() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Portrait".into(),
+                    intent: "A short".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let required = |key: &str, generate: bool| {
+            let options = RunOptions {
+                generate_delivery_subtitles: generate,
+                ..RunOptions::default()
+            };
+            let run = store
+                .enqueue_video_draft(workspace, draft.id, key, &options)
+                .unwrap();
+            run.snapshot["formats"][0]["delivery"]["required"].clone()
+        };
+        assert_eq!(required("with", true), json!(["final_video", "subtitles"]));
+        assert_eq!(required("without", false), json!(["final_video"]));
     }
 
     #[test]

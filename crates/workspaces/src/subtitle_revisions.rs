@@ -54,7 +54,11 @@ impl WorkspaceStore {
         }
         Ok(SubtitleRevision {
             revision: 0,
-            subtitles: read_subtitle_file(&original)?,
+            // A video delivered without subtitles starts with an empty track to write.
+            subtitles: original
+                .map(|path| read_subtitle_file(&path))
+                .transpose()?
+                .unwrap_or_default(),
         })
     }
 

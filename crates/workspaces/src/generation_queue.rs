@@ -448,8 +448,13 @@ impl WorkspaceStore {
             return Err(rusqlite::Error::InvalidQuery);
         }
         let mut formats = formats;
+        let without_subtitles = options["generate_delivery_subtitles"] == json!(false);
         for entry in &mut formats {
             self.resolve_portrait_source(workspace_id, entry)?;
+            // A video queued without automatic subtitles is delivered without them.
+            if without_subtitles {
+                entry["delivery"]["required"] = json!(["final_video"]);
+            }
         }
         let chosen: Option<Vec<i64>> = options
             .get("formats")
