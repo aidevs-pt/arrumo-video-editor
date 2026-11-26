@@ -2,6 +2,16 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.12 (2026-11-26)
+
+### New
+
+- Group by cause, report silent failures, and send no location (#97)
+
+### Fixes
+
+- Keep the lease while a cut renders its animations (#95)
+
 ## 0.1.11 (2026-11-26)
 
 ### Fixes
