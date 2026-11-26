@@ -207,7 +207,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               </CollapsibleTrigger>
               <CollapsibleContent forceMount className="flex flex-col gap-5 border-t px-5 py-4 data-[state=closed]:hidden">
                 <Field orientation="horizontal">
-                  <Switch id="run-generate-subtitles" name="generate-subtitles" aria-describedby="run-generate-subtitles-description" />
+                  <Switch id="run-generate-subtitles" name="generate-subtitles" defaultChecked aria-describedby="run-generate-subtitles-description" />
                   <FieldContent>
                     <FieldLabel htmlFor="run-generate-subtitles">{messages.queue.automaticSubtitles}</FieldLabel>
                     <FieldDescription id="run-generate-subtitles-description">{messages.queue.automaticSubtitlesHint}</FieldDescription>

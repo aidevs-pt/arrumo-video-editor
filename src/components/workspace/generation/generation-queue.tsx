@@ -150,7 +150,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
                       </FieldContent>
                     </Field>
                     <Field orientation="horizontal">
-                      <Switch id="run-generate-subtitles" name="generate-subtitles" disabled={pending}
+                      <Switch id="run-generate-subtitles" name="generate-subtitles" defaultChecked disabled={pending}
                         aria-describedby="run-generate-subtitles-description" />
                       <FieldContent>
                         <FieldLabel htmlFor="run-generate-subtitles">{copy.automaticSubtitles}</FieldLabel>

@@ -12,7 +12,8 @@ use crate::format_deliveries::read_settings;
 pub struct RunOptions {
     #[serde(default)]
     pub autopilot: bool,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// On unless turned off: every delivery needs subtitles, and without them the run waits.
+    #[serde(default = "default_generate_delivery_subtitles")]
     pub generate_delivery_subtitles: bool,
     #[serde(default = "default_save_motion_to_library")]
     pub save_motion_to_library: bool,
@@ -168,11 +169,15 @@ fn default_save_motion_to_library() -> bool {
     true
 }
 
+fn default_generate_delivery_subtitles() -> bool {
+    true
+}
+
 impl Default for RunOptions {
     fn default() -> Self {
         Self {
             autopilot: false,
-            generate_delivery_subtitles: false,
+            generate_delivery_subtitles: default_generate_delivery_subtitles(),
             save_motion_to_library: default_save_motion_to_library(),
             platform: None,
             provider_overrides: BTreeMap::new(),

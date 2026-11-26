@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useId, useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/locale-provider";
 
@@ -51,15 +51,26 @@ export function DeliverySubtitles({ workspaceId, runId, formats, automatic, disa
     }
   }
 
+  const ready = (format: DeliveryFormat) => !!saved[format.id] || automatic?.[format.id] === "completed";
+  const working = formats.some((format) => automatic?.[format.id] === "started");
+  const waiting = formats.length > 0 && !working && !formats.every(ready);
+
   return (
     <div className="flex flex-col gap-2">
+      {waiting && (
+        <Alert>
+          <AlertTitle>{copy.waitingSubtitlesTitle}</AlertTitle>
+          <AlertDescription>{copy.waitingSubtitlesDescription}</AlertDescription>
+        </Alert>
+      )}
       <p id={hintId} className="text-sm text-muted-foreground">{copy.generateSubtitlesHint}</p>
       <ul className="flex flex-col gap-2">
         {formats.map((format) => (
           <li key={format.id} aria-busy={pending?.formatId === format.id} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">{format.name}</span>
-              <Button type="button" size="sm" variant="outline" disabled={disabled || !!pending || !!saved[format.id]}
+              <Button type="button" size="sm" variant={ready(format) ? "outline" : "default"}
+                disabled={disabled || !!pending || !!saved[format.id]}
                 aria-label={`${copy.generateSubtitles} · ${format.name}`} aria-describedby={hintId}
                 onClick={() => void updateSubtitles(format.id, "generate")}>
                 {pending?.formatId === format.id && pending.action === "generate" ? copy.generatingSubtitles : copy.generateSubtitles}
