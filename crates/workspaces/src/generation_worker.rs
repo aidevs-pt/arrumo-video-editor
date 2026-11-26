@@ -656,6 +656,49 @@ mod tests {
             "Final rendering failed.\nFFmpeg failed while rendering: [redacted] Invalid data found"
         );
     }
+
+    #[test]
+    fn a_step_that_fails_after_its_run_was_cancelled_is_not_a_failure() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "request", &RunOptions::default())
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        store
+            .control_generation(workspace, run.id, RunControl::Cancel)
+            .unwrap();
+        // The step only notices once its lease check fails; recording that failure finds no
+        // running run, which the workers treat as handled rather than report.
+        let recorded = store.fail_generation_with_error(
+            workspace,
+            run.id,
+            claim.attempt,
+            "Final rendering failed.",
+            &std::io::Error::other("The render stopped because its run was stopped or taken over"),
+        );
+        assert!(matches!(
+            recorded,
+            Err(rusqlite::Error::QueryReturnedNoRows)
+        ));
+        let state = store
+            .generation_run(workspace, run.id)
+            .unwrap()
+            .unwrap()
+            .state;
+        assert_ne!(state, "failed");
+    }
 }
 
 #[cfg(test)]

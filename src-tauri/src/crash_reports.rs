@@ -89,18 +89,7 @@ fn scrub(event: &mut sentry::protocol::Event<'static>) {
         ip_address: Some(sentry::protocol::IpAddress::Exact(NO_ADDRESS)),
         ..Default::default()
     });
-    event
-        .contexts
-        .retain(|key, _| KEPT_CONTEXTS.contains(&key.as_str()));
-    for context in event.contexts.values_mut() {
-        let Ok(mut fields) = serde_json::to_value(&*context) else {
-            continue;
-        };
-        keep_known_fields(&mut fields);
-        if let Ok(kept) = serde_json::from_value(fields) {
-            *context = kept;
-        }
-    }
+    scrub_contexts(&mut event.contexts, false);
     event.server_name = None;
     // Breadcrumbs can quote console text and page addresses with titles in them.
     event.breadcrumbs = Default::default();
@@ -239,7 +228,12 @@ fn guard(envelope: sentry::Envelope, allowed: Allowed) -> Option<sentry::Envelop
         for item in envelope.into_items() {
             match item {
                 EnvelopeItem::Transaction(mut transaction) if allowed.usage => {
-                    transaction.user = None;
+                    // Usage data carries no ID, and its address keeps it from being located.
+                    transaction.user = Some(sentry::User {
+                        ip_address: Some(sentry::protocol::IpAddress::Exact(NO_ADDRESS)),
+                        ..Default::default()
+                    });
+                    scrub_contexts(&mut transaction.contexts, true);
                     transaction.request = None;
                     transaction.server_name = None;
                     transaction.extra.clear();
@@ -357,6 +351,30 @@ fn scrub_json(event: &mut Value) {
             }
         }
     }
+}
+
+/// Keeps the contexts in [`KEPT_CONTEXTS`], and the trace for a timing, which needs it, each
+/// with only its known fields. A context that does not read back is dropped.
+fn scrub_contexts(
+    contexts: &mut sentry::protocol::Map<String, sentry::protocol::Context>,
+    keep_trace: bool,
+) {
+    contexts.retain(|key, context| {
+        if !(KEPT_CONTEXTS.contains(&key.as_str()) || keep_trace && key == "trace") {
+            return false;
+        }
+        let Ok(mut fields) = serde_json::to_value(&*context) else {
+            return false;
+        };
+        keep_known_fields(&mut fields);
+        match serde_json::from_value(fields) {
+            Ok(kept) => {
+                *context = kept;
+                true
+            }
+            Err(_) => false,
+        }
+    });
 }
 
 /// Keeps only the listed fields of a device or operating system context, so details such as the
@@ -650,6 +668,9 @@ hello
         for private in ["studio-mac", "/Users/ana", "folder"] {
             assert!(!text.contains(private), "{private} was sent: {text}");
         }
+        // Timings carry an address that cannot be located, and no ID.
+        assert!(text.contains(r#""ip_address":"0.0.0.0""#), "{text}");
+        assert!(!text.contains(r#""user":{"id""#), "{text}");
         assert_eq!(run(false), "");
     }
 

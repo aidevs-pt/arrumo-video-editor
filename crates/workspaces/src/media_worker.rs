@@ -143,8 +143,10 @@ impl WorkspaceStore {
                 summary,
                 &*error,
             ) {
-                Ok(_) => Err(crate::Reported::new(&*error).into()),
-                Err(rusqlite::Error::QueryReturnedNoRows) => Err(error),
+                // A run stopped or taken over meanwhile is not a failure to report.
+                Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {
+                    Err(crate::Handled::new(&*error).into())
+                }
                 Err(record_error) => Err(io::Error::other(format!(
                     "{error}. Could not record the worker failure: {record_error}"
                 ))

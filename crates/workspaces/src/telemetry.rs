@@ -173,28 +173,28 @@ pub fn set_failure_sink(sink: impl Fn(&FailureReport<'_>) + Send + Sync + 'stati
     let _ = FAILURE_SINK.set(Box::new(sink));
 }
 
-/// An error already sent as a failure report, so callers further up do not send it again. It
-/// keeps the error's chain as text.
+/// An error that needs no report from callers further up: it was already reported, or its run
+/// was stopped or taken over, which is not a failure. It keeps the error's chain as text.
 #[derive(Debug)]
-pub struct Reported(String);
+pub struct Handled(String);
 
-impl Reported {
+impl Handled {
     pub fn new(error: &(dyn std::error::Error + 'static)) -> Self {
         Self(error_chain(error))
     }
 }
 
-impl std::fmt::Display for Reported {
+impl std::fmt::Display for Handled {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl std::error::Error for Reported {}
+impl std::error::Error for Handled {}
 
-/// Whether `error`, or an error it wraps, was already reported.
-pub fn already_reported(error: &(dyn std::error::Error + 'static)) -> bool {
-    crate::quiet_process::error_sources(error).any(|error| error.is::<Reported>())
+/// Whether `error`, or an error it wraps, needs no report; see [`Handled`].
+pub fn already_handled(error: &(dyn std::error::Error + 'static)) -> bool {
+    crate::quiet_process::error_sources(error).any(|error| error.is::<Handled>())
 }
 
 /// The first line of the error at the bottom of `error`'s chain: what actually went wrong.
@@ -206,13 +206,13 @@ pub fn root_cause(error: &(dyn std::error::Error + 'static)) -> String {
     root.lines().next().unwrap_or_default().to_owned()
 }
 
-/// Reports `error` with its whole chain and its root cause, unless it was already reported.
+/// Reports `error` with its whole chain and its root cause, unless it is [`Handled`].
 pub fn report_error(
     area: &str,
     error: &(dyn std::error::Error + 'static),
     details: &[(&str, &str)],
 ) {
-    if already_reported(error) {
+    if already_handled(error) {
         return;
     }
     let cause = error_chain(error);
@@ -284,7 +284,10 @@ fn failure_report<'a>(
         root.clone().unwrap_or_else(|| report_pattern(&title)),
     ];
     let title = match root {
-        Some(root) if !root.is_empty() => format!("{}: {root}", first_sentence(&title)),
+        // A root that is the failure itself would only repeat it.
+        Some(root) if !root.is_empty() && root != report_pattern(&title) => {
+            format!("{}: {root}", first_sentence(&title))
+        }
         _ => title,
     };
     FailureReport {
@@ -818,15 +821,21 @@ mod tests {
         let plain = failure_report("backup", &"Could not restore 3 files", &[]);
         assert_eq!(plain.title, "Could not restore 3 files");
         assert_eq!(plain.fingerprint[3], "Could not restore N files");
+        let single = failure_report(
+            "background",
+            &"Disk full",
+            &[("cause", "Disk full"), ("root", "Disk full")],
+        );
+        assert_eq!(single.title, "Disk full");
     }
 
     #[test]
-    fn a_reported_error_is_not_reported_again() {
-        let reported: Box<dyn std::error::Error> =
-            Box::new(Reported::new(&std::io::Error::other("disk full")));
-        assert!(already_reported(&*reported));
-        assert_eq!(reported.to_string(), "disk full");
-        assert!(!already_reported(&std::io::Error::other("disk full")));
+    fn a_handled_error_is_not_reported_again() {
+        let handled: Box<dyn std::error::Error> =
+            Box::new(Handled::new(&std::io::Error::other("disk full")));
+        assert!(already_handled(&*handled));
+        assert_eq!(handled.to_string(), "disk full");
+        assert!(!already_handled(&std::io::Error::other("disk full")));
     }
 
     #[test]
