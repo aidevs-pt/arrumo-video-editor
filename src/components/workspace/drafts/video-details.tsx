@@ -19,6 +19,7 @@ import { RunProviders } from "@/components/workspace/generation/run-providers";
 import { UsageNotice } from "@/components/workspace/usage/provider-usage";
 import { profileHref, workspaceHref } from "@/components/workspace/home/workspace-links";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
+import { useSubtitleProviderPrompt } from "@/components/workspace/generation/subtitle-provider-prompt";
 import { useLocale } from "@/lib/locale-provider";
 import { useAgentChanges } from "@/lib/agent-changes";
 
@@ -62,6 +63,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
   const { messages } = useLocale();
   const copy = messages.videoDetails;
   const workspaceId = workspace.id;
+  const subtitles = useSubtitleProviderPrompt(workspaceId);
   const request = useRef<{ key: string; payload: string } | null>(null);
   const [pending, setPending] = useState<"saving" | "generating" | null>(null);
   const [message, setMessage] = useState<"saved" | "saveError" | "generateError" | "needsTitle" | "needsContent" | null>(null);
@@ -130,6 +132,9 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
       skip_hooks: JSON.parse(String(fields.get("skip-hooks") ?? "[]")) as string[],
       ...outputOptions(outputChoice, plan ?? []),
     };
+    const subtitleChoice = await subtitles.confirm(options.generate_delivery_subtitles);
+    if (subtitleChoice === "cancel") { setPending(null); return; }
+    if (subtitleChoice === "without") options.generate_delivery_subtitles = false;
     const payload = JSON.stringify({ draftId: saved.id, draft, options });
     if (request.current?.payload !== payload) request.current = { key: crypto.randomUUID(), payload };
     try {
@@ -207,7 +212,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
               </CollapsibleTrigger>
               <CollapsibleContent forceMount className="flex flex-col gap-5 border-t px-5 py-4 data-[state=closed]:hidden">
                 <Field orientation="horizontal">
-                  <Switch id="run-generate-subtitles" name="generate-subtitles" aria-describedby="run-generate-subtitles-description" />
+                  <Switch id="run-generate-subtitles" name="generate-subtitles" defaultChecked aria-describedby="run-generate-subtitles-description" />
                   <FieldContent>
                     <FieldLabel htmlFor="run-generate-subtitles">{messages.queue.automaticSubtitles}</FieldLabel>
                     <FieldDescription id="run-generate-subtitles-description">{messages.queue.automaticSubtitlesHint}</FieldDescription>
@@ -255,6 +260,7 @@ export function VideoDetails({ workspace, draftId, draft, profiles, onChange, on
           </aside>
         </div>
       </fieldset>
+      {subtitles.dialog}
     </form>
   );
 }

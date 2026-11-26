@@ -120,7 +120,8 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     if (runState === "completed") return copy.captionDone;
     if (stage === "verify_delivery" && runState === "queued") {
       const automatic = Object.values(progress?.automatic_subtitles ?? {});
-      return automatic.includes("started") ? copy.captionSubtitling : copy.captionNeedsSubtitles;
+      if (automatic.includes("started")) return copy.captionSubtitling;
+      return automatic.includes("failed") ? copy.captionSubtitlesFailed : copy.captionNeedsSubtitles;
     }
     if (runState === "paused") return copy.captionPaused.replace("{stage}", stageName(stage));
     return (runState === "running" ? copy.captionRunning : copy.captionQueued).replace("{stage}", stageName(stage));

@@ -26,7 +26,7 @@ export function MediaStageAction({ workspaceId, runId, stage, available, canImpo
   const { messages: { productionPlan: copy } } = useLocale();
   const [importing, setImporting] = useState(false);
   const [pending, setPending] = useState(false);
-  const [status, setStatus] = useState<"mediaUnavailable" | "mediaFailed">();
+  const [status, setStatus] = useState<"mediaUnavailable" | "mediaFailed" | "deliveryFilesMissing">();
 
   async function processStage() {
     if (pending || importing || !available) return;
@@ -35,8 +35,8 @@ export function MediaStageAction({ workspaceId, runId, stage, available, canImpo
     try {
       const processed = await invoke<boolean>("process_desktop_media_stage", { workspaceId, runId, stage });
       if (!processed) setStatus("mediaUnavailable");
-    } catch {
-      setStatus("mediaFailed");
+    } catch (error) {
+      setStatus(error === "delivery_files_missing" ? "deliveryFilesMissing" : "mediaFailed");
     } finally {
       setPending(false);
     }

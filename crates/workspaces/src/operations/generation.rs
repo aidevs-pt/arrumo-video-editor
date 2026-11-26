@@ -288,7 +288,7 @@ pub(super) fn definitions() -> [Value; 42] {
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "draftId": id, "requestKey": {"type": "string", "minLength": 1, "maxLength": 128},
                 "options": {"type": "object", "properties": {
-                    "autopilot": {"type": "boolean"}, "generate_delivery_subtitles": {"type": "boolean", "default": false}, "save_motion_to_library": {"type": "boolean", "default": true}, "platform": {"type": ["string", "null"]},
+                    "autopilot": {"type": "boolean"}, "generate_delivery_subtitles": {"type": "boolean", "default": true}, "save_motion_to_library": {"type": "boolean", "default": true}, "platform": {"type": ["string", "null"]},
                     "provider_overrides": {"type": "object", "additionalProperties": {
                         "type": "array", "items": {"type": "string"}, "uniqueItems": true
                     }},
