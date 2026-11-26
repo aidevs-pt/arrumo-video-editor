@@ -2,6 +2,16 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.13 (2026-11-26)
+
+### New
+
+- Deliver videos queued without subtitles without waiting for them (#101)
+
+### Fixes
+
+- Generate subtitles by default and never fail a run for verifying early (#99)
+
 ## 0.1.12 (2026-11-26)
 
 ### New
