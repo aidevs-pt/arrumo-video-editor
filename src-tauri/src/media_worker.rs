@@ -14,8 +14,17 @@ pub async fn process_desktop_media_stage(
             .app_local_data_dir()
             .map_err(|_| "store_unavailable")?
             .join("workspaces.sqlite");
-        WorkspaceStore::open(&database)
-            .map_err(|_| "store_unavailable")?
+        let store = WorkspaceStore::open(&database).map_err(|_| "store_unavailable")?;
+        // Verifying before every format has its subtitles would fail the run; ask for them.
+        if stage == ProductionStage::VerifyDelivery
+            && !store
+                .delivery_files_missing(&database, workspace_id, run_id)
+                .map_err(|_| "media_stage_failed")?
+                .is_empty()
+        {
+            return Err("delivery_files_missing");
+        }
+        store
             .process_media_stage_at(&database, workspace_id, run_id, stage)
             .map(|work| work.is_some())
             .map_err(|_| "media_stage_failed")

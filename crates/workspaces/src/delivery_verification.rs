@@ -103,13 +103,7 @@ impl WorkspaceStore {
             if formats.is_empty() {
                 continue;
             }
-            let files_ready = formats.iter().all(|entry| {
-                let id = entry.format.id;
-                [format!("{id}.mp4"), format!("{id}.srt")]
-                    .iter()
-                    .all(|name| managed_delivery_file(database, workspace_id, run_id, name).is_ok())
-            });
-            if files_ready
+            if missing_delivery_files(database, workspace_id, run_id, &formats).is_empty()
                 && self
                     .process_media_stage_at(
                         database,
@@ -218,7 +212,14 @@ fn probe(
     selection: &[&str],
 ) -> io::Result<Vec<u8>> {
     let path = directory.join(filename);
-    let metadata = fs::symlink_metadata(&path).io_step("Checking a file")?;
+    let metadata = match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Err(io::Error::other(format!(
+                "Missing delivery file: {filename}"
+            )));
+        }
+        metadata => metadata.io_step("Checking a file")?,
+    };
     if !metadata.is_file() || metadata.len() == 0 {
         return Err(io::Error::other(format!(
             "Missing or empty delivery file: {filename}"
@@ -438,6 +439,48 @@ impl WorkspaceStore {
             managed_delivery_file(database, workspace_id, run_id, &name)
         };
         Ok((file(output.video, "mp4")?, file(output.subtitles, "srt")?))
+    }
+}
+
+/// The video and subtitle files a run still needs before its delivery can be verified.
+fn missing_delivery_files(
+    database: &Path,
+    workspace_id: i64,
+    run_id: i64,
+    formats: &[DeliveryFormat],
+) -> Vec<String> {
+    formats
+        .iter()
+        .flat_map(|entry| {
+            let id = entry.format.id;
+            [format!("{id}.mp4"), format!("{id}.srt")]
+        })
+        .filter(|name| managed_delivery_file(database, workspace_id, run_id, name).is_err())
+        .collect()
+}
+
+impl WorkspaceStore {
+    /// The delivery files a run still needs, such as a format's subtitles, so verifying it now
+    /// would fail. Empty once every format has its video and subtitles.
+    pub fn delivery_files_missing(
+        &self,
+        database: &Path,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        let formats: String = self.0.query_row(
+            "SELECT COALESCE(json_extract(snapshot_json, '$.formats'), '[]') FROM generation_runs
+             WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, run_id],
+            |row| row.get(0),
+        )?;
+        let formats: Vec<DeliveryFormat> = serde_json::from_str(&formats)?;
+        Ok(missing_delivery_files(
+            database,
+            workspace_id,
+            run_id,
+            &formats,
+        ))
     }
 }
 
@@ -862,5 +905,65 @@ mod transcription_tests {
         let verified = store.verified_delivery(workspace, run.id).unwrap();
         assert_eq!(verified.verified_outputs[0].subtitle_cues, 1);
         assert_eq!(verified.verified_outputs[0].subtitles, "5.srt");
+    }
+}
+
+#[cfg(test)]
+mod readiness_tests {
+    use super::*;
+    use crate::{DraftSettings, RunOptions};
+    use serde_json::json;
+
+    #[test]
+    fn a_delivery_names_the_files_it_still_needs() {
+        let temp = tempfile::tempdir().unwrap();
+        let database = temp.path().join("workspace.sqlite");
+        let mut store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Portrait".into(),
+                    intent: "A short".into(),
+                    profile_id: None,
+                    source_ids: Vec::new(),
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &RunOptions::default())
+            .unwrap();
+        let snapshot = json!({"formats": [{"format": {"id": 2, "width": 1080, "height": 1920}}]});
+        store
+            .0
+            .execute(
+                "UPDATE generation_runs SET snapshot_json = ?1 WHERE id = ?2",
+                params![snapshot.to_string(), run.id],
+            )
+            .unwrap();
+        let directory = delivery_directory(&database, workspace, run.id);
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("2.mp4"), b"video").unwrap();
+        assert_eq!(
+            store
+                .delivery_files_missing(&database, workspace, run.id)
+                .unwrap(),
+            ["2.srt"]
+        );
+        fs::write(directory.join("2.srt"), b"1\n").unwrap();
+        assert!(
+            store
+                .delivery_files_missing(&database, workspace, run.id)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_missing_file_is_named_when_checked() {
+        let temp = tempfile::tempdir().unwrap();
+        let error = probe(temp.path(), "2.srt", "srt", "packet=pts", &[]).unwrap_err();
+        assert_eq!(error.to_string(), "Missing delivery file: 2.srt");
     }
 }

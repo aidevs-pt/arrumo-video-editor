@@ -1267,6 +1267,7 @@
     "verifyHint": "Delivery verification requires an SRT file for every output format.",
     "mediaUnavailable": "This stage is no longer available. Check the current production step.",
     "mediaFailed": "Media processing did not finish. Check the run activity for details.",
+    "deliveryFilesMissing": "Add subtitles for every format first. Generate them or import an SRT above, then verify.",
     "watchPreview": "Watch preview",
     "playPreviewError": "Could not play this preview. Check that the file is available and your system supports MP4 playback.",
     "loadingPreview": "Loading video preview…",
