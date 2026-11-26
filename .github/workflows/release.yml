@@ -103,7 +103,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           NOTES: ${{ steps.version.outputs.notes }}
           PREVIEW: ${{ inputs.preview }}
-          WINDOWS_SIGNED: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && vars.AZURE_ARTIFACT_SIGNING_PROFILE != '' && secrets.AZURE_CLIENT_ID != '' }}
+          WINDOWS_SIGNED: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && vars.AZURE_ARTIFACT_SIGNING_PROFILE != '' && secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' }}
           MACOS_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
         run: |
           title="Arrumo $VERSION"; flags=""
@@ -116,6 +116,10 @@ jobs:
   build:
     needs: prepare
     environment: release
+    # id-token lets Windows signing sign in to Azure with a token GitHub issues for this run.
+    permissions:
+      contents: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
@@ -203,23 +207,48 @@ jobs:
       # without it the build is unsigned and SmartScreen warns on first install.
       - name: Prepare Windows signing
         if: runner.os == 'Windows'
-        shell: bash
+        shell: pwsh
         working-directory: video-editor
         env:
           ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
           ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
           PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
           CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
-          # Signing needs the account, its certificate profile and the app registration's login.
-          if [ -z "$ACCOUNT" ] || [ -z "$PROFILE" ] || [ -z "$CLIENT_ID" ]; then
-            echo '{}' > windows-signing.json
+          # Signing needs the account, its certificate profile and the app registration that
+          # trusts this repository's release environment.
+          if (-not $env:ACCOUNT -or -not $env:PROFILE -or -not $env:CLIENT_ID -or -not $env:TENANT_ID) {
+            '{}' | Set-Content windows-signing.json
             exit 0
-          fi
-          cargo install --locked artifact-signing-cli@0.12.0
-          jq -n --arg e "$ENDPOINT" --arg a "$ACCOUNT" --arg c "$PROFILE" \
-            '{bundle: {windows: {signCommand: {cmd: "artifact-signing-cli",
-              args: ["-e", $e, "-a", $a, "-c", $c, "-d", "Arrumo AI Video Editor", "%1"]}}}}' > windows-signing.json
+          }
+          # Microsoft's signing client for signtool, checked against the version this was tested with.
+          $client = Join-Path $env:RUNNER_TEMP 'artifact-signing'
+          $package = "$client.nupkg"
+          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/1.0.146' -OutFile $package
+          if ((Get-FileHash $package -Algorithm SHA256).Hash -ne '7761E5D8F31E54B764DA21D33CD8B0A2940E1B05526C7DFCB5E94B0431426F70') {
+            throw 'The Artifact Signing client does not match its expected checksum'
+          }
+          Expand-Archive $package -DestinationPath $client
+          # Only the GitHub token sign-in is tried, so signing never waits on other methods.
+          $metadata = Join-Path $client 'metadata.json'
+          @{
+            Endpoint = $env:ENDPOINT
+            CodeSigningAccountName = $env:ACCOUNT
+            CertificateProfileName = $env:PROFILE
+            ExcludeCredentials = @('EnvironmentCredential', 'ManagedIdentityCredential', 'SharedTokenCacheCredential',
+              'VisualStudioCredential', 'VisualStudioCodeCredential', 'AzureCliCredential', 'AzurePowerShellCredential',
+              'AzureDeveloperCliCredential', 'InteractiveBrowserCredential')
+          } | ConvertTo-Json | Set-Content $metadata
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          "ARRUMO_SIGNTOOL=$($signtool.FullName)" >> $env:GITHUB_ENV
+          "ARRUMO_SIGNING_DLIB=$(Join-Path $client 'bin\x64\Azure.CodeSigning.Dlib.dll')" >> $env:GITHUB_ENV
+          "ARRUMO_SIGNING_METADATA=$metadata" >> $env:GITHUB_ENV
+          $script = (Resolve-Path scripts/windows-sign.ps1).Path
+          @{ bundle = @{ windows = @{ signCommand = @{ cmd = 'powershell'
+            args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script, '%1') } } } } |
+            ConvertTo-Json -Depth 5 | Set-Content windows-signing.json
       # Apple variables are only set when the certificate exists, since empty values would make
       # the bundler try to import a certificate. Without one the app gets an ad-hoc signature, so
       # macOS offers "Open Anyway" instead of calling the app damaged.
@@ -289,8 +318,9 @@ jobs:
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # With AZURE_FEDERATED_TOKEN_FILE from scripts/windows-sign.ps1, these sign the
+          # Windows build in to Azure without a secret.
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         with:
           projectPath: video-editor
