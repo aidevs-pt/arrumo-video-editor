@@ -2,6 +2,16 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.10 (2026-11-26)
+
+### New
+
+- Read the PATH again when checking for an agent's CLI (#86)
+
+### Fixes
+
+- Apply an agent switch right away and to videos in progress (#84)
+
 ## 0.1.9 (2026-11-25)
 
 ### New
