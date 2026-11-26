@@ -2,6 +2,13 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.11 (2026-11-26)
+
+### Fixes
+
+- Say why a render failed and report the whole error (#93)
+- Show the signing client's output when Windows signing fails (#91)
+
 ## 0.1.10 (2026-11-26)
 
 ### New
