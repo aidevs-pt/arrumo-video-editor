@@ -1346,7 +1346,41 @@ impl ActiveRender<'_> {
                 |_| Ok(()),
             )
             .optional()?;
-        held.ok_or_else(|| io::Error::other(LOST_LEASE).into())
+        held.ok_or_else(|| self.lost_lease())
+    }
+
+    /// Why the lease is gone, from the run as it is now, so a report can tell a stop, a takeover
+    /// and a lapse apart.
+    fn lost_lease(&self) -> Box<dyn Error> {
+        let now: Option<(String, i64, Option<i64>)> = self
+            .store
+            .0
+            .query_row(
+                "SELECT state, attempt, unixepoch() - lease_until FROM generation_runs
+                 WHERE workspace_id = ?1 AND id = ?2",
+                params![self.workspace_id, self.run_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .ok()
+            .flatten();
+        let detail = match now {
+            None => "the run no longer exists".to_owned(),
+            Some((state, attempt, lapsed)) => {
+                let lease = lapsed.map_or("no lease".to_owned(), |seconds| {
+                    if seconds >= 0 {
+                        format!("lease lapsed {seconds} s ago")
+                    } else {
+                        format!("lease held for {} s more", -seconds)
+                    }
+                });
+                format!(
+                    "run {state}, attempt {attempt} (this render is attempt {}), {lease}",
+                    self.attempt
+                )
+            }
+        };
+        io::Error::other(format!("{LOST_LEASE} ({detail})")).into()
     }
 
     /// Renews the lease every ten seconds and confirms it in between, for any step that runs
@@ -1356,11 +1390,16 @@ impl ActiveRender<'_> {
             return self.confirm_lease();
         }
         *renewed = Instant::now();
+        self.renew_lease()
+    }
+
+    /// Renews the lease now, before a step that may follow a long one.
+    fn renew_lease(&self) -> Result<(), Box<dyn Error>> {
         self.store
             .renew_generation_lease(self.workspace_id, self.run_id, self.attempt)
             .optional()?
             .map(drop)
-            .ok_or_else(|| io::Error::other(LOST_LEASE).into())
+            .ok_or_else(|| self.lost_lease())
     }
 
     fn run(&self, command: &mut Command, operation: &str) -> Result<(), Box<dyn Error>> {
@@ -1369,7 +1408,8 @@ impl ActiveRender<'_> {
 
     /// Runs FFmpeg while keeping the lease, returning what it wrote to stderr.
     fn run_output(&self, command: &mut Command, operation: &str) -> Result<String, Box<dyn Error>> {
-        self.confirm_lease()?;
+        self.renew_lease()?;
+        let mut heartbeat = Instant::now();
         let mut process = command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -1383,7 +1423,6 @@ impl ActiveRender<'_> {
                 text
             })
         });
-        let mut heartbeat = Instant::now();
         loop {
             if let Some(status) = process.try_wait()? {
                 let errors = errors
@@ -1453,7 +1492,7 @@ impl ActiveRender<'_> {
         path: &Path,
         cut: Option<&PreviewCut>,
     ) -> Result<bool, Box<dyn Error>> {
-        self.confirm_lease()?;
+        self.renew_lease()?;
         let output = crate::quiet_command(crate::media_tools::ffprobe())
             .args([
                 "-v",
@@ -1970,7 +2009,7 @@ mod tests {
     #[test]
     fn a_render_longer_than_the_lease_keeps_it() {
         use crate::{DraftSettings, RunOptions, WorkspaceStore};
-        use std::time::{Duration, Instant};
+        use std::time::Instant;
         let mut store = WorkspaceStore::open(":memory:").unwrap();
         let workspace = store.create("Studio").unwrap().id;
         let draft = store
@@ -2006,13 +2045,14 @@ mod tests {
         };
         // A step that outlived the lease renews it rather than failing.
         lapse();
-        let mut renewed = Instant::now() - Duration::from_secs(11);
-        renderer.keep_lease(&mut renewed).unwrap();
+        renderer.renew_lease().unwrap();
+        let mut renewed = Instant::now();
         renderer.keep_lease(&mut renewed).unwrap();
         // Between renewals a lapsed lease says so in words.
         lapse();
         let lost = renderer.keep_lease(&mut renewed).unwrap_err();
-        assert_eq!(lost.to_string(), super::LOST_LEASE);
+        assert!(lost.to_string().contains("lease lapsed"), "{lost}");
+        assert!(lost.to_string().starts_with(super::LOST_LEASE), "{lost}");
         // Another attempt took over, so this one stops.
         store
             .0
@@ -2021,9 +2061,13 @@ mod tests {
                 [run],
             )
             .unwrap();
-        let mut renewed = Instant::now() - Duration::from_secs(11);
-        let lost = renderer.keep_lease(&mut renewed).unwrap_err();
-        assert_eq!(lost.to_string(), super::LOST_LEASE);
+        let lost = renderer.renew_lease().unwrap_err();
+        assert!(lost.to_string().starts_with(super::LOST_LEASE), "{lost}");
+        assert!(
+            lost.to_string()
+                .contains(&format!("attempt {}", attempt + 1)),
+            "{lost}"
+        );
     }
 
     #[test]
