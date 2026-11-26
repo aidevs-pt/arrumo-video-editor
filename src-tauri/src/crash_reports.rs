@@ -1,7 +1,8 @@
 //! Crash and error reports through Sentry, for Rust panics and errors and for the web frontend,
 //! plus step timings and warnings ([`SentryDiagnostics`]). Builds without `ARRUMO_CRASH_DSN` start
 //! nothing. Reports are dropped while the creator has crash reports turned off, timings and
-//! warnings while usage data is off, and none of them carry personal data. Native crash dumps are not
+//! warnings while usage data is off. Reports keep whole errors and program output, with the home
+//! folder written as `~`, and no user, machine name or breadcrumbs. Native crash dumps are not
 //! collected: they hold raw memory that could include the creator's content.
 
 use std::{borrow::Cow, path::Path, sync::Arc, time::Duration};
@@ -58,8 +59,8 @@ fn options() -> sentry::ClientOptions {
     options
 }
 
-/// Leaves out who and where: no user or machine name, local paths cut to file names, and path
-/// or address words removed from error messages.
+/// Leaves out who and where: no user or machine name, binary paths cut to file names, and the
+/// home folder written as `~` in messages.
 fn scrub(event: &mut sentry::protocol::Event<'static>) {
     event.user = None;
     event.server_name = None;

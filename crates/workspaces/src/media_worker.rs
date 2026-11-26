@@ -127,8 +127,7 @@ impl WorkspaceStore {
                 "A generation step failed",
                 &[("stage", work.stage.clone().into())],
             );
-            // Keep native paths and external command details out of persisted activity.
-            let detail = match work.stage.as_str() {
+            let summary = match work.stage.as_str() {
                 "preview" => {
                     "Preview rendering failed. Check the edit, managed sources, and FFmpeg installation."
                 }
@@ -137,7 +136,7 @@ impl WorkspaceStore {
                 }
                 _ => "Delivery verification failed. Check the rendered videos and subtitle files.",
             };
-            match self.fail_generation(workspace_id, run_id, attempt, detail) {
+            match self.fail_generation_with_error(workspace_id, run_id, attempt, summary, &*error) {
                 Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
                 Err(record_error) => {
                     return Err(io::Error::other(format!(

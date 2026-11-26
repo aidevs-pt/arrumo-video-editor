@@ -339,7 +339,7 @@
     "usageData": "Datos de uso anónimos",
     "usageDataHint": "Cuenta qué funciones se usan y cuánto tardan los pasos de generación, con los avisos de la app. Nunca ligado a ti. Sin cookies ni contenido.",
     "crashReports": "Informes de errores",
-    "crashReportsHint": "Envía el error y la versión de la app cuando algo falla. Sin nombres de archivo ni contenido.",
+    "crashReportsHint": "Envía los detalles del error y la versión de la app cuando algo falla. Tu carpeta personal se oculta, pero pueden aparecer nombres de archivo. Nunca tu contenido.",
     "notInThisBuild": "Esta compilación no tiene servicio de informes, así que no se envía nada.",
     "privacyError": "No se pudo guardar esta opción. Inténtalo de nuevo.",
     "agentHeading": "Agente",

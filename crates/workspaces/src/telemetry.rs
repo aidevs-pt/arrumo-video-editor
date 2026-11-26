@@ -159,25 +159,73 @@ pub fn set_failure_sink(sink: impl Fn(&str, &str, &[(&str, String)]) + Send + Sy
 }
 
 /// Reports a failure the app handled but the creator should not have hit, such as a render that
-/// stopped, so it can be fixed. `area` names the feature. The message keeps its first line,
-/// without paths, addresses or quoted text, where names and titles usually appear.
+/// stopped, so it can be fixed. `area` names the feature. The report keeps the whole error, with
+/// the home folder written as `~` (see [`mask_home`]); its first line is the report's title.
 pub fn report_failure(area: &str, error: &dyn std::fmt::Display) {
     report_failure_with(area, error, &[]);
 }
 
-/// [`report_failure`] with details of where and why, redacted the same way line by line.
+/// [`report_failure`] with details of where and why, such as the error chain and a program's
+/// output, masked the same way.
 pub fn report_failure_with(area: &str, error: &dyn std::fmt::Display, details: &[(&str, &str)]) {
     if !crash_reports_allowed() {
         return;
     }
     if let Some(sink) = FAILURE_SINK.get() {
-        let details: Vec<(&str, String)> = details
+        let text = mask_home(&error.to_string());
+        let title: String = text
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .chars()
+            .take(300)
+            .collect();
+        let mut details: Vec<(&str, String)> = details
             .iter()
             .filter(|(_, value)| !value.trim().is_empty())
-            .map(|(key, value)| (*key, redact_lines(value)))
+            .map(|(key, value)| (*key, limited(&mask_home(value))))
             .collect();
-        sink(area, &redact(&without_quotes(&error.to_string())), &details);
+        if text.trim() != title.trim() {
+            details.push(("error", limited(&text)));
+        }
+        sink(area, &title, &details);
     }
+}
+
+/// The most a report field carries, below the crash service's limit for a single value.
+const REPORT_FIELD_LIMIT: usize = 8000;
+
+fn limited(text: &str) -> String {
+    text.chars().take(REPORT_FIELD_LIMIT).collect()
+}
+
+/// Writes the creator's home folder as `~`, so a report keeps every path and message needed to
+/// debug it, but not the user name the home folder is named after.
+pub fn mask_home(text: &str) -> String {
+    let homes: Vec<String> = ["HOME", "USERPROFILE"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .map(|home| home.to_string_lossy().into_owned())
+        .collect();
+    mask_folders(text, &homes)
+}
+
+fn mask_folders(text: &str, homes: &[String]) -> String {
+    let mut forms: Vec<String> = homes
+        .iter()
+        .map(|home| home.trim_end_matches(['/', '\\']).to_owned())
+        .filter(|home| home.len() > 1)
+        // Windows tools also write the folder with forward slashes or in lower case.
+        .flat_map(|home| {
+            let slashed = home.replace('\\', "/");
+            [home.to_lowercase(), slashed.to_lowercase(), slashed, home]
+        })
+        .collect();
+    forms.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    forms.dedup();
+    forms.iter().fold(text.to_owned(), |masked, home| {
+        masked.replace(home.as_str(), "~")
+    })
 }
 
 /// The error and each error that caused it, one per line, for a failure report.
@@ -395,10 +443,10 @@ fn usage_request(event: &str, install: &str, props: &BTreeMap<&str, Value>) -> V
     }])
 }
 
-/// Removes anything that looks like a local path or address from a crash message, for crash
+/// A crash message as reports carry it: whole, with the home folder written as `~`, for crash
 /// SDKs to apply before they send.
 pub fn redact_report_text(message: &str) -> String {
-    redact(message)
+    limited(&mask_home(message))
 }
 
 /// Removes anything that looks like a local path or address from a crash message.
@@ -444,7 +492,7 @@ fn crash_request(dsn: &str, message: &str, location: &str) -> Option<(String, St
         "release": format!("arrumo@{}", env!("CARGO_PKG_VERSION")),
         "environment": if cfg!(debug_assertions) { "debug" } else { "release" },
         "tags": {"os": std::env::consts::OS, "session": session_id()},
-        "exception": {"values": [{"type": "panic", "value": redact(message), "module": location}]},
+        "exception": {"values": [{"type": "panic", "value": redact_report_text(message), "module": location}]},
     });
     Some((endpoint, auth, body))
 }
@@ -643,7 +691,21 @@ mod tests {
     }
 
     #[test]
-    fn requests_carry_no_paths_or_content() {
+    fn reports_keep_the_whole_message_without_the_home_folder() {
+        let homes = ["/Users/ana".to_owned(), "C:\\Users\\Ana Rita\\".to_owned()];
+        assert_eq!(
+            mask_folders(
+                "could not open /Users/ana/Movies/clip.mp4\nffmpeg -i C:\\Users\\Ana Rita\\a.mp4 c:/users/ana rita/b.mp4",
+                &homes
+            ),
+            "could not open ~/Movies/clip.mp4\nffmpeg -i ~\\a.mp4 ~/b.mp4"
+        );
+        assert_eq!(mask_folders("/ stays", &["/".to_owned()]), "/ stays");
+        assert_eq!(limited(&"x".repeat(9000)).len(), REPORT_FIELD_LIMIT);
+    }
+
+    #[test]
+    fn requests_follow_the_crash_service_format() {
         assert_eq!(
             redact("could not open /home/ana/Videos/secret.mp4 for ana@example.com\nmore"),
             "could not open [redacted] for [redacted]"
@@ -658,7 +720,7 @@ mod tests {
         assert!(auth.contains("sentry_key=abc123"));
         assert_eq!(
             body["exception"]["values"][0]["value"],
-            "boom at [redacted]"
+            "boom at C:\\Users\\x"
         );
         assert!(crash_request("http://k@h/1", "x", "y").is_none());
         let usage = usage_request(

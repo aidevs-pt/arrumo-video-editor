@@ -153,6 +153,30 @@ impl WorkspaceStore {
         self.fail_generation_because(workspace_id, run_id, attempt, detail, None)
     }
 
+    /// Fails the run with `summary` and the first line of `error`, without paths or quoted names,
+    /// so the creator sees why. The failure report carries the whole error chain.
+    pub(crate) fn fail_generation_with_error(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        summary: &str,
+        error: &(dyn std::error::Error + 'static),
+    ) -> rusqlite::Result<GenerationRun> {
+        let cause = crate::telemetry::error_chain(error);
+        let reason: Vec<String> = crate::telemetry::redact_lines(&cause)
+            .lines()
+            .take(1)
+            .map(str::to_owned)
+            .collect();
+        let detail = if reason.is_empty() {
+            summary.to_owned()
+        } else {
+            format!("{summary}\n{}", reason.join("\n"))
+        };
+        self.fail_generation_because(workspace_id, run_id, attempt, &detail, Some(&cause))
+    }
+
     /// Fails the run with `detail` for the creator, and reports `cause`, the error underneath
     /// it, with the stage and agent so the report says where it went wrong.
     pub(crate) fn fail_generation_because(
@@ -569,6 +593,45 @@ mod tests {
         let history = store.generation_activity(workspace, run.id).unwrap();
         assert_eq!(history[2].state, "failed");
         assert_eq!(history[2].detail.as_deref(), Some("Source unavailable"));
+    }
+
+    #[test]
+    fn a_failed_step_tells_the_creator_why_without_their_paths() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "request", &RunOptions::default())
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        let error = std::io::Error::other(
+            "FFmpeg failed while rendering: /Users/ana/Library/clip.mp4: Invalid data found",
+        );
+        store
+            .fail_generation_with_error(
+                workspace,
+                run.id,
+                claim.attempt,
+                "Final rendering failed.",
+                &error,
+            )
+            .unwrap();
+        let history = store.generation_activity(workspace, run.id).unwrap();
+        let detail = history.last().unwrap().detail.clone().unwrap();
+        assert_eq!(
+            detail,
+            "Final rendering failed.\nFFmpeg failed while rendering: [redacted] Invalid data found"
+        );
     }
 }
 

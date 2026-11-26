@@ -1380,11 +1380,11 @@ impl ActiveRender<'_> {
                 return if status.success() {
                     Ok(errors)
                 } else {
-                    let tail: Vec<&str> = errors.lines().rev().take(4).collect();
-                    Err(io::Error::other(format!(
-                        "FFmpeg failed while {operation}: {}",
-                        tail.join(" | ")
-                    ))
+                    Err(crate::quiet_process::ffmpeg_failure(
+                        &format!("FFmpeg failed while {operation} ({status})"),
+                        &errors,
+                        command.get_args(),
+                    )
                     .into())
                 };
             }

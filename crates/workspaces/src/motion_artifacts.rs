@@ -73,11 +73,12 @@ impl WorkspaceStore {
             Ok(id) => Ok(Some(id)),
             Err(error) => {
                 crate::telemetry::warn("A generation step failed", &[("stage", "motion".into())]);
-                match self.fail_generation(
+                match self.fail_generation_with_error(
                     workspace_id,
                     run_id,
                     attempt,
                     "Motion artifact import failed. Check the files and retry.",
+                    &*error,
                 ) {
                     Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
                     Err(failure) => return Err(failure.into()),
