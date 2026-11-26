@@ -339,7 +339,7 @@
     "usageData": "Anonymous usage data",
     "usageDataHint": "Counts which features are used and how long generation steps take, with the app's warnings. Never tied to you. No cookies, no content.",
     "crashReports": "Crash reports",
-    "crashReportsHint": "Sends the error and app version when something breaks. No file names or content.",
+    "crashReportsHint": "Sends the error details and app version when something breaks. Your home folder is hidden, but file names can appear. Never your content.",
     "notInThisBuild": "This build was made without a reporting service, so nothing is sent.",
     "privacyError": "Could not save this choice. Try again.",
     "agentHeading": "Agent",

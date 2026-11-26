@@ -1,7 +1,9 @@
 //! Crash and error reports through Sentry, for Rust panics and errors and for the web frontend,
 //! plus step timings and warnings ([`SentryDiagnostics`]). Builds without `ARRUMO_CRASH_DSN` start
 //! nothing. Reports are dropped while the creator has crash reports turned off, timings and
-//! warnings while usage data is off, and none of them carry personal data. Native crash dumps are not
+//! warnings while usage data is off. Reports keep whole errors and program output, with the home
+//! folder written as `~`, and no user or machine name or breadcrumbs; their only ID is a random
+//! one of their own, never the usage install ID. Native crash dumps are not
 //! collected: they hold raw memory that could include the creator's content.
 
 use std::{borrow::Cow, path::Path, sync::Arc, time::Duration};
@@ -58,20 +60,23 @@ fn options() -> sentry::ClientOptions {
     options
 }
 
-/// Leaves out who and where: no user or machine name, local paths cut to file names, and path
-/// or address words removed from error messages.
+/// Leaves out who and where: no user or machine name, binary paths cut to file names, and the
+/// home folder written as `~` in messages. The only user detail is the random crash report ID.
 fn scrub(event: &mut sentry::protocol::Event<'static>) {
-    event.user = None;
+    event.user = arrumo_workspaces::crash_report_id().map(|id| sentry::User {
+        id: Some(id),
+        ..Default::default()
+    });
     event.server_name = None;
     // Breadcrumbs can quote console text and page addresses with titles in them.
     event.breadcrumbs = Default::default();
     event.request = None;
     if let Some(message) = &mut event.message {
-        *message = arrumo_workspaces::redact_report_text(message);
+        *message = arrumo_workspaces::mask_report_text(message);
     }
     for exception in &mut event.exception.values {
         if let Some(value) = &mut exception.value {
-            *value = arrumo_workspaces::redact_report_text(value);
+            *value = arrumo_workspaces::mask_report_text(value);
         }
     }
     for image in &mut event.debug_meta.to_mut().images {
@@ -279,13 +284,16 @@ fn scrub_json(event: &mut Value) {
     for field in ["user", "server_name", "breadcrumbs", "request"] {
         event.remove(field);
     }
+    if let Some(id) = arrumo_workspaces::crash_report_id() {
+        event.insert("user".into(), serde_json::json!({ "id": id }));
+    }
     for field in ["message", "logentry"] {
         match event.get_mut(field) {
-            Some(Value::String(text)) => *text = arrumo_workspaces::redact_report_text(text),
+            Some(Value::String(text)) => *text = arrumo_workspaces::mask_report_text(text),
             Some(Value::Object(entry)) => {
                 for key in ["message", "formatted"] {
                     if let Some(Value::String(text)) = entry.get_mut(key) {
-                        *text = arrumo_workspaces::redact_report_text(text);
+                        *text = arrumo_workspaces::mask_report_text(text);
                     }
                 }
             }
@@ -298,7 +306,7 @@ fn scrub_json(event: &mut Value) {
     {
         for exception in values {
             if let Some(Value::String(text)) = exception.get_mut("value") {
-                *text = arrumo_workspaces::redact_report_text(text);
+                *text = arrumo_workspaces::mask_report_text(text);
             }
         }
     }
@@ -373,10 +381,10 @@ hello
         }
         let events = events(&bytes);
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0]["message"], "Could not open [redacted]");
+        assert_eq!(events[0]["message"], "Could not open ~/Movies/clip.mp4");
         assert_eq!(
             events[0]["exception"]["values"][0]["value"],
-            "Failed at [redacted] for [redacted]"
+            "Failed at ~/a.js for [email]"
         );
         assert_eq!(
             events[0]["debug_meta"]["images"][0]["debug_id"],

@@ -236,11 +236,12 @@ impl WorkspaceStore {
         match rendered {
             Ok(result_id) => Ok(result_id),
             Err(error) => {
-                match self.fail_generation(
+                match self.fail_generation_with_error(
                     workspace_id,
                     run_id,
                     attempt,
                     "Motion rendering or publication failed.",
+                    &*error,
                 ) {
                     Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
                     Err(failure) => return Err(failure.into()),

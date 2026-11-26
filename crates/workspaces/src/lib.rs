@@ -212,9 +212,9 @@ pub use supplemental_review::{
 };
 pub use telemetry::{
     Diagnostics, PrivacySettings, Timing, TimingEnd, allow_crash_reports, crash_dsn,
-    crash_reports_allowed, error_chain, install_crash_reporter, redact_report_text, report_failure,
-    report_failure_with, set_diagnostics, set_failure_sink, set_usage_sink, time_step,
-    usage_data_allowed, usage_key, warn,
+    crash_report_id, crash_reports_allowed, error_chain, install_crash_reporter, mask_report_text,
+    redact_report_text, report_failure, report_failure_with, set_diagnostics, set_failure_sink,
+    set_usage_sink, time_step, usage_data_allowed, usage_key, warn,
 };
 pub use transcription::{ProviderTranscript, Transcript, TranscriptWord};
 pub use video_drafts::{DraftSettings, VideoDraft};
@@ -356,6 +356,7 @@ impl WorkspaceStore {
             include_str!("../migrations/069-install-event.sql"),
             include_str!("../migrations/070-media-order-limits.sql"),
             include_str!("../migrations/071-agent-rounds.sql"),
+            include_str!("../migrations/072-crash-report-id.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

@@ -2342,11 +2342,11 @@ fn run_ffmpeg_once(
                 return Ok(Some(()));
             }
             let errors = fs::read_to_string(&log).unwrap_or_default();
-            let tail: String = errors.lines().rev().take(6).collect::<Vec<_>>().join(" | ");
-            return Err(io::Error::other(format!(
-                "FFmpeg could not render ({}): {tail}",
-                describe_exit(status)
-            ))
+            return Err(crate::quiet_process::ffmpeg_failure(
+                &format!("FFmpeg could not render ({})", describe_exit(status)),
+                &errors,
+                args,
+            )
             .into());
         }
         if last.elapsed() >= Duration::from_secs(2) {

@@ -76,6 +76,34 @@ fn not_started(command: &Command, error: io::Error, at: &Location<'_>) -> io::Er
 }
 
 /// `file.rs:line`, without the folders, which reports would redact as a path.
+/// An FFmpeg failure: `headline` with FFmpeg's last error line, then everything it wrote to
+/// stderr and the command, so a failure report shows the whole cause.
+pub(crate) fn ffmpeg_failure(
+    headline: &str,
+    errors: &str,
+    args: impl IntoIterator<Item = impl AsRef<OsStr>>,
+) -> io::Error {
+    let last = errors
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("no error output");
+    let command: String = args
+        .into_iter()
+        .map(|arg| arg.as_ref().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(2000)
+        .collect();
+    // The end of the output holds the error; a long log loses its start.
+    let output: Vec<char> = errors.trim().chars().collect();
+    let output: String = output[output.len().saturating_sub(5000)..].iter().collect();
+    io::Error::other(format!(
+        "{headline}: {last}\nFFmpeg output:\n{output}\nCommand: ffmpeg {command}"
+    ))
+}
+
 pub(crate) fn place(at: &Location<'_>) -> String {
     let file = at.file().rsplit(['/', '\\']).next().unwrap_or_default();
     format!("{file}:{}", at.line())
@@ -145,6 +173,22 @@ pub(crate) fn error_sources<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_ffmpeg_failure_carries_its_whole_output_and_command() {
+        let error = ffmpeg_failure(
+            "FFmpeg failed while rendering (exit status: 1)",
+            "[mov] moov atom not found\nclip.mp4: Invalid data found\n",
+            ["-i", "clip.mp4", "out.mp4"],
+        )
+        .to_string();
+        assert_eq!(
+            error,
+            "FFmpeg failed while rendering (exit status: 1): clip.mp4: Invalid data found\n\
+             FFmpeg output:\n[mov] moov atom not found\nclip.mp4: Invalid data found\n\
+             Command: ffmpeg -i clip.mp4 out.mp4"
+        );
+    }
 
     #[test]
     fn a_program_that_cannot_start_is_named_with_where_it_was_started() {

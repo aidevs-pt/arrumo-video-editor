@@ -36,6 +36,8 @@ const CRASH_DSN: Option<&str> = option_env!("ARRUMO_CRASH_DSN");
 type UsageSink = Box<dyn Fn(&str, Value) + Send + Sync>;
 static USAGE_SINK: OnceLock<UsageSink> = OnceLock::new();
 static CRASH_ALLOWED: AtomicBool = AtomicBool::new(false);
+/// The random ID crash reports carry while they are on; see [`crash_report_id`].
+static CRASH_ID: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
 static USAGE_ALLOWED: AtomicBool = AtomicBool::new(false);
 
 /// Receives timings and warnings while the creator allows usage data. Names and attributes are
@@ -159,25 +161,82 @@ pub fn set_failure_sink(sink: impl Fn(&str, &str, &[(&str, String)]) + Send + Sy
 }
 
 /// Reports a failure the app handled but the creator should not have hit, such as a render that
-/// stopped, so it can be fixed. `area` names the feature. The message keeps its first line,
-/// without paths, addresses or quoted text, where names and titles usually appear.
+/// stopped, so it can be fixed. `area` names the feature. The report keeps the whole error, with
+/// the home folder written as `~` (see [`mask_home`]); its first line is the report's title.
 pub fn report_failure(area: &str, error: &dyn std::fmt::Display) {
     report_failure_with(area, error, &[]);
 }
 
-/// [`report_failure`] with details of where and why, redacted the same way line by line.
+/// [`report_failure`] with details of where and why, such as the error chain and a program's
+/// output, masked the same way.
 pub fn report_failure_with(area: &str, error: &dyn std::fmt::Display, details: &[(&str, &str)]) {
     if !crash_reports_allowed() {
         return;
     }
     if let Some(sink) = FAILURE_SINK.get() {
-        let details: Vec<(&str, String)> = details
+        let text = mask_home(&error.to_string());
+        let title: String = text
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .chars()
+            .take(300)
+            .collect();
+        let mut details: Vec<(&str, String)> = details
             .iter()
             .filter(|(_, value)| !value.trim().is_empty())
-            .map(|(key, value)| (*key, redact_lines(value)))
+            .map(|(key, value)| (*key, limited(&mask_home(value))))
             .collect();
-        sink(area, &redact(&without_quotes(&error.to_string())), &details);
+        if text.trim() != title.trim() {
+            details.push(("error", limited(&text)));
+        }
+        sink(area, &title, &details);
     }
+}
+
+/// The most a report field carries, below the crash service's limit for a single value.
+const REPORT_FIELD_LIMIT: usize = 8000;
+
+fn limited(text: &str) -> String {
+    text.chars().take(REPORT_FIELD_LIMIT).collect()
+}
+
+/// Writes the creator's home folder, and any other user's home folder, as `~`, and email
+/// addresses as `[email]`, so a report keeps every path and message needed to debug it, but not
+/// the user names home folders are named after.
+pub fn mask_home(text: &str) -> String {
+    let homes: Vec<String> = ["HOME", "USERPROFILE"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .map(|home| home.to_string_lossy().into_owned())
+        .collect();
+    mask_folders(text, &homes)
+}
+
+fn mask_folders(text: &str, homes: &[String]) -> String {
+    let mut forms: Vec<String> = homes
+        .iter()
+        .map(|home| home.trim_end_matches(['/', '\\']).to_owned())
+        .filter(|home| home.len() > 1)
+        // Windows tools also write the folder with forward slashes or in lower case.
+        .flat_map(|home| {
+            let slashed = home.replace('\\', "/");
+            [home.to_lowercase(), slashed.to_lowercase(), slashed, home]
+        })
+        .collect();
+    forms.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    forms.dedup();
+    let masked = forms.iter().fold(text.to_owned(), |masked, home| {
+        masked.replace(home.as_str(), "~")
+    });
+    static HOME: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"(?i)(?:\b[a-z]:[\\/]users[\\/]|/users/|/home/)[^\\/\s"']+"#).unwrap()
+    });
+    static EMAIL: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"[\w.%+-]+@[\w-]+(?:\.[\w-]+)*\.[a-zA-Z]{2,}").unwrap()
+    });
+    let masked = HOME.replace_all(&masked, "~");
+    EMAIL.replace_all(&masked, "[email]").into_owned()
 }
 
 /// The error and each error that caused it, one per line, for a failure report.
@@ -233,6 +292,16 @@ pub fn crash_reports_allowed() -> bool {
     CRASH_ALLOWED.load(Ordering::Relaxed)
 }
 
+/// A random ID that only crash reports carry, so reports from one install can be grouped. It is
+/// not the usage install ID, and turning crash reports off replaces it. `None` until the store
+/// opens or while crash reports are off.
+pub fn crash_report_id() -> Option<String> {
+    let id = CRASH_ID
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    id.clone().filter(|_| crash_reports_allowed())
+}
+
 /// Sets the crash report choice before the store is open, from the copy kept beside it.
 pub fn allow_crash_reports(allowed: bool) {
     CRASH_ALLOWED.store(allowed, Ordering::Relaxed);
@@ -251,13 +320,16 @@ pub struct PrivacySettings {
 impl WorkspaceStore {
     pub fn privacy_settings(&self) -> rusqlite::Result<PrivacySettings> {
         self.0.query_row(
-            "SELECT usage_data, crash_reports FROM privacy_settings WHERE id = 1",
+            "SELECT usage_data, crash_reports, crash_report_id FROM privacy_settings WHERE id = 1",
             [],
             |row| {
                 let usage_data = row.get(0)?;
                 let crash_reports = row.get(1)?;
                 USAGE_ALLOWED.store(usage_data, Ordering::Relaxed);
                 CRASH_ALLOWED.store(crash_reports, Ordering::Relaxed);
+                *CRASH_ID
+                    .write()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = row.get(2)?;
                 Ok(PrivacySettings {
                     usage_data,
                     crash_reports,
@@ -274,7 +346,11 @@ impl WorkspaceStore {
         crash_reports: bool,
     ) -> rusqlite::Result<PrivacySettings> {
         self.0.execute(
-            "UPDATE privacy_settings SET usage_data = ?1, crash_reports = ?2 WHERE id = 1",
+            // Turning crash reports off replaces their ID, so later reports start a new one.
+            "UPDATE privacy_settings SET usage_data = ?1, crash_reports = ?2,
+                 crash_report_id = CASE WHEN ?2 THEN crash_report_id
+                                        ELSE lower(hex(randomblob(16))) END
+             WHERE id = 1",
             params![usage_data, crash_reports],
         )?;
         self.privacy_settings()
@@ -395,8 +471,14 @@ fn usage_request(event: &str, install: &str, props: &BTreeMap<&str, Value>) -> V
     }])
 }
 
-/// Removes anything that looks like a local path or address from a crash message, for crash
+/// A crash message as reports carry it: whole, with the home folder written as `~`, for crash
 /// SDKs to apply before they send.
+pub fn mask_report_text(message: &str) -> String {
+    limited(&mask_home(message))
+}
+
+/// Removes anything that looks like a local path or address from a usage log, which carries no
+/// file paths, for diagnostics SDKs to apply before they send.
 pub fn redact_report_text(message: &str) -> String {
     redact(message)
 }
@@ -444,7 +526,8 @@ fn crash_request(dsn: &str, message: &str, location: &str) -> Option<(String, St
         "release": format!("arrumo@{}", env!("CARGO_PKG_VERSION")),
         "environment": if cfg!(debug_assertions) { "debug" } else { "release" },
         "tags": {"os": std::env::consts::OS, "session": session_id()},
-        "exception": {"values": [{"type": "panic", "value": redact(message), "module": location}]},
+        "user": crash_report_id().map(|id| json!({"id": id})),
+        "exception": {"values": [{"type": "panic", "value": mask_report_text(message), "module": location}]},
     });
     Some((endpoint, auth, body))
 }
@@ -546,6 +629,34 @@ mod tests {
     }
 
     #[test]
+    fn crash_reports_carry_their_own_id_and_lose_it_when_turned_off() {
+        let _usage = USAGE_SETTING
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let id = |store: &WorkspaceStore| -> String {
+            store
+                .0
+                .query_row("SELECT crash_report_id FROM privacy_settings", [], |row| {
+                    row.get(0)
+                })
+                .unwrap()
+        };
+        let first = id(&store);
+        assert_eq!(first.len(), 32);
+        assert_ne!(first, store.install_id().unwrap());
+        store.set_privacy_settings(false, true).unwrap();
+        assert_eq!(id(&store), first);
+        assert_eq!(crash_report_id().as_deref(), Some(first.as_str()));
+        store.set_privacy_settings(true, false).unwrap();
+        assert!(crash_report_id().is_none());
+        let renewed = store.set_privacy_settings(true, true).unwrap();
+        assert!(renewed.crash_reports);
+        assert_ne!(id(&store), first);
+        assert_eq!(crash_report_id(), Some(id(&store)));
+    }
+
+    #[test]
     fn only_claimed_steps_and_the_work_inside_them_are_timed() {
         use std::cell::RefCell;
         thread_local! {
@@ -626,6 +737,7 @@ mod tests {
             .0
             .execute_batch(
                 "ALTER TABLE privacy_settings DROP COLUMN install_reported;
+                 ALTER TABLE privacy_settings DROP COLUMN crash_report_id;
                  DROP TRIGGER generation_activity_transition;
                  ALTER TABLE generation_activity DROP COLUMN stage;
                  ALTER TABLE agent_logs DROP COLUMN round; ALTER TABLE agent_sessions DROP COLUMN round;
@@ -643,7 +755,28 @@ mod tests {
     }
 
     #[test]
-    fn requests_carry_no_paths_or_content() {
+    fn reports_keep_the_whole_message_without_the_home_folder() {
+        let homes = ["/Users/ana".to_owned(), "C:\\Users\\Ana Rita\\".to_owned()];
+        assert_eq!(
+            mask_folders(
+                "could not open /Users/ana/Movies/clip.mp4\nffmpeg -i C:\\Users\\Ana Rita\\a.mp4 c:/users/ana rita/b.mp4",
+                &homes
+            ),
+            "could not open ~/Movies/clip.mp4\nffmpeg -i ~\\a.mp4 ~/b.mp4"
+        );
+        assert_eq!(mask_folders("/ stays", &["/".to_owned()]), "/ stays");
+        assert_eq!(
+            mask_folders(
+                "at /home/bob/x and D:\\Users\\carl\\y and /Users/dee for dee@example.com",
+                &[]
+            ),
+            "at ~/x and ~\\y and ~ for [email]"
+        );
+        assert_eq!(limited(&"x".repeat(9000)).len(), REPORT_FIELD_LIMIT);
+    }
+
+    #[test]
+    fn requests_follow_the_crash_service_format() {
         assert_eq!(
             redact("could not open /home/ana/Videos/secret.mp4 for ana@example.com\nmore"),
             "could not open [redacted] for [redacted]"
@@ -656,10 +789,7 @@ mod tests {
         .unwrap();
         assert_eq!(endpoint, "https://o1.ingest.example.io/api/42/store/");
         assert!(auth.contains("sentry_key=abc123"));
-        assert_eq!(
-            body["exception"]["values"][0]["value"],
-            "boom at [redacted]"
-        );
+        assert_eq!(body["exception"]["values"][0]["value"], "boom at ~");
         assert!(crash_request("http://k@h/1", "x", "y").is_none());
         let usage = usage_request(
             "video_queued",
