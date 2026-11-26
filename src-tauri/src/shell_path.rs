@@ -24,6 +24,12 @@ pub fn login_shell_path() -> Option<OsString> {
     if std::io::stdin().is_terminal() {
         return None;
     }
+    shell_path(env::var_os("PATH").unwrap_or_default())
+}
+
+/// The login shell's PATH again, ahead of `current`, such as after an agent's CLI was installed
+/// while Arrumo was open.
+pub fn shell_path(current: OsString) -> Option<OsString> {
     let shell = env::var_os("SHELL")
         .map(PathBuf::from)
         .filter(|shell| shell.is_absolute() && shell.is_file())
@@ -36,10 +42,15 @@ pub fn login_shell_path() -> Option<OsString> {
         });
     // A file, not a pipe: helpers that start-up files leave running inherit the output, and
     // reading a pipe would wait for all of them to exit, keeping the app from ever opening.
-    let output_file = env::temp_dir().join(format!("arrumo-shell-path-{}", std::process::id()));
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let output_file =
+        env::temp_dir().join(format!("arrumo-shell-path-{}-{stamp}", std::process::id()));
     let output = read_shell_path(shell, &output_file);
     let _ = fs::remove_file(&output_file);
-    merge(&output?, env::var_os("PATH").unwrap_or_default())
+    merge(&output?, current)
 }
 
 fn read_shell_path(shell: PathBuf, output_file: &Path) -> Option<String> {

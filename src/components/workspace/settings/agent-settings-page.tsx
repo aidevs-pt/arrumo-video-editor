@@ -589,10 +589,12 @@ function AgentSetupHelp({ provider }: { provider: string }) {
         }}>
           {copy.guide}<ArrowUpRight data-icon="inline-end" />
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => {
+        <Button type="button" size="sm" variant="ghost" disabled={detected === undefined && !failed} onClick={() => {
           setFailed(false);
           setLocation(undefined);
-          setAttempt((value) => value + 1);
+          // Reads the PATH again first, so a CLI installed while Arrumo is open is found.
+          void invoke("refresh_agent_search_path").catch(() => false)
+            .finally(() => setAttempt((value) => value + 1));
         }}>{copy.recheck}</Button>
         <Button type="button" size="sm" variant="outline" onClick={() => void changeProgram(true)}>{copy.chooseProgram}</Button>
         {location?.chosen && <Button type="button" size="sm" variant="ghost" onClick={() => void changeProgram(false)}>{copy.resetProgram}</Button>}

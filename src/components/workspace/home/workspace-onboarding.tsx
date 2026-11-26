@@ -2,7 +2,7 @@
 
 import { PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ArrowUpRight, Check, Globe, Info, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, CircleAlert, FolderOpen, Globe, Info, RefreshCw, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,6 +11,7 @@ import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/co
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { OnboardingKeys } from "./onboarding-keys";
 import type { PluginSettingsManifest } from "@/components/workspace/settings/plugin-preferences";
 import { chooseAgentProgram } from "@/lib/agent-cli";
@@ -298,16 +299,20 @@ function AgentOption({ agent, description, selected }: {
   const [failed, setFailed] = useState(false);
   const [guideError, setGuideError] = useState(false);
   const [programError, setProgramError] = useState<string>();
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    invoke<boolean>("agent_cli_detected", { provider: agent.id }).then(
-      (found) => { if (active) setDetected(found); },
-      () => { if (active) setFailed(true); },
-    );
+    // A check after the first reads the PATH again, so a CLI installed meanwhile is found.
+    (attempt ? invoke("refresh_agent_search_path").catch(() => false) : Promise.resolve())
+      .then(() => invoke<boolean>("agent_cli_detected", { provider: agent.id }))
+      .then(
+        (found) => { if (active) setDetected(found); },
+        () => { if (active) setFailed(true); },
+      );
     return () => { active = false; };
-  }, [agent.id]);
+  }, [agent.id, attempt]);
 
-  return <div className={cn("flex flex-col rounded-xl border bg-card", selected && "border-primary ring-1 ring-inset ring-primary")}>
+  return <div className={cn("flex flex-col rounded-xl border bg-card", selected && "border-primary ring-1 ring-primary")}>
     <label htmlFor={id} className="flex flex-1 cursor-pointer flex-col gap-2 p-4 sm:p-5">
       <span className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-3">
@@ -318,22 +323,48 @@ function AgentOption({ agent, description, selected }: {
       </span>
       {description && <span className="text-sm text-muted-foreground">{description}</span>}
     </label>
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-4 text-sm sm:px-5 sm:pb-5">
-      {detected && <Check aria-hidden="true" className="size-4 text-approval" />}
-      <span role="status">{failed ? copy.checkFailed : detected === undefined ? copy.checking : detected ? copy.detected : copy.notDetected}</span>
-      {detected === false && <button type="button" className="inline-flex items-center gap-1 font-semibold text-primary underline underline-offset-2" onClick={() => {
-        setGuideError(false);
-        void invoke("open_agent_setup_guide", { provider: agent.id }).catch(() => setGuideError(true));
-      }}>{copy.guide}<ArrowUpRight aria-hidden="true" className="size-3.5" /></button>}
-      {detected === false && <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={() => {
-        setProgramError(undefined);
-        chooseAgentProgram(agent.id, copy.chooseProgramTitle).then(
-          (location) => { if (location) setDetected(location.found !== null); },
-          (error) => setProgramError(error === "agent_cli_not_runnable" ? copy.programNotRunnable : copy.programFailed),
-        );
-      }}>{copy.chooseProgram}</button>}
+    <div className="flex min-h-12 flex-col justify-center gap-1 border-t px-4 py-2 text-sm sm:px-5">
+      <div className="flex items-center gap-2">
+        <p role="status" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+          <span className={cn("flex items-center gap-1.5", detected && "text-approval")}>
+            {detected ? <Check aria-hidden="true" className="size-4 shrink-0" />
+              : (detected === false || failed) && <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+            <span className={cn(!detected && "text-muted-foreground")}>{failed ? copy.checkFailed : detected === undefined ? copy.checking : detected ? copy.detected : copy.notDetected}</span>
+          </span>
+          {detected === false && <button type="button" className="inline-flex items-center gap-0.5 rounded-sm font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => {
+            setGuideError(false);
+            void invoke("open_agent_setup_guide", { provider: agent.id }).catch(() => setGuideError(true));
+          }}>{copy.guide}<ArrowUpRight aria-hidden="true" className="size-3.5" /></button>}
+        </p>
+        {(detected === false || failed) && <TooltipProvider delayDuration={250}>
+          <span className="ms-auto flex shrink-0 items-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon-sm" aria-label={copy.recheck} onClick={() => {
+                  setFailed(false);
+                  setDetected(undefined);
+                  setAttempt((value) => value + 1);
+                }}><RefreshCw /></Button>
+              </TooltipTrigger>
+              <TooltipContent>{copy.recheck}</TooltipContent>
+            </Tooltip>
+            {detected === false && <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon-sm" aria-label={copy.chooseProgram} onClick={() => {
+                  setProgramError(undefined);
+                  chooseAgentProgram(agent.id, copy.chooseProgramTitle).then(
+                    (location) => { if (location) setDetected(location.found !== null); },
+                    (error) => setProgramError(error === "agent_cli_not_runnable" ? copy.programNotRunnable : copy.programFailed),
+                  );
+                }}><FolderOpen /></Button>
+              </TooltipTrigger>
+              <TooltipContent>{copy.chooseProgram}</TooltipContent>
+            </Tooltip>}
+          </span>
+        </TooltipProvider>}
+      </div>
       {guideError && <p role="alert" className="text-destructive">{copy.guideError}</p>}
-      {programError && <p role="alert" className="w-full text-destructive">{programError}</p>}
+      {programError && <p role="alert" className="text-destructive">{programError}</p>}
     </div>
   </div>;
 }
