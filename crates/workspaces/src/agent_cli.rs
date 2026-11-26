@@ -220,31 +220,48 @@ pub(crate) fn find_agent_cli(plugin: &AgentPlugin) -> Option<PathBuf> {
     if let Some(path) = chosen.filter(|path| runnable(path)) {
         return Some(path);
     }
-    let executable = &plugin.cli.executable;
-    let search_path = agent_search_path()?;
-    env::split_paths(&search_path)
+    let home = env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
+    search_folders(agent_search_path(), home)
+        .into_iter()
+        .find_map(|dir| program_in(&dir, &plugin.cli.executable))
+}
+
+/// The PATH's folders, then the per-user program folder, `~/.local/bin`, where official agent
+/// installers put their program without always adding it to the PATH.
+fn search_folders(search_path: Option<OsString>, home: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut folders: Vec<PathBuf> = search_path
+        .iter()
+        .flat_map(env::split_paths)
         .filter(|dir| dir.is_absolute())
-        .find_map(|dir| {
-            let candidate = dir.join(executable);
-            // npm installs CLIs on Windows as `.cmd` shims, so every PATHEXT extension counts.
-            #[cfg(windows)]
-            {
-                let extensions =
-                    env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
-                extensions
-                    .split(';')
-                    .filter(|extension| !extension.is_empty())
-                    .map(|extension| candidate.with_extension(extension.trim_start_matches('.')))
-                    .find(|candidate| candidate.is_file())
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let metadata = candidate.metadata().ok()?;
-                (metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-                    .then_some(candidate)
-            }
-        })
+        .collect();
+    if let Some(user_programs) = home
+        .filter(|home| home.is_absolute())
+        .map(|home| home.join(".local").join("bin"))
+        .filter(|dir| !folders.contains(dir))
+    {
+        folders.push(user_programs);
+    }
+    folders
+}
+
+fn program_in(dir: &Path, executable: &str) -> Option<PathBuf> {
+    let candidate = dir.join(executable);
+    // npm installs CLIs on Windows as `.cmd` shims, so every PATHEXT extension counts.
+    #[cfg(windows)]
+    {
+        let extensions = env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+        extensions
+            .split(';')
+            .filter(|extension| !extension.is_empty())
+            .map(|extension| candidate.with_extension(extension.trim_start_matches('.')))
+            .find(|candidate| candidate.is_file())
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata = candidate.metadata().ok()?;
+        (metadata.is_file() && metadata.permissions().mode() & 0o111 != 0).then_some(candidate)
+    }
 }
 
 /// Used percent, reset time in Unix seconds and window length in minutes.
@@ -330,6 +347,45 @@ pub(crate) fn read_agent_usage(plugin: &AgentPlugin) -> Option<std::io::Result<A
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_user_program_folder_is_searched_after_the_path() {
+        let home = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let user_programs = home.path().join(".local").join("bin");
+        let path = env::join_paths([other.path()]).unwrap();
+        assert_eq!(
+            search_folders(Some(path.clone()), Some(home.path().to_path_buf())),
+            [other.path().to_path_buf(), user_programs.clone()]
+        );
+        // Already on the PATH, it keeps its place and isn't searched twice.
+        let both = env::join_paths([user_programs.as_path(), other.path()]).unwrap();
+        assert_eq!(
+            search_folders(Some(both), Some(home.path().to_path_buf())),
+            [user_programs.clone(), other.path().to_path_buf()]
+        );
+        // No PATH at all still finds it; a relative home is ignored.
+        assert_eq!(
+            search_folders(None, Some(home.path().to_path_buf())),
+            std::slice::from_ref(&user_programs)
+        );
+        assert!(search_folders(None, Some(PathBuf::from("relative"))).is_empty());
+
+        std::fs::create_dir_all(&user_programs).unwrap();
+        let name = if cfg!(windows) { "agent.exe" } else { "agent" };
+        let program = user_programs.join(name);
+        std::fs::write(&program, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let found = search_folders(Some(path), Some(home.path().to_path_buf()))
+            .into_iter()
+            .find_map(|dir| program_in(&dir, "agent"));
+        // Windows tries each PATHEXT extension, which may differ in case from the file's.
+        assert_eq!(found.as_deref().and_then(Path::parent), program.parent());
+    }
 
     #[test]
     #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
