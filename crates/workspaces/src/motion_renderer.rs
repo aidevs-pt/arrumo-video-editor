@@ -217,6 +217,7 @@ impl WorkspaceStore {
         let attempt = self
             .claim_queued_motion_stage(workspace_id, run_id)?
             .ok_or_else(|| io::Error::other("The selected run has no queued Assets stage"))?;
+        let timing = crate::telemetry::time_step("motion", &[]);
         let rendered = (|| -> Result<i64, Box<dyn Error>> {
             let mut last_renewal = std::time::Instant::now();
             let result = run_motion_worker(&bytes, digest, paths, scratch, || {
@@ -233,6 +234,10 @@ impl WorkspaceStore {
                 .submit_motion_artifacts(database, workspace_id, run_id, attempt, &artifacts)
                 .map_err(io::Error::other)?)
         })();
+        if rendered.is_err() {
+            crate::telemetry::warn("A generation step failed", &[("stage", "motion".into())]);
+        }
+        timing.finish(rendered.is_ok());
         match rendered {
             Ok(result_id) => Ok(result_id),
             Err(error) => {

@@ -121,12 +121,15 @@ impl WorkspaceStore {
                 .verify_generation_delivery(database, workspace_id, run_id, attempt)
                 .map(|_| ()),
         };
-        timing.finish(result.is_ok());
-        if let Err(error) = result {
+        if result.is_err() {
+            // Inside the step's timing, so the warning shows in its trace.
             crate::telemetry::warn(
                 "A generation step failed",
                 &[("stage", work.stage.clone().into())],
             );
+        }
+        timing.finish(result.is_ok());
+        if let Err(error) = result {
             let summary = match work.stage.as_str() {
                 "preview" => {
                     "Preview rendering failed. Check the edit, managed sources, and FFmpeg installation."

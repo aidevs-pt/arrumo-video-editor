@@ -109,9 +109,10 @@ fn scrub(event: &mut sentry::protocol::Event<'static>) {
     }
 }
 
-/// The attributes [`arrumo_workspaces::warn`] callers pass; the SDK's own, such as the machine
-/// name, are left out.
-const DIAGNOSTIC_ATTRIBUTES: &[&str] = &["stage", "agent", "round"];
+/// The attributes [`arrumo_workspaces::warn`] callers pass, and the span a warning was recorded
+/// in so it shows in that step's trace; the SDK's other attributes, such as the machine name,
+/// are left out.
+const DIAGNOSTIC_ATTRIBUTES: &[&str] = &["stage", "agent", "round", "program", "parent_span_id"];
 
 /// Sends step timings as Sentry traces and warnings as Sentry logs.
 pub struct SentryDiagnostics;
@@ -668,6 +669,8 @@ hello
         for private in ["studio-mac", "/Users/ana", "folder"] {
             assert!(!text.contains(private), "{private} was sent: {text}");
         }
+        // A warning recorded during a step names the span it belongs to.
+        assert!(text.contains("parent_span_id"), "{text}");
         // Timings carry an address that cannot be located, and no ID.
         assert!(text.contains(r#""ip_address":"0.0.0.0""#), "{text}");
         assert!(!text.contains(r#""user":{"id""#), "{text}");
