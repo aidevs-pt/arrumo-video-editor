@@ -7,7 +7,7 @@ use std::{
     error::Error,
     fmt, fs,
     io::{self, Read, Write},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::Mutex,
     thread,
     time::{Duration, Instant},
@@ -295,7 +295,7 @@ pub(crate) fn run_agent_process(
     mut tick: impl FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), AgentRunError> {
     let failed = |reason| AgentRunError::Failed(reason);
-    let mut command = Command::new(executable);
+    let mut command = crate::agent_cli::agent_command(executable);
     command
         .args(args)
         .current_dir(directory)

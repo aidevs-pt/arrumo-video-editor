@@ -296,14 +296,18 @@ function AgentOption({ agent, description, selected }: {
   const [failed, setFailed] = useState(false);
   const [guideError, setGuideError] = useState(false);
   const [programError, setProgramError] = useState<string>();
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    invoke<boolean>("agent_cli_detected", { provider: agent.id }).then(
-      (found) => { if (active) setDetected(found); },
-      () => { if (active) setFailed(true); },
-    );
+    // A check after the first reads the PATH again, so a CLI installed meanwhile is found.
+    (attempt ? invoke("refresh_agent_search_path").catch(() => false) : Promise.resolve())
+      .then(() => invoke<boolean>("agent_cli_detected", { provider: agent.id }))
+      .then(
+        (found) => { if (active) setDetected(found); },
+        () => { if (active) setFailed(true); },
+      );
     return () => { active = false; };
-  }, [agent.id]);
+  }, [agent.id, attempt]);
 
   return <div className={cn("flex flex-col rounded-xl border bg-card", selected && "border-primary ring-1 ring-inset ring-primary")}>
     <label htmlFor={id} className="flex flex-1 cursor-pointer flex-col gap-2 p-4 sm:p-5">
@@ -330,6 +334,11 @@ function AgentOption({ agent, description, selected }: {
           (error) => setProgramError(error === "agent_cli_not_runnable" ? copy.programNotRunnable : copy.programFailed),
         );
       }}>{copy.chooseProgram}</button>}
+      {(detected === false || failed) && <button type="button" className="font-semibold text-primary underline underline-offset-2" onClick={() => {
+        setFailed(false);
+        setDetected(undefined);
+        setAttempt((value) => value + 1);
+      }}>{copy.recheck}</button>}
       {guideError && <p role="alert" className="text-destructive">{copy.guideError}</p>}
       {programError && <p role="alert" className="w-full text-destructive">{programError}</p>}
     </div>

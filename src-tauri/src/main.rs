@@ -28,6 +28,8 @@ mod profiles;
 #[cfg(unix)]
 mod shell_path;
 mod updates;
+#[cfg(windows)]
+mod windows_path;
 
 type Store = Mutex<WorkspaceStore>;
 
@@ -1959,6 +1961,7 @@ fn main() {
             plugin_settings::open_plugin_setting_help,
             agent_settings::set_agent_provider,
             agent_settings::agent_cli_detected,
+            agent_settings::refresh_agent_search_path,
             agent_settings::agent_cli_location,
             agent_settings::set_agent_cli_path,
             agent_settings::agent_login_status,

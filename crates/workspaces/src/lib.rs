@@ -121,7 +121,8 @@ mod workspace_feedback;
 
 pub use a2a::serve_a2a;
 pub use agent_cli::{
-    AgentExecutableError, AgentLoginStatus, agent_cli_detected, agent_cli_path, check_agent_login,
+    AgentExecutableError, AgentLoginStatus, agent_cli_detected, agent_cli_path, agent_search_path,
+    check_agent_login, set_agent_search_path,
 };
 pub use agent_logs::{AgentLog, AgentLogSummary};
 pub use agent_plugins::{AgentPlugin, agent_plugin, agent_plugins};

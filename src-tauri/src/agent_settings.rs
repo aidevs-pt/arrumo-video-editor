@@ -33,6 +33,25 @@ pub fn set_agent_provider(
         .map_err(|_| "agent_settings_failed")
 }
 
+/// Reads the PATH again, so an agent's CLI installed while Arrumo is open can be found.
+#[tauri::command]
+pub async fn refresh_agent_search_path() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        let current = arrumo_workspaces::agent_search_path().unwrap_or_default();
+        #[cfg(unix)]
+        let fresh = crate::shell_path::shell_path(current);
+        #[cfg(windows)]
+        let fresh = crate::windows_path::registry_path(current);
+        #[cfg(not(any(unix, windows)))]
+        let fresh: Option<std::ffi::OsString> = None;
+        fresh
+            .map(arrumo_workspaces::set_agent_search_path)
+            .is_some()
+    })
+    .await
+    .unwrap_or(false)
+}
+
 #[tauri::command]
 pub fn agent_cli_detected(provider: String) -> bool {
     arrumo_workspaces::agent_cli_detected(&provider)
