@@ -243,10 +243,10 @@ impl WorkspaceStore {
                     "Motion rendering or publication failed.",
                     &*error,
                 ) {
-                    Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                    Err(failure) => return Err(failure.into()),
+                    Ok(_) => Err(crate::Reported::new(&*error).into()),
+                    Err(rusqlite::Error::QueryReturnedNoRows) => Err(error),
+                    Err(failure) => Err(failure.into()),
                 }
-                Err(error)
             }
         }
     }

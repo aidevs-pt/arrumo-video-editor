@@ -136,16 +136,20 @@ impl WorkspaceStore {
                 }
                 _ => "Delivery verification failed. Check the rendered videos and subtitle files.",
             };
-            match self.fail_generation_with_error(workspace_id, run_id, attempt, summary, &*error) {
-                Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                Err(record_error) => {
-                    return Err(io::Error::other(format!(
-                        "{error}. Could not record the worker failure: {record_error}"
-                    ))
-                    .into());
-                }
-            }
-            return Err(error);
+            return match self.fail_generation_with_error(
+                workspace_id,
+                run_id,
+                attempt,
+                summary,
+                &*error,
+            ) {
+                Ok(_) => Err(crate::Reported::new(&*error).into()),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Err(error),
+                Err(record_error) => Err(io::Error::other(format!(
+                    "{error}. Could not record the worker failure: {record_error}"
+                ))
+                .into()),
+            };
         }
         Ok(Some(work))
     }

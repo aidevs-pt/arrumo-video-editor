@@ -60,13 +60,47 @@ fn options() -> sentry::ClientOptions {
     options
 }
 
-/// Leaves out who and where: no user or machine name, binary paths cut to file names, and the
-/// home folder written as `~` in messages. The only user detail is the random crash report ID.
+/// The address reports give in place of the sender's, so the crash service has none to locate.
+const NO_ADDRESS: std::net::IpAddr = std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
+
+/// The contexts a report keeps: the app, its WebView, the computer's type, processor and memory,
+/// and the operating system. The trace context is left out so a report cannot be joined to the
+/// usage data of the same step.
+const KEPT_CONTEXTS: &[&str] = &["app", "browser", "device", "os", "runtime", "rust"];
+const KEPT_DEVICE: &[&str] = &[
+    "type",
+    "family",
+    "model",
+    "model_id",
+    "arch",
+    "simulator",
+    "memory_size",
+    "free_memory",
+    "usable_memory",
+];
+const KEPT_OS: &[&str] = &["type", "name", "version", "build"];
+
+/// Leaves out who and where: no user or machine name, no address or location, binary paths cut
+/// to file names, and the home folder written as `~` in messages. The only user detail is the
+/// random crash report ID.
 fn scrub(event: &mut sentry::protocol::Event<'static>) {
-    event.user = arrumo_workspaces::crash_report_id().map(|id| sentry::User {
-        id: Some(id),
+    event.user = Some(sentry::User {
+        id: arrumo_workspaces::crash_report_id(),
+        ip_address: Some(sentry::protocol::IpAddress::Exact(NO_ADDRESS)),
         ..Default::default()
     });
+    event
+        .contexts
+        .retain(|key, _| KEPT_CONTEXTS.contains(&key.as_str()));
+    for context in event.contexts.values_mut() {
+        let Ok(mut fields) = serde_json::to_value(&*context) else {
+            continue;
+        };
+        keep_known_fields(&mut fields);
+        if let Ok(kept) = serde_json::from_value(fields) {
+            *context = kept;
+        }
+    }
     event.server_name = None;
     // Breadcrumbs can quote console text and page addresses with titles in them.
     event.breadcrumbs = Default::default();
@@ -284,8 +318,21 @@ fn scrub_json(event: &mut Value) {
     for field in ["user", "server_name", "breadcrumbs", "request"] {
         event.remove(field);
     }
-    if let Some(id) = arrumo_workspaces::crash_report_id() {
-        event.insert("user".into(), serde_json::json!({ "id": id }));
+    event.insert(
+        "user".into(),
+        serde_json::json!({
+            "id": arrumo_workspaces::crash_report_id(),
+            "ip_address": NO_ADDRESS.to_string(),
+        }),
+    );
+    if let Some(Value::Object(contexts)) = event.get_mut("contexts") {
+        contexts.retain(|key, _| KEPT_CONTEXTS.contains(&key.as_str()));
+        for (key, context) in contexts.iter_mut() {
+            if let Some(fields) = context.as_object_mut() {
+                fields.insert("type".into(), Value::String(key.clone()));
+            }
+            keep_known_fields(context);
+        }
     }
     for field in ["message", "logentry"] {
         match event.get_mut(field) {
@@ -310,6 +357,20 @@ fn scrub_json(event: &mut Value) {
             }
         }
     }
+}
+
+/// Keeps only the listed fields of a device or operating system context, so details such as the
+/// computer's name, time zone or screen never leave it.
+fn keep_known_fields(context: &mut Value) {
+    let Some(fields) = context.as_object_mut() else {
+        return;
+    };
+    let kept = match fields.get("type").and_then(Value::as_str) {
+        Some("device") => KEPT_DEVICE,
+        Some("os") => KEPT_OS,
+        _ => return,
+    };
+    fields.retain(|key, _| kept.contains(&key.as_str()));
 }
 
 /// The crash report choice is also kept in a small file beside the data, so failures before the
@@ -381,6 +442,7 @@ hello
         }
         let events = events(&bytes);
         assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["user"]["ip_address"], "0.0.0.0");
         assert_eq!(events[0]["message"], "Could not open ~/Movies/clip.mp4");
         assert_eq!(
             events[0]["exception"]["values"][0]["value"],
@@ -390,6 +452,60 @@ hello
             events[0]["debug_meta"]["images"][0]["debug_id"],
             "011c4791-62f8-553d-b55b-d23bc9051a96"
         );
+    }
+
+    #[test]
+    fn reports_keep_the_computer_type_but_not_its_name_place_or_trace() {
+        use sentry::protocol::{Context, DeviceContext, OsContext};
+        let mut event = sentry::protocol::Event {
+            user: Some(sentry::User {
+                ip_address: Some(sentry::protocol::IpAddress::Auto),
+                username: Some("ana".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let device = DeviceContext {
+            name: Some("Ana's MacBook".into()),
+            model: Some("Mac14,2".into()),
+            arch: Some("aarch64".into()),
+            timezone: Some("Europe/Lisbon".into()),
+            memory_size: Some(8 << 30),
+            other: [("screen_resolution".to_owned(), "2940x1912".into())]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        };
+        event
+            .contexts
+            .insert("device".into(), Context::Device(Box::new(device)));
+        event.contexts.insert(
+            "os".into(),
+            Context::Os(Box::new(OsContext {
+                name: Some("macOS".into()),
+                version: Some("26.7.3".into()),
+                kernel_version: Some("Darwin Kernel Version 25.6.0".into()),
+                ..Default::default()
+            })),
+        );
+        event
+            .contexts
+            .insert("trace".into(), Context::Trace(Box::default()));
+        scrub(&mut event);
+        let user = event.user.as_ref().unwrap();
+        assert_eq!(
+            user.ip_address,
+            Some(sentry::protocol::IpAddress::Exact(NO_ADDRESS))
+        );
+        assert!(user.username.is_none());
+        assert!(!event.contexts.contains_key("trace"));
+        let text = serde_json::to_string(&event.contexts).unwrap();
+        for private in ["Ana", "Lisbon", "2940x1912", "Darwin"] {
+            assert!(!text.contains(private), "{private} was sent: {text}");
+        }
+        for kept in ["Mac14,2", "aarch64", "macOS", "26.7.3", "memory_size"] {
+            assert!(text.contains(kept), "{kept} missing: {text}");
+        }
     }
 
     const ALL: Allowed = Allowed {

@@ -174,7 +174,15 @@ impl WorkspaceStore {
         } else {
             format!("{summary}\n{}", reason.join("\n"))
         };
-        self.fail_generation_because(workspace_id, run_id, attempt, &detail, Some(&cause))
+        let root = crate::telemetry::root_cause(error);
+        self.fail_generation_reporting(
+            workspace_id,
+            run_id,
+            attempt,
+            &detail,
+            Some(&cause),
+            Some(&root),
+        )
     }
 
     /// Fails the run with `detail` for the creator, and reports `cause`, the error underneath
@@ -186,6 +194,20 @@ impl WorkspaceStore {
         attempt: i64,
         detail: &str,
         cause: Option<&str>,
+    ) -> rusqlite::Result<GenerationRun> {
+        self.fail_generation_reporting(workspace_id, run_id, attempt, detail, cause, None)
+    }
+
+    /// [`Self::fail_generation_because`] with the root cause, the error at the bottom of
+    /// `cause`, which groups the report with others that failed the same way.
+    fn fail_generation_reporting(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        detail: &str,
+        cause: Option<&str>,
+        root: Option<&str>,
     ) -> rusqlite::Result<GenerationRun> {
         let detail = detail.trim();
         if detail.is_empty() || detail.len() > 2000 || detail.contains('\0') {
@@ -227,6 +249,7 @@ impl WorkspaceStore {
                 ("agent", agent.as_deref().unwrap_or_default()),
                 ("attempt", &attempt_text),
                 ("cause", cause.unwrap_or_default()),
+                ("root", root.unwrap_or_default()),
             ],
         );
         self.queue_generation_failed_hooks(workspace_id, run_id, attempt, detail);

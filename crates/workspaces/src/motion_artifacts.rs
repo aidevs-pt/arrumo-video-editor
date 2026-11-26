@@ -80,10 +80,10 @@ impl WorkspaceStore {
                     "Motion artifact import failed. Check the files and retry.",
                     &*error,
                 ) {
-                    Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                    Err(failure) => return Err(failure.into()),
+                    Ok(_) => Err(crate::Reported::new(&*error).into()),
+                    Err(rusqlite::Error::QueryReturnedNoRows) => Err(error),
+                    Err(failure) => Err(failure.into()),
                 }
-                Err(error)
             }
         }
     }

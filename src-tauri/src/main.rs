@@ -1827,7 +1827,8 @@ fn main() {
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("workspaces.sqlite");
             // A restored backup replaces the data before anything opens it.
-            if let Err(error) = arrumo_workspaces::apply_pending_import(&database) {
+            let restore = arrumo_workspaces::apply_pending_import(&database).err();
+            if let Some(error) = &restore {
                 eprintln!("Arrumo could not restore the staged backup: {error}");
             }
             let store = WorkspaceStore::open(&database)?;
@@ -1837,11 +1838,14 @@ fn main() {
             }
             if arrumo_workspaces::crash_dsn().is_some() {
                 arrumo_workspaces::set_diagnostics(crash_reports::SentryDiagnostics);
-                arrumo_workspaces::set_failure_sink(|area, message, details| {
+                arrumo_workspaces::set_failure_sink(|report| {
                     sentry::with_scope(
                         |scope| {
-                            scope.set_tag("area", area);
-                            for (key, value) in details {
+                            scope.set_tag("area", report.area);
+                            let fingerprint: Vec<&str> =
+                                report.fingerprint.iter().map(String::as_str).collect();
+                            scope.set_fingerprint(Some(&fingerprint));
+                            for (key, value) in &report.details {
                                 // Short values can be searched as tags; longer ones read as data.
                                 if value.len() <= 64 && !value.contains('\n') {
                                     scope.set_tag(key, value);
@@ -1850,7 +1854,7 @@ fn main() {
                                 }
                             }
                         },
-                        || sentry::capture_message(message, sentry::Level::Error),
+                        || sentry::capture_message(&report.title, sentry::Level::Error),
                     );
                 });
             }
@@ -1860,6 +1864,9 @@ fn main() {
                 arrumo_workspaces::set_usage_sink(move |event, props| {
                     let _ = handle.track_event(event, Some(props));
                 });
+            }
+            if let Some(error) = &restore {
+                arrumo_workspaces::report_error("backup", error, &[("step", "restore")]);
             }
             store.track_install();
             app.manage(Mutex::new(store));
@@ -1872,11 +1879,15 @@ fn main() {
                     eprintln!("Arrumo could not open the store to retry managed file cleanup.");
                     return;
                 };
-                if arrumo_workspaces::recover_motion_scratch(&database).is_err() {
-                    eprintln!("Arrumo could not retry pending motion scratch cleanup.");
+                let cleanup_failed = |step: &str, error: &(dyn std::error::Error + 'static)| {
+                    eprintln!("Arrumo could not finish the {step} cleanup: {error}");
+                    arrumo_workspaces::report_error("cleanup", error, &[("step", step)]);
+                };
+                if let Err(error) = arrumo_workspaces::recover_motion_scratch(&database) {
+                    cleanup_failed("motion scratch", &error);
                 }
-                if store.remove_finished_agent_work(&database).is_err() {
-                    eprintln!("Arrumo could not remove the work folders of finished runs.");
+                if let Err(error) = store.remove_finished_agent_work(&database) {
+                    cleanup_failed("finished runs", &error);
                 }
                 match store.recover_all_delivery_cleanup(&database) {
                     Ok(report) if report.pending_run_ids.is_empty() => {}
@@ -1884,14 +1895,14 @@ fn main() {
                         "Arrumo still has {} pending delivery cleanup entries.",
                         report.pending_run_ids.len()
                     ),
-                    Err(_) => eprintln!("Arrumo could not retry pending delivery cleanup."),
+                    Err(error) => cleanup_failed("delivery", &*error),
                 }
                 match store.recover_asset_cleanup(&database) {
                     Ok(0) => {}
                     Ok(remaining) => {
                         eprintln!("Arrumo still has {remaining} pending asset cleanup entries.")
                     }
-                    Err(_) => eprintln!("Arrumo could not retry pending asset cleanup."),
+                    Err(error) => cleanup_failed("asset", &*error),
                 }
             });
             Ok(())

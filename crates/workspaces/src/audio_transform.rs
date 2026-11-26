@@ -239,7 +239,7 @@ pub(crate) fn provider_reason(response: reqwest::blocking::Response) -> Option<S
         .or_else(|| value.get("message"))?
         .as_str()?;
     let clean: String = text.chars().filter(|c| !c.is_control()).take(240).collect();
-    (!clean.trim().is_empty()).then(|| clean.trim().to_owned())
+    (!clean.trim().is_empty()).then(|| crate::telemetry::provider_text(clean.trim()))
 }
 
 /// Names the result after its source: `interview.mp4` becomes `interview-voice-isolated.mp3`.
