@@ -36,7 +36,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` | The Developer ID Application certificate (base64 `.p12`), its password and its identity name |
    | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | For notarization; `APPLE_PASSWORD` is an app-specific password |
    | `RELEASE_DEPLOY_KEY` | The private half of a deploy key with write access (see below). Needed once the repository is public |
-   | `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | The Azure app registration allowed to sign (Windows) |
+   | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` | The Azure app registration allowed to sign (Windows); it needs no client secret |
 
    Once the repository is public, the "Protect main" ruleset only lets you and one deploy key push to `main`, and the release workflow pushes its version commit with that key. Create it on your computer with `ssh-keygen -t ed25519 -N "" -C "release" -f release-deploy-key`. Add `release-deploy-key.pub` under Settings › Deploy keys with **Allow write access**, save `release-deploy-key` as the `RELEASE_DEPLOY_KEY` secret, then delete both files. `arrumo-plugin-registry` needs its own key the same way, for **Add plugin release**.
 
@@ -44,11 +44,11 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    1. In the Azure portal, create an **Artifact Signing account**. Note its region's endpoint: `https://neu.codesigning.azure.net` for North Europe, which DEVS AI uses (West Europe wasn't accepting new customers in November 2026). The endpoint must match the account's region, or signing fails with 403.
    2. In the account, complete **Identity validation** for DEVS.AI UNIPESSOAL LDA as a public organisation. Microsoft checks the company's official records; this can take a few days.
    3. Create a **Public Trust** certificate profile on the validated identity.
-   4. In Microsoft Entra ID, create an **App registration** and a client secret under Certificates & secrets.
+   4. In Microsoft Entra ID, create an **App registration**. Under **Certificates & secrets › Federated credentials**, add a **GitHub Actions** credential for your organisation and repository, with entity type **Environment** and environment `release`. If the form asks for the organisation and repository IDs, `gh api repos/<owner>/<repo> --jq '.owner.id, .id'` prints them. The release build signs in with a token GitHub issues for each run, so there is no client secret to store or rotate.
    5. On the Artifact Signing account (Access control), give that app the **Artifact Signing Certificate Profile Signer** role (called *Trusted Signing Certificate Profile Signer* on older pages).
-   6. Add the variables `AZURE_ARTIFACT_SIGNING_ENDPOINT`, `AZURE_ARTIFACT_SIGNING_ACCOUNT` (the account name) and `AZURE_ARTIFACT_SIGNING_PROFILE` (the certificate profile name), and the three `AZURE_*` secrets above.
+   6. Add the variables `AZURE_ARTIFACT_SIGNING_ENDPOINT`, `AZURE_ARTIFACT_SIGNING_ACCOUNT` (the account name) and `AZURE_ARTIFACT_SIGNING_PROFILE` (the certificate profile name), and the two `AZURE_*` secrets above.
 
-   The release build installs [`artifact-signing-cli`](https://github.com/Levminer/artifact-signing-cli). Tauri runs it on the app executable and both installers, before it signs the update files, so updates install the signed build.
+   The release build downloads Microsoft's Artifact Signing client for `signtool` (checked against its SHA-256) and signs with `scripts/windows-sign.ps1`, which asks GitHub for a fresh token for each file. Tauri runs it on the app executable and both installers, before it signs the update files, so updates install the signed build.
 
 ## Before each release
 
