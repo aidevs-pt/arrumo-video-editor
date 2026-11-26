@@ -16,6 +16,7 @@ import type { PluginSettingsManifest } from "@/components/workspace/settings/plu
 import { chooseAgentProgram } from "@/lib/agent-cli";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
+import { announceAgentChange } from "@/lib/agent-changes";
 
 type Agent = { id: string; label: string };
 type Plugin = { bundled: boolean; manifest: PluginSettingsManifest & { description: string } };
@@ -83,6 +84,7 @@ export function WorkspaceOnboarding({ desktop, onCreate }: {
       if (agent.id !== setup.effective) {
         await invoke("set_agent_provider", { workspaceId: null, provider: agent.id });
         setSetup({ ...setup, effective: agent.id });
+        announceAgentChange();
       }
       setStep(1);
     } catch {

@@ -15,6 +15,7 @@ import { VideoThumbnail } from "@/components/workspace/video-thumbnail";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { completedVideoHref, profileHref, workspaceHref, type Workspace } from "./workspace-links";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 type Profile = { id: number; name: string; guidance: string; color: string | null };
 type ScheduledOutput = {
@@ -218,6 +219,7 @@ function ContextNudge({ workspaceId }: { workspaceId: number }) {
   const [empty, setEmpty] = useState(false);
   const [agent, setAgent] = useState<string>();
   const [agentId, setAgentId] = useState<string>();
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -232,7 +234,7 @@ function ContextNudge({ workspaceId }: { workspaceId: number }) {
       setAgentId(plugin?.id);
     }, () => {});
     return () => { active = false; };
-  }, [workspaceId, messages.context.template]);
+  }, [workspaceId, messages.context.template, agentChanges]);
   if (!empty) return null;
   const name = agent ?? messages.contextResearch.agentFallback;
   return (

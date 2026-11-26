@@ -48,6 +48,31 @@ impl WorkspaceStore {
         })
     }
 
+    /// Points a run at the agent selected now, with that agent's settings, so continuing a video
+    /// after switching agents uses the new one. With no agent selected the run keeps its own.
+    pub(crate) fn adopt_current_agent(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+    ) -> rusqlite::Result<()> {
+        let settings = self.agent_settings(Some(workspace_id))?;
+        let Some(provider) = settings.effective_provider.as_deref() else {
+            return Ok(());
+        };
+        let options = self.agent_options(workspace_id, provider);
+        let to_json = |value| {
+            serde_json::to_string(value)
+                .map_err(|error| rusqlite::Error::ToSqlConversionFailure(error.into()))
+        };
+        self.0.execute(
+            "UPDATE generation_runs
+             SET snapshot_json = json_set(snapshot_json, '$.agent_settings', json(?3), '$.agent_options', json(?4))
+             WHERE workspace_id = ?1 AND id = ?2",
+            params![workspace_id, run_id, to_json(&serde_json::json!(settings))?, to_json(&serde_json::json!(options))?],
+        )?;
+        Ok(())
+    }
+
     /// The agent plugins that are turned on.
     pub fn active_agent_plugins(&self) -> rusqlite::Result<Vec<&'static AgentPlugin>> {
         let activation = self.plugin_activation()?;
@@ -92,5 +117,90 @@ impl WorkspaceStore {
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        DraftSettings, ProductionStage, ReviewDecision, RunControl, RunOptions, WorkspaceStore,
+    };
+
+    #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
+    fn continuing_a_video_uses_the_agent_selected_now() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        store.set_agent_provider(None, Some("claude-code")).unwrap();
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Explainer".into(),
+                    profile_id: None,
+                    intent: "Explain".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &RunOptions::default())
+            .unwrap();
+        let agent = |store: &WorkspaceStore| {
+            let run = store.generation_run(workspace, run.id).unwrap().unwrap();
+            run.snapshot["agent_settings"]["effective_provider"]
+                .as_str()
+                .map(str::to_owned)
+        };
+        assert_eq!(agent(&store).as_deref(), Some("claude-code"));
+
+        // Awaiting feedback: the review decision continues with the new agent.
+        let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+        let script = serde_json::json!({"markdown": "## Hook"});
+        let result = store
+            .submit_production_result(workspace, run.id, attempt, ProductionStage::Script, &script)
+            .unwrap();
+        store.set_agent_provider(None, Some("codex")).unwrap();
+        store
+            .review_production_result(workspace, run.id, result, ReviewDecision::Approved, "")
+            .unwrap();
+        assert_eq!(agent(&store).as_deref(), Some("codex"));
+        let snapshot = store
+            .generation_run(workspace, run.id)
+            .unwrap()
+            .unwrap()
+            .snapshot;
+        assert_eq!(
+            snapshot["agent_options"],
+            serde_json::json!(store.agent_options(workspace, "codex"))
+        );
+
+        // Paused: resuming continues with the new agent, here a workspace override.
+        store
+            .control_generation(workspace, run.id, RunControl::Pause)
+            .unwrap();
+        store
+            .set_agent_provider(Some(workspace), Some("claude-code"))
+            .unwrap();
+        assert_eq!(
+            agent(&store).as_deref(),
+            Some("codex"),
+            "pausing keeps the agent"
+        );
+        store
+            .control_generation(workspace, run.id, RunControl::Resume)
+            .unwrap();
+        assert_eq!(agent(&store).as_deref(), Some("claude-code"));
+
+        // With no agent selected any more, the run keeps the one it has.
+        store
+            .control_generation(workspace, run.id, RunControl::Pause)
+            .unwrap();
+        store.set_agent_provider(Some(workspace), None).unwrap();
+        store.set_agent_provider(None, None).unwrap();
+        store
+            .control_generation(workspace, run.id, RunControl::Resume)
+            .unwrap();
+        assert_eq!(agent(&store).as_deref(), Some("claude-code"));
     }
 }

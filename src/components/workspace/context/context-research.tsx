@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 const MAX_SOURCES = 8;
 
@@ -62,6 +63,7 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
   const [agent, setAgent] = useState<string>();
   const [agentId, setAgentId] = useState<string>();
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -72,7 +74,7 @@ export function ContextResearch({ workspaceId, startOpen, onDraft }: {
       if (active) { setAgent(plugin?.label); setAgentId(plugin?.id); }
     }, () => {});
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, agentChanges]);
 
   useEffect(() => {
     let active = true;

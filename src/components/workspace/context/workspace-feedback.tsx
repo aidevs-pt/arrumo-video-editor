@@ -11,6 +11,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Pencil, Trash2 } from "lucide-react";
+import { useAgentChanges } from "@/lib/agent-changes";
 
 type Feedback = { id: number; title: string; markdown: string };
 
@@ -29,6 +30,7 @@ export function WorkspaceFeedback({ workspaceId }: {
   const { messages } = useLocale();
   const copy = messages.feedback;
 
+  const agentChanges = useAgentChanges();
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -38,7 +40,7 @@ export function WorkspaceFeedback({ workspaceId }: {
       if (active) setAgent(plugins.find(({ id }) => id === settings.effective_provider)?.label ?? null);
     }, () => {});
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, agentChanges]);
 
   useEffect(() => {
     let active = true;
