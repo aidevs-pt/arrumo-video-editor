@@ -18,7 +18,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    pnpm tauri signer generate -w ~/.tauri/arrumo-updater.key
    ```
 
-3. **Create the `release` environment** (Settings › Environments). Add yourself as a required reviewer if every release should wait for your approval.
+3. **Create the `release` environment** (Settings › Environments). Under **Deployment branches and tags**, allow only `main`, and keep the release secrets in this environment. Add yourself as a required reviewer if every release should wait for your approval.
 4. **Add the variables** (Settings › Secrets and variables › Actions › Variables):
    - `RELEASE_ACTORS`: the GitHub accounts allowed to release, separated by commas (for example `IAntonioDev`).
    - `ARRUMO_UPDATER_PUBKEY`: the contents of `~/.tauri/arrumo-updater.key.pub`. The public key is not secret.
@@ -38,7 +38,7 @@ Installed copies of Arrumo read `latest.json` from the latest release, check its
    | `RELEASE_DEPLOY_KEY` | The private half of a deploy key with write access (see below). Needed once the repository is public |
    | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` | The Azure app registration allowed to sign (Windows); it needs no client secret |
 
-   Once the repository is public, the "Protect main" ruleset only lets you and one deploy key push to `main`, and the release workflow pushes its version commit with that key. Create it on your computer with `ssh-keygen -t ed25519 -N "" -C "release" -f release-deploy-key`. Add `release-deploy-key.pub` under Settings › Deploy keys with **Allow write access**, save `release-deploy-key` as the `RELEASE_DEPLOY_KEY` secret, then delete both files. `arrumo-plugin-registry` needs its own key the same way, for **Add plugin release**.
+   Once the repository is public, the "Protect main" ruleset only lets you and one deploy key push to `main`, and the release workflow pushes its version commit with that key. Create it on your computer with `ssh-keygen -t ed25519 -N "" -C "release" -f release-deploy-key`. Add `release-deploy-key.pub` under Settings › Deploy keys with **Allow write access**, save `release-deploy-key` as the `RELEASE_DEPLOY_KEY` secret of the `release` environment (Settings › Environments › release), not as a repository secret, then delete both files. The environment only deploys from `main`, so a workflow run from any other branch can't read the key and push past the ruleset. `arrumo-plugin-registry` needs its own key the same way, in its own `release` environment, for **Add plugin release**.
 
 6. **Set up Windows signing** with [Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/), which is open to organisations in the EU. Without it the Windows build is unsigned, and SmartScreen warns on first install.
    1. In the Azure portal, create an **Artifact Signing account**. Note its region's endpoint: `https://neu.codesigning.azure.net` for North Europe, which DEVS AI uses (West Europe wasn't accepting new customers in November 2026). The endpoint must match the account's region, or signing fails with 403.
