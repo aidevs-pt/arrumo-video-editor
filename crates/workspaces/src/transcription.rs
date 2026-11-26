@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeMap,
+    error::Error,
     io::{self, Read},
     time::Duration,
 };
@@ -109,6 +110,29 @@ impl WorkspaceStore {
             .map_err(|_| io::Error::other("Could not resolve transcription providers"))?
             .effective;
         self.transcribe_ordered_wav(workspace_id, order, audio, false)
+    }
+
+    /// Whether automatic subtitles can run in the workspace: a transcription provider in its
+    /// order is on, returns word timings and has its key. Checked before a video is queued so
+    /// the creator can set one up instead of finding out at delivery.
+    pub fn subtitle_provider_ready(&self, workspace_id: i64) -> Result<bool, Box<dyn Error>> {
+        let order = self.without_inactive(
+            self.provider_preferences("transcription", Some(workspace_id))?
+                .effective,
+        )?;
+        for provider in order {
+            let Some(adapter) = find_bundled_transcription_adapter(&provider, true)? else {
+                continue;
+            };
+            if adapter.response.words.is_some()
+                && self
+                    .provider_secret(&provider, &adapter.credential_setting, workspace_id)?
+                    .is_some()
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(crate) fn transcribe_ordered_wav(
@@ -387,6 +411,16 @@ fn invalid_transcript() -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subtitles_are_not_ready_without_a_transcription_provider() {
+        let store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        store
+            .set_provider_preferences("transcription", Some(workspace), Some(&[]))
+            .unwrap();
+        assert!(!store.subtitle_provider_ready(workspace).unwrap());
+    }
 
     fn fixture() -> TranscriptionAdapter {
         serde_json::from_value(serde_json::json!({

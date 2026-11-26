@@ -1,5 +1,6 @@
 "use client";
 
+import { useSubtitleProviderPrompt } from "@/components/workspace/generation/subtitle-provider-prompt";
 import { useLocale } from "@/lib/locale-provider";
 import { WorkspaceHeading, WorkspaceRows, WorkspaceShell } from "@/components/workspace/layout";
 import { invoke } from "@tauri-apps/api/core";
@@ -42,6 +43,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
   const [submitError, setSubmitError] = useState(false);
   const [profileFilter, setProfileFilter] = useState<number | null>(null);
   const { messages } = useLocale();
+  const subtitles = useSubtitleProviderPrompt(workspaceId);
   const copy = messages.queue;
   const selected = drafts.find((draft) => draft.id === selectedId);
 
@@ -77,6 +79,9 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
       provider_overrides: JSON.parse(String(fields.get("provider-overrides") ?? "{}")) as Record<string, string[]>,
       skip_hooks: JSON.parse(String(fields.get("skip-hooks") ?? "[]")) as string[],
     };
+    const subtitleChoice = await subtitles.confirm(options.generate_delivery_subtitles);
+    if (subtitleChoice === "cancel") return;
+    if (subtitleChoice === "without") options.generate_delivery_subtitles = false;
     const payload = JSON.stringify({ draftId: selected.id, options });
     if (request.current?.payload !== payload) {
       request.current = { key: crypto.randomUUID(), payload };
@@ -232,6 +237,7 @@ export function GenerationQueue({ workspaceId, drafts, initialDraftId, catalogVi
           </Tabs>
         ) : !runs && !loadError && <Skeleton className="min-h-36" aria-label={copy.loading} />}
       </div>
+      {subtitles.dialog}
     </WorkspaceShell>
   );
 }

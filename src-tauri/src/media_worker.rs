@@ -33,6 +33,27 @@ pub async fn process_desktop_media_stage(
     .map_err(|_| "media_stage_failed")?
 }
 
+/// Whether a video queued now could generate its subtitles automatically.
+#[tauri::command]
+pub async fn subtitle_provider_ready(
+    workspace_id: i64,
+    app: AppHandle,
+) -> Result<bool, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable")?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable")?
+            .subtitle_provider_ready(workspace_id)
+            .map_err(|_| "provider_check_failed")
+    })
+    .await
+    .map_err(|_| "provider_check_failed")?
+}
+
 #[tauri::command]
 pub async fn generate_delivery_subtitles(
     workspace_id: i64,

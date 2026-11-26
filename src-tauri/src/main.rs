@@ -2090,6 +2090,7 @@ fn main() {
             media_worker::desktop_motion_renderer_available,
             media_worker::render_desktop_run_motion,
             media_worker::generate_delivery_subtitles,
+            media_worker::subtitle_provider_ready,
             media_worker::import_delivery_subtitles,
             close_guard::answer_close_request,
             updates::update_status,
