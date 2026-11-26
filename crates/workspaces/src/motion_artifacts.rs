@@ -68,11 +68,14 @@ impl WorkspaceStore {
         let timing = crate::telemetry::time_step("motion", &[]);
         let outcome =
             self.submit_motion_artifacts(database, workspace_id, run_id, attempt, artifacts);
+        if outcome.is_err() {
+            // Inside the step's timing, so the warning shows in its trace.
+            crate::telemetry::warn("A generation step failed", &[("stage", "motion".into())]);
+        }
         timing.finish(outcome.is_ok());
         match outcome {
             Ok(id) => Ok(Some(id)),
             Err(error) => {
-                crate::telemetry::warn("A generation step failed", &[("stage", "motion".into())]);
                 match self.fail_generation_with_error(
                     workspace_id,
                     run_id,
@@ -80,10 +83,12 @@ impl WorkspaceStore {
                     "Motion artifact import failed. Check the files and retry.",
                     &*error,
                 ) {
-                    Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                    Err(failure) => return Err(failure.into()),
+                    // A run stopped or taken over meanwhile is not a failure to report.
+                    Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {
+                        Err(crate::Handled::new(&*error).into())
+                    }
+                    Err(failure) => Err(failure.into()),
                 }
-                Err(error)
             }
         }
     }

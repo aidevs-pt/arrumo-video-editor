@@ -1,4 +1,5 @@
 use std::{
+    error::Error,
     io,
     path::PathBuf,
     sync::{
@@ -27,7 +28,6 @@ impl DesktopJobWorkers {
                     store
                         .process_next_motion_stage(&motion_database, &worker)
                         .map(|result| result.is_some())
-                        .map_err(|_| ())
                 },
             )?;
         }
@@ -40,7 +40,6 @@ impl DesktopJobWorkers {
                 store
                     .process_next_script_stage(&script_database)
                     .map(|result| result.is_some())
-                    .map_err(|_| ())
             },
         )?;
         let assets_database = database.clone();
@@ -52,7 +51,6 @@ impl DesktopJobWorkers {
                 store
                     .process_next_asset_plan(&assets_database)
                     .map(|result| result.is_some())
-                    .map_err(|_| ())
             },
         )?;
         let preview_database = database.clone();
@@ -64,7 +62,6 @@ impl DesktopJobWorkers {
                 store
                     .process_next_preview_edit(&preview_database)
                     .map(|result| result.is_some())
-                    .map_err(|_| ())
             },
         )?;
         let publishing_database = database.clone();
@@ -76,7 +73,6 @@ impl DesktopJobWorkers {
                 store
                     .process_next_supplemental_writing(&publishing_database)
                     .map(|result| result.is_some())
-                    .map_err(|_| ())
             },
         )?;
         let render_database = database.clone();
@@ -84,39 +80,32 @@ impl DesktopJobWorkers {
             "arrumo-final-render",
             database.clone(),
             Duration::from_secs(2),
-            move |store| {
-                store
-                    .process_next_final_render(&render_database)
-                    .map_err(|_| ())
-            },
+            move |store| store.process_next_final_render(&render_database),
         )?;
         let subtitles_database = database.clone();
         workers.spawn(
             "arrumo-delivery-subtitles",
             database.clone(),
             Duration::from_secs(2),
-            move |store| {
-                store
-                    .process_next_automatic_subtitles(&subtitles_database)
-                    .map_err(|_| ())
-            },
+            move |store| store.process_next_automatic_subtitles(&subtitles_database),
         )?;
         let delivery_database = database.clone();
         workers.spawn(
             "arrumo-delivery-verification",
             database.clone(),
             Duration::from_secs(2),
-            move |store| {
-                store
-                    .process_next_ready_delivery(&delivery_database)
-                    .map_err(|_| ())
-            },
+            move |store| store.process_next_ready_delivery(&delivery_database),
         )?;
         workers.spawn(
             "arrumo-agent-sessions",
             database.clone(),
             Duration::from_secs(300),
-            |store| store.sweep_agent_sessions().map(|_| false).map_err(|_| ()),
+            |store| {
+                store
+                    .sweep_agent_sessions()
+                    .map(|_| false)
+                    .map_err(Into::into)
+            },
         )?;
         workers.spawn(
             "arrumo-publish-dates",
@@ -126,7 +115,7 @@ impl DesktopJobWorkers {
                 store
                     .queue_publish_date_hooks()
                     .map(|_| false)
-                    .map_err(|_| ())
+                    .map_err(Into::into)
             },
         )?;
         workers.spawn(
@@ -134,10 +123,7 @@ impl DesktopJobWorkers {
             database,
             Duration::from_millis(500),
             move |store| {
-                let processed = store
-                    .process_next_plugin_action_job()
-                    .map_err(|_| ())?
-                    .is_some();
+                let processed = store.process_next_plugin_action_job()?.is_some();
                 if processed {
                     let _ = app.emit("arrumo-plugin-jobs-changed", ());
                 }
@@ -152,19 +138,35 @@ impl DesktopJobWorkers {
         name: &str,
         database: PathBuf,
         idle_delay: Duration,
-        process: impl Fn(&WorkspaceStore) -> Result<bool, ()> + Send + 'static,
+        process: impl Fn(&WorkspaceStore) -> Result<bool, Box<dyn Error>> + Send + 'static,
     ) -> io::Result<()> {
         let stopped = Arc::clone(&self.0);
+        let worker = name.to_owned();
         thread::Builder::new().name(name.into()).spawn(move || {
+            // Workers retry every few seconds, so each failure is reported once, until it changes.
+            let mut last_failure = String::new();
+            let mut failed = |error: &(dyn Error + 'static)| {
+                let chain = arrumo_workspaces::error_chain(error);
+                if chain != last_failure {
+                    arrumo_workspaces::report_error("background", error, &[("worker", &worker)]);
+                    last_failure = chain;
+                }
+            };
             while !stopped.load(Ordering::Relaxed) {
-                if let Ok(store) = WorkspaceStore::open(&database) {
-                    while !stopped.load(Ordering::Relaxed) {
-                        match process(&store) {
-                            Ok(true) => {}
-                            Ok(false) => thread::sleep(idle_delay),
-                            Err(()) => break,
+                match WorkspaceStore::open(&database) {
+                    Ok(store) => {
+                        while !stopped.load(Ordering::Relaxed) {
+                            match process(&store) {
+                                Ok(true) => {}
+                                Ok(false) => thread::sleep(idle_delay),
+                                Err(error) => {
+                                    failed(&*error);
+                                    break;
+                                }
+                            }
                         }
                     }
+                    Err(error) => failed(&error),
                 }
                 if !stopped.load(Ordering::Relaxed) {
                     thread::sleep(Duration::from_secs(2));

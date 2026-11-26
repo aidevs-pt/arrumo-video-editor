@@ -174,7 +174,15 @@ impl WorkspaceStore {
         } else {
             format!("{summary}\n{}", reason.join("\n"))
         };
-        self.fail_generation_because(workspace_id, run_id, attempt, &detail, Some(&cause))
+        let root = crate::telemetry::root_cause(error);
+        self.fail_generation_reporting(
+            workspace_id,
+            run_id,
+            attempt,
+            &detail,
+            Some(&cause),
+            Some(&root),
+        )
     }
 
     /// Fails the run with `detail` for the creator, and reports `cause`, the error underneath
@@ -186,6 +194,20 @@ impl WorkspaceStore {
         attempt: i64,
         detail: &str,
         cause: Option<&str>,
+    ) -> rusqlite::Result<GenerationRun> {
+        self.fail_generation_reporting(workspace_id, run_id, attempt, detail, cause, None)
+    }
+
+    /// [`Self::fail_generation_because`] with the root cause, the error at the bottom of
+    /// `cause`, which groups the report with others that failed the same way.
+    fn fail_generation_reporting(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        attempt: i64,
+        detail: &str,
+        cause: Option<&str>,
+        root: Option<&str>,
     ) -> rusqlite::Result<GenerationRun> {
         let detail = detail.trim();
         if detail.is_empty() || detail.len() > 2000 || detail.contains('\0') {
@@ -227,6 +249,7 @@ impl WorkspaceStore {
                 ("agent", agent.as_deref().unwrap_or_default()),
                 ("attempt", &attempt_text),
                 ("cause", cause.unwrap_or_default()),
+                ("root", root.unwrap_or_default()),
             ],
         );
         self.queue_generation_failed_hooks(workspace_id, run_id, attempt, detail);
@@ -632,6 +655,49 @@ mod tests {
             detail,
             "Final rendering failed.\nFFmpeg failed while rendering: [redacted] Invalid data found"
         );
+    }
+
+    #[test]
+    fn a_step_that_fails_after_its_run_was_cancelled_is_not_a_failure() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Demo".into(),
+                    intent: "Brief".into(),
+                    profile_id: None,
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "request", &RunOptions::default())
+            .unwrap();
+        let claim = store.claim_generation(workspace).unwrap().unwrap();
+        store
+            .control_generation(workspace, run.id, RunControl::Cancel)
+            .unwrap();
+        // The step only notices once its lease check fails; recording that failure finds no
+        // running run, which the workers treat as handled rather than report.
+        let recorded = store.fail_generation_with_error(
+            workspace,
+            run.id,
+            claim.attempt,
+            "Final rendering failed.",
+            &std::io::Error::other("The render stopped because its run was stopped or taken over"),
+        );
+        assert!(matches!(
+            recorded,
+            Err(rusqlite::Error::QueryReturnedNoRows)
+        ));
+        let state = store
+            .generation_run(workspace, run.id)
+            .unwrap()
+            .unwrap()
+            .state;
+        assert_ne!(state, "failed");
     }
 }
 

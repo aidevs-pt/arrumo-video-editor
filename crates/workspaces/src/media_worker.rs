@@ -121,12 +121,15 @@ impl WorkspaceStore {
                 .verify_generation_delivery(database, workspace_id, run_id, attempt)
                 .map(|_| ()),
         };
-        timing.finish(result.is_ok());
-        if let Err(error) = result {
+        if result.is_err() {
+            // Inside the step's timing, so the warning shows in its trace.
             crate::telemetry::warn(
                 "A generation step failed",
                 &[("stage", work.stage.clone().into())],
             );
+        }
+        timing.finish(result.is_ok());
+        if let Err(error) = result {
             let summary = match work.stage.as_str() {
                 "preview" => {
                     "Preview rendering failed. Check the edit, managed sources, and FFmpeg installation."
@@ -136,16 +139,22 @@ impl WorkspaceStore {
                 }
                 _ => "Delivery verification failed. Check the rendered videos and subtitle files.",
             };
-            match self.fail_generation_with_error(workspace_id, run_id, attempt, summary, &*error) {
-                Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                Err(record_error) => {
-                    return Err(io::Error::other(format!(
-                        "{error}. Could not record the worker failure: {record_error}"
-                    ))
-                    .into());
+            return match self.fail_generation_with_error(
+                workspace_id,
+                run_id,
+                attempt,
+                summary,
+                &*error,
+            ) {
+                // A run stopped or taken over meanwhile is not a failure to report.
+                Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => {
+                    Err(crate::Handled::new(&*error).into())
                 }
-            }
-            return Err(error);
+                Err(record_error) => Err(io::Error::other(format!(
+                    "{error}. Could not record the worker failure: {record_error}"
+                ))
+                .into()),
+            };
         }
         Ok(Some(work))
     }

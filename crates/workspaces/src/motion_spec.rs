@@ -2290,7 +2290,11 @@ pub(crate) fn run_ffmpeg(
         match run_ffmpeg_once(directory, args, check)? {
             Some(()) => return Ok(()),
             None if attempt < ATTEMPTS => {
-                eprintln!("FFmpeg stalled; retrying ({attempt}/{ATTEMPTS})")
+                eprintln!("FFmpeg stalled; retrying ({attempt}/{ATTEMPTS})");
+                crate::telemetry::warn(
+                    "FFmpeg stalled and was restarted",
+                    &[("program", "arrumo-ffmpeg".into())],
+                );
             }
             None => {}
         }

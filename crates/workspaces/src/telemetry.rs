@@ -151,13 +151,75 @@ pub fn set_usage_sink(sink: impl Fn(&str, Value) + Send + Sync + 'static) {
 /// Receives handled failures that the creator should not have hit, already redacted, as
 /// `(area, message, details)`. Details name where it failed and why, such as the stage and the
 /// underlying error.
-type FailureSink = Box<dyn Fn(&str, &str, &[(&str, String)]) + Send + Sync>;
+type FailureSink = Box<dyn Fn(&FailureReport<'_>) + Send + Sync>;
 static FAILURE_SINK: OnceLock<FailureSink> = OnceLock::new();
+
+/// A handled failure as the crash reporter receives it, already masked.
+pub struct FailureReport<'a> {
+    /// The feature that failed, such as `generation`.
+    pub area: &'a str,
+    /// What failed and, when known, the error at the bottom of it, with names and numbers left
+    /// out so the title reads the same each time the failure happens.
+    pub title: String,
+    /// Where and why it failed, such as the stage and the whole error chain.
+    pub details: Vec<(&'a str, String)>,
+    /// Groups reports by where and why they failed rather than by their wording.
+    pub fingerprint: Vec<String>,
+}
 
 /// Sends handled failures through `sink`, such as the desktop app's crash reporter. They pass the
 /// crash report setting first.
-pub fn set_failure_sink(sink: impl Fn(&str, &str, &[(&str, String)]) + Send + Sync + 'static) {
+pub fn set_failure_sink(sink: impl Fn(&FailureReport<'_>) + Send + Sync + 'static) {
     let _ = FAILURE_SINK.set(Box::new(sink));
+}
+
+/// An error that needs no report from callers further up: it was already reported, or its run
+/// was stopped or taken over, which is not a failure. It keeps the error's chain as text.
+#[derive(Debug)]
+pub struct Handled(String);
+
+impl Handled {
+    pub fn new(error: &(dyn std::error::Error + 'static)) -> Self {
+        Self(error_chain(error))
+    }
+}
+
+impl std::fmt::Display for Handled {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for Handled {}
+
+/// Whether `error`, or an error it wraps, needs no report; see [`Handled`].
+pub fn already_handled(error: &(dyn std::error::Error + 'static)) -> bool {
+    crate::quiet_process::error_sources(error).any(|error| error.is::<Handled>())
+}
+
+/// The first line of the error at the bottom of `error`'s chain: what actually went wrong.
+pub fn root_cause(error: &(dyn std::error::Error + 'static)) -> String {
+    let root = crate::quiet_process::error_sources(error)
+        .last()
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    root.lines().next().unwrap_or_default().to_owned()
+}
+
+/// Reports `error` with its whole chain and its root cause, unless it is [`Handled`].
+pub fn report_error(
+    area: &str,
+    error: &(dyn std::error::Error + 'static),
+    details: &[(&str, &str)],
+) {
+    if already_handled(error) {
+        return;
+    }
+    let cause = error_chain(error);
+    let root = root_cause(error);
+    let mut details = details.to_vec();
+    details.extend([("cause", cause.as_str()), ("root", root.as_str())]);
+    report_failure_with(area, &error.to_string(), &details);
 }
 
 /// Reports a failure the app handled but the creator should not have hit, such as a render that
@@ -174,24 +236,104 @@ pub fn report_failure_with(area: &str, error: &dyn std::fmt::Display, details: &
         return;
     }
     if let Some(sink) = FAILURE_SINK.get() {
-        let text = mask_home(&error.to_string());
-        let title: String = text
-            .lines()
-            .next()
-            .unwrap_or_default()
-            .chars()
-            .take(300)
-            .collect();
-        let mut details: Vec<(&str, String)> = details
-            .iter()
-            .filter(|(_, value)| !value.trim().is_empty())
-            .map(|(key, value)| (*key, limited(&mask_home(value))))
-            .collect();
-        if text.trim() != title.trim() {
-            details.push(("error", limited(&text)));
-        }
-        sink(area, &title, &details);
+        sink(&failure_report(area, error, details));
     }
+}
+
+/// The report [`report_failure_with`] sends: the masked error, its details, and a title and
+/// fingerprint from the stage, the failed step and the root cause.
+fn failure_report<'a>(
+    area: &'a str,
+    error: &dyn std::fmt::Display,
+    details: &[(&'a str, &str)],
+) -> FailureReport<'a> {
+    let text = mask_home(&error.to_string());
+    let title: String = text
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .take(300)
+        .collect();
+    let mut details: Vec<(&str, String)> = details
+        .iter()
+        .filter(|(_, value)| !value.trim().is_empty())
+        .map(|(key, value)| (*key, limited(&mask_home(value))))
+        .collect();
+    if text.trim() != title.trim() {
+        details.push(("error", limited(&text)));
+    }
+    let detail = |key: &str| {
+        details
+            .iter()
+            .find(|(name, _)| *name == key)
+            .map(|(_, value)| value.as_str())
+    };
+    let root = detail("root").map(report_pattern);
+    let step = detail("cause")
+        .and_then(|cause| cause.lines().next())
+        .map(report_pattern)
+        .unwrap_or_default();
+    let fingerprint = vec![
+        area.to_owned(),
+        detail("stage")
+            .or(detail("worker"))
+            .unwrap_or_default()
+            .to_owned(),
+        step,
+        root.clone().unwrap_or_else(|| report_pattern(&title)),
+    ];
+    let title = match root {
+        // A root that is the failure itself would only repeat it.
+        Some(root) if !root.is_empty() && root != report_pattern(&title) => {
+            format!("{}: {root}", first_sentence(&title))
+        }
+        _ => title,
+    };
+    FailureReport {
+        area,
+        title,
+        details,
+        fingerprint,
+    }
+}
+
+/// The first sentence of a message, without its full stop.
+fn first_sentence(message: &str) -> &str {
+    message
+        .split_once(". ")
+        .map_or(message, |(sentence, _)| sentence)
+        .trim_end_matches('.')
+}
+
+/// A line of an error with what changes between occurrences left out: code locations, quoted
+/// text, paths and addresses, and numbers. Reports that read the same this way share a cause.
+pub(crate) fn report_pattern(line: &str) -> String {
+    static LOCATION: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"\s*\([\w./-]+\.rs:\d+\)").unwrap());
+    static NUMBER: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"\d+").unwrap());
+    let line = LOCATION.replace_all(line, "");
+    let line = without_quotes(&line).replace("[redacted]", "*");
+    let words: Vec<&str> = line
+        .split_whitespace()
+        .map(|word| {
+            if ['/', '\\', '@', '*']
+                .iter()
+                .any(|mark| word.contains(*mark))
+                || word.contains("://")
+            {
+                "*"
+            } else {
+                word
+            }
+        })
+        .collect();
+    NUMBER
+        .replace_all(&words.join(" "), "N")
+        .chars()
+        .take(200)
+        .collect()
 }
 
 /// The most a report field carries, below the crash service's limit for a single value.
@@ -236,7 +378,21 @@ fn mask_folders(text: &str, homes: &[String]) -> String {
         regex::Regex::new(r"[\w.%+-]+@[\w-]+(?:\.[\w-]+)*\.[a-zA-Z]{2,}").unwrap()
     });
     let masked = HOME.replace_all(&masked, "~");
-    EMAIL.replace_all(&masked, "[email]").into_owned()
+    let masked = EMAIL.replace_all(&masked, "[email]");
+    without_provider_text(&masked)
+}
+
+/// Replaces what a provider wrote back, which [`provider_text`] marks, since it may repeat the
+/// prompt it was given. The creator still sees it in the app.
+fn without_provider_text(text: &str) -> String {
+    static PROVIDER: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"«[^»]*»?").unwrap());
+    PROVIDER.replace_all(text, "«provider text»").into_owned()
+}
+
+/// Marks what a provider wrote back so reports leave it out; see [`without_provider_text`].
+pub(crate) fn provider_text(text: &str) -> String {
+    format!("«{}»", text.replace(['«', '»'], ""))
 }
 
 /// The error and each error that caused it, one per line, for a failure report.
@@ -526,7 +682,8 @@ fn crash_request(dsn: &str, message: &str, location: &str) -> Option<(String, St
         "release": format!("arrumo@{}", env!("CARGO_PKG_VERSION")),
         "environment": if cfg!(debug_assertions) { "debug" } else { "release" },
         "tags": {"os": std::env::consts::OS, "session": session_id()},
-        "user": crash_report_id().map(|id| json!({"id": id})),
+        // An explicit address keeps the crash service from locating the sender by theirs.
+        "user": {"id": crash_report_id(), "ip_address": "0.0.0.0"},
         "exception": {"values": [{"type": "panic", "value": mask_report_text(message), "module": location}]},
     });
     Some((endpoint, auth, body))
@@ -626,6 +783,59 @@ mod tests {
         assert!(!off.usage_data && off.crash_reports);
         // Contributor builds have no keys, so tracking is a no-op.
         store.track_usage("app_installed", &[]);
+    }
+
+    #[test]
+    fn failures_group_by_step_and_root_cause_not_by_wording() {
+        let report = |cause: &str, root: &str| {
+            failure_report(
+                "generation",
+                &"Final rendering failed. Check the accepted edit.\nRendering the cut (clip_render.rs:753)",
+                &[("stage", "final_render"), ("cause", cause), ("root", root)],
+            )
+        };
+        let first = report(
+            "Rendering the cut (clip_render.rs:753)\nFFmpeg failed while rendering (exit status: 1): /Users/ana/a.mp4: Invalid data",
+            "FFmpeg failed while rendering (exit status: 1): /Users/ana/a.mp4: Invalid data",
+        );
+        let again = report(
+            "Rendering the cut (clip_render.rs:760)\nFFmpeg failed while rendering (exit status: 234): 'Holiday.mp4': Invalid data",
+            "FFmpeg failed while rendering (exit status: 234): 'Holiday.mp4': Invalid data",
+        );
+        assert_eq!(first.fingerprint, again.fingerprint);
+        assert_eq!(
+            first.title,
+            "Final rendering failed: FFmpeg failed while rendering (exit status: N): * Invalid data"
+        );
+        assert!(!again.title.contains("Holiday"));
+        let other = report(
+            "Rendering the cut (clip_render.rs:753)\nQuery returned no rows",
+            "Query returned no rows",
+        );
+        assert_ne!(first.fingerprint, other.fingerprint);
+        assert_eq!(
+            other.title,
+            "Final rendering failed: Query returned no rows"
+        );
+        // Without a root cause the title stays the failure's own first line.
+        let plain = failure_report("backup", &"Could not restore 3 files", &[]);
+        assert_eq!(plain.title, "Could not restore 3 files");
+        assert_eq!(plain.fingerprint[3], "Could not restore N files");
+        let single = failure_report(
+            "background",
+            &"Disk full",
+            &[("cause", "Disk full"), ("root", "Disk full")],
+        );
+        assert_eq!(single.title, "Disk full");
+    }
+
+    #[test]
+    fn a_handled_error_is_not_reported_again() {
+        let handled: Box<dyn std::error::Error> =
+            Box::new(Handled::new(&std::io::Error::other("disk full")));
+        assert!(already_handled(&*handled));
+        assert_eq!(handled.to_string(), "disk full");
+        assert!(!already_handled(&std::io::Error::other("disk full")));
     }
 
     #[test]
@@ -771,6 +981,13 @@ mod tests {
                 &[]
             ),
             "at ~/x and ~\\y and ~ for [email]"
+        );
+        assert_eq!(
+            mask_folders(
+                &format!("HTTP 400: {}", provider_text("Prompt «a cat» was rejected")),
+                &[]
+            ),
+            "HTTP 400: «provider text»"
         );
         assert_eq!(limited(&"x".repeat(9000)).len(), REPORT_FIELD_LIMIT);
     }

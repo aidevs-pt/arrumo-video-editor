@@ -66,7 +66,8 @@ pub(crate) fn safe_https(url: &str) -> bool {
 
 /// A provider's short reason, such as `not_enough_credits`, safe to show.
 pub(crate) fn provider_reason(text: &str) -> String {
-    text.chars().filter(|c| !c.is_control()).take(120).collect()
+    let clean: String = text.chars().filter(|c| !c.is_control()).take(120).collect();
+    crate::telemetry::provider_text(&clean)
 }
 
 pub(crate) fn read_json(response: reqwest::blocking::Response, what: &str) -> io::Result<Value> {
