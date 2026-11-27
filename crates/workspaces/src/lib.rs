@@ -19,6 +19,8 @@ mod agent_settings;
 mod agent_stage;
 mod agent_work;
 mod asset_cleanup;
+mod footage_cleanup;
+pub use footage_cleanup::StorageSettings;
 mod asset_descriptions;
 pub use asset_cleanup::{AssetRemoval, AssetUse, AssetUseKind};
 pub use asset_descriptions::{DescribedAssets, DescriptionPlan, OmitReason, OmittedAsset};
@@ -359,6 +361,7 @@ impl WorkspaceStore {
             include_str!("../migrations/071-agent-rounds.sql"),
             include_str!("../migrations/072-crash-report-id.sql"),
             include_str!("../migrations/073-profile-formats-off.sql"),
+            include_str!("../migrations/074-storage-settings.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

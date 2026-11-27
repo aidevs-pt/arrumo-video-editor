@@ -8,7 +8,7 @@ import { useLocale } from "@/lib/locale-provider";
 
 type ReplayMode = "captured" | "current";
 
-export function CompletedVideoReplay({ workspaceId, runId }: { workspaceId: number; runId: number }) {
+export function CompletedVideoReplay({ workspaceId, runId, footageRemoved = false }: { workspaceId: number; runId: number; footageRemoved?: boolean }) {
   const { messages: { completedVideo: copy } } = useLocale();
   const [mode, setMode] = useState<ReplayMode>("captured");
   const [pending, setPending] = useState(false);
@@ -32,6 +32,7 @@ export function CompletedVideoReplay({ workspaceId, runId }: { workspaceId: numb
     }
   }
 
+  if (footageRemoved) return <p className="text-sm text-muted-foreground">{copy.replayFootageRemoved}</p>;
   return (
     <form onSubmit={replay}>
       <FieldGroup>

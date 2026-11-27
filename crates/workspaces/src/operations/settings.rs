@@ -118,7 +118,7 @@ struct RemovePackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 23] {
+pub(super) fn definitions() -> [Value; 25] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -166,6 +166,13 @@ pub(super) fn definitions() -> [Value; 23] {
                 "maxMedia": {"type": ["integer", "null"], "minimum": 0, "maximum": 50},
                 "maxClips": {"type": ["integer", "null"], "minimum": 0, "maximum": 50}
             }, "required": ["maxMedia", "maxClips"], "additionalProperties": false},
+            "annotations": {"idempotentHint": true}}),
+        json!({"name": "get_storage_settings", "description": "Read whether the clips uploaded for a video are deleted once it is finished (deleteUsedFootage). Clips another draft, an open video or an animation still uses always stay.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_storage_settings", "description": "Choose whether the clips uploaded for a video are deleted once it is finished. A finished video whose clips were deleted can't be made again from them.",
+            "inputSchema": {"type": "object", "properties": {"deleteUsedFootage": {"type": "boolean"}},
+                "required": ["deleteUsedFootage"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
         json!({"name": "list_plugin_catalog", "description": "List bundled and installed plugins with declared capabilities, settings metadata, and package information.",
             "inputSchema": {"type": "object", "additionalProperties": false},
@@ -278,6 +285,17 @@ pub(super) fn call(
                 .set_media_order_limits(args.max_media, args.max_clips)
                 .map(|limits| json!({"limits": limits}))
                 .map_err(|_| "Could not save the limits. Use 0 to 50, with clips no more than pieces")
+        }),
+        "get_storage_settings" if arguments.is_empty() => store
+            .storage_settings()
+            .map(|settings| json!({"settings": settings}))
+            .map_err(|_| "Could not read storage settings"),
+        "get_storage_settings" => Err("This tool takes no arguments"),
+        "set_storage_settings" => parse(arguments).and_then(|settings: crate::StorageSettings| {
+            store
+                .set_storage_settings(&settings)
+                .map(|settings| json!({"settings": settings}))
+                .map_err(|_| "Could not save storage settings")
         }),
         "list_plugin_catalog" if arguments.is_empty() => store
             .plugin_catalog()

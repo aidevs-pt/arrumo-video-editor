@@ -81,6 +81,29 @@ fn set_media_order_limits(
 }
 
 #[tauri::command]
+fn get_storage_settings(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::StorageSettings, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .storage_settings()
+        .map_err(|_| "storage_settings_failed")
+}
+
+#[tauri::command]
+fn set_storage_settings(
+    settings: arrumo_workspaces::StorageSettings,
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::StorageSettings, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_storage_settings(&settings)
+        .map_err(|_| "storage_settings_failed")
+}
+
+#[tauri::command]
 fn list_workspaces(store: State<'_, Store>) -> Result<Vec<Workspace>, &'static str> {
     store
         .lock()
@@ -1951,6 +1974,8 @@ fn main() {
             set_preview_max_edge,
             get_media_order_limits,
             set_media_order_limits,
+            get_storage_settings,
+            set_storage_settings,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,

@@ -352,7 +352,11 @@
     "notifications": "Notificaciones",
     "notificationsError": "No se pudieron cambiar las notificaciones. Inténtalo de nuevo.",
     "about": "Acerca de",
-    "aboutIntro": "Versión, licencia y el software de código abierto que incluye Arrumo."
+    "aboutIntro": "Versión, licencia y el software de código abierto que incluye Arrumo.",
+    "storage": "Almacenamiento",
+    "deleteUsedFootage": "Eliminar los clips subidos cuando su vídeo esté terminado",
+    "deleteUsedFootageHint": "Evita que Arrumo crezca con cada vídeo. Los clips que aún usa otro borrador o un vídeo abierto se quedan. Un vídeo terminado cuyos clips se han eliminado no se puede volver a hacer a partir de ellos.",
+    "storageError": "No se ha podido guardar este ajuste. Vuelve a intentarlo."
   },
   "studio": {
     "videos": "Vídeos",
@@ -1237,7 +1241,8 @@
     "completedAt": "Terminado el {date}",
     "story": "Cómo se hizo",
     "storyHint": "Comenta cualquier paso; el agente lo lee cuando este vídeo se vuelva a generar.",
-    "settingsUsed": "Ajustes usados"
+    "settingsUsed": "Ajustes usados",
+    "replayFootageRemoved": "Sus clips subidos se eliminaron al terminarlo, así que no se puede volver a hacer a partir de ellos. Empieza un vídeo nuevo con los clips."
   },
   "productionPlan": {
     "addItemNote": "Añadir nota",

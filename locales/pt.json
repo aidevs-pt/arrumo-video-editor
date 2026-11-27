@@ -352,7 +352,11 @@
     "notifications": "Notificações",
     "notificationsError": "Não foi possível mudar as notificações. Tenta de novo.",
     "about": "Sobre",
-    "aboutIntro": "Versão, licença e o software de código aberto que o Arrumo inclui."
+    "aboutIntro": "Versão, licença e o software de código aberto que o Arrumo inclui.",
+    "storage": "Armazenamento",
+    "deleteUsedFootage": "Apagar os clipes carregados quando o vídeo estiver concluído",
+    "deleteUsedFootageHint": "Evita que o Arrumo cresça a cada vídeo. Os clipes que outro rascunho ou um vídeo aberto ainda usa ficam. Um vídeo concluído cujos clipes foram apagados não pode voltar a ser feito a partir deles.",
+    "storageError": "Não foi possível guardar esta definição. Tenta de novo."
   },
   "studio": {
     "videos": "Vídeos",
@@ -1237,7 +1241,8 @@
     "completedAt": "Concluído a {date}",
     "story": "Como foi feito",
     "storyHint": "Comenta qualquer passo; o agente lê-o quando este vídeo for gerado de novo.",
-    "settingsUsed": "Definições usadas"
+    "settingsUsed": "Definições usadas",
+    "replayFootageRemoved": "Os clipes carregados foram apagados quando ficou concluído, por isso não pode voltar a ser feito a partir deles. Começa um vídeo novo com os clipes."
   },
   "productionPlan": {
     "addItemNote": "Adicionar nota",

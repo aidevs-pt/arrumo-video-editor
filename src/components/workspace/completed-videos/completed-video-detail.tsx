@@ -72,6 +72,7 @@ type CompletedVideo = {
   supplemental_text: TextOutput[];
   supplemental_media: SupplementalMedia[];
   output_dates: Record<number, string>;
+  footage_removed?: boolean;
 };
 
 export function CompletedVideoDetail({ workspaceId, runId, initialFormatId, file }: { workspaceId: number; runId: number; initialFormatId: number; file?: CompletedFile }) {
@@ -431,7 +432,7 @@ function CompletedVideoContent({ workspaceId, video, initialFormatId, file, onAt
           <h2 id="completed-settings" className="text-[1.5rem]">{copy.settingsUsed}</h2>
           <Card>
             <CardHeader><CardTitle>{copy.replaySettings}</CardTitle></CardHeader>
-            <CardContent><CompletedVideoReplay workspaceId={workspaceId} runId={runId} /></CardContent>
+            <CardContent><CompletedVideoReplay workspaceId={workspaceId} runId={runId} footageRemoved={video.footage_removed} /></CardContent>
           </Card>
 
           <Card>

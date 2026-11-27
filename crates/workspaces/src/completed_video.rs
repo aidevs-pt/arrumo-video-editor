@@ -24,6 +24,8 @@ pub struct CompletedVideo {
     pub production: ProductionProgress,
     pub activity: Vec<GenerationActivity>,
     pub feedback: Vec<CompletedVideoFeedback>,
+    /// Its uploaded clips were deleted after it was finished, so it can't be made again.
+    pub footage_removed: bool,
 }
 
 impl WorkspaceStore {
@@ -50,6 +52,7 @@ impl WorkspaceStore {
             production: self.production_progress(workspace_id, run_id)?,
             activity: self.generation_activity(workspace_id, run_id)?,
             feedback: self.completed_video_feedback(workspace_id, run_id)?,
+            footage_removed: self.run_footage_removed(workspace_id, run_id)?,
         })
     }
 

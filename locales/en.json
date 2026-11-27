@@ -352,7 +352,11 @@
     "notifications": "Notifications",
     "notificationsError": "Couldn't change notifications. Try again.",
     "about": "About",
-    "aboutIntro": "Version, license and the open-source software Arrumo includes."
+    "aboutIntro": "Version, license and the open-source software Arrumo includes.",
+    "storage": "Storage",
+    "deleteUsedFootage": "Delete uploaded clips once their video is finished",
+    "deleteUsedFootageHint": "Keeps Arrumo from growing with every video. Clips another draft or an open video still uses stay. A finished video whose clips are gone can't be made again from them.",
+    "storageError": "Couldn't save this setting. Try again."
   },
   "studio": {
     "videos": "Videos",
@@ -1237,7 +1241,8 @@
     "completedAt": "Completed {date}",
     "story": "How it was made",
     "storyHint": "Comment on any step; the agent reads it when this video is generated again.",
-    "settingsUsed": "Settings used"
+    "settingsUsed": "Settings used",
+    "replayFootageRemoved": "Its uploaded clips were deleted after it was finished, so it can't be made again from them. Start a new video with the clips instead."
   },
   "productionPlan": {
     "addItemNote": "Add note",

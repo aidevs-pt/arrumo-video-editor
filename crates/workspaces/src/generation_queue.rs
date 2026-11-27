@@ -307,6 +307,11 @@ impl WorkspaceStore {
                 }
                 run
             } else {
+                // Its uploaded clips were deleted once it was finished; without them it would
+                // quietly become a different video.
+                if self.run_footage_removed(workspace_id, source_run_id)? {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
                 let snapshot = match mode {
                     ReplayMode::Captured => source.snapshot,
                     ReplayMode::Current => self.capture_generation_inputs(

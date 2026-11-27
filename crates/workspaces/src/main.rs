@@ -469,6 +469,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             store.set_preview_max_edge(max_edge)?;
             println!("{}", serde_json::to_string(&store.preview_settings()?)?);
         }
+        [database, command] if command == "storage-settings" => {
+            let settings = WorkspaceStore::open(Path::new(database))?.storage_settings()?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
+        [database, command, delete] if command == "set-delete-used-footage" => {
+            let settings = WorkspaceStore::open(Path::new(database))?.set_storage_settings(
+                &arrumo_workspaces::StorageSettings {
+                    delete_used_footage: match utf8(delete)? {
+                        "on" => true,
+                        "off" => false,
+                        _ => return Err("Use on or off".into()),
+                    },
+                },
+            )?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
         [database, command] if command == "media-order-limits" => {
             let limits = WorkspaceStore::open(Path::new(database))?.media_order_limits()?;
             println!("{}", serde_json::to_string(&limits)?);
@@ -1741,7 +1757,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
                 "update-format <workspace-id> <format-id> <settings-json> | ",
                 "remove-format <workspace-id> <format-id> | ",
-                "profile-formats <workspace-id> <profile-id> | set-profile-format-enabled <workspace-id> <profile-id> <format-id> <on|off> | ",
+                "storage-settings | set-delete-used-footage <on|off> | profile-formats <workspace-id> <profile-id> | set-profile-format-enabled <workspace-id> <profile-id> <format-id> <on|off> | ",
                 "set-profile-format <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "format-delivery <workspace-id> <format-id> | ",
                 "set-format-delivery <workspace-id> <format-id> <settings-json> | ",

@@ -116,7 +116,7 @@ export function AgentSettingsPage() {
               {tab === "general" && <AgentSummary workspaceId={studioWorkspace ? Number(studioWorkspace) : undefined} href={settingsHref("agent")} />}
               {tab === "general" && <PrivacySettings />}
               {tab === "general" && <UpdateSettings />}
-              {tab === "quality" && <div className="flex flex-col gap-4"><QualitySettings /><MediaOrderLimitSettings /></div>}
+              {tab === "quality" && <div className="flex flex-col gap-4"><QualitySettings /><MediaOrderLimitSettings /><StorageSettings /></div>}
               {tab === "backup" && <BackupSettings />}
               {tab === "about" && <AboutSettings />}
               {setupWorkspace && <Alert><AlertDescription>{copy.setupIntro}</AlertDescription></Alert>}
@@ -352,6 +352,36 @@ function QualitySettings() {
       {state !== "idle" && <p role="status" className={cn("px-5 py-3 text-sm", state === "error" ? "text-destructive" : "text-muted-foreground")}>
         {state === "error" ? text.previewError : text.previewSaved.replace("{size}", String(settings.effective_max_edge))}
       </p>}
+    </section>
+  );
+}
+
+/** Whether the clips uploaded for a video are deleted once it is finished, to keep the app small. */
+function StorageSettings() {
+  const { messages: { settings: text } } = useLocale();
+  const [settings, setSettings] = useState<{ deleteUsedFootage: boolean }>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    invoke<{ deleteUsedFootage: boolean }>("get_storage_settings").then((value) => { if (active) setSettings(value); }, () => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, []);
+  async function change(deleteUsedFootage: boolean) {
+    const previous = settings;
+    setSettings({ deleteUsedFootage });
+    setFailed(false);
+    try { setSettings(await invoke<{ deleteUsedFootage: boolean }>("set_storage_settings", { settings: { deleteUsedFootage } })); }
+    catch { setSettings(previous); setFailed(true); }
+  }
+  return (
+    <section aria-labelledby="settings-storage" className="rounded-xl border bg-card">
+      <h3 id="settings-storage" className="sr-only">{text.storage}</h3>
+      <SettingRow label={text.deleteUsedFootage} hint={text.deleteUsedFootageHint} labelId="settings-delete-footage">
+        {settings === undefined && !failed ? <Skeleton className="h-6 w-11" />
+          : <Switch aria-labelledby="settings-delete-footage" checked={settings?.deleteUsedFootage ?? true} disabled={!settings}
+            onCheckedChange={(value) => void change(value)} />}
+      </SettingRow>
+      {failed && <p role="alert" className="px-5 pb-3 text-sm text-destructive">{text.storageError}</p>}
     </section>
   );
 }
