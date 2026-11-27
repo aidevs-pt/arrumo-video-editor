@@ -62,7 +62,23 @@ jobs:
             gh repo clone "aidevs-pt/arrumo-plugin-$id" "plugins/$id" -- --depth 1
           done
       - if: needs.gate.outputs.run == 'true' && (runner.os == 'Linux')
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev ffmpeg bubblewrap
+      # Canvas layer tests drive a real headless browser, so the pipe and sandbox code runs on
+      # each system; the same build the canvas plugin names.
+      - if: needs.gate.outputs.run == 'true'
+        name: Fetch a headless browser for the canvas tests
+        working-directory: .
+        run: |
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            Linux-X64) platform=linux64 exe=chrome-headless-shell ;;
+            macOS-ARM64) platform=mac-arm64 exe=chrome-headless-shell ;;
+            macOS-X64) platform=mac-x64 exe=chrome-headless-shell ;;
+            Windows-X64) platform=win64 exe=chrome-headless-shell.exe ;;
+            *) echo "::notice::No headless browser for $RUNNER_OS-$RUNNER_ARCH"; exit 0 ;;
+          esac
+          curl -sSfL -o browser.zip "https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.88/$platform/chrome-headless-shell-$platform.zip"
+          unzip -q browser.zip -d canvas-browser
+          echo "ARRUMO_TEST_CANVAS_BROWSER=$PWD/canvas-browser/chrome-headless-shell-$platform/$exe" >> "$GITHUB_ENV"
       - if: needs.gate.outputs.run == 'true'
         run: cargo fmt --check
       - if: needs.gate.outputs.run == 'true'
