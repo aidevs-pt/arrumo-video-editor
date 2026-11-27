@@ -69,6 +69,14 @@ struct SetShares {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Restore {
+    workspace_id: i64,
+    item_id: i64,
+    version: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SaveResult {
     workspace_id: i64,
     run_id: i64,
@@ -94,7 +102,7 @@ struct RenderRun {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 11] {
+pub(super) fn definitions() -> [Value; 13] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -120,15 +128,23 @@ pub(super) fn definitions() -> [Value; 11] {
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id, "settings": settings},
                 "required": ["workspaceId", "itemId", "settings"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
-        json!({"name": "generate_motion_library_item", "description": "Let the workspace's agent design an animation or transition from a description and save its rendered preview to the library. Pass basedOn to add a changed version of an existing item; the original is kept. Takes minutes; read progress with list_agent_logs.",
+        json!({"name": "generate_motion_library_item", "description": "Let the workspace's agent design an animation or transition from a description and save its rendered preview to the library. Pass basedOn to change an existing item in place; its previous state is kept as a version you can restore. Takes minutes; read progress with list_agent_logs.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "profileId": optional_id, "basedOn": optional_id,
                 "request": {"type": "string", "minLength": 1, "maxLength": 4000}
             }, "required": ["workspaceId", "request"], "additionalProperties": false}}),
+        json!({"name": "list_motion_library_versions", "description": "List a motion item's current state and the earlier versions it replaced, newest first. A change made with the agent, or new media chosen by hand, keeps the previous state as a version; the last 10 stay.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id},
+                "required": ["workspaceId", "itemId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "restore_motion_library_version", "description": "Make an earlier version the motion item's current state. The state it replaces is kept as a version, so this can be undone. Videos already planned keep the version they planned with.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id, "version": id},
+                "required": ["workspaceId", "itemId", "version"], "additionalProperties": false},
+            "annotations": {"idempotentHint": false}}),
         json!({"name": "duplicate_motion_library_item", "description": "Copy a motion item with a new title and reuse its media.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id, "title": title},
                 "required": ["workspaceId", "itemId", "title"], "additionalProperties": false}}),
-        json!({"name": "delete_motion_library_item", "description": "Delete a library entry using its exact saved title and keep its managed media.",
+        json!({"name": "delete_motion_library_item", "description": "Delete a library entry and its earlier versions using its exact saved title. Media chosen from Assets stays; media Arrumo rendered for it goes once nothing else uses it.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id, "confirmedTitle": title},
                 "required": ["workspaceId", "itemId", "confirmedTitle"], "additionalProperties": false},
             "annotations": {"destructiveHint": true, "idempotentHint": true}}),
@@ -201,13 +217,23 @@ pub(super) fn call(
                 .map(|item| json!({"item": item}))
                 .map_err(|_| "Could not generate the animation. Read the latest agent log for the reason")
         }),
+        "list_motion_library_versions" => parse(arguments).and_then(|args: ReadShares| {
+            store.motion_library_versions(args.workspace_id, args.item_id)
+                .map(|versions| json!({"versions": versions}))
+                .map_err(|_| "Could not read versions. Check the workspace and item")
+        }),
+        "restore_motion_library_version" => parse(arguments).and_then(|args: Restore| {
+            store.restore_motion_library_version(database, args.workspace_id, args.item_id, args.version)
+                .map(|item| json!({"item": item}))
+                .map_err(|_| "Could not restore that version. List the item's versions and use one that is not current")
+        }),
         "duplicate_motion_library_item" => parse(arguments).and_then(|args: Duplicate| {
             store.duplicate_motion_library_item(args.workspace_id, args.item_id, &args.title)
                 .map(|item| json!({"item": item}))
                 .map_err(|_| "Could not duplicate motion item. Check the item and title")
         }),
         "delete_motion_library_item" => parse(arguments).and_then(|args: Delete| {
-            store.delete_motion_library_item(args.workspace_id, args.item_id, &args.confirmed_title)
+            store.delete_motion_library_item(database, args.workspace_id, args.item_id, &args.confirmed_title)
                 .map(|deleted| json!({"deleted": deleted}))
                 .map_err(|_| "Could not delete motion item")
         }),

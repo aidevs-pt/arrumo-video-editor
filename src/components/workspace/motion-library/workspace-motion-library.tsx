@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { GenerateMotionDialog } from "./generate-motion-dialog";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
+import { MotionVersionHistory } from "./motion-version-history";
 
 type Kind = "animation" | "transition";
 type Settings = {
@@ -133,6 +134,12 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
     if (gone.size === chosenItems.length) return true;
     if (!gone.size) return copy.bulkDeletion.deleteError;
     return copy.bulkDeletion.partial.replace("{removed}", String(gone.size)).replace("{total}", String(chosenItems.length));
+  }
+
+  /** An item changed in place, by the agent or by bringing back a version. */
+  function replaceItem(item: Item) {
+    setItems((current) => current?.map((entry) => entry.id === item.id ? item : entry));
+    setChosenId(item.id);
   }
 
   const existing = operation?.item.settings;
@@ -279,7 +286,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
             <div className="flex items-center gap-2 border-t pt-4">
               <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={chosen.settings.profile_id}
                 basedOn={{ id: chosen.id, title: chosen.settings.title }} disabled={open} className="min-w-0 flex-1"
-                onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
+                onCreate={replaceItem} />
               {(["edit", "duplicate"] as const).map((mode) => (
                 <IconAction key={mode} label={copy[mode]} disabled={open} onClick={() => {
                   setOperation({ mode, item: chosen });
@@ -304,6 +311,8 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
                   heading.current?.focus();
                 }} />
             </div>
+            <MotionVersionHistory<Item> workspaceId={workspaceId} itemId={chosen.id} revision={chosen.settings}
+              disabled={open} onRestored={replaceItem} />
           </aside>}
         </div>}
       {picked.length > 0 && items && <div role="region" aria-label={copy.selectionCount.replace("{count}", String(picked.length))}

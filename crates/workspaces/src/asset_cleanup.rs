@@ -80,6 +80,13 @@ fn asset_uses(
             "SELECT title FROM motion_library WHERE workspace_id = ?1
                AND (?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id)
                  OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(spec_json) THEN spec_json END) AS layer
+                            WHERE layer.key IN ('assetId', 'soundAssetId') AND layer.atom = ?2))
+             UNION
+             SELECT item.title FROM motion_library_versions AS version
+               JOIN motion_library AS item ON item.workspace_id = version.workspace_id AND item.id = version.item_id
+             WHERE version.workspace_id = ?1
+               AND (?2 IN (version.preview_asset_id, version.thumbnail_asset_id, version.sound_asset_id)
+                 OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(version.spec_json) THEN version.spec_json END) AS layer
                             WHERE layer.key IN ('assetId', 'soundAssetId') AND layer.atom = ?2))"
                 .to_owned(),
         ),

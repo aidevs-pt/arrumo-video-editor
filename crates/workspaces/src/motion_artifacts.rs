@@ -219,10 +219,12 @@ impl WorkspaceStore {
         workspace_id: i64,
         artifact: &MotionArtifact,
         spec: &crate::motion_spec::MotionSpec,
+        replacing: Option<(i64, &str)>,
     ) -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
         let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let mut copied = Vec::new();
+        let mut dropped = Vec::new();
         let result = (|| -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
             let mut import =
                 |source: &Path, kind: &str| -> Result<i64, Box<dyn Error + Send + Sync>> {
@@ -246,7 +248,37 @@ impl WorkspaceStore {
                     .transpose()?,
                 sound_asset_id: None,
             };
-            let item = self.create_motion_library_item(workspace_id, &settings)?;
+            let item = match replacing {
+                // The item keeps its place, name, sharing and sound; its earlier state stays
+                // as a version.
+                Some((item_id, request)) => {
+                    dropped = crate::motion_versions::keep_current_version(
+                        &tx,
+                        workspace_id,
+                        item_id,
+                        request,
+                        None,
+                    )?;
+                    tx.execute(
+                        "UPDATE motion_library SET kind = ?3, usage_markdown = ?4,
+                             preview_asset_id = ?5, thumbnail_asset_id = ?6
+                         WHERE workspace_id = ?1 AND id = ?2",
+                        params![
+                            workspace_id,
+                            item_id,
+                            match settings.kind {
+                                crate::MotionKind::Animation => "animation",
+                                crate::MotionKind::Transition => "transition",
+                            },
+                            settings.usage_markdown,
+                            settings.preview_asset_id,
+                            settings.thumbnail_asset_id
+                        ],
+                    )?;
+                    self.motion_library_item(workspace_id, item_id)?
+                }
+                None => self.create_motion_library_item(workspace_id, &settings)?,
+            };
             tx.execute(
                 "UPDATE motion_library SET spec_json = ?2 WHERE id = ?1",
                 params![item.id, serde_json::to_string(spec)?],
@@ -256,6 +288,7 @@ impl WorkspaceStore {
         match result {
             Ok(item) => {
                 tx.commit()?;
+                self.release_motion_media(database, workspace_id, &dropped);
                 Ok(item)
             }
             Err(error) => {

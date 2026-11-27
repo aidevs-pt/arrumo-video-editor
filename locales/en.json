@@ -490,10 +490,10 @@
     "generatingShort": "Generating…",
     "generateSubmit": "Generate",
     "changeWithAgent": "Change with agent",
-    "changeDescription": "Describe what to change in “{title}”. The original stays in the library and the changed version is added next to it.",
+    "changeDescription": "Describe what to change in “{title}”. The agent updates it in place and keeps the current state in its versions, so you can go back.",
     "changeRequest": "What should change?",
     "changePlaceholder": "Make it faster and use the accent color for the bar",
-    "changeSubmit": "Create changed version",
+    "changeSubmit": "Change it",
     "generateErrors": {
       "agent_unavailable": "The workspace's agent is not available. Choose an agent in Settings and check that its command line tool is installed.",
       "agent_timed_out": "The agent did not answer in time. Try a simpler request.",
@@ -518,7 +518,16 @@
       "partial": "Deleted {removed} of {total}. The others changed meanwhile; check them and try again.",
       "cancelDelete": "Cancel",
       "deleting": "Deleting…"
-    }
+    },
+    "versions": "Versions ({count})",
+    "versionLabel": "Version {version}",
+    "versionCurrent": "Current",
+    "versionFirst": "First version",
+    "versionByHand": "Media changed by hand",
+    "versionRestored": "Brought back version {version}",
+    "versionReplaced": "Replaced {date}",
+    "versionRestore": "Bring back version {version}",
+    "versionRestoreError": "Couldn't bring that version back. Try again."
   },
   "assets": {
     "replaceFile": "Replace file",

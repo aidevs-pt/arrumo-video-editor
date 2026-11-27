@@ -490,10 +490,10 @@
     "generatingShort": "A gerar…",
     "generateSubmit": "Gerar",
     "changeWithAgent": "Alterar com o agente",
-    "changeDescription": "Descreve o que alterar em «{title}». O original fica na biblioteca e a versão alterada é adicionada ao lado.",
+    "changeDescription": "Descreve o que mudar em «{title}». O agente atualiza-a no mesmo sítio e guarda o estado atual nas versões, para poderes voltar atrás.",
     "changeRequest": "O que deve mudar?",
     "changePlaceholder": "Torna-a mais rápida e usa a cor de destaque na barra",
-    "changeSubmit": "Criar versão alterada",
+    "changeSubmit": "Alterá-la",
     "generateErrors": {
       "agent_unavailable": "O agente do espaço não está disponível. Escolhe um agente nas Definições e confirma que a ferramenta de linha de comandos está instalada.",
       "agent_timed_out": "O agente não respondeu a tempo. Experimenta um pedido mais simples.",
@@ -518,7 +518,16 @@
       "partial": "Foram apagadas {removed} de {total}. As outras mudaram entretanto; verifica-as e tenta de novo.",
       "cancelDelete": "Cancelar",
       "deleting": "A apagar…"
-    }
+    },
+    "versions": "Versões ({count})",
+    "versionLabel": "Versão {version}",
+    "versionCurrent": "Atual",
+    "versionFirst": "Primeira versão",
+    "versionByHand": "Ficheiros alterados à mão",
+    "versionRestored": "Recuperou a versão {version}",
+    "versionReplaced": "Substituída a {date}",
+    "versionRestore": "Recuperar a versão {version}",
+    "versionRestoreError": "Não foi possível recuperar essa versão. Tenta de novo."
   },
   "assets": {
     "replaceFile": "Substituir ficheiro",

@@ -646,6 +646,12 @@ impl WorkspaceStore {
                 continue;
             }
             seen.push(id);
+            // The design as it was when planned, so later changes to the library item, or
+            // restoring an older version of it, don't change this video.
+            if entry["spec"].is_object() {
+                animations.push(entry["spec"].clone());
+                continue;
+            }
             let spec: Option<String> = self
                 .0
                 .query_row(
@@ -767,7 +773,7 @@ impl WorkspaceStore {
             "video": {"title": snapshot["draft"]["title"], "intent": snapshot["draft"]["intent"]},
             "approvedScript": script,
             "approvedAnimations": animations,
-            "approvedAssetPlan": approved.as_ref().map(|result| result["asset_plan"].clone()),
+            "approvedAssetPlan": approved.as_ref().map(|result| crate::motion_versions::plan_for_agent(&result["asset_plan"])),
             "workspaceContext": snapshot["workspace_context"],
             "learnedFeedback": snapshot["feedback"],
             "profile": snapshot["profile"],

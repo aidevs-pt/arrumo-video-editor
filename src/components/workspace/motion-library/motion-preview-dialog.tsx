@@ -5,18 +5,24 @@ import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { IconAction } from "@/components/workspace/icon-action";
 import { useLocale } from "@/lib/locale-provider";
 
 type Preview = { video_url: string; sound_url: string | null };
 
-/** A library item, or an item a run's Assets stage proposes for review. */
-type Source = { profileId: number | null; itemId: number } | { runId: number; resultId: number; index: number };
+/** A library item, one of its earlier versions, or an item a run's Assets stage proposes for review. */
+type Source = { profileId: number | null; itemId: number } | { itemId: number; version: number }
+  | { runId: number; resultId: number; index: number };
 
-export function MotionPreviewDialog({ workspaceId, title, ...source }: Source & {
+export function MotionPreviewDialog({ workspaceId, title, compact = false, ...source }: Source & {
   workspaceId: number;
   title: string;
+  /** An icon button, for rows of versions. */
+  compact?: boolean;
 }) {
-  const request = "itemId" in source
+  const request = "version" in source
+    ? ["preview_motion_library_version", { workspaceId, itemId: source.itemId, version: source.version }] as const
+    : "itemId" in source
     ? ["preview_motion_library_item", { workspaceId, profileId: source.profileId, itemId: source.itemId }] as const
     : ["preview_run_motion_item", { workspaceId, runId: source.runId, resultId: source.resultId, index: source.index }] as const;
   const requestKey = JSON.stringify(request);
@@ -46,9 +52,10 @@ export function MotionPreviewDialog({ workspaceId, title, ...source }: Source & 
       setOpen(next);
     }}>
       <DialogTrigger asChild>
-        <Button type="button" size="sm" variant="outline" aria-label={`${copy.playPreview} · ${title}`}>
-          <Play data-icon="inline-start" />{copy.playPreview}
-        </Button>
+        {compact ? <IconAction label={`${copy.playPreview} · ${title}`} variant="ghost"><Play /></IconAction>
+          : <Button type="button" size="sm" variant="outline" aria-label={`${copy.playPreview} · ${title}`}>
+            <Play data-icon="inline-start" />{copy.playPreview}
+          </Button>}
       </DialogTrigger>
       <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>

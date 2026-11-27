@@ -213,7 +213,8 @@ impl WorkspaceStore {
     }
 
     /// Lets the workspace's agent design an animation from the creator's request and saves it to
-    /// the library. `based_on` is a library item to change; it stays as it was.
+    /// the library. `based_on` is a library item to change: it is replaced in place and its
+    /// earlier state kept as a version.
     pub fn generate_motion_library_item(
         &self,
         database: &Path,
@@ -321,7 +322,13 @@ impl WorkspaceStore {
             .ok_or_else(|| io::Error::other("Nothing was rendered"))?;
         artifact.profile_id = profile_id;
         let item = self
-            .import_motion_library_item(database, workspace_id, &artifact, &spec)
+            .import_motion_library_item(
+                database,
+                workspace_id,
+                &artifact,
+                &spec,
+                based_on.map(|id| (id, request)),
+            )
             .map_err(|error| -> Box<dyn Error> { io::Error::other(error.to_string()).into() })?;
         self.track_usage(
             "animation_generated",

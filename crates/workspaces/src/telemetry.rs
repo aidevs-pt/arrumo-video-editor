@@ -951,7 +951,8 @@ mod tests {
                  DROP TRIGGER generation_activity_transition;
                  ALTER TABLE generation_activity DROP COLUMN stage;
                  ALTER TABLE agent_logs DROP COLUMN round; ALTER TABLE agent_sessions DROP COLUMN round;
-                 DROP TABLE profile_formats_off; DROP TABLE storage_settings;
+                 DROP TABLE profile_formats_off; DROP TABLE storage_settings; DROP TABLE motion_library_versions;
+                     ALTER TABLE motion_library DROP COLUMN version; ALTER TABLE motion_library DROP COLUMN change_note; ALTER TABLE motion_library DROP COLUMN restored_from;
                  PRAGMA user_version = 68;",
             )
             .unwrap();

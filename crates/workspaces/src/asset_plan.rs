@@ -404,7 +404,7 @@ impl WorkspaceStore {
             })
             .map(|result| {
                 json!({
-                    "plan": result.result["asset_plan"],
+                    "plan": crate::motion_versions::plan_for_agent(&result.result["asset_plan"]),
                     "animations": result.result["motion_specs"],
                     "decision": result.decision,
                     "notes": result.review_notes,
@@ -476,6 +476,7 @@ impl WorkspaceStore {
             )?;
         }
         let mut result = asset_plan(&answer, &library, &provider.id).map_err(io::Error::other)?;
+        self.pin_library_designs(workspace_id, &mut result)?;
         if !kinds.is_empty() {
             self.generate_planned_media(
                 database,
