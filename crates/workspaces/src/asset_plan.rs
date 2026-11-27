@@ -11,7 +11,6 @@ use crate::{
     AgentPlugin, ProductionStage, WorkspaceStore,
     motion_design::{WorkspaceImage, answer_animations, assets_answer_schema, run_preview_size},
     motion_scratch::MotionScratch,
-    motion_spec::SPEC_GUIDE,
     revision_media::Orderable,
     script_stage::AGENT_TIMEOUT,
 };
@@ -244,7 +243,7 @@ fn plan_prompt(
         } else {
             "This video has no recorded footage and is built from animated scenes, so design animations that carry its main beats. "
         },
-        guide = SPEC_GUIDE,
+        guide = crate::motion_spec::spec_guide(),
         clips = if kinds.is_empty() {
             String::new()
         } else {

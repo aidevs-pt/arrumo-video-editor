@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 16] =
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 17] =
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -46,6 +46,13 @@ pub struct PluginManifest {
         skip_serializing_if = "Option::is_none"
     )]
     pub agent_provider: Option<ProviderDescriptor>,
+    /// Schema 17: draws animation layers agents write as web pages; see `canvas_render`.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub canvas_renderer: Option<crate::canvas_render::CanvasRendererDescriptor>,
     /// What the plugin adds, shown once in the plugin tour after it arrives (schema 8).
     #[serde(
         default,
@@ -912,6 +919,13 @@ impl PluginManifest {
                 }))
         {
             return Err(invalid_manifest("Invalid plugin agent provider descriptor").into());
+        }
+        if manifest
+            .canvas_renderer
+            .as_ref()
+            .is_some_and(|canvas| manifest.schema_version < 17 || !canvas.valid())
+        {
+            return Err(invalid_manifest("Invalid plugin canvas renderer").into());
         }
         if !crate::plugin_text::valid_translations(&manifest) {
             return Err(invalid_manifest("Invalid plugin translations").into());

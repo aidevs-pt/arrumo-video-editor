@@ -56,6 +56,8 @@ pub(crate) fn clean_inputs(spec: &mut MotionSpec) {
                     .text
                     .as_deref()
                     .is_some_and(|text| text.contains(&placeholder(key)))
+                // A canvas page reads values by key from window.arrumo.values.
+                || layer.canvas.as_ref().is_some_and(|canvas| canvas.html.contains(key))
         })
     };
     let mut kept: Vec<TemplateInput> = Vec::new();
@@ -123,6 +125,14 @@ impl MotionSpec {
         let mut spec = self.clone();
         spec.inputs.clear();
         for layer in &mut spec.layers {
+            if let Some(canvas) = &mut layer.canvas {
+                canvas.values = self
+                    .inputs
+                    .iter()
+                    .zip(&filled)
+                    .map(|(input, (_, value))| (input.key.clone(), Value::String(value.clone())))
+                    .collect();
+            }
             if let Some(text) = &mut layer.text {
                 for (mark, value) in &filled {
                     *text = text.replace(mark, value);
@@ -342,7 +352,8 @@ tips on what makes a good value, and up to four dos and donts. Keep keys lowerca
 or step_number. Design for the longest value too: when a box is the card behind a text layer, set \
 the box's fitText to that text layer's index (its position in layers, from 0), and centre both on \
 the same y; the card then grows taller for longer text. Leave fitText null on every other layer. \
-Use no inputs for an animation with nothing to fill in, such as a transition.";
+A canvas layer reads its inputs as window.arrumo.values.key instead of {{key}}. Use no inputs for \
+an animation with nothing to fill in, such as a transition.";
 
 #[cfg(test)]
 mod tests {

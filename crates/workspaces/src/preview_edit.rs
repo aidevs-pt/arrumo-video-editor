@@ -867,7 +867,7 @@ impl WorkspaceStore {
                     .unwrap_or_default()
                 )
             },
-            guide = crate::motion_spec::SPEC_GUIDE,
+            guide = crate::motion_spec::spec_guide(),
             sound_guide = if sounds.is_empty() {
                 ""
             } else {
@@ -1205,7 +1205,7 @@ impl WorkspaceStore {
             .unwrap_or_default(),
             first = animations.len(),
             second = animations.len() + 1,
-            guide = crate::motion_spec::SPEC_GUIDE,
+            guide = crate::motion_spec::spec_guide(),
             images = serde_json::to_string(
                 &images_for_new
                     .iter()
