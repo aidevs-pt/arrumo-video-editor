@@ -24,10 +24,11 @@ macro_rules! guide {
     };
 }
 
-pub const EDITING_GUIDES: [EditingGuide; 10] = [
+pub const EDITING_GUIDES: [EditingGuide; 18] = [
     guide!("script", "Writing the script", "script"),
     guide!("visuals", "Planning supporting visuals", "assets"),
     guide!("animation", "Designing animations", "assets"),
+    guide!("direction", "Directing the look and motion", "assets"),
     guide!("cutting", "Cutting recorded footage", "preview"),
     guide!(
         "storyboard",
@@ -49,7 +50,82 @@ pub const EDITING_GUIDES: [EditingGuide; 10] = [
         "delivery"
     ),
     guide!("review", "Reviewing an edit before showing it", "review"),
+    guide!("explainer", "Explainers and tutorials", "kind"),
+    guide!("data-story", "Data stories and recaps", "kind"),
+    guide!("promo", "Product, launch and ad videos", "kind"),
+    guide!("short-vertical", "Short vertical videos", "kind"),
+    guide!(
+        "talking-head",
+        "Talking heads, interviews and podcasts",
+        "kind"
+    ),
+    guide!("titles", "Titles, logos and type in motion", "kind"),
+    guide!(
+        "animated-short",
+        "Animated shorts, stories and moods",
+        "kind"
+    ),
 ];
+
+/// The kinds of video the script stage chooses from, each with the shape it usually takes. Each
+/// has the guide of the same ID, which the later stages read.
+pub(crate) const VIDEO_KINDS: [(&str, &str); 7] = [
+    (
+        "explainer",
+        "the viewer's problem, what it costs, the answer in one line, how it works in one to three steps, the result and one next step",
+    ),
+    (
+        "data-story",
+        "the question, the context on screen, the data building one series at a time, the moment that matters, the takeaway held still",
+    ),
+    (
+        "promo",
+        "a hook within two seconds, the problem or wish, the product as the answer, one proof, one call to action held at the end",
+    ),
+    (
+        "short-vertical",
+        "the payoff promised in the first second, beats that raise the stakes, the payoff, an ending that loops or points onward",
+    ),
+    (
+        "talking-head",
+        "the speaker opens, graphics carry figures and steps between their personal lines, the speaker closes",
+    ),
+    (
+        "titles",
+        "one idea set in type or a mark, revealed in reading order, landing on a held final frame",
+    ),
+    (
+        "animated-short",
+        "a title beat, a middle where something changes because of what came before, an ending that lands and holds",
+    ),
+];
+
+/// The kinds a script result names, without unknown values or repeats. Results written before
+/// kinds existed name none.
+pub(crate) fn video_kinds(script: Option<&serde_json::Value>) -> Vec<&'static str> {
+    let mut kinds = Vec::new();
+    for value in script
+        .and_then(|result| result.get("kinds"))
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        if let Some((id, _)) = VIDEO_KINDS
+            .iter()
+            .find(|(id, _)| Some(*id) == value.as_str())
+            && !kinds.contains(id)
+        {
+            kinds.push(*id);
+        }
+    }
+    kinds
+}
+
+/// The guides of a stage followed by those of the video's kinds.
+pub(crate) fn guide_section_for(ids: &[&str], kinds: &[&'static str]) -> String {
+    let all: Vec<&str> = ids.iter().copied().chain(kinds.iter().copied()).collect();
+    guide_section(&all)
+}
 
 pub fn editing_guide(id: &str) -> Option<&'static EditingGuide> {
     EDITING_GUIDES.iter().find(|guide| guide.id == id)
@@ -99,5 +175,22 @@ mod tests {
         }
         assert!(guide_section(&["cutting"]).contains("Cut in pauses"));
         assert!(editing_guide("missing").is_none());
+    }
+
+    #[test]
+    fn every_kind_has_a_guide_and_scripts_name_only_known_kinds() {
+        for (id, shape) in VIDEO_KINDS {
+            assert_eq!(editing_guide(id).map(|guide| guide.stage), Some("kind"));
+            assert!(!shape.is_empty());
+        }
+        let script =
+            serde_json::json!({"kinds": ["promo", "general", "promo", "unknown", "titles"]});
+        assert_eq!(video_kinds(Some(&script)), ["promo", "titles"]);
+        assert!(video_kinds(Some(&serde_json::json!({}))).is_empty());
+        assert!(video_kinds(None).is_empty());
+        let section = guide_section_for(&["animation"], &["promo"]);
+        assert!(
+            section.contains("# Designing animations") && section.contains("# Product, launch")
+        );
     }
 }

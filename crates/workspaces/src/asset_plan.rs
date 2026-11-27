@@ -170,13 +170,17 @@ fn asset_plan(
 
 fn plan_prompt(
     snapshot: &Value,
-    script: Option<&str>,
+    script: Option<&Value>,
     library: &[LibraryEntry],
     images: &[WorkspaceImage],
     earlier: &[Value],
     notes: &[Value],
     orderable: &Orderable,
 ) -> String {
+    let video_kinds = crate::editing_guides::video_kinds(script);
+    let script = script
+        .and_then(|result| result.get("markdown"))
+        .and_then(Value::as_str);
     let entries: Vec<Value> = library
         .iter()
         .map(|entry| {
@@ -236,7 +240,10 @@ fn plan_prompt(
          {revision}\
          The summary is one sentence to the creator about the plan, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides = crate::editing_guides::guide_section(&["visuals", "animation", "platforms"]),
+        guides = crate::editing_guides::guide_section_for(
+            &["visuals", "animation", "direction", "platforms"],
+            &video_kinds
+        ),
         max = crate::motion_design::MAX_RUN_ANIMATIONS,
         footage = if recorded {
             "They play over or between the recorded footage, so design for the footage's frame. Return none when the footage alone is better. "
@@ -423,10 +430,6 @@ impl WorkspaceStore {
         let images = self.workspace_images(workspace_id)?;
         let image_ids: Vec<i64> = images.iter().map(|image| image.id).collect();
         let script = self.approved_stage_result(run_id, "script")?;
-        let script = script
-            .as_ref()
-            .and_then(|result| result.get("markdown"))
-            .and_then(Value::as_str);
         let progress = self.production_progress(workspace_id, run_id)?;
         let earlier: Vec<Value> = progress
             .results
@@ -481,7 +484,13 @@ impl WorkspaceStore {
             scope,
             provider,
             &plan_prompt(
-                snapshot, script, &library, &images, &earlier, &notes, &orderable,
+                snapshot,
+                script.as_ref(),
+                &library,
+                &images,
+                &earlier,
+                &notes,
+                &orderable,
             ),
             &schema,
             AGENT_TIMEOUT,
@@ -812,9 +821,18 @@ mod tests {
     fn the_prompt_lists_the_library_and_review_notes() {
         let snapshot = json!({"draft": {"title": "T", "intent": "I"}});
         let none = Orderable::default();
-        let first = plan_prompt(&snapshot, Some("## Hook"), &library(), &[], &[], &[], &none);
+        let first = plan_prompt(
+            &snapshot,
+            Some(&json!({"markdown": "## Hook", "kinds": ["explainer"]})),
+            &library(),
+            &[],
+            &[],
+            &[],
+            &none,
+        );
         assert!(first.contains("\"reference\": \"asset-4\"") && !first.contains("earlierPlans"));
         assert!(first.contains("\"design\"") && first.contains("house style"));
+        assert!(first.contains("# Explainers and tutorials"));
         let revised = plan_prompt(
             &snapshot,
             None,
@@ -825,6 +843,10 @@ mod tests {
             &none,
         );
         assert!(revised.contains("No logo") && revised.contains("Address every note"));
+        assert!(
+            !revised.contains("# Explainers"),
+            "runs without kinds keep the stage guides"
+        );
         assert!(revised.contains("creatorNotesFromEarlierSteps") && revised.contains("upbeat"));
         assert!(
             !has_motion_renderer(&snapshot)

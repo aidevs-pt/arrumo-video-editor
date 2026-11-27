@@ -77,7 +77,7 @@ pub(super) fn definitions() -> Vec<Value> {
             "annotations": {"idempotentHint": true}}),
         json!({"name": "cancel_backup_import", "description": "Discard a staged backup so nothing is replaced at the next start.",
             "inputSchema": none, "annotations": {"idempotentHint": true}}),
-        json!({"name": "list_editing_guides", "description": "List Arrumo's editing guides: the craft notes each production step's agent follows (script, visuals, animation, cutting, storyboard, sound, platforms, portrait cuts, publishing text, review). Read one with get_editing_guide before doing that kind of work yourself.",
+        json!({"name": "list_editing_guides", "description": "List Arrumo's editing guides: the craft notes each production step's agent follows (script, visuals, animation, direction, cutting, storyboard, sound, platforms, portrait cuts, publishing text, review), and the guides for each kind of video (stage kind: explainers, data stories, product and ad videos, short vertical videos, talking heads, titles and type, animated shorts). Read one with get_editing_guide before doing that kind of work yourself.",
             "inputSchema": none, "annotations": {"readOnlyHint": true}}),
         json!({"name": "get_editing_guide", "description": "Read one editing guide as Markdown.",
             "inputSchema": {"type": "object", "properties": {"id": {"enum": crate::EDITING_GUIDES.map(|guide| guide.id)}},

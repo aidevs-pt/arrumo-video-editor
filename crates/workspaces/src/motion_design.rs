@@ -369,7 +369,7 @@ impl WorkspaceStore {
              says in one or two sentences when an editor should use it.\n\n\
              {guides}BRIEF (JSON):\n{}",
             serde_json::to_string_pretty(&brief).unwrap_or_default(),
-            guides = crate::editing_guides::guide_section(&["animation"]),
+            guides = crate::editing_guides::guide_section(&["animation", "direction"]),
         );
         let mut schema = crate::motion_templates::template_schema(spec_schema(&image_ids));
         if making_component {

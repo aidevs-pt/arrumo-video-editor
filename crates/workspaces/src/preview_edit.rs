@@ -551,6 +551,7 @@ fn storyboard(
 fn preview_prompt(
     snapshot: &Value,
     script: Option<&str>,
+    video_kinds: &[&'static str],
     footage: &[Value],
     earlier: &[Value],
 ) -> String {
@@ -579,8 +580,10 @@ fn preview_prompt(
          {revision}\
          The summary is one sentence to the creator about this cut, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides =
-            crate::editing_guides::guide_section(&["cutting", "sound", "animation", "platforms"]),
+        guides = crate::editing_guides::guide_section_for(
+            &["cutting", "sound", "animation", "direction", "platforms"],
+            video_kinds
+        ),
         revision = if earlier.is_empty() {
             ""
         } else {
@@ -759,6 +762,7 @@ impl WorkspaceStore {
             .step("Listing the workspace sound effects")?;
         let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
         let script = self.approved_stage_result(run_id, "script")?;
+        let video_kinds = crate::editing_guides::video_kinds(script.as_ref());
         let script = script
             .as_ref()
             .and_then(|result| result.get("markdown"))
@@ -835,12 +839,10 @@ impl WorkspaceStore {
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
              {guides}BRIEF (JSON):\n{brief}",
-            guides = crate::editing_guides::guide_section(&[
-                "storyboard",
-                "animation",
-                "sound",
-                "platforms"
-            ]),
+            guides = crate::editing_guides::guide_section_for(
+                &["storyboard", "animation", "direction", "sound", "platforms"],
+                &video_kinds
+            ),
             made = if ordered.made.is_empty() {
                 ""
             } else {
@@ -1048,6 +1050,7 @@ impl WorkspaceStore {
             clips.push((id, duration, name));
         }
         let script = self.approved_stage_result(run_id, "script")?;
+        let video_kinds = crate::editing_guides::video_kinds(script.as_ref());
         let script = script
             .as_ref()
             .and_then(|result| result.get("markdown"))
@@ -1084,7 +1087,7 @@ impl WorkspaceStore {
         let sounds = self.workspace_sounds(database, workspace_id)?;
         let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
         let voice = self.current_voice(workspace_id, snapshot)?;
-        let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
+        let mut prompt = preview_prompt(snapshot, script, &video_kinds, &footage, &earlier);
         if !ordered.made.is_empty() {
             prompt.push_str(&format!(
                 "\n\nFor this revision Arrumo made the media below, as the creator's notes asked. Use each \
@@ -1550,8 +1553,9 @@ mod tests {
     fn the_prompt_includes_footage_and_review_notes() {
         let snapshot = json!({"draft": {"title": "T", "intent": "I"}, "workspace_context": null, "feedback": [], "profile": null});
         let footage = [json!({"clipId": 1, "durationSeconds": 3.0, "transcript": "[0:00] Hello."})];
-        let first = preview_prompt(&snapshot, Some("## Hook"), &footage, &[]);
+        let first = preview_prompt(&snapshot, Some("## Hook"), &["talking-head"], &footage, &[]);
         assert!(first.contains("[0:00] Hello.") && !first.contains("earlierCuts"));
+        assert!(first.contains("# Talking heads") && first.contains("# Directing the look"));
         let guide = first.find("Cut in pauses").unwrap();
         assert!(
             guide < first.find("BRIEF (JSON)").unwrap(),
@@ -1560,6 +1564,7 @@ mod tests {
         let revised = preview_prompt(
             &snapshot,
             None,
+            &[],
             &footage,
             &[json!({"notes": "Tighter hook"})],
         );
