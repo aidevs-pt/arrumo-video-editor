@@ -502,7 +502,23 @@
     },
     "emptyGenerate": "Genera una con el agente o añade un vídeo que ya tengas.",
     "showDetails": "Ver detalles",
-    "emptyGenerateOnly": "Genera una con el agente: descríbela y Arrumo crea una vista previa en bucle."
+    "emptyGenerateOnly": "Genera una con el agente: descríbela y Arrumo crea una vista previa en bucle.",
+    "select": "Seleccionar",
+    "unselect": "Quitar de la selección",
+    "selectionCount": "{count} seleccionadas",
+    "selectAll": "Seleccionar todas",
+    "clearSelection": "Borrar selección",
+    "bulkDeletion": {
+      "button": "Eliminar",
+      "deleteTitle": "Eliminar {count} animaciones",
+      "deleteDescription": "Esto las quita de la biblioteca. Sus archivos se quedan en Recursos y los vídeos que ya las usaron las conservan.",
+      "confirmTitle": "Escribe esta frase para confirmar",
+      "phrase": "Eliminar estas animaciones",
+      "deleteError": "No se han podido eliminar las animaciones. Vuelve a abrir la biblioteca e inténtalo de nuevo.",
+      "partial": "Se han eliminado {removed} de {total}. Las demás han cambiado mientras tanto; revísalas e inténtalo de nuevo.",
+      "cancelDelete": "Cancelar",
+      "deleting": "Eliminando…"
+    }
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",

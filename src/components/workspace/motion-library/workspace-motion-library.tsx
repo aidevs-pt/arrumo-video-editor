@@ -1,13 +1,15 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, PanelRight, Pencil, Plus, Sparkles, Trash2, Volume2, X } from "lucide-react";
+import { Copy, PanelRight, Pencil, Plus, Sparkles, SquareCheck, SquareMinus, Trash2, Volume2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ItemContextMenu } from "@/components/workspace/item-context-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { IconAction } from "@/components/workspace/icon-action";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -56,6 +58,8 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
   const [saveError, setSaveError] = useState(false);
   const [chosenId, setChosenId] = useState<number | null>(null);
   const [deletingItem, setDeletingItem] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const workspaceId = workspace.id;
 
   useEffect(() => {
@@ -107,6 +111,28 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
     } finally {
       setSaving(false);
     }
+  }
+
+  function pick(id: number, on: boolean) {
+    // Choosing several leaves one item's details behind.
+    if (on) setChosenId(null);
+    setPicked((current) => on ? [...new Set([...current, id])] : current.filter((value) => value !== id));
+  }
+
+  /** Deletes the picked items one by one; any that changed meanwhile stay and are counted. */
+  async function deletePicked(): Promise<true | string> {
+    const chosenItems = (items ?? []).filter((item) => picked.includes(item.id));
+    const gone = new Set<number>();
+    for (const item of chosenItems) {
+      const deleted = await invoke<boolean>("delete_motion_library_item", { workspaceId, itemId: item.id, confirmedTitle: item.settings.title }).catch(() => false);
+      if (deleted) gone.add(item.id);
+    }
+    setItems((current) => current?.filter((item) => !gone.has(item.id)));
+    setPicked((current) => current.filter((id) => !gone.has(id)));
+    if (chosenId !== null && gone.has(chosenId)) setChosenId(null);
+    if (gone.size === chosenItems.length) return true;
+    if (!gone.size) return copy.bulkDeletion.deleteError;
+    return copy.bulkDeletion.partial.replace("{removed}", String(gone.size)).replace("{total}", String(chosenItems.length));
   }
 
   const existing = operation?.item.settings;
@@ -205,15 +231,20 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
         </Empty>
         : <div className={cn("grid items-start gap-6", chosen && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-4">
-            {items.map((item) => { const { id, settings } = item; return <ItemContextMenu key={id} label={settings.title} items={[
+            {items.map((item) => { const { id, settings } = item; const checked = picked.includes(id); return <ItemContextMenu key={id} label={settings.title} items={[
               { label: copy.showDetails, icon: PanelRight, onSelect: () => setChosenId(id) },
+              { label: checked ? copy.unselect : copy.select, icon: checked ? SquareMinus : SquareCheck, onSelect: () => pick(id, !checked) },
               { label: copy.edit, icon: Pencil, group: true, disabled: open, onSelect: () => { setChosenId(id); setOperation({ mode: "edit", item }); setSaveError(false); setOpen(true); } },
               { label: copy.duplicate, icon: Copy, disabled: open, onSelect: () => { setChosenId(id); setOperation({ mode: "duplicate", item }); setSaveError(false); setOpen(true); } },
               { label: copy.deletion.deleteTitle, icon: Trash2, destructive: true, group: true, disabled: open, onSelect: () => { setChosenId(id); setDeletingItem(id); } },
-            ]}><li className="min-w-0">
-              <button type="button" aria-pressed={chosen?.id === id} onClick={() => setChosenId(chosenId === id ? null : id)}
+            ]}><li className="group relative min-w-0">
+              <Checkbox checked={checked} onCheckedChange={(value) => pick(id, value === true)}
+                aria-label={`${copy.select}, ${settings.title}`}
+                className={cn("absolute top-4 start-4 z-[1] size-5 border-2 border-white bg-card/90 shadow-md data-[state=checked]:border-white transition-opacity duration-150 motion-reduce:transition-none",
+                  !checked && !picked.length && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100")} />
+              <button type="button" aria-pressed={chosen?.id === id} onClick={() => picked.length ? pick(id, !checked) : setChosenId(chosenId === id ? null : id)}
                 className={cn("flex h-full w-full flex-col gap-3 rounded-xl border-2 border-border bg-card p-2 text-start transition-colors duration-150 hover:border-line-strong",
-                  chosen?.id === id && "border-primary hover:border-primary")}>
+                  chosen?.id === id && "border-primary hover:border-primary", checked && "border-primary ring-3 ring-primary/25 hover:border-primary")}>
                 <AssetThumbnail workspaceId={workspaceId} kind={settings.thumbnail_asset_id ? "image" : "video"}
                   assetId={settings.thumbnail_asset_id ?? settings.preview_asset_id} fit="contain" className="w-full bg-ink/90" />
                 <span className="flex flex-col items-start gap-2 px-1.5 pb-1.5">
@@ -245,35 +276,47 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
             </div>}
             <p className="flex flex-wrap items-center gap-2 font-bold">{copy.sharedWith}
               <span className="rounded-md bg-secondary px-2 py-0.5 text-sm">{scopeName(chosen.settings.profile_id)}</span></p>
-            <div className="flex flex-wrap gap-2 border-t pt-4">
-              {(["edit", "duplicate"] as const).map((mode) => (
-                <Button key={mode} type="button" variant="outline" disabled={open}
-                  onClick={() => {
-                    setOperation({ mode, item: chosen });
-                    setSaveError(false);
-                    setOpen(true);
-                  }}>{mode === "edit" ? <Pencil data-icon="inline-start" /> : <Copy data-icon="inline-start" />}{copy[mode]}</Button>
-              ))}
+            <div className="flex items-center gap-2 border-t pt-4">
               <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={chosen.settings.profile_id}
-                basedOn={{ id: chosen.id, title: chosen.settings.title }} disabled={open}
+                basedOn={{ id: chosen.id, title: chosen.settings.title }} disabled={open} className="min-w-0 flex-1"
                 onCreate={(item) => { setItems((current) => [...(current ?? []), item]); setChosenId(item.id); }} />
+              {(["edit", "duplicate"] as const).map((mode) => (
+                <IconAction key={mode} label={copy[mode]} disabled={open} onClick={() => {
+                  setOperation({ mode, item: chosen });
+                  setSaveError(false);
+                  setOpen(true);
+                }}>{mode === "edit" ? <Pencil /> : <Copy />}</IconAction>
+              ))}
               {chosen.settings.profile_id !== null && catalog && <MotionShareDialog
                 workspaceId={workspaceId} itemId={chosen.id} title={chosen.settings.title}
                 ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}
                 onSave={() => setAttempt((value) => value + 1)} />}
-              <ConfirmTitleDelete title={chosen.settings.title} disabled={open} copy={copy.deletion}
+              <IconAction label={copy.deletion.deleteTitle} destructive disabled={open} onClick={() => setDeletingItem(chosen.id)}><Trash2 /></IconAction>
+              <ConfirmTitleDelete hideTrigger title={chosen.settings.title} disabled={open} copy={copy.deletion}
                 open={deletingItem === chosen.id} onOpenChange={(value) => setDeletingItem(value ? chosen.id : null)}
                 onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
                   workspaceId, itemId: chosen.id, confirmedTitle,
                 })}
                 onDelete={() => {
                   setItems((current) => current?.filter((item) => item.id !== chosen.id));
+                  setPicked((current) => current.filter((id) => id !== chosen.id));
                   setChosenId(null);
                   heading.current?.focus();
                 }} />
             </div>
           </aside>}
         </div>}
+      {picked.length > 0 && items && <div role="region" aria-label={copy.selectionCount.replace("{count}", String(picked.length))}
+        className="sticky bottom-4 z-[2] mt-6 flex flex-wrap items-center gap-2 rounded-lg bg-ink px-3 py-2 text-white shadow-lg">
+        <span role="status" className="me-auto px-1 font-semibold tabular-nums">{copy.selectionCount.replace("{count}", String(picked.length))}</span>
+        <Button type="button" variant="outline" className="border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+          disabled={picked.length === items.length} onClick={() => setPicked(items.map(({ id }) => id))}>{copy.selectAll}</Button>
+        <Button type="button" variant="outline" className="border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white" onClick={() => setPicked([])}>{copy.clearSelection}</Button>
+        <Button type="button" disabled={open} onClick={() => setBulkDeleting(true)} className="bg-destructive text-white hover:bg-destructive/90"><Trash2 data-icon="inline-start" />{copy.bulkDeletion.button}</Button>
+        <ConfirmTitleDelete hideTrigger title={copy.bulkDeletion.phrase} disabled={open} open={bulkDeleting} onOpenChange={setBulkDeleting}
+          copy={{ ...copy.bulkDeletion, deleteTitle: copy.bulkDeletion.deleteTitle.replace("{count}", String(picked.length)) }}
+          onConfirm={() => deletePicked()} onDelete={() => setPicked([])} />
+      </div>}
     </Shell>
   );
 }

@@ -14,7 +14,8 @@ import { useLocale } from "@/lib/locale-provider";
 type Failure = "agent_unavailable" | "agent_timed_out" | "agent_failed" | "motion_generation_failed";
 
 /** Asks the workspace's agent for a new animation, or a changed copy of `basedOn`. */
-export function GenerateMotionDialog<Item>({ workspaceId, profileId, basedOn, disabled, onCreate }: {
+export function GenerateMotionDialog<Item>({ workspaceId, profileId, basedOn, disabled, onCreate, className }: {
+  className?: string;
   workspaceId: number;
   profileId: number | null;
   basedOn?: { id: number; title: string };
@@ -48,7 +49,7 @@ export function GenerateMotionDialog<Item>({ workspaceId, profileId, basedOn, di
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!working) { setFailure(undefined); setOpen(next); } }}>
       <DialogTrigger asChild>
-        <Button type="button" variant={basedOn ? "outline" : "default"} disabled={disabled}>
+        <Button type="button" variant={basedOn ? "outline" : "default"} disabled={disabled} className={className}>
           {basedOn ? <WandSparkles data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}
           {basedOn ? copy.changeWithAgent : copy.generate}
         </Button>
