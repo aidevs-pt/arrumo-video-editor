@@ -29,22 +29,32 @@ export function MotionClip({ workspaceId, profileId, itemId, title, revision, th
   const video = useRef<HTMLVideoElement>(null);
   const [url, setUrl] = useState<string>();
   const [failed, setFailed] = useState(false);
+  // WebKit paints the first frames at a default 2:1 size, so the video fills the box until its
+  // real shape is known, and is fitted inside only when that shape isn't the box's.
+  const [fitted, setFitted] = useState(false);
   const revisionKey = JSON.stringify(revision);
 
   useEffect(() => {
     let active = true;
     setFailed(false);
+    setFitted(false);
     invoke<{ video_url: string }>("preview_motion_library_item", { workspaceId, profileId, itemId })
       .then((preview) => { if (active) setUrl(preview.video_url); }, () => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [workspaceId, profileId, itemId, revisionKey]);
+
+  function measure() {
+    const element = video.current;
+    if (element?.videoHeight) setFitted(Math.abs(element.videoWidth / element.videoHeight - 16 / 9) > 0.02);
+    if (mode === "still" || reduceMotion) settle();
+  }
 
   function settle() {
     const element = video.current;
     if (element && Number.isFinite(element.duration)) element.currentTime = element.duration * SETTLED;
   }
 
-  const box = cn("aspect-video w-full overflow-hidden rounded-lg bg-ink/90", className);
+  const box = cn("relative aspect-video w-full overflow-hidden rounded-lg bg-ink/90", className);
   if (failed || !url) {
     return failed
       ? <AssetThumbnail workspaceId={workspaceId} kind={thumbnail.kind} assetId={thumbnail.assetId} fit="contain" className={box} />
@@ -61,9 +71,9 @@ export function MotionClip({ workspaceId, profileId, itemId, title, revision, th
       <video ref={video} key={url} src={url} aria-label={title} muted playsInline
         loop={mode === "loop" || !reduceMotion} preload="metadata"
         autoPlay={mode === "loop" && !reduceMotion} controls={mode === "loop" && !!reduceMotion}
-        onLoadedMetadata={mode === "still" || reduceMotion ? settle : undefined}
+        onLoadedMetadata={measure}
         onError={() => setFailed(true)}
-        className="size-full object-contain" />
+        className={cn("absolute inset-0 size-full", fitted ? "object-contain" : "object-cover")} />
     </div>
   );
 }

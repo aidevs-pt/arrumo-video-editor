@@ -16,12 +16,13 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmTitleDelete } from "@/components/workspace/confirm-title-delete";
+import { InspectorPanel } from "@/components/workspace/inspector-panel";
 import { WorkspaceHeading, WorkspaceShell } from "@/components/workspace/layout";
 import { workspaceHref, type Workspace } from "@/components/workspace/home/workspace-links";
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
-import { ComponentCode, ComponentDetails, type CanvasComponent } from "./component-details";
+import { ComponentDetails, type CanvasComponent } from "./component-details";
 import { GenerateMotionDialog } from "./generate-motion-dialog";
 import { MotionClip } from "./motion-clip";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
@@ -296,11 +297,42 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
               </button>
             </li></ItemContextMenu>; })}
           </ul>
-          {chosen && <aside className="flex flex-col gap-4 rounded-xl border bg-card p-5 xl:sticky xl:top-20" aria-labelledby="motion-panel-title">
-            <div className="flex items-start justify-between gap-2">
-              <h2 id="motion-panel-title" className="min-w-0 text-[1.35rem] leading-tight text-balance">{chosen.settings.title}</h2>
+          {chosen && <InspectorPanel aria-labelledby="motion-panel-title"
+            header={<>
+              <h2 id="motion-panel-title" className="font-sans min-w-0 text-[1.125rem] leading-snug font-bold text-balance wrap-anywhere">{chosen.settings.title}</h2>
               <Button variant="ghost" size="icon-sm" aria-label={copy.close} onClick={() => setChosenId(null)}><X /></Button>
+
+            </>}
+            footer={
+            <div className="flex items-center gap-2">
+              <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={chosen.settings.profile_id}
+                basedOn={{ id: chosen.id, title: chosen.settings.title }} disabled={open} className="min-w-0 flex-1"
+                onCreate={replaceItem} />
+              {(chosen.component ? ["edit"] as const : ["edit", "duplicate"] as const).map((mode) => (
+                <IconAction key={mode} label={copy[mode]} disabled={open} onClick={() => {
+                  setOperation({ mode, item: chosen });
+                  setSaveError(false);
+                  setOpen(true);
+                }}>{mode === "edit" ? <Pencil /> : <Copy />}</IconAction>
+              ))}
+              {chosen.settings.profile_id !== null && catalog && <MotionShareDialog
+                workspaceId={workspaceId} itemId={chosen.id} title={chosen.settings.title}
+                ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}
+                onSave={() => setAttempt((value) => value + 1)} />}
+              <IconAction label={copy.deletion.deleteTitle} destructive disabled={open} onClick={() => setDeletingItem(chosen.id)}><Trash2 /></IconAction>
+              <ConfirmTitleDelete hideTrigger title={chosen.settings.title} disabled={open} copy={copy.deletion}
+                open={deletingItem === chosen.id} onOpenChange={(value) => setDeletingItem(value ? chosen.id : null)}
+                onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
+                  workspaceId, itemId: chosen.id, confirmedTitle,
+                })}
+                onDelete={() => {
+                  setItems((current) => current?.filter((item) => item.id !== chosen.id));
+                  setPicked((current) => current.filter((id) => id !== chosen.id));
+                  setChosenId(null);
+                  heading.current?.focus();
+                }} />
             </div>
+            }>
             {chosen.component ? <ComponentDetails workspaceId={workspaceId} profileId={scope ? Number(scope) : null}
               itemId={chosen.id} title={chosen.settings.title} component={chosen.component} revision={chosen}
               thumbnail={{ kind: chosen.settings.thumbnail_asset_id ? "image" : "video", assetId: chosen.settings.thumbnail_asset_id ?? chosen.settings.preview_asset_id }} />
@@ -318,38 +350,9 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
             {!chosen.component && <MotionTemplateInputs workspaceId={workspaceId} itemId={chosen.id} revision={chosen.settings} />}
             <p className="flex flex-wrap items-center gap-2 font-bold">{copy.sharedWith}
               <span className="rounded-md bg-secondary px-2 py-0.5 text-sm">{scopeName(chosen.settings.profile_id)}</span></p>
-            <div className="flex items-center gap-2 border-t pt-4">
-              <GenerateMotionDialog<Item> workspaceId={workspaceId} profileId={chosen.settings.profile_id}
-                basedOn={{ id: chosen.id, title: chosen.settings.title }} disabled={open} className="min-w-0 flex-1"
-                onCreate={replaceItem} />
-              {(chosen.component ? ["edit"] as const : ["edit", "duplicate"] as const).map((mode) => (
-                <IconAction key={mode} label={copy[mode]} disabled={open} onClick={() => {
-                  setOperation({ mode, item: chosen });
-                  setSaveError(false);
-                  setOpen(true);
-                }}>{mode === "edit" ? <Pencil /> : <Copy />}</IconAction>
-              ))}
-              {chosen.settings.profile_id !== null && catalog && <MotionShareDialog
-                workspaceId={workspaceId} itemId={chosen.id} title={chosen.settings.title}
-                ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}
-                onSave={() => setAttempt((value) => value + 1)} />}
-              {chosen.component && <ComponentCode title={chosen.settings.title} source={chosen.component.source} disabled={open} />}
-              <IconAction label={copy.deletion.deleteTitle} destructive disabled={open} onClick={() => setDeletingItem(chosen.id)}><Trash2 /></IconAction>
-              <ConfirmTitleDelete hideTrigger title={chosen.settings.title} disabled={open} copy={copy.deletion}
-                open={deletingItem === chosen.id} onOpenChange={(value) => setDeletingItem(value ? chosen.id : null)}
-                onConfirm={(confirmedTitle) => invoke<boolean>("delete_motion_library_item", {
-                  workspaceId, itemId: chosen.id, confirmedTitle,
-                })}
-                onDelete={() => {
-                  setItems((current) => current?.filter((item) => item.id !== chosen.id));
-                  setPicked((current) => current.filter((id) => id !== chosen.id));
-                  setChosenId(null);
-                  heading.current?.focus();
-                }} />
-            </div>
             <MotionVersionHistory<Item> workspaceId={workspaceId} itemId={chosen.id} revision={chosen.settings}
               disabled={open} onRestored={replaceItem} />
-          </aside>}
+          </InspectorPanel>}
         </div>}
       {picked.length > 0 && items && <div role="region" aria-label={copy.selectionCount.replace("{count}", String(picked.length))}
         className="sticky bottom-4 z-[2] mt-6 flex flex-wrap items-center gap-2 rounded-lg bg-ink px-3 py-2 text-white shadow-lg">

@@ -392,6 +392,48 @@ mod tests {
     }
 
     #[test]
+    fn a_changed_component_keeps_its_old_code_and_restores_it() {
+        let lib = library();
+        let first = lib.video("first.mp4", true);
+        let second = lib.video("second.mp4", true);
+        let item = lib
+            .store
+            .create_motion_library_item(lib.workspace, &lib.settings("Sweep", first))
+            .unwrap()
+            .id;
+        let set_component = |source: &str, preview: i64| {
+            let tx = lib.store.0.unchecked_transaction().unwrap();
+            super::keep_current_version(&tx, lib.workspace, item, "softer", None).unwrap();
+            tx.execute(
+                "UPDATE motion_library SET component_json = ?2, preview_asset_id = ?3 WHERE id = ?1",
+                params![
+                    item,
+                    serde_json::json!({"slug": "light-sweep", "source": source, "options": [], "libraries": []})
+                        .to_string(),
+                    preview
+                ],
+            )
+            .unwrap();
+            tx.commit().unwrap();
+        };
+        set_component("export default () => () => 1;", first);
+        set_component("export default () => () => 2;", second);
+
+        let restored = lib
+            .store
+            .restore_motion_library_version(&lib.database, lib.workspace, item, 2)
+            .unwrap();
+        assert_eq!(
+            restored
+                .component
+                .map(|component| component.source)
+                .as_deref(),
+            Some("export default () => () => 1;"),
+            "restoring brings back the component code of that version"
+        );
+    }
+
+    #[test]
     fn only_the_latest_versions_stay_and_their_rendered_media_goes() {
         let lib = library();
         let chosen = lib.video("from-assets.mp4", false);

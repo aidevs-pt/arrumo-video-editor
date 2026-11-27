@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { IconAction } from "@/components/workspace/icon-action";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { useLocale } from "@/lib/locale-provider";
 
 import { HighlightedCode } from "./code-highlight";
@@ -47,13 +47,15 @@ export function ComponentDetails({ workspaceId, profileId, itemId, title, compon
         revision={revision} thumbnail={thumbnail} />
       <p className="text-sm text-muted-foreground">{copy.componentIntro}</p>
       <div>
-        <h3 className="mb-1 font-bold">{copy.importPath}</h3>
-        <div className="flex items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-md bg-secondary px-2 py-1 font-mono text-sm">{importPath}</code>
-          <IconAction label={copied ? copy.copied : copy.copyImport} onClick={copyImport}>
-            {copied ? <Check /> : <Copy />}
-          </IconAction>
-        </div>
+        <h3 className="mb-1 font-bold"><label htmlFor="component-import-path">{copy.importPath}</label></h3>
+        <InputGroup>
+          <InputGroupInput id="component-import-path" readOnly value={importPath} className="font-mono"
+            onFocus={(event) => event.currentTarget.select()} />
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton size="icon-sm" aria-label={copied ? copy.copied : copy.copyImport} title={copied ? copy.copied : copy.copyImport}
+              onClick={copyImport}>{copied ? <Check /> : <Copy />}</InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
       <div>
         <h3 className="mb-1 font-bold">{copy.options}</h3>
@@ -68,6 +70,7 @@ export function ComponentDetails({ workspaceId, profileId, itemId, title, compon
         <span className="font-bold">{copy.usesLibraries}</span>
         {component.libraries.map((library) => <Badge key={library} variant="secondary">{library}</Badge>)}
       </p>}
+      <ComponentCode title={title} source={component.source} />
     </div>
   );
 }
@@ -87,7 +90,9 @@ export function ComponentCode({ title, source, disabled }: { title: string; sour
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <IconAction label={copy.viewCode} disabled={disabled}><Code /></IconAction>
+        <Button type="button" variant="link" size="sm" disabled={disabled} className="h-auto self-start px-0! text-muted-foreground">
+          <Code data-icon="inline-start" />{copy.viewCode}
+        </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-3xl">
         <DialogHeader>
