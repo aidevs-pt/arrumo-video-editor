@@ -63,6 +63,24 @@ jobs:
           done
       - if: needs.gate.outputs.run == 'true' && (runner.os == 'Linux')
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev ffmpeg bubblewrap
+      # Elsewhere the tests use the FFmpeg build the app bundles, so canvas layers encode there too.
+      - if: needs.gate.outputs.run == 'true' && (runner.os != 'Linux')
+        name: Fetch FFmpeg for the media tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$RUNNER_OS" in
+            Windows) asset=windows-x64 ;;
+            macOS) asset=macos-universal ;;
+          esac
+          release=$(awk '$1 == "release" { print $2 }' src-tauri/media-tools.txt)
+          file=$(awk -v a="$asset" '$1 == a { print $2 }' src-tauri/media-tools.txt)
+          sha=$(awk -v a="$asset" '$1 == a { print $3 }' src-tauri/media-tools.txt)
+          gh release download "$release" --repo aidevs-pt/ffmpeg-builds --pattern "$file" --dir "$RUNNER_TEMP"
+          echo "$sha  $RUNNER_TEMP/$file" | sha256sum -c - 2>/dev/null || echo "$sha  $RUNNER_TEMP/$file" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/$file" -d "$RUNNER_TEMP/ffmpeg"
+          chmod +x "$RUNNER_TEMP"/ffmpeg/ff*
+          echo "$RUNNER_TEMP/ffmpeg" >> "$GITHUB_PATH"
       # Canvas layer tests drive a real headless browser, so the pipe and sandbox code runs on
       # each system; the same build the canvas plugin names.
       - if: needs.gate.outputs.run == 'true'
