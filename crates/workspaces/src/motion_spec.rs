@@ -2868,7 +2868,9 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             "without a renderer a canvas layer is dropped"
         );
         if !crate::canvas_render::use_test_runtime() {
-            eprintln!("skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser");
+            eprintln!(
+                "skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser and install FFmpeg"
+            );
             return;
         }
         assert!(spec_schema(&[]).to_string().contains("\"canvas\""));

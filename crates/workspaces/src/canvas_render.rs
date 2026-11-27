@@ -1049,7 +1049,12 @@ pub(crate) fn render_frames(
 #[cfg(test)]
 pub(crate) fn test_runtime() -> Option<CanvasRuntime> {
     let browser = PathBuf::from(std::env::var_os("ARRUMO_TEST_CANVAS_BROWSER")?);
-    browser.is_file().then(|| CanvasRuntime {
+    // Layers are encoded with FFmpeg, which some test machines lack.
+    let encodes = crate::quiet_command(crate::media_tools::ffmpeg())
+        .arg("-version")
+        .output()
+        .is_ok();
+    (encodes && browser.is_file()).then(|| CanvasRuntime {
         browser,
         libraries: vec![Library {
             id: "tween".into(),
@@ -1094,7 +1099,9 @@ mod tests {
     #[test]
     fn draws_frames_on_a_clock_without_network() {
         let Some(runtime) = test_runtime() else {
-            eprintln!("skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser");
+            eprintln!(
+                "skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser and install FFmpeg"
+            );
             return;
         };
         let output = tempfile::tempdir().unwrap();
@@ -1162,7 +1169,9 @@ window.render = (t) => {
     #[test]
     fn pages_import_workspace_components_with_their_libraries() {
         let Some(runtime) = test_runtime() else {
-            eprintln!("skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser");
+            eprintln!(
+                "skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser and install FFmpeg"
+            );
             return;
         };
         let output = tempfile::tempdir().unwrap();
