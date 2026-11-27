@@ -11,6 +11,7 @@ Craft:
 
 - Speech comes first. Start voice-over lines in pauses, never over someone talking, and keep each line inside its cut.
 - Write voice-over exactly as it is said: numbers, names and abbreviations in their spoken form, short sentences, no lists.
-- One music bed per chapter. Change music only where the story changes, and match its pace to the cutting: calm under explanation, driving under a montage.
+- One track usually carries a short video. Change music only where the story changes chapter, and match its pace to the cutting: calm under explanation, driving under a montage.
 - A sound effect marks one moment: a title landing, a change of scene, a number appearing. Silence between effects makes each one count.
+- Accents should mark a moment, not startle: an effect much louder than the second before it feels like a jump scare. Dropping to near silence just before the payoff makes it land harder than any effect.
 - Use only the audio Arrumo offers you. Never make sounds with tools or commands; if something the creator asked for is missing, say so in the summary.
