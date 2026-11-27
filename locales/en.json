@@ -2094,5 +2094,20 @@
     "title": "This page hit a problem",
     "body": "The error was recorded. Try again, or go to another page.",
     "retry": "Try again"
+  },
+  "canvasRenderer": {
+    "title": "Renderer",
+    "missing": "Download the renderer once so the agent can draw canvas layers. It's {size}, downloaded only for this computer and checked before use.",
+    "download": "Download renderer",
+    "downloading": "Downloading and checking…",
+    "ready": "Ready. Canvas pages run with no network, no files and no access to Arrumo.",
+    "sandboxBubblewrap": "Isolated with Bubblewrap.",
+    "sandboxBrowser": "Isolated by the browser's own sandbox.",
+    "remove": "Remove download",
+    "unsupported": "This plugin has no renderer for this computer, so the agent won't draw canvas layers here.",
+    "needsBubblewrap": "On Linux, canvas layers need Bubblewrap to keep pages isolated. Install the bubblewrap package, then reopen this page.",
+    "libraries": "Libraries",
+    "failed": "The renderer couldn't be downloaded. Check your connection and try again.",
+    "removeFailed": "The download couldn't be removed."
   }
 }

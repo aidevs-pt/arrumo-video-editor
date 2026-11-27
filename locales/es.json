@@ -2094,5 +2094,20 @@
     "title": "Esta página ha tenido un problema",
     "body": "Se ha registrado el error. Vuelve a intentarlo o ve a otra página.",
     "retry": "Volver a intentarlo"
+  },
+  "canvasRenderer": {
+    "title": "Renderizador",
+    "missing": "Descarga el renderizador una vez para que el agente pueda dibujar capas de lienzo. Ocupa {size}, se descarga solo para este ordenador y se comprueba antes de usarlo.",
+    "download": "Descargar renderizador",
+    "downloading": "Descargando y comprobando…",
+    "ready": "Listo. Las páginas de lienzo se ejecutan sin red, sin archivos y sin acceso a Arrumo.",
+    "sandboxBubblewrap": "Aisladas con Bubblewrap.",
+    "sandboxBrowser": "Protegidas por el aislamiento propio del navegador.",
+    "remove": "Quitar descarga",
+    "unsupported": "Este complemento no tiene renderizador para este ordenador, así que el agente no dibujará capas de lienzo aquí.",
+    "needsBubblewrap": "En Linux, las capas de lienzo necesitan Bubblewrap para mantener aisladas las páginas. Instala el paquete bubblewrap y vuelve a abrir esta página.",
+    "libraries": "Bibliotecas",
+    "failed": "No se pudo descargar el renderizador. Comprueba tu conexión y vuelve a intentarlo.",
+    "removeFailed": "No se pudo quitar la descarga."
   }
 }

@@ -2094,5 +2094,20 @@
     "title": "Esta página teve um problema",
     "body": "O erro foi registado. Tenta novamente ou vai para outra página.",
     "retry": "Tentar novamente"
+  },
+  "canvasRenderer": {
+    "title": "Renderizador",
+    "missing": "Descarrega o renderizador uma vez para que o agente possa desenhar camadas de tela. Ocupa {size}, é descarregado só para este computador e verificado antes de ser usado.",
+    "download": "Descarregar renderizador",
+    "downloading": "A descarregar e a verificar…",
+    "ready": "Pronto. As páginas de tela correm sem rede, sem ficheiros e sem acesso ao Arrumo.",
+    "sandboxBubblewrap": "Isoladas com o Bubblewrap.",
+    "sandboxBrowser": "Protegidas pelo isolamento do próprio navegador.",
+    "remove": "Remover descarga",
+    "unsupported": "Este plugin não tem renderizador para este computador, por isso o agente não vai desenhar camadas de tela aqui.",
+    "needsBubblewrap": "No Linux, as camadas de tela precisam do Bubblewrap para manter as páginas isoladas. Instala o pacote bubblewrap e volta a abrir esta página.",
+    "libraries": "Bibliotecas",
+    "failed": "Não foi possível descarregar o renderizador. Verifica a tua ligação e tenta novamente.",
+    "removeFailed": "Não foi possível remover a descarga."
   }
 }
