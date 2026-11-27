@@ -17,6 +17,7 @@
 - Stagger what arrives together: words a few hundredths of a second apart, list items and bars a few tenths apart, never several blocks at once. Let the first readable text land within a second.
 - A number counts to its exact value, eases into it and never overshoots it.
 - Hold each finished state long enough to read, about two and a half words a second plus a beat, and hold the final frame for at least a second before the cut.
+- When a line replaces another in the same place, let the old one finish leaving before the new one arrives; two lines crossing in the same spot are unreadable.
 - When text types on, keep its anchor fixed to the full line so it does not slide while it grows.
 - Size everything relative to the frame so the same animation works in landscape and portrait.
 - An animation that plays over footage must leave the subject visible; an animation between clips can fill the frame.
