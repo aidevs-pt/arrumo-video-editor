@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { keepContextMenuInside } from "@/lib/portal-events"
 import { Select as SelectPrimitive } from "radix-ui"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
@@ -72,6 +73,7 @@ function SelectContent({
         position={position}
         align={align}
         {...props}
+        onContextMenu={keepContextMenuInside(props.onContextMenu)}
       >
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport

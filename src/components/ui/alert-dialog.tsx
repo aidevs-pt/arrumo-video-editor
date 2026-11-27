@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { keepContextMenuInside } from "@/lib/portal-events"
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
@@ -40,6 +41,7 @@ function AlertDialogOverlay({
         className
       )}
       {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
     />
   )
 }
@@ -62,6 +64,7 @@ function AlertDialogContent({
           className
         )}
         {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
       />
     </AlertDialogPortal>
   )

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { keepContextMenuInside } from "@/lib/portal-events"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ function SheetOverlay({
         className
       )}
       {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
     />
   )
 }
@@ -66,6 +68,7 @@ function SheetContent({
           className
         )}
         {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
       >
         {children}
         {showCloseButton && (

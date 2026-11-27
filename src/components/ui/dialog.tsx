@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { keepContextMenuInside } from "@/lib/portal-events"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
@@ -43,6 +44,7 @@ function DialogOverlay({
         className
       )}
       {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
     />
   )
 }
@@ -65,6 +67,7 @@ function DialogContent({
           className
         )}
         {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
       >
         {children}
         {showCloseButton && (

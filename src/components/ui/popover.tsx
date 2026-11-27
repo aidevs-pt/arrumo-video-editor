@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { keepContextMenuInside } from "@/lib/portal-events"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
 function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
@@ -29,6 +30,7 @@ function PopoverContent({
           className
         )}
         {...props}
+      onContextMenu={keepContextMenuInside(props.onContextMenu)}
       />
     </PopoverPrimitive.Portal>
   )
