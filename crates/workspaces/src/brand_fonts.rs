@@ -339,7 +339,8 @@ impl WorkspaceStore {
             workspace_id,
             &serde_json::from_value::<Vec<BrandFont>>(snapshot["brand_fonts"].clone())
                 .unwrap_or_default(),
-        ))
+        )
+        .with_colors(serde_json::from_value(snapshot["brand_colors"].clone()).unwrap_or_default()))
     }
 
     /// The workspace's fonts as they are now, for library animations.
@@ -348,19 +349,20 @@ impl WorkspaceStore {
         media_root: &Path,
         workspace_id: i64,
     ) -> rusqlite::Result<FontSet> {
-        Ok(FontSet::from_fonts(
-            media_root,
-            workspace_id,
-            &self.brand_fonts(workspace_id)?,
-        ))
+        Ok(
+            FontSet::from_fonts(media_root, workspace_id, &self.brand_fonts(workspace_id)?)
+                .with_colors(self.video_brand_colors(workspace_id)?),
+        )
     }
 }
 
-/// The font files animation text is drawn with. A missing bold uses the regular file of the
-/// same role, a missing heading uses the body font, and a missing body uses the system font.
+/// The font files animation text is drawn with, and the brand colours videos use, which canvas
+/// pages are themed with. A missing bold uses the regular file of the same role, a missing
+/// heading uses the body font, and a missing body uses the system font.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct FontSet {
     files: Vec<(FontRole, FontWeight, PathBuf, f64)>,
+    colors: Vec<String>,
 }
 
 impl FontSet {
@@ -380,7 +382,20 @@ impl FontSet {
             })
             .filter(|(_, _, path, _)| path.is_file())
             .collect();
-        Self { files }
+        Self {
+            files,
+            colors: Vec::new(),
+        }
+    }
+
+    pub(crate) fn with_colors(mut self, colors: Vec<String>) -> Self {
+        self.colors = colors;
+        self
+    }
+
+    /// The brand colours for videos, in palette order.
+    pub(crate) fn colors(&self) -> &[String] {
+        &self.colors
     }
 
     fn find(&self, role: FontRole, weight: FontWeight) -> Option<(&Path, f64)> {

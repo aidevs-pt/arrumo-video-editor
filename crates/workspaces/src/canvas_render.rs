@@ -8,6 +8,7 @@
 use std::{
     collections::BTreeMap,
     error::Error,
+    fmt::Write as _,
     fs,
     io::{self, BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
@@ -518,6 +519,40 @@ pub(crate) struct CanvasPage<'a> {
     pub values: &'a serde_json::Map<String, Value>,
     /// Font files served to the page by family name.
     pub fonts: &'a [(&'a str, &'a str, PathBuf)],
+    /// The colours the page is themed with: `colors` (the brand palette), `background`, `text`
+    /// and `accent`, each a hex colour.
+    pub theme: &'a Value,
+}
+
+fn is_hex_color(value: &str) -> bool {
+    let digits = value.strip_prefix('#').unwrap_or("");
+    matches!(digits.len(), 3 | 4 | 6 | 8) && digits.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// The theme as page settings and CSS variables, keeping only well-formed colours.
+fn theme_parts(theme: &Value) -> (Value, String) {
+    let color = |key: &str| theme[key].as_str().filter(|value| is_hex_color(value));
+    let colors: Vec<&str> = theme["colors"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|value| is_hex_color(value))
+        .take(12)
+        .collect();
+    let mut settings = serde_json::Map::new();
+    settings.insert("colors".into(), json!(colors));
+    let mut css = String::new();
+    for key in ["background", "text", "accent"] {
+        if let Some(value) = color(key) {
+            settings.insert(key.into(), json!(value));
+            write!(css, "--arrumo-{key}:{value};").ok();
+        }
+    }
+    for (index, value) in colors.iter().enumerate() {
+        write!(css, "--arrumo-color-{}:{value};", index + 1).ok();
+    }
+    (Value::Object(settings), format!(":root{{{css}}}"))
 }
 
 /// Runs before the page's own scripts: time only moves when Arrumo draws a frame, so animation
@@ -840,12 +875,14 @@ fn page_document(
     fps: u32,
     duration: f64,
 ) -> String {
+    let (theme, variables) = theme_parts(page.theme);
     let setup = json!({
         "width": size.0,
         "height": size.1,
         "fps": fps,
         "duration": duration,
         "values": page.values,
+        "theme": theme,
     });
     let imports: serde_json::Map<String, Value> = runtime
         .libraries
@@ -875,7 +912,7 @@ fn page_document(
         .collect();
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\">\
-         <style>{fonts}html,body{{margin:0;padding:0;background:transparent;overflow:hidden;width:{w}px;height:{h}px}}</style>\
+         <style>{variables}{fonts}html,body{{margin:0;padding:0;background:transparent;overflow:hidden;width:{w}px;height:{h}px}}</style>\
          <script>window.arrumo={setup};</script>\
          <script type=\"importmap\">{{\"imports\":{imports}}}</script>{scripts}</head>\
          <body>{html}</body></html>",
@@ -1053,7 +1090,15 @@ window.render = (t) => {
             libraries: &["tween".into()],
             values: &values,
             fonts: &[],
+            theme: &json!({"colors": ["#123456", "red", "#abc"], "accent": "#00ff00", "text": "x;}"}),
         };
+        let document = page_document(&page, &runtime, (64, 32), 10, 1.0);
+        assert!(
+            document.contains(
+                "--arrumo-accent:#00ff00;--arrumo-color-1:#123456;--arrumo-color-2:#abc;"
+            )
+        );
+        assert!(!document.contains("x;}"), "malformed colours are left out");
         render_frames(&runtime, &page, (64, 32), 10, 11, output.path()).unwrap();
         let first = output.path().join("f00000.png");
         let middle = output.path().join("f00005.png");
@@ -1076,6 +1121,7 @@ window.render = (t) => {
             libraries: &[],
             values: &values,
             fonts: &[],
+            theme: &Value::Null,
         };
         let error = render_frames(&runtime, &broken, (16, 16), 10, 2, &output.path().join("b"))
             .unwrap_err()

@@ -450,7 +450,10 @@ promise. Draw from t alone, with no state carried from frame to frame, since fra
 in any order and at other sizes; requestAnimationFrame, performance.now and CSS or SVG animations \
 also follow this clock. Assign a promise to window.arrumoReady when setup is asynchronous. Size \
 everything from width and height. Brand fonts are the families brand-heading and brand-body. \
-Set text null, assetId null, and color to the main colour the page draws.";
+window.arrumo.theme holds the video's colours: colors (the brand palette), background, text (this \
+layer's color) and accent (this layer's accent), also as the CSS variables --arrumo-background, \
+--arrumo-text, --arrumo-accent and --arrumo-color-1 onwards. Draw in them unless the brief asks for \
+other colours. Set text null, assetId null, and color to the main colour the page draws.";
 
 /// What the agent reads about animations: `SPEC_GUIDE`, and canvas layers when a renderer is ready.
 pub(crate) fn spec_guide() -> String {
@@ -1508,6 +1511,14 @@ impl LayerTarget<'_> {
                         )
                     })
                     .collect();
+                    let palette = self.fonts.colors();
+                    let theme = serde_json::json!({
+                        "colors": palette,
+                        "background": spec.background,
+                        "text": layer.color,
+                        "accent": layer.accent.as_deref().or(spec.light_color.as_deref())
+                            .or(palette.iter().find(|color| !color.eq_ignore_ascii_case(&spec.background)).map(String::as_str)),
+                    });
                     crate::canvas_render::render_frames(
                         &runtime,
                         &crate::canvas_render::CanvasPage {
@@ -1515,6 +1526,7 @@ impl LayerTarget<'_> {
                             libraries: &canvas.libraries,
                             values: &canvas.values,
                             fonts: &fonts,
+                            theme: &theme,
                         },
                         (box_w, box_h),
                         FPS,
