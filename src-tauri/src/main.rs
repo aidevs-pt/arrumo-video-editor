@@ -1248,6 +1248,37 @@ async fn generate_motion_library_item(
 }
 
 #[tauri::command]
+async fn generate_canvas_component(
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    request: String,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::MotionLibraryItem, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .generate_canvas_component(&database, workspace_id, profile_id, &request)
+            .map_err(|error| {
+                arrumo_workspaces::report_failure("motion_library", &error);
+                match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
+                    Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
+                    Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
+                    Some(_) => "agent_failed",
+                    None => "motion_generation_failed",
+                }
+                .to_owned()
+            })
+    })
+    .await
+    .map_err(|_| "motion_generation_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn set_workspace_context(
     workspace_id: i64,
     markdown: String,
@@ -2096,6 +2127,7 @@ fn main() {
             list_video_models,
             provider_usage,
             generate_motion_library_item,
+            generate_canvas_component,
             apply_context_import,
             set_workspace_context,
             list_workspace_feedback,

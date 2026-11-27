@@ -517,6 +517,8 @@ impl WorkspaceStore {
             .as_deref()
             .map(|provider| self.agent_options(workspace_id, provider))
             .unwrap_or_default();
+        let canvas_components =
+            self.offered_components(workspace_id, profile.as_ref().map(|profile| profile.id))?;
         Ok(json!({
             "schema_version": 1,
             "motion_renderer": motion_renderer,
@@ -538,6 +540,7 @@ impl WorkspaceStore {
             },
             "profile": profile,
             "formats": formats,
+            "canvas_components": canvas_components,
         }))
     }
 

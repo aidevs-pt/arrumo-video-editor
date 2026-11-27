@@ -19,9 +19,11 @@ mod agent_settings;
 mod agent_stage;
 mod agent_work;
 mod asset_cleanup;
+mod canvas_components;
 mod canvas_render;
 mod footage_cleanup;
 mod motion_versions;
+pub use canvas_components::{CanvasComponent, ComponentOption};
 pub use canvas_render::{CanvasLibraryInfo, CanvasStatus};
 pub use footage_cleanup::StorageSettings;
 pub use motion_templates::{InputKind, TemplateInput};
@@ -369,6 +371,7 @@ impl WorkspaceStore {
             include_str!("../migrations/073-profile-formats-off.sql"),
             include_str!("../migrations/074-storage-settings.sql"),
             include_str!("../migrations/075-motion-versions.sql"),
+            include_str!("../migrations/076-canvas-components.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

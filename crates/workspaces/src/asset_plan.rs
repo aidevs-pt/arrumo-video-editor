@@ -243,7 +243,7 @@ fn plan_prompt(
         } else {
             "This video has no recorded footage and is built from animated scenes, so design animations that carry its main beats. "
         },
-        guide = crate::motion_spec::spec_guide(),
+        guide = crate::canvas_components::run_spec_guide(snapshot),
         clips = if kinds.is_empty() {
             String::new()
         } else {
@@ -374,6 +374,7 @@ impl WorkspaceStore {
             .prepare(
                 "SELECT id, title, kind, usage_markdown, spec_json FROM motion_library
                  WHERE workspace_id = ?1 AND (profile_id IS NULL OR profile_id IS ?2)
+                   AND component_json IS NULL
                  ORDER BY id DESC LIMIT ?3",
             )?
             .query_map(params![workspace_id, profile, MAX_LIBRARY], |row| {
@@ -488,7 +489,7 @@ impl WorkspaceStore {
             renew,
         )?;
         if let Some(animations) = answer["animations"].as_array_mut() {
-            let fonts = self.run_font_set(&crate::asset_root(database), workspace_id, run_id)?;
+            let fonts = self.run_brand_kit(&crate::asset_root(database), workspace_id, run_id)?;
             self.review_motion_answers(
                 database,
                 workspace_id,
@@ -503,6 +504,7 @@ impl WorkspaceStore {
                     provider,
                     size: run_preview_size(snapshot),
                     fonts: &fonts,
+                    kit_for: None,
                 },
                 &mut || renew(),
             )?;

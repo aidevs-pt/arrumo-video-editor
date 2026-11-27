@@ -867,7 +867,7 @@ impl WorkspaceStore {
                     .unwrap_or_default()
                 )
             },
-            guide = crate::motion_spec::spec_guide(),
+            guide = crate::canvas_components::run_spec_guide(snapshot),
             sound_guide = if sounds.is_empty() {
                 ""
             } else {
@@ -924,7 +924,7 @@ impl WorkspaceStore {
         )?;
         if let Some(scenes) = answer["scenes"].as_array_mut() {
             let fonts = self
-                .run_font_set(&crate::asset_root(database), workspace_id, run_id)
+                .run_brand_kit(&crate::asset_root(database), workspace_id, run_id)
                 .step("Loading the brand fonts")?;
             self.review_motion_answers(
                 database,
@@ -947,6 +947,7 @@ impl WorkspaceStore {
                     provider,
                     size: crate::motion_design::run_preview_size(snapshot),
                     fonts: &fonts,
+                    kit_for: None,
                 },
                 &mut || {
                     self.renew_generation_lease(workspace_id, run_id, attempt)?;
@@ -1205,7 +1206,7 @@ impl WorkspaceStore {
             .unwrap_or_default(),
             first = animations.len(),
             second = animations.len() + 1,
-            guide = crate::motion_spec::spec_guide(),
+            guide = crate::canvas_components::run_spec_guide(snapshot),
             images = serde_json::to_string(
                 &images_for_new
                     .iter()
@@ -1282,7 +1283,7 @@ impl WorkspaceStore {
             .unwrap_or_default();
         designed.truncate(MAX_NEW_CUT_ANIMATIONS);
         if !designed.is_empty() {
-            let fonts = self.run_font_set(&root, workspace_id, run_id)?;
+            let fonts = self.run_brand_kit(&root, workspace_id, run_id)?;
             self.review_motion_answers(
                 database,
                 workspace_id,
@@ -1294,6 +1295,7 @@ impl WorkspaceStore {
                     provider,
                     size: crate::motion_design::run_preview_size(snapshot),
                     fonts: &fonts,
+                    kit_for: None,
                 },
                 &mut || {
                     self.renew_generation_lease(workspace_id, run_id, attempt)?;

@@ -55,9 +55,9 @@ pub(crate) fn keep_current_version(
     let kept = connection.execute(
         "INSERT INTO motion_library_versions
             (workspace_id, item_id, version, kind, title, usage_markdown, preview_asset_id,
-             thumbnail_asset_id, sound_asset_id, spec_json, change_note, restored_from)
+             thumbnail_asset_id, sound_asset_id, spec_json, component_json, change_note, restored_from)
          SELECT workspace_id, id, version, kind, title, usage_markdown, preview_asset_id,
-                thumbnail_asset_id, sound_asset_id, spec_json, change_note, restored_from
+                thumbnail_asset_id, sound_asset_id, spec_json, component_json, change_note, restored_from
          FROM motion_library WHERE workspace_id = ?1 AND id = ?2",
         params![workspace_id, item_id],
     )?;
@@ -183,7 +183,8 @@ impl WorkspaceStore {
             "UPDATE motion_library AS item SET
                  kind = old.kind, title = old.title, usage_markdown = old.usage_markdown,
                  preview_asset_id = old.preview_asset_id, thumbnail_asset_id = old.thumbnail_asset_id,
-                 sound_asset_id = old.sound_asset_id, spec_json = old.spec_json
+                 sound_asset_id = old.sound_asset_id, spec_json = old.spec_json,
+                 component_json = old.component_json
              FROM motion_library_versions AS old
              WHERE item.workspace_id = ?1 AND item.id = ?2
                AND old.workspace_id = ?1 AND old.item_id = ?2 AND old.version = ?3",

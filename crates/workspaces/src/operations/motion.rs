@@ -38,6 +38,14 @@ struct Generate {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GenerateComponent {
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    request: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Duplicate {
     workspace_id: i64,
     item_id: i64,
@@ -102,7 +110,7 @@ struct RenderRun {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 14] {
+pub(super) fn definitions() -> [Value; 15] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -131,6 +139,11 @@ pub(super) fn definitions() -> [Value; 14] {
         json!({"name": "generate_motion_library_item", "description": "Let the workspace's agent design an animation or transition from a description and save its rendered preview to the library. Pass basedOn to change an existing item in place; its previous state is kept as a version you can restore. Takes minutes; read progress with list_agent_logs.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "profileId": optional_id, "basedOn": optional_id,
+                "request": {"type": "string", "minLength": 1, "maxLength": 4000}
+            }, "required": ["workspaceId", "request"], "additionalProperties": false}}),
+        json!({"name": "generate_canvas_component", "description": "Let the workspace's agent write a canvas component, a reusable piece of motion such as a confetti burst or a signature reveal that canvas pages import as workspace/<slug>, and save it to the library with a rendered animation that demonstrates it. Agents then use it in later animations for the workspace or the profiles it is shared with. To change one, call generate_motion_library_item with basedOn. Needs the canvas layers plugin with its renderer downloaded. Takes minutes; read progress with list_agent_logs.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "profileId": optional_id,
                 "request": {"type": "string", "minLength": 1, "maxLength": 4000}
             }, "required": ["workspaceId", "request"], "additionalProperties": false}}),
         json!({"name": "list_motion_library_versions", "description": "List a motion item's current state and the earlier versions it replaced, newest first. A change made with the agent, or new media chosen by hand, keeps the previous state as a version; the last 10 stay.",
@@ -220,6 +233,11 @@ pub(super) fn call(
             store.generate_motion_library_item(database, args.workspace_id, args.profile_id, &args.request, args.based_on)
                 .map(|item| json!({"item": item}))
                 .map_err(|_| "Could not generate the animation. Read the latest agent log for the reason")
+        }),
+        "generate_canvas_component" => parse(arguments).and_then(|args: GenerateComponent| {
+            store.generate_canvas_component(database, args.workspace_id, args.profile_id, &args.request)
+                .map(|item| json!({"item": item}))
+                .map_err(|_| "Could not make the component. Check that canvas layers are ready, then read the latest agent log")
         }),
         "list_motion_library_versions" => parse(arguments).and_then(|args: ReadShares| {
             store.motion_library_versions(args.workspace_id, args.item_id)

@@ -36,6 +36,10 @@ pub struct MotionLibraryItem {
     pub id: i64,
     pub workspace_id: i64,
     pub settings: MotionLibrarySettings,
+    /// The module canvas pages import, when the item is a canvas component; the item's
+    /// animation then demonstrates it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub component: Option<crate::canvas_components::CanvasComponent>,
 }
 
 const VALID_MEDIA: &str = "EXISTS (SELECT 1 FROM workspace_assets
@@ -112,7 +116,7 @@ impl WorkspaceStore {
              SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
              WHERE {VALID_MEDIA}
              RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
-                       preview_asset_id, thumbnail_asset_id, sound_asset_id"
+                       preview_asset_id, thumbnail_asset_id, sound_asset_id, component_json"
             ),
             params![
                 workspace_id,
@@ -231,7 +235,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<MotionLibraryItem> {
         let existing = self.0.query_row(
             "SELECT id, workspace_id, profile_id, kind, title, usage_markdown,
-                    preview_asset_id, thumbnail_asset_id, sound_asset_id
+                    preview_asset_id, thumbnail_asset_id, sound_asset_id, component_json
              FROM motion_library WHERE workspace_id = ?1 AND source_result_id = ?2 AND source_motion_index = ?3",
             params![workspace_id, result_id, index],
             read_item,
@@ -280,7 +284,7 @@ impl WorkspaceStore {
                      preview_asset_id = ?6, thumbnail_asset_id = ?7, sound_asset_id = ?8
                  WHERE workspace_id = ?1 AND id = ?10 AND {VALID_MEDIA}
                  RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
-                           preview_asset_id, thumbnail_asset_id, sound_asset_id"
+                           preview_asset_id, thumbnail_asset_id, sound_asset_id, component_json"
             ),
             params![
                 workspace_id,
@@ -315,12 +319,14 @@ impl WorkspaceStore {
         let item = tx.query_row(
             "INSERT INTO motion_library
                 (workspace_id, profile_id, kind, title, usage_markdown,
-                 preview_asset_id, thumbnail_asset_id, sound_asset_id, spec_json)
+                 preview_asset_id, thumbnail_asset_id, sound_asset_id, spec_json, component_json)
              SELECT workspace_id, profile_id, kind, ?3, usage_markdown,
-                    preview_asset_id, thumbnail_asset_id, sound_asset_id, spec_json
+                    preview_asset_id, thumbnail_asset_id, sound_asset_id, spec_json, component_json
              FROM motion_library WHERE workspace_id = ?1 AND id = ?2
+               -- A copy of a component would claim the same import path.
+               AND component_json IS NULL
              RETURNING id, workspace_id, profile_id, kind, title, usage_markdown,
-                       preview_asset_id, thumbnail_asset_id, sound_asset_id",
+                       preview_asset_id, thumbnail_asset_id, sound_asset_id, component_json",
             params![workspace_id, item_id, title.trim()],
             read_item,
         )?;
@@ -376,7 +382,7 @@ impl WorkspaceStore {
     ) -> rusqlite::Result<MotionLibraryItem> {
         self.0.query_row(
             "SELECT id, workspace_id, profile_id, kind, title, usage_markdown,
-                    preview_asset_id, thumbnail_asset_id, sound_asset_id
+                    preview_asset_id, thumbnail_asset_id, sound_asset_id, component_json
              FROM motion_library WHERE workspace_id = ?1 AND id = ?2",
             params![workspace_id, item_id],
             read_item,
@@ -449,7 +455,7 @@ impl WorkspaceStore {
         self.0
             .prepare(
                 "SELECT id, workspace_id, profile_id, kind, title, usage_markdown,
-                    preview_asset_id, thumbnail_asset_id, sound_asset_id
+                    preview_asset_id, thumbnail_asset_id, sound_asset_id, component_json
              FROM motion_library AS item
              WHERE workspace_id = ?1 AND (profile_id IS NULL OR profile_id = ?2
                  OR EXISTS (SELECT 1 FROM motion_profile_shares AS share
@@ -478,6 +484,9 @@ fn read_item(row: &Row<'_>) -> rusqlite::Result<MotionLibraryItem> {
             thumbnail_asset_id: row.get(7)?,
             sound_asset_id: row.get(8)?,
         },
+        component: row
+            .get::<_, Option<String>>(9)?
+            .and_then(|text| serde_json::from_str(&text).ok()),
     })
 }
 

@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 
 use crate::{
     MotionKind,
-    brand_fonts::{FontRole, FontSet, FontWeight},
+    brand_fonts::{BrandKit, FontRole, FontWeight},
     motion_effects::{Atmosphere, CountUp, Tilt},
 };
 
@@ -1048,7 +1048,7 @@ fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String
 
 /// Copies the fonts drawtext uses into the job directory as `font-<role>-<weight>`, so filter
 /// arguments need no path escaping: the brand's files where there are some, else the system font.
-pub(crate) fn ensure_fonts(directory: &Path, fonts: &FontSet) -> io::Result<()> {
+pub(crate) fn ensure_fonts(directory: &Path, fonts: &BrandKit) -> io::Result<()> {
     for role in [FontRole::Heading, FontRole::Body] {
         for weight in [FontWeight::Regular, FontWeight::Bold] {
             let source = match fonts.file(role, weight) {
@@ -1110,7 +1110,7 @@ struct LayerTarget<'a> {
     shift: f64,
     /// How long image and box sources last, in seconds of the base video.
     length: f64,
-    fonts: &'a FontSet,
+    fonts: &'a BrandKit,
 }
 
 impl LayerTarget<'_> {
@@ -1527,6 +1527,7 @@ impl LayerTarget<'_> {
                             values: &canvas.values,
                             fonts: &fonts,
                             theme: &theme,
+                            components: self.fonts.components(),
                         },
                         (box_w, box_h),
                         FPS,
@@ -2364,7 +2365,7 @@ pub(crate) fn overlay_graph(
     graph: &mut String,
     args: &mut Vec<String>,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
 ) -> io::Result<String> {
     ensure_fonts(directory, fonts)?;
     LayerTarget {
@@ -2389,7 +2390,7 @@ fn render_arguments(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
     audio: Option<&Path>,
 ) -> io::Result<Vec<String>> {
     let duration = spec.duration_seconds;
@@ -2658,7 +2659,7 @@ pub(crate) fn render_spec(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
     render_spec_with_audio(spec, size, directory, output, images, fonts, None, check)
@@ -2672,7 +2673,7 @@ pub(crate) fn render_spec_with_audio(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
     audio: Option<&Path>,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -2892,7 +2893,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &|_| None,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3049,7 +3050,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &|_| None,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3125,7 +3126,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
                         "/media/image.png"
                     }))
                 },
-                &FontSet::default(),
+                &BrandKit::default(),
                 None,
             )
             .unwrap()
@@ -3352,7 +3353,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3451,7 +3452,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3509,7 +3510,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3566,7 +3567,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &|_| None,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3640,7 +3641,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
                 &mut graph,
                 &mut inputs,
                 &|_| None,
-                &FontSet::default(),
+                &BrandKit::default(),
             )
             .unwrap();
         }
@@ -3715,7 +3716,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3758,7 +3759,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
             directory.path(),
             "effect.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3811,7 +3812,7 @@ g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math
                 directory.path(),
                 &name,
                 &|_| None,
-                &FontSet::default(),
+                &BrandKit::default(),
                 &mut || Ok(()),
             )
             .unwrap();
@@ -3924,7 +3925,7 @@ mod fit_tests {
     #[test]
     fn a_card_grows_for_long_text_and_keeps_its_size_for_short() {
         let directory = tempfile::tempdir().unwrap();
-        let fonts = FontSet::default();
+        let fonts = BrandKit::default();
         let target = LayerTarget {
             width: 1280,
             height: 720,

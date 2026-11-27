@@ -522,6 +522,19 @@ pub(crate) struct CanvasPage<'a> {
     /// The colours the page is themed with: `colors` (the brand palette), `background`, `text`
     /// and `accent`, each a hex colour.
     pub theme: &'a Value,
+    /// Workspace components the page may import as `workspace/<slug>`.
+    pub components: &'a [crate::canvas_components::CanvasComponent],
+}
+
+impl CanvasPage<'_> {
+    /// The libraries the page and the components it imports use.
+    fn uses(&self, library: &str) -> bool {
+        self.libraries.iter().any(|id| id == library)
+            || self.components.iter().any(|component| {
+                component.libraries.iter().any(|id| id == library)
+                    && self.html.contains(&component.import_path())
+            })
+    }
 }
 
 fn is_hex_color(value: &str) -> bool {
@@ -887,18 +900,24 @@ fn page_document(
     let imports: serde_json::Map<String, Value> = runtime
         .libraries
         .iter()
-        .filter(|library| library.module && page.libraries.contains(&library.id))
+        .filter(|library| library.module && page.uses(&library.id))
         .map(|library| {
             (
                 library.id.clone(),
                 json!(format!("{ORIGIN}/lib/{}.js", library.id)),
             )
         })
+        .chain(page.components.iter().map(|component| {
+            (
+                component.import_path(),
+                json!(format!("{ORIGIN}/{}.js", component.import_path())),
+            )
+        }))
         .collect();
     let scripts: String = runtime
         .libraries
         .iter()
-        .filter(|library| !library.module && page.libraries.contains(&library.id))
+        .filter(|library| !library.module && page.uses(&library.id))
         .map(|library| format!("<script src=\"{ORIGIN}/lib/{}.js\"></script>", library.id))
         .collect();
     let fonts: String = page
@@ -945,6 +964,15 @@ pub(crate) fn render_frames(
         session.resources.insert(
             format!("/lib/{}.js", library.id),
             ("text/javascript; charset=utf-8", library.bytes.clone()),
+        );
+    }
+    for component in page.components {
+        session.resources.insert(
+            format!("/{}.js", component.import_path()),
+            (
+                "text/javascript; charset=utf-8",
+                Arc::new(component.source.clone().into_bytes()),
+            ),
         );
     }
     for (family, weight, path) in page.fonts {
@@ -1091,6 +1119,7 @@ window.render = (t) => {
             values: &values,
             fonts: &[],
             theme: &json!({"colors": ["#123456", "red", "#abc"], "accent": "#00ff00", "text": "x;}"}),
+            components: &[],
         };
         let document = page_document(&page, &runtime, (64, 32), 10, 1.0);
         assert!(
@@ -1122,11 +1151,57 @@ window.render = (t) => {
             values: &values,
             fonts: &[],
             theme: &Value::Null,
+            components: &[],
         };
         let error = render_frames(&runtime, &broken, (16, 16), 10, 2, &output.path().join("b"))
             .unwrap_err()
             .to_string();
         assert!(error.contains("boom"), "{error}");
+    }
+
+    #[test]
+    fn pages_import_workspace_components_with_their_libraries() {
+        let Some(runtime) = test_runtime() else {
+            eprintln!("skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser");
+            return;
+        };
+        let output = tempfile::tempdir().unwrap();
+        // The component needs the tween library although the page doesn't list it.
+        let component = crate::canvas_components::CanvasComponent {
+            slug: "fill".into(),
+            source: r#"import { ease } from "tween";
+export default function (element, options = {}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = arrumo.width; canvas.height = arrumo.height;
+  element.appendChild(canvas);
+  const c = canvas.getContext("2d");
+  return (t) => {
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    c.fillStyle = options.color ?? arrumo.theme.accent;
+    c.fillRect(0, 0, Math.round(canvas.width * ease(Math.min(t, 1))), canvas.height);
+  };
+}"#
+            .into(),
+            options: vec![],
+            libraries: vec!["tween".into()],
+        };
+        let page = CanvasPage {
+            html: r#"<script type="module">
+import fill from "workspace/fill";
+window.render = fill(document.body);
+</script>"#,
+            libraries: &[],
+            values: &serde_json::Map::new(),
+            fonts: &[],
+            theme: &json!({"accent": "#0000ff"}),
+            components: std::slice::from_ref(&component),
+        };
+        render_frames(&runtime, &page, (32, 16), 10, 11, output.path()).unwrap();
+        assert_eq!(
+            pixel(&output.path().join("f00010.png"), 30, 8),
+            [0, 0, 255, 255],
+            "the component draws in the theme's accent"
+        );
     }
 
     #[test]

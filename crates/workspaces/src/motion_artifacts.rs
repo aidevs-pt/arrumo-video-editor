@@ -219,6 +219,7 @@ impl WorkspaceStore {
         workspace_id: i64,
         artifact: &MotionArtifact,
         spec: &crate::motion_spec::MotionSpec,
+        component: Option<&crate::canvas_components::CanvasComponent>,
         replacing: Option<(i64, &str)>,
     ) -> Result<crate::MotionLibraryItem, Box<dyn Error + Send + Sync>> {
         let root = asset_root(&database.canonicalize().io_step("Resolving a path")?);
@@ -280,10 +281,17 @@ impl WorkspaceStore {
                 None => self.create_motion_library_item(workspace_id, &settings)?,
             };
             tx.execute(
-                "UPDATE motion_library SET spec_json = ?2 WHERE id = ?1",
-                params![item.id, serde_json::to_string(spec)?],
+                "UPDATE motion_library SET spec_json = ?2, component_json = ?3 WHERE id = ?1",
+                params![
+                    item.id,
+                    serde_json::to_string(spec)?,
+                    component.map(serde_json::to_string).transpose()?
+                ],
             )?;
-            Ok(item)
+            Ok(crate::MotionLibraryItem {
+                component: component.cloned(),
+                ..item
+            })
         })();
         match result {
             Ok(item) => {
