@@ -2,7 +2,7 @@
 
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Bot, DatabaseBackup, Gauge, Info, KeyRound, Package, Settings2 } from "lucide-react";
+import { ArrowUpRight, Bot, Check, CircleAlert, DatabaseBackup, FolderOpen, Gauge, Info, KeyRound, LoaderCircle, Package, RefreshCw, RotateCcw, Settings2, UserRoundCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
@@ -23,6 +23,7 @@ import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { PluginCatalog } from "./plugin-catalog";
 import { PluginDetail } from "@/components/workspace/plugins/plugin-detail";
@@ -573,42 +574,55 @@ function AgentSetupHelp({ provider }: { provider: string }) {
     }
   }
 
+  const iconAction = (label: string, icon: ReactNode, onClick: () => void, disabled = false) => <Tooltip>
+    <TooltipTrigger asChild>
+      <Button type="button" variant="ghost" size="icon-sm" aria-label={label} disabled={disabled} onClick={onClick}>{icon}</Button>
+    </TooltipTrigger>
+    <TooltipContent>{label}</TooltipContent>
+  </Tooltip>;
+  const signIn = loginStatus && ({
+    confirmed: copy.loginConfirmed, unconfirmed: copy.loginUnconfirmed,
+    unavailable: copy.notDetected, timed_out: copy.loginTimedOut, failed: copy.loginCheckFailed,
+  })[loginStatus];
+
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/30 p-3">
-      <div role="status" className="text-sm">
-        <p className="font-medium">{failed ? copy.checkFailed
-          : detected === undefined ? copy.checking
-          : detected ? copy.detected : copy.notDetected}</p>
-        {location?.found && <p className="break-all text-muted-foreground">{copy.foundAt.replace("{path}", location.found)}</p>}
-        <p className="text-muted-foreground">{copy.connectionHint}</p>
+    <div className="flex flex-col gap-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+      <div className="flex items-center gap-2">
+        <p role="status" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+          <span className={cn("flex items-center gap-1.5 font-medium", detected && "text-approval")}>
+            {detected ? <Check aria-hidden="true" className="size-4 shrink-0" />
+              : (detected === false || failed) ? <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+              : <LoaderCircle aria-hidden="true" className="size-4 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" />}
+            <span className={cn(!detected && "text-muted-foreground")}>{failed ? copy.checkFailed
+              : detected === undefined ? copy.checking : detected ? copy.detected : copy.notDetected}</span>
+          </span>
+          <button type="button" className="inline-flex items-center gap-0.5 rounded-sm font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            onClick={() => {
+              setGuideError(false);
+              void invoke("open_agent_setup_guide", { provider }).catch(() => setGuideError(true));
+            }}>{copy.guide}<ArrowUpRight aria-hidden="true" className="size-3.5" /></button>
+        </p>
+        <TooltipProvider delayDuration={250}>
+          <span className="ms-auto flex shrink-0 items-center">
+            {detected && iconAction(checkingLogin ? copy.checkingLogin : copy.checkLogin,
+              checkingLogin ? <LoaderCircle className="animate-spin motion-reduce:animate-none" /> : <UserRoundCheck />, () => void checkLogin(), checkingLogin)}
+            {iconAction(copy.recheck, <RefreshCw />, () => {
+              setFailed(false);
+              setLocation(undefined);
+              // Reads the PATH again first, so a CLI installed while Arrumo is open is found.
+              void invoke("refresh_agent_search_path").catch(() => false)
+                .finally(() => setAttempt((value) => value + 1));
+            }, detected === undefined && !failed)}
+            {iconAction(copy.chooseProgram, <FolderOpen />, () => void changeProgram(true))}
+            {location?.chosen && iconAction(copy.resetProgram, <RotateCcw />, () => void changeProgram(false))}
+          </span>
+        </TooltipProvider>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => {
-          setGuideError(false);
-          void invoke("open_agent_setup_guide", { provider }).catch(() => setGuideError(true));
-        }}>
-          {copy.guide}<ArrowUpRight data-icon="inline-end" />
-        </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={detected === undefined && !failed} onClick={() => {
-          setFailed(false);
-          setLocation(undefined);
-          // Reads the PATH again first, so a CLI installed while Arrumo is open is found.
-          void invoke("refresh_agent_search_path").catch(() => false)
-            .finally(() => setAttempt((value) => value + 1));
-        }}>{copy.recheck}</Button>
-        <Button type="button" size="sm" variant="outline" onClick={() => void changeProgram(true)}>{copy.chooseProgram}</Button>
-        {location?.chosen && <Button type="button" size="sm" variant="ghost" onClick={() => void changeProgram(false)}>{copy.resetProgram}</Button>}
-        {detected && <Button type="button" size="sm" variant="outline"
-          disabled={checkingLogin} onClick={() => void checkLogin()}>
-          {checkingLogin ? copy.checkingLogin : copy.checkLogin}
-        </Button>}
-      </div>
-      <p role="status" className="text-sm text-muted-foreground">
-        {loginStatus && ({
-          confirmed: copy.loginConfirmed, unconfirmed: copy.loginUnconfirmed,
-          unavailable: copy.notDetected, timed_out: copy.loginTimedOut, failed: copy.loginCheckFailed,
-        })[loginStatus]}
-      </p>
+      {location?.found && <p className="break-all text-muted-foreground">{copy.foundAt.replace("{path}", location.found)}</p>}
+      {!detected && <p className="text-muted-foreground">{copy.connectionHint}</p>}
+      {signIn && <p role="status" className={cn("flex items-center gap-1.5", loginStatus === "confirmed" ? "text-approval" : "text-muted-foreground")}>
+        {loginStatus === "confirmed" ? <Check aria-hidden="true" className="size-4" /> : <CircleAlert aria-hidden="true" className="size-4" />}{signIn}
+      </p>}
       {guideError && <p role="alert" className="text-sm text-destructive">{copy.guideError}</p>}
       {programError && <p role="alert" className="text-sm text-destructive">{programError}</p>}
     </div>

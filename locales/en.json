@@ -972,7 +972,9 @@
     "createAndRead": "Create {name} and read the links",
     "recommended": "Recommended",
     "orThisOne": "Or this one",
-    "oneTranscriber": "Transcription needs one key: {providers}. The first is recommended."
+    "oneTranscriber": "Transcription needs one key: {providers}. The first is recommended.",
+    "preferences": "Preferences",
+    "preferencesLater": "You can change these later in Settings › General."
   },
   "workspaces": {
     "missing": "This workspace could not be found.",
@@ -1896,7 +1898,11 @@
     "weekly": "Weekly limit",
     "hourly": "{hours}-hour limit",
     "planLimit": "Plan limit",
-    "unknownAgent": "Could not read the plan’s usage ({reason})."
+    "unknownAgent": "Could not read the plan’s usage ({reason}).",
+    "columnService": "Service",
+    "columnLeft": "Left",
+    "columnDetails": "Details",
+    "columnActions": "Actions"
   },
   "pluginDetail": {
     "back": "All plugins",

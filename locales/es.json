@@ -972,7 +972,9 @@
     "createAndRead": "Crear {name} y leer los enlaces",
     "recommended": "Recomendado",
     "orThisOne": "O este",
-    "oneTranscriber": "La transcripción necesita una clave: {providers}. Se recomienda la primera."
+    "oneTranscriber": "La transcripción necesita una clave: {providers}. Se recomienda la primera.",
+    "preferences": "Preferencias",
+    "preferencesLater": "Puedes cambiarlas más tarde en Ajustes › General."
   },
   "workspaces": {
     "missing": "No se encontró este espacio de trabajo.",
@@ -1896,7 +1898,11 @@
     "weekly": "Límite semanal",
     "hourly": "Límite de {hours} horas",
     "planLimit": "Límite del plan",
-    "unknownAgent": "No se pudo leer el uso del plan ({reason})."
+    "unknownAgent": "No se pudo leer el uso del plan ({reason}).",
+    "columnService": "Servicio",
+    "columnLeft": "Restante",
+    "columnDetails": "Detalles",
+    "columnActions": "Acciones"
   },
   "pluginDetail": {
     "back": "Todos los complementos",
