@@ -1644,13 +1644,19 @@ async fn control_generation(
     workspace_id: i64,
     run_id: i64,
     action: RunControl,
+    stage_index: Option<usize>,
     store: State<'_, Store>,
 ) -> Result<GenerationRun, &'static str> {
-    store
-        .lock()
-        .map_err(|_| "store_unavailable")?
-        .control_generation(workspace_id, run_id, action)
-        .map_err(|_| "generation_control_failed")
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    match (action, stage_index) {
+        (RunControl::Stop, Some(stage)) => store
+            .return_generation_to_stage(workspace_id, run_id, stage)
+            .map_err(|_| "generation_control_failed"),
+        (_, Some(_)) => Err("generation_control_failed"),
+        (action, None) => store
+            .control_generation(workspace_id, run_id, action)
+            .map_err(|_| "generation_control_failed"),
+    }
 }
 
 #[tauri::command]

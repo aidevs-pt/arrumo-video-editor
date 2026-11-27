@@ -9,11 +9,15 @@ import { isScriptSections, ScriptSectionReview } from "./script-section-review";
 import { AgentProgress } from "./agent-progress";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FieldDescription, Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +35,7 @@ import { MotionArtifactAction } from "./motion-artifact-action";
 import { SupplementalReview } from "./supplemental-review";
 import type { AutomaticSubtitles } from "./delivery-subtitles";
 import { MediaStageAction } from "./media-stage-action";
+import { bulkTargets, ReviewActionBar } from "./review-action-bar";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
@@ -76,6 +81,9 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
   const [reviewError, setReviewError] = useState(false);
   const [plan, setPlan] = useState<Plan | null>();
   const [loadError, setLoadError] = useState(false);
+  const [goBackTo, setGoBackTo] = useState<number>();
+  const [goingBack, setGoingBack] = useState(false);
+  const [goBackError, setGoBackError] = useState(false);
   const awaiting = progress?.results.find((entry) => entry.id === progress.pending_review_id);
 
   useEffect(() => {
@@ -130,6 +138,24 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     || (hasSources && (currentStage === "preview" || currentStage === "final_render"))
     ? currentStage : undefined;
 
+  const canGoBack = (index: number) => runState !== "completed" && runState !== "cancelled" && !reviewing && !goingBack
+    && progress !== undefined && index < progress.stage_index && progress.results.some((entry) => entry.stage_index === index);
+
+  async function returnTo(stageIndex: number) {
+    setGoingBack(true);
+    setGoBackError(false);
+    try {
+      await invoke("control_generation", { workspaceId, runId, action: "stop", stageIndex });
+      const status = await invoke<StageProgress>("production_progress", { workspaceId, runId });
+      setProgress(status);
+    } catch {
+      setGoBackError(true);
+    } finally {
+      setGoingBack(false);
+      setGoBackTo(undefined);
+    }
+  }
+
   async function review(resultId: number, decision: Decision | "", notes: string, saveMotionIndexes?: number[], supplemental?: SupplementalReview, preview?: PreviewChoice[]) {
     if (reviewing) return false;
     setReviewing(true);
@@ -153,9 +179,21 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
     }
   }
 
+  function stepFace(stage: Stage, complete: boolean, current: boolean, hover?: string) {
+    return <>
+      <span className={cn("h-[30px] rounded-xs border transition-colors", complete
+        ? cn("border-white/85 bg-white/85", hover) : current ? (runState === "paused"
+          ? "border-white/85 bg-[repeating-linear-gradient(135deg,rgb(255_255_255_/_30%)_0,rgb(255_255_255_/_30%)_4px,transparent_4px,transparent_9px)]"
+          : "border-transparent bg-attention") : "border-white/35")} aria-hidden="true" />
+      <span className={cn("min-w-0 px-1 text-xs font-bold wrap-anywhere",
+        current && runState !== "paused" ? "text-attention" : "text-white/85")}>{copy[stage]}</span>
+    </>;
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <section ref={timeline} tabIndex={-1} aria-label={copy.title} className="flex min-w-0 flex-col gap-2 rounded-sm focus:outline-2 focus:outline-attention">
+      <section ref={timeline} tabIndex={-1} aria-label={copy.title} className="flex min-w-0 flex-col gap-2 outline-none">
+        {goBackError && <Alert variant="destructive"><AlertDescription>{copy.goBackError}</AlertDescription></Alert>}
         {loadError && <Alert variant="destructive"><AlertDescription>{copy.loadError}</AlertDescription></Alert>}
         {plan === undefined && !loadError && <Skeleton className="h-14 bg-white/15" aria-label={copy.loading} />}
         {plan === null && <p role="status" className="border-y border-white/20 py-3 text-sm text-white/80">{copy.waiting}</p>}
@@ -168,13 +206,14 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
               const activeColor = runState === "paused" ? "bg-white" : "bg-attention";
               return (
                 <li key={step.stage} aria-current={current ? "step" : undefined}
-                  className="relative flex min-w-0 flex-col gap-1.5 pt-1.5 pb-2.5">
-                  <span className={cn("h-[30px] rounded-xs border", complete
-                    ? "border-white/85 bg-white/85" : current ? (runState === "paused"
-                      ? "border-white/85 bg-[repeating-linear-gradient(135deg,rgb(255_255_255_/_30%)_0,rgb(255_255_255_/_30%)_4px,transparent_4px,transparent_9px)]"
-                      : "border-transparent bg-attention") : "border-white/35")} aria-hidden="true" />
-                  <span className={cn("min-w-0 px-1 text-xs font-bold wrap-anywhere",
-                    current && runState !== "paused" ? "text-attention" : "text-white/85")}>{copy[step.stage]}</span>
+                  className="relative flex min-w-0 flex-col pb-2.5">
+                  {canGoBack(index) ? (
+                    <button type="button" onClick={() => setGoBackTo(index)}
+                      aria-label={copy.goBackLabel.replace("{stage}", stageName(step.stage))} title={copy.goBackLabel.replace("{stage}", stageName(step.stage))}
+                      className="group flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-xs pt-1.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-white/80">
+                      {stepFace(step.stage, complete, current, "group-hover:bg-white group-hover:border-white")}
+                    </button>
+                  ) : <div className="flex min-w-0 flex-col gap-1.5 pt-1.5">{stepFace(step.stage, complete, current)}</div>}
                   <span className="absolute inset-x-0 bottom-0 h-1.5 border-t border-white/30 bg-[repeating-linear-gradient(to_right,transparent_0,transparent_calc(25%_-_1px),rgb(255_255_255_/_20%)_calc(25%_-_1px),rgb(255_255_255_/_20%)_25%)]" aria-hidden="true" />
                   {complete && <span className="sr-only">{copy.stageComplete}</span>}
                   {step.review_required && current && <span className="sr-only">{copy.reviewRequired}</span>}
@@ -191,6 +230,21 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
           </ol>
         )}
       </section>
+      <AlertDialog open={goBackTo !== undefined} onOpenChange={(open) => { if (!open && !goingBack) setGoBackTo(undefined); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{goBackTo !== undefined && plan ? copy.goBackTitle.replace("{stage}", stageName(plan.steps[goBackTo].stage)) : ""}</AlertDialogTitle>
+            <AlertDialogDescription>{goBackTo !== undefined && plan ? copy.goBackDescription.replace("{stage}", stageName(plan.steps[goBackTo].stage)) : ""}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={goingBack}>{copy.goBackCancel}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={goingBack}
+              onClick={(event) => { event.preventDefault(); if (goBackTo !== undefined) void returnTo(goBackTo); }}>
+              {copy.goBackConfirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {(currentStage || runState === "completed") && <div className="flex items-center gap-3 py-2 text-white">
         <PluginIcon pluginId={agentId} tone="dark" className="size-11" />
         <div className="flex min-w-0 flex-col items-start gap-1" role="status">
@@ -361,18 +415,24 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   const footerItems = hasItemReview || (motionReview && !draft.decision);
   const stagedCount = motionReview ? motionStaged : staged;
   const undecided = hasItemReview ? textCount + mediaCount - staged : motionReview ? motionItems.length - motionStaged : 0;
-  function approveRest() {
+  function decideBulk(value: Decision) {
     if (motionReview) {
-      updateDraft({ ...draft, motion: Object.fromEntries(motionItems.map(({ index }) => [index, draft.motion?.[index] ?? "approved"])) });
+      const targets = bulkTargets(motionItems.map(({ index }) => index), (index) => Boolean(draft.motion?.[index]));
+      updateDraft({ ...draft, decision: "", motion: { ...draft.motion, ...Object.fromEntries(targets.map((index) => [index, value])) } });
       return;
     }
-    setDraft((current) => current.supplemental ? {
-      ...current,
-      supplemental: {
-        text: current.supplemental.text.map((value) => value || "approved"),
-        media: current.supplemental.media.map((value) => value || "approved"),
-      },
-    } : current);
+    if (!itemDraft) return;
+    const keys = [...itemDraft.text.map((_, index) => `text-${index}`), ...itemDraft.media.map((_, index) => `media-${index}`)];
+    const current = (key: string) => {
+      const [kind, index] = key.split("-") as ["text" | "media", string];
+      return itemDraft[kind][Number(index)];
+    };
+    const targets = new Set(bulkTargets(keys, (key) => Boolean(current(key)), (key) => batchSelection.has(key)));
+    updateDraft({ ...draft, supplemental: {
+      text: itemDraft.text.map((decision, index) => targets.has(`text-${index}`) ? value : decision),
+      media: itemDraft.media.map((decision, index) => targets.has(`media-${index}`) ? value : decision),
+    } });
+    setBatchSelection(new Set());
   }
   const canSend = hasItemReview ? staged === textCount + mediaCount : motionReview ? Boolean(draft.decision) || motionStaged === motionItems.length : Boolean(draft.decision);
   const source = Object.fromEntries(Object.entries(result.result).filter(([key]) =>
@@ -493,16 +553,6 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <NoTranscriptNote workspaceId={workspaceId} clips={result.result.footage_without_transcript} />
         {markdown && <ScriptReviewText markdown={markdown} />}
         {itemDraft && <>
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-secondary p-2" role="group" aria-label={selectedCount ? copy.selectedOutputCount.replace("{count}", String(selectedCount)) : copy.batchDecisions}>
-            {selectedCount > 0 && <span className="px-1 text-sm">{copy.selectedOutputCount.replace("{count}", String(selectedCount))}</span>}
-            {decisions.map(({ value, icon: Icon }) => <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
-              onClick={() => updateDraft({ ...draft, supplemental: {
-                text: itemDraft.text.map((current, index) => !selectedCount || batchSelection.has(`text-${index}`) ? value : current),
-                media: itemDraft.media.map((current, index) => !selectedCount || batchSelection.has(`media-${index}`) ? value : current),
-              } })}><Icon data-icon="inline-start" />{selectedCount ? copy[`selected_${value}`] : copy[`batch_${value}`]}</Button>)}
-            {selectedCount > 0 && <Button type="button" size="sm" variant="ghost" disabled={reviewing}
-              onClick={() => setBatchSelection(new Set())}>{copy.clearOutputSelection}</Button>}
-          </div>
           {hasSupplemental && <SupplementalReview workspaceId={workspaceId} runId={runId} resultId={result.id} formats={formats}
             prompts={result.result.thumbnail_prompts}
             controls={reviewControls} />}
@@ -584,47 +634,40 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <form id={reviewFormId} onSubmit={(event) => void submit(event)}>
           <fieldset disabled={reviewing}>
             <FieldGroup>
-              {!hasItemReview && <Field>
-                {motionReview && <FieldDescription>{copy.wholeStepHint}</FieldDescription>}
-                <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-2">
-                  {decisions.map(({ value, label, icon: Icon, fill }) => {
-                    const selected = draft.decision === value;
-                    return <Button key={value} type="button" size="sm" variant="outline" aria-pressed={selected}
-                      onClick={() => updateDraft({ ...draft, decision: selected ? "" : value })}
-                      className={cn(selected && fill)}>
-                      <Icon data-icon="inline-start" />{copy[label]}
-                    </Button>;
-                  })}
-                </div>
-              </Field>}
-              <Field>
-                <FieldLabel htmlFor={`review-notes-${runId}`}>{copy.reviewNotes}</FieldLabel>
-                <Textarea id={`review-notes-${runId}`} name="notes" value={draft.notes}
-                  onChange={(event) => updateDraft({ ...draft, notes: event.target.value })} />
-              </Field>
               {reviewError && <Alert variant="destructive"><AlertDescription>{copy.reviewError}</AlertDescription></Alert>}
             </FieldGroup>
           </fieldset>
         </form>
       </CardContent>
-      <div className="sticky bottom-4 z-[1] flex flex-wrap mx-4 items-center justify-between gap-3 rounded-lg bg-ink px-3 py-2 text-white">
-        <p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || stagedCount > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
+      <ReviewActionBar className="mx-4" total={footerItems ? (motionReview ? motionItems.length : textCount + mediaCount) : 0}
+        decided={stagedCount} selected={hasItemReview ? selectedCount : 0} reviewing={reviewing}
+        onDecide={footerItems ? decideBulk : undefined} onClearSelection={() => setBatchSelection(new Set())}
+        notes={draft.notes} onNotes={(notes) => updateDraft({ ...draft, notes })} notesLabel={copy.reviewNotes}
+        status={<p className={cn("flex flex-wrap items-center gap-2 text-sm", (draft.decision || stagedCount > 0 || draft.notes || hasItemNotes) && "font-bold text-attention")} role="status">
           {draft.decision && <span aria-hidden="true"
             className={cn("size-2 rounded-xs", decisions.find((option) => option.value === draft.decision)?.marker)} />}
           {!footerItems && draft.decision ? copy.stagedOne.replace("{agent}", agent ?? copy.agentFallback)
             : footerItems && stagedCount > 0 && undecided > 0 ? <>{(stagedCount === 1 ? copy.stagedItemsOne : copy.stagedItems).replace("{count}", String(stagedCount))}
               <span className="font-normal text-white">{(undecided === 1 ? copy.stillNeedsOne : copy.stillNeeds).replace("{count}", String(undecided))}</span></>
             : draft.decision || stagedCount > 0 || draft.notes || hasItemNotes ? copy.unsentReview : footerItems ? (motionReview ? copy.selectEveryAnimation : copy.selectEveryItem) : copy.selectDecision}
-        </p>
-        {footerItems && stagedCount > 0 && undecided > 0 && <Button type="button" variant="outline" disabled={reviewing} onClick={approveRest}
-          className="ms-auto border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">{copy.approveRest}</Button>}
-        <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
-          className={cn("bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100",
-            !(footerItems && stagedCount > 0 && undecided > 0) && "ms-auto")}>
-          {footerItems ? (stagedCount === 0 ? copy.sendNothing : stagedCount === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(stagedCount)))
-            : draft.decision ? copy.submitDecision : copy.sendNothing}
-        </Button>
-      </div>
+        </p>}
+        actions={<>
+          {!footerItems && <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-1.5">
+            {decisions.map(({ value, label, icon: Icon, fill }) => {
+              const selected = draft.decision === value;
+              return <Button key={value} type="button" size="sm" variant="outline" aria-pressed={selected} disabled={reviewing}
+                onClick={() => updateDraft({ ...draft, decision: selected ? "" : value })}
+                className={cn("border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white", selected && fill)}>
+                <Icon data-icon="inline-start" />{copy[label]}
+              </Button>;
+            })}
+          </div>}
+          <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
+            className="bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
+            {footerItems ? (stagedCount === 0 ? copy.sendNothing : stagedCount === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(stagedCount)))
+              : draft.decision ? copy.submitDecision : copy.sendNothing}
+          </Button>
+        </>} />
     </Card>
   );
 }

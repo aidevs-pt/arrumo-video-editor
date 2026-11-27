@@ -1,12 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { enUS, es, pt } from "date-fns/locale";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { useId, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocale } from "@/lib/locale-provider";
 
 const calendarLocales = { en: enUS, es, pt } as const;
@@ -51,34 +52,41 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
 
   const selected = savedDate ? day(savedDate) : undefined;
   const label = selected
-    ? new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(selected)
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(selected)
     : copy.notScheduled;
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <Field>
         <FieldLabel htmlFor={id}>{copy.scheduleDate}</FieldLabel>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button id={id} type="button" variant="outline" disabled={pending}
-              className="h-auto min-h-9 w-full justify-start gap-2 py-2 text-start font-normal whitespace-normal">
-              <CalendarDays data-icon="inline-start" className="text-muted-foreground" />
-              <span className={selected ? undefined : "text-muted-foreground"}>{label}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={selected} defaultMonth={selected}
-              locale={calendarLocales[locale as keyof typeof calendarLocales] ?? enUS}
-              onSelect={(value) => {
-                setOpen(false);
-                if (value && isoDay(value) !== savedDate) void save(isoDay(value));
-              }} />
-          </PopoverContent>
-        </Popover>
+        <div className="flex min-w-0 items-center gap-1">
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button id={id} type="button" variant="outline" disabled={pending} title={label}
+                className="min-w-0 flex-1 justify-start gap-2 text-start font-normal">
+                <CalendarDays data-icon="inline-start" className="text-muted-foreground" />
+                <span className={selected ? "truncate" : "truncate text-muted-foreground"}>{label}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={selected} defaultMonth={selected}
+                locale={calendarLocales[locale as keyof typeof calendarLocales] ?? enUS}
+                onSelect={(value) => {
+                  setOpen(false);
+                  if (value && isoDay(value) !== savedDate) void save(isoDay(value));
+                }} />
+            </PopoverContent>
+          </Popover>
+          {savedDate && <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" aria-label={copy.clearDate} disabled={pending} onClick={() => void save("")}>
+                <X />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{copy.clearDate}</TooltipContent>
+          </Tooltip>}
+        </div>
       </Field>
-      {savedDate && <Button type="button" size="sm" variant="ghost" className="self-start" disabled={pending} onClick={() => void save("")}>
-        {copy.clearDate}
-      </Button>}
       {status === "saved" && <p role="status" className="text-sm text-muted-foreground">{copy.dateSaved}</p>}
       {status === "failed" && <Alert variant="destructive"><AlertDescription>{copy.dateError}</AlertDescription></Alert>}
     </div>

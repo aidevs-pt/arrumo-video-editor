@@ -273,7 +273,7 @@ impl WorkspaceStore {
         action: RunControl,
     ) -> rusqlite::Result<GenerationRun> {
         let (target, allowed) = match action {
-            RunControl::Stop => return self.stop_generation(workspace_id, run_id),
+            RunControl::Stop => return self.stop_generation(workspace_id, run_id, None),
             RunControl::Pause => ("paused", ["queued", "running", "paused"]),
             RunControl::Retry => ("queued", ["failed", "queued", "queued"]),
             RunControl::Resume => ("queued", ["paused", "queued", "queued"]),
@@ -302,9 +302,26 @@ impl WorkspaceStore {
         Ok(run)
     }
 
+    /// Stops the run and reopens an earlier step for review: `stage_index`, or the one just before
+    /// the current step. Everything the later steps saved is dropped so they are made again.
+    pub fn return_generation_to_stage(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        stage_index: usize,
+    ) -> rusqlite::Result<GenerationRun> {
+        let run = self.stop_generation(workspace_id, run_id, Some(stage_index as i64))?;
+        Ok(self.generation_run(workspace_id, run.id)?.unwrap_or(run))
+    }
+
     /// Reopens the most recent result of an earlier stage for review and pauses the run there.
     /// The original decision stays in the history; the review applies to a copy of the result.
-    fn stop_generation(&self, workspace_id: i64, run_id: i64) -> rusqlite::Result<GenerationRun> {
+    fn stop_generation(
+        &self,
+        workspace_id: i64,
+        run_id: i64,
+        target: Option<i64>,
+    ) -> rusqlite::Result<GenerationRun> {
         let tx = Transaction::new_unchecked(&self.0, TransactionBehavior::Immediate)?;
         let (previous, stage_index, was_paused): (i64, i64, bool) = tx.query_row(
             "SELECT result.id, result.stage_index, run.state = 'paused' FROM production_results AS result
@@ -312,8 +329,9 @@ impl WorkspaceStore {
              WHERE run.workspace_id = ?1 AND run.id = ?2
                AND run.state IN ('queued', 'running', 'paused', 'failed')
                AND result.stage_index < run.stage_index
+               AND (?3 IS NULL OR result.stage_index = ?3)
              ORDER BY result.id DESC LIMIT 1",
-            params![workspace_id, run_id],
+            params![workspace_id, run_id, target],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )?;
         let reopened: i64 = tx.query_row(
@@ -325,13 +343,18 @@ impl WorkspaceStore {
         )?;
         let run = tx.query_row(
             "UPDATE generation_runs
-             SET state = 'paused', stage_index = ?3, pending_review_id = ?4, lease_until = NULL
+             SET state = 'paused', stage_index = ?3, pending_review_id = ?4, lease_until = NULL,
+                 checkpoint_json = NULL
              WHERE workspace_id = ?1 AND id = ?2
              RETURNING id, draft_id, state, snapshot_json, pending_review_id, display_title",
             params![workspace_id, run_id, stage_index, reopened],
             read_run,
         )?;
-        let detail = "Stopped and returned to the previous step";
+        let detail = if target.is_some() {
+            "Stopped and went back to an earlier step"
+        } else {
+            "Stopped and returned to the previous step"
+        };
         if was_paused {
             // A paused run stays paused, so the state trigger records nothing.
             tx.execute(
@@ -780,6 +803,93 @@ mod stop_tests {
                 .unwrap()
                 .stage_index,
             0
+        );
+    }
+
+    #[test]
+    fn going_back_to_an_earlier_step_drops_what_came_after() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let draft = store
+            .create_video_draft(
+                workspace,
+                DraftSettings {
+                    title: "Explainer".into(),
+                    profile_id: None,
+                    intent: "Explain".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &RunOptions::default())
+            .unwrap();
+        let plan = store.generation_plan(workspace, run.id).unwrap().unwrap();
+        let script = serde_json::json!({"markdown": "## Hook"});
+        let mut first = None;
+        for (index, step) in plan.steps.iter().take(2).enumerate() {
+            let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+            let result = if index == 0 {
+                script.clone()
+            } else {
+                serde_json::json!({"note": "second"})
+            };
+            let id = store
+                .submit_production_result(workspace, run.id, attempt, step.stage, &result)
+                .unwrap();
+            first.get_or_insert(id);
+            if step.review_required {
+                store
+                    .review_production_result(workspace, run.id, id, ReviewDecision::Approved, "")
+                    .unwrap();
+            }
+        }
+        let attempt = store.claim_generation(workspace).unwrap().unwrap().attempt;
+        store
+            .checkpoint_generation(workspace, run.id, attempt, &serde_json::json!({"saved": 1}))
+            .unwrap();
+        assert!(
+            store
+                .return_generation_to_stage(workspace, run.id, 2)
+                .is_err(),
+            "only an earlier step"
+        );
+
+        let back = store
+            .return_generation_to_stage(workspace, run.id, 0)
+            .unwrap();
+        assert_eq!(back.state, "paused");
+        let progress = store.production_progress(workspace, run.id).unwrap();
+        assert_eq!(progress.stage_index, 0);
+        let reopened = progress.pending_review_id.unwrap();
+        assert_ne!(Some(reopened), first);
+        assert_eq!(
+            progress
+                .results
+                .iter()
+                .find(|entry| entry.id == reopened)
+                .unwrap()
+                .result,
+            script
+        );
+        let checkpoint: Option<String> = store
+            .0
+            .query_row(
+                "SELECT checkpoint_json FROM generation_runs WHERE id = ?1",
+                [run.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(checkpoint, None);
+        assert_eq!(
+            store
+                .generation_activity(workspace, run.id)
+                .unwrap()
+                .last()
+                .unwrap()
+                .detail
+                .as_deref(),
+            Some("Stopped and went back to an earlier step")
         );
     }
 }

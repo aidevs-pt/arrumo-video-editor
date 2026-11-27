@@ -52,6 +52,7 @@ struct ControlInput {
     workspace_id: i64,
     run_id: i64,
     action: RunControl,
+    stage_index: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -308,9 +309,10 @@ pub(super) fn definitions() -> [Value; 42] {
                         "description": "Plugin hooks this video does not run, as plugin-id/action-id."}
                 }, "additionalProperties": false}
             }, "required": ["workspaceId", "draftId", "requestKey"], "additionalProperties": false}}),
-        json!({"name": "control_generation", "description": "Pause, resume, retry, or cancel a generation run.",
+        json!({"name": "control_generation", "description": "Pause, resume, retry, or cancel a generation run. Stop goes back to the previous reviewed step, or to stageIndex when given, and reopens it for review; the steps after it are made again.",
             "inputSchema": {"type": "object", "properties": {
-                "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel", "stop"]}
+                "workspaceId": id, "runId": id, "action": {"enum": ["pause", "resume", "retry", "cancel", "stop"]},
+                "stageIndex": {"type": "integer", "minimum": 0, "description": "With stop only: the earlier step to go back to, counted from 0 in the run's plan."}
             }, "required": ["workspaceId", "runId", "action"], "additionalProperties": false}}),
         json!({"name": "process_script_stage", "description": "Run the run's agent on its queued Script stage and submit the draft for review. Earlier drafts' review notes are included. The run fails with a reason if the agent cannot finish.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "runId": id},
@@ -522,9 +524,14 @@ pub(super) fn call(
                 .map_err(|_| "Could not enqueue draft. Check scope, request key and options")
         }),
         "control_generation" => parse(arguments).and_then(|args: ControlInput| {
-            store
-                .control_generation(args.workspace_id, args.run_id, args.action)
-                .map(|run| json!({"run": run_summary(&run)}))
+            match (args.action, args.stage_index) {
+                (RunControl::Stop, Some(stage)) => {
+                    store.return_generation_to_stage(args.workspace_id, args.run_id, stage)
+                }
+                (_, Some(_)) => Err(rusqlite::Error::InvalidQuery),
+                (action, None) => store.control_generation(args.workspace_id, args.run_id, action),
+            }
+            .map(|run| json!({"run": run_summary(&run)}))
                 .map_err(|_| "Could not change this run in its current state or workspace")
         }),
         "process_script_stage" => parse(arguments).and_then(|args: RunInput| {

@@ -999,6 +999,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{expires}");
         }
+        [database, command, workspace, run, action, stage]
+            if command == "control-generation" && action == "stop" =>
+        {
+            let run = WorkspaceStore::open(Path::new(database))?.return_generation_to_stage(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(stage)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
+        }
         [database, command, workspace, run, action] if command == "control-generation" => {
             let action = match utf8(action)? {
                 "pause" => RunControl::Pause,
@@ -1742,7 +1752,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | sweep-agent-sessions | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
-                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> | ",
+                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> [stage-index] | ",
                 "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
                 "read-completion-notification <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
