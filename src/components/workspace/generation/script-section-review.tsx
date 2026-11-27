@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MessageSquare, PencilLine, X } from "lucide-react";
+import { Check, MessageSquare, PencilLine, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
-import { bulkTargets, ReviewActionBar } from "./review-action-bar";
+import { bulkTargets, DecisionToggles, ReviewActionBar } from "./review-action-bar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type ScriptSection = { heading: string; timing: string; narration: string; idea: string };
@@ -139,14 +140,16 @@ export function ScriptSectionReview({ storageKey, sections, agent, reviewing, re
                     {marker && <span aria-hidden="true" className={cn("size-2.5 rounded-[2px]", marker)} />}
                     {decision ? labels[decision] : <span className="rounded-md bg-secondary px-2 py-0.5 font-normal text-muted-foreground">{copy.noDecision}</span>}
                   </span>
-                  <Button type="button" size="sm" variant="ghost" disabled={reviewing}
-                    onClick={() => setOpenNotes((current) => [...current, index])}><MessageSquare data-icon="inline-start" />{copy.comment}</Button>
-                  {options.map(({ value, icon: Icon, fill }) => (
-                    <Button key={value} type="button" size="sm" variant="outline" aria-pressed={decision === value} disabled={reviewing}
-                      className={cn(decision === value && fill)} onClick={() => decide([index], value)}>
-                      <Icon data-icon="inline-start" />{plan[`item_${value}`]}
-                    </Button>
-                  ))}
+                  <TooltipProvider delayDuration={250}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button type="button" size="icon-sm" variant="ghost" disabled={reviewing} aria-label={copy.commentFor.replace("{heading}", section.heading)}
+                          onClick={() => setOpenNotes((current) => [...current, index])}><MessageSquare /></Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{copy.comment}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <DecisionToggles value={decision} label={section.heading} disabled={reviewing} onChange={(value) => decide([index], value)} />
                 </div>
               </div>
             </li>
@@ -163,13 +166,11 @@ export function ScriptSectionReview({ storageKey, sections, agent, reviewing, re
         }}
         onClearSelection={() => setSelected([])}
         notes={staged.overall} onNotes={(overall) => update({ ...staged, overall })} notesLabel={copy.overall}
-        status={<p className="text-sm" role="status">
-          {count ? <><span className="font-bold text-attention">{count === 1 ? copy.stagedOne : copy.staged.replace("{count}", String(count))}</span>{" "}
-            {copy.stagedHint.replace("{agent}", agentName)}</> : copy.nothingStaged}
+        status={<p className="text-sm" role="status" title={count ? copy.stagedHint.replace("{agent}", agentName) : copy.nothingStaged}>
+          {count ? <span className="font-bold text-attention">{count === 1 ? copy.stagedOne : copy.staged.replace("{count}", String(count))}</span> : copy.noDecisionsYet}
         </p>}
+        menuItems={[{ label: copy.rejectAll, icon: Trash2, destructive: true, onSelect: () => void send("rejected") }]}
         actions={<>
-          <Button type="button" variant="ghost" size="sm" disabled={reviewing} onClick={() => void send("rejected")}
-            className="text-white/80 hover:bg-white/10 hover:text-white">{copy.rejectAll}</Button>
           <Button type="button" disabled={reviewing || (!count && !staged.overall.trim())} onClick={() => void send()}
             className="bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
             {count === 0 ? plan.sendNothing : count === 1 ? copy.sendOne : copy.send.replace("{count}", String(count))}

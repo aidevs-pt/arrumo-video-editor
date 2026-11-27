@@ -1238,15 +1238,8 @@
     "editItemNote": "Editar nota",
     "itemNoteFor": "Nota para {label}",
     "selectedOutputCount": "{count} seleccionados",
-    "selected_approved": "Aprobar selección",
-    "selected_revise": "Pedir cambios en la selección",
-    "selected_rejected": "Rechazar selección",
     "clearOutputSelection": "Limpiar selección",
     "selectOutput": "Seleccionar {label}",
-    "batchDecisions": "Decidir sobre todas las salidas",
-    "batch_approved": "Aprobar todo",
-    "batch_revise": "Pedir cambios en todo",
-    "batch_rejected": "Rechazar todo",
     "item_approved": "Aprobar",
     "item_revise": "Pedir cambios",
     "item_rejected": "Rechazar",
@@ -1354,12 +1347,13 @@
     "goBackConfirm": "Parar y volver",
     "goBackCancel": "Seguir",
     "goBackError": "No se ha podido volver a ese paso. Vuelve a intentarlo.",
-    "rest_approved": "Aprobar el resto",
-    "rest_revise": "Pedir cambios en el resto",
-    "rest_rejected": "Rechazar el resto",
     "addNotes": "Notas",
     "editNotes": "Editar notas",
-    "hideNotes": "Ocultar notas"
+    "hideNotes": "Ocultar notas",
+    "batch_menu": "Decidir todo",
+    "rest_menu": "Decidir el resto",
+    "selected_menu": "Decidir {count} seleccionados",
+    "moreActions": "Más"
   },
   "markdownEditor": {
     "loading": "Cargando el editor de texto enriquecido…",
@@ -1676,7 +1670,8 @@
     "sendOne": "Enviar 1 decisión",
     "rejectAll": "Descartar este borrador y empezar de nuevo",
     "overall": "Algo más sobre todo el guion (opcional)",
-    "notesHeading": "Decisiones por sección:"
+    "notesHeading": "Decisiones por sección:",
+    "noDecisionsYet": "Aún no hay decisiones"
   },
   "media": {
     "linuxCodecs": "En Linux, el vídeo se reproduce con GStreamer. Instala su decodificador H.264 (gstreamer1.0-libav en Debian y Ubuntu, gstreamer1-plugin-openh264 o gstreamer1-plugin-libav en Fedora) y reinicia Arrumo."

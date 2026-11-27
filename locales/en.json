@@ -1238,15 +1238,8 @@
     "editItemNote": "Edit note",
     "itemNoteFor": "Note for {label}",
     "selectedOutputCount": "{count} selected",
-    "selected_approved": "Approve selected",
-    "selected_revise": "Ask for changes to selected",
-    "selected_rejected": "Reject selected",
     "clearOutputSelection": "Clear selection",
     "selectOutput": "Select {label}",
-    "batchDecisions": "Decide for all outputs",
-    "batch_approved": "Approve all",
-    "batch_revise": "Ask for changes to all",
-    "batch_rejected": "Reject all",
     "item_approved": "Approve",
     "item_revise": "Ask for changes",
     "item_rejected": "Reject",
@@ -1354,12 +1347,13 @@
     "goBackConfirm": "Stop and go back",
     "goBackCancel": "Keep going",
     "goBackError": "Couldn't go back to that step. Try again.",
-    "rest_approved": "Approve the rest",
-    "rest_revise": "Ask for changes to the rest",
-    "rest_rejected": "Reject the rest",
     "addNotes": "Notes",
     "editNotes": "Edit notes",
-    "hideNotes": "Hide notes"
+    "hideNotes": "Hide notes",
+    "batch_menu": "Decide all",
+    "rest_menu": "Decide the rest",
+    "selected_menu": "Decide {count} selected",
+    "moreActions": "More"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",
@@ -1676,7 +1670,8 @@
     "sendOne": "Send 1 decision",
     "rejectAll": "Scrap this draft and start over",
     "overall": "Anything else about the whole script (optional)",
-    "notesHeading": "Section decisions:"
+    "notesHeading": "Section decisions:",
+    "noDecisionsYet": "No decisions yet"
   },
   "media": {
     "linuxCodecs": "On Linux, video plays through GStreamer. Install its H.264 decoder (gstreamer1.0-libav on Debian and Ubuntu, gstreamer1-plugin-openh264 or gstreamer1-plugin-libav on Fedora), then restart Arrumo."

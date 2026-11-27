@@ -3,7 +3,7 @@
 import { PlacedPluginActions } from "@/components/workspace/plugins/placed-actions";
 import { PluginIcon } from "@/lib/plugin-text";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowUpRight, Check, ChevronDown, CircleCheck, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, MessageSquare, CircleCheck, Clapperboard, Film, Image as ImageIcon, Music, PencilLine, Sparkles, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { isScriptSections, ScriptSectionReview } from "./script-section-review";
 import { AgentProgress } from "./agent-progress";
@@ -35,7 +35,7 @@ import { MotionArtifactAction } from "./motion-artifact-action";
 import { SupplementalReview } from "./supplemental-review";
 import type { AutomaticSubtitles } from "./delivery-subtitles";
 import { MediaStageAction } from "./media-stage-action";
-import { bulkTargets, ReviewActionBar } from "./review-action-bar";
+import { bulkTargets, DecisionToggles, ReviewActionBar } from "./review-action-bar";
 import { completedVideoHref } from "@/components/workspace/home/workspace-router";
 
 export type Stage = "script" | "assets" | "preview" | "supplemental_outputs" | "final_render" | "verify_delivery";
@@ -491,15 +491,14 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
         <Checkbox disabled={reviewing} checked={batchSelection.has(`${kind}-${index}`)}
           aria-label={copy.selectOutput.replace("{label}", label)}
           onCheckedChange={(checked) => selectItem(`${kind}-${index}`, checked === true)} />
-        {decisions.map(({ value, icon: Icon, fill }) => {
+        <DecisionToggles value={itemDraft[kind][index]} label={label} disabled={reviewing} onChange={(value) => {
           const active = itemDraft[kind][index] === value;
-          return <Button key={value} type="button" variant="outline" size="sm" disabled={reviewing}
-            aria-pressed={active} className={cn(active && fill)} onClick={() => {
-              const items = itemDraft[kind].map((decision, position) => position === index ? (active ? "" : value) : decision);
-              updateDraft({ ...draft, supplemental: { ...itemDraft, [kind]: items } });
-            }}><Icon data-icon="inline-start" />{copy[`item_${value}`]}</Button>;
-        })}
-        <Button type="button" size="sm" variant="ghost" disabled={reviewing} aria-expanded={openNotes.has(key)}
+          const items = itemDraft[kind].map((decision, position) => position === index ? (active ? "" : value) : decision);
+          updateDraft({ ...draft, supplemental: { ...itemDraft, [kind]: items } });
+        }} />
+        <Button type="button" size="icon-sm" variant="ghost" disabled={reviewing} aria-expanded={openNotes.has(key)}
+          aria-label={note ? copy.editItemNote : copy.addItemNote} title={note ? copy.editItemNote : copy.addItemNote}
+          className={cn(note && "text-primary")}
           aria-controls={`${reviewFormId}-${key}`} onClick={() => {
             setOpenNotes((current) => {
               const next = new Set(current);
@@ -507,7 +506,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
               else next.add(key);
               return next;
             });
-          }}>{note ? copy.editItemNote : copy.addItemNote}</Button>
+          }}><MessageSquare /></Button>
       </div>
       {openNotes.has(key) && <Field>
         <FieldLabel htmlFor={`${reviewFormId}-${key}`}>{copy.itemNoteFor.replace("{label}", label)}</FieldLabel>
@@ -582,19 +581,13 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
                       }} />
                       {copy.saveToLibrary}
                     </label>
-                    {motionReview && <div className="ms-auto flex items-center gap-1.5" role="group" aria-label={copy.decisionFor.replace("{label}", title)}>
-                      {decisions.map(({ value, icon: Icon, fill }) => {
-                        const active = draft.motion?.[index] === value;
-                        return <Button key={value} type="button" size="icon" variant="outline" disabled={reviewing} aria-pressed={active}
-                          aria-label={copy[`item_${value}`]} title={copy[`item_${value}`]} className={cn("size-8", active && fill)}
-                          onClick={() => {
-                            const motion = { ...draft.motion };
-                            if (active) delete motion[index];
-                            else motion[index] = value;
-                            updateDraft({ ...draft, motion });
-                          }}><Icon /></Button>;
-                      })}
-                    </div>}
+                    {motionReview && <DecisionToggles className="ms-auto" value={draft.motion?.[index]} label={title} disabled={reviewing}
+                      onChange={(value) => {
+                        const motion = { ...draft.motion };
+                        if (motion[index] === value) delete motion[index];
+                        else motion[index] = value;
+                        updateDraft({ ...draft, motion });
+                      }} />}
                   </div>
                   {motionReview && draft.motion?.[index] && draft.motion[index] !== "approved" && (
                     <Textarea aria-label={copy.itemNoteFor.replace("{label}", title)} placeholder={copy.motionNotePlaceholder} maxLength={2000}
@@ -652,16 +645,8 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             : draft.decision || stagedCount > 0 || draft.notes || hasItemNotes ? copy.unsentReview : footerItems ? (motionReview ? copy.selectEveryAnimation : copy.selectEveryItem) : copy.selectDecision}
         </p>}
         actions={<>
-          {!footerItems && <div role="group" aria-label={copy.decision} className="flex flex-wrap items-center gap-1.5">
-            {decisions.map(({ value, label, icon: Icon, fill }) => {
-              const selected = draft.decision === value;
-              return <Button key={value} type="button" size="sm" variant="outline" aria-pressed={selected} disabled={reviewing}
-                onClick={() => updateDraft({ ...draft, decision: selected ? "" : value })}
-                className={cn("border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white", selected && fill)}>
-                <Icon data-icon="inline-start" />{copy[label]}
-              </Button>;
-            })}
-          </div>}
+          {!footerItems && <DecisionToggles value={draft.decision} label={copy[stage]} disabled={reviewing}
+            onChange={(value) => updateDraft({ ...draft, decision: draft.decision === value ? "" : value })} />}
           <Button type="submit" form={reviewFormId} disabled={!canSend || reviewing}
             className="bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
             {footerItems ? (stagedCount === 0 ? copy.sendNothing : stagedCount === 1 ? copy.submitDecision : copy.submitDecisions.replace("{count}", String(stagedCount)))
