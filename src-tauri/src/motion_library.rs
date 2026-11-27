@@ -34,12 +34,11 @@ pub async fn delete_motion_library_item(
     workspace_id: i64,
     item_id: i64,
     confirmed_title: String,
-    store: State<'_, Store>,
+    app: tauri::AppHandle,
 ) -> Result<bool, &'static str> {
+    let (database, store) = open_store(&app)?;
     store
-        .lock()
-        .map_err(|_| "store_unavailable")?
-        .delete_motion_library_item(workspace_id, item_id, &confirmed_title)
+        .delete_motion_library_item(&database, workspace_id, item_id, &confirmed_title)
         .map_err(|_| "motion_library_delete_failed")
 }
 
@@ -164,6 +163,77 @@ pub async fn preview_motion_library_item(
         .find(|item| item.id == item_id)
         .ok_or("motion_library_preview_failed")?;
     motion_preview(&database, &store, workspace_id, &item.settings, &stream)
+}
+
+#[tauri::command]
+pub async fn list_motion_library_versions(
+    workspace_id: i64,
+    item_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::MotionVersion>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .motion_library_versions(workspace_id, item_id)
+        .map_err(|_| "motion_library_versions_failed")
+}
+
+#[tauri::command]
+pub async fn restore_motion_library_version(
+    workspace_id: i64,
+    item_id: i64,
+    version: i64,
+    app: tauri::AppHandle,
+) -> Result<MotionLibraryItem, &'static str> {
+    let (database, store) = open_store(&app)?;
+    store
+        .restore_motion_library_version(&database, workspace_id, item_id, version)
+        .map_err(|_| "motion_library_restore_failed")
+}
+
+#[tauri::command]
+pub async fn preview_motion_library_version(
+    workspace_id: i64,
+    item_id: i64,
+    version: i64,
+    app: tauri::AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<MotionPreview, &'static str> {
+    let (database, store) = open_store(&app)?;
+    let settings = store
+        .motion_library_version(workspace_id, item_id, version)
+        .map_err(|_| "motion_library_preview_failed")?
+        .settings(None);
+    motion_preview(&database, &store, workspace_id, &settings, &stream)
+}
+
+#[tauri::command]
+pub async fn preview_run_plan_use(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    index: usize,
+    app: tauri::AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<MotionPreview, &'static str> {
+    let (database, store) = open_store(&app)?;
+    let settings = store
+        .run_plan_use(workspace_id, run_id, result_id, index)
+        .map_err(|_| "motion_library_preview_failed")?;
+    motion_preview(&database, &store, workspace_id, &settings, &stream)
+}
+
+#[tauri::command]
+pub async fn motion_template_inputs(
+    workspace_id: i64,
+    item_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::TemplateInput>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .motion_template_inputs(workspace_id, item_id)
+        .map_err(|_| "motion_template_failed")
 }
 
 #[tauri::command]

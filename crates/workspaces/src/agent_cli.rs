@@ -273,6 +273,10 @@ pub(crate) type AgentUsage = (f64, Option<i64>, Option<i64>);
 pub(crate) fn read_agent_usage(plugin: &AgentPlugin) -> Option<std::io::Result<AgentUsage>> {
     use std::io::{BufRead, BufReader, Read, Write};
 
+    if let Some(text) = &plugin.cli.usage_text {
+        let executable = find_agent_cli(plugin)?;
+        return Some(read_usage_text(&executable, text));
+    }
     let run = plugin.cli.usage_run.as_ref()?;
     let executable = find_agent_cli(plugin)?;
     Some((|| {
@@ -342,6 +346,47 @@ pub(crate) fn read_agent_usage(plugin: &AgentPlugin) -> Option<std::io::Result<A
             .max_by(|first, second| first.0.total_cmp(&second.0))
             .ok_or_else(|| failed("the answer has no usage"))
     })())
+}
+
+/// Runs the agent's usage command and reads the most used window from what it prints.
+fn read_usage_text(
+    executable: &Path,
+    text: &crate::plugin_catalog::UsageText,
+) -> std::io::Result<AgentUsage> {
+    use std::io::Read;
+
+    let failed =
+        |what: &str| std::io::Error::other(format!("The agent's usage could not be read: {what}"));
+    let directory = tempfile::tempdir()?;
+    let mut command = agent_command(executable);
+    command
+        .args(&text.args)
+        .current_dir(directory.path())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let mut process = command.launch().map_err(|_| failed("it did not start"))?;
+    let mut stdout = process.stdout.take().ok_or_else(|| failed("no output"))?;
+    let (sender, receiver) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let mut output = Vec::new();
+        let _ = (&mut stdout).take(1024 * 1024).read_to_end(&mut output);
+        let _ = sender.send(output);
+    });
+    let output = receiver.recv_timeout(Duration::from_secs(20));
+    let _ = process.kill();
+    let _ = process.wait();
+    let output = output.map_err(|_| failed("no answer in time"))?;
+    text.read(&String::from_utf8_lossy(&output), chrono::Local::now())
+        .into_iter()
+        .map(|(_, usage)| usage)
+        .max_by(|first, second| first.0.total_cmp(&second.0))
+        .ok_or_else(|| failed("the answer has no usage"))
 }
 
 #[cfg(test)]

@@ -469,6 +469,35 @@ fn main() -> Result<(), Box<dyn Error>> {
             store.set_preview_max_edge(max_edge)?;
             println!("{}", serde_json::to_string(&store.preview_settings()?)?);
         }
+        [database, command] if command == "canvas-renderer" => {
+            let status = WorkspaceStore::open(Path::new(database))?.canvas_status()?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
+        [database, command] if command == "install-canvas-renderer" => {
+            let status = WorkspaceStore::open(Path::new(database))?.install_canvas_browser()?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
+        [database, command] if command == "remove-canvas-renderer" => {
+            let status = WorkspaceStore::open(Path::new(database))?.remove_canvas_browser()?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
+        [database, command] if command == "storage-settings" => {
+            let settings = WorkspaceStore::open(Path::new(database))?.storage_settings()?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
+        [database, command, delete] if command == "set-delete-used-footage" => {
+            let settings = WorkspaceStore::open(Path::new(database))?.apply_storage_settings(
+                Path::new(database),
+                &arrumo_workspaces::StorageSettings {
+                    delete_used_footage: match utf8(delete)? {
+                        "on" => true,
+                        "off" => false,
+                        _ => return Err("Use on or off".into()),
+                    },
+                },
+            )?;
+            println!("{}", serde_json::to_string(&settings)?);
+        }
         [database, command] if command == "media-order-limits" => {
             let limits = WorkspaceStore::open(Path::new(database))?.media_order_limits()?;
             println!("{}", serde_json::to_string(&limits)?);
@@ -619,6 +648,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .list_profile_formats(utf8(workspace)?.parse()?, utf8(profile)?.parse()?)?;
             println!("{}", serde_json::to_string(&formats)?);
         }
+        [database, command, workspace, profile, format, state]
+            if command == "set-profile-format-enabled" =>
+        {
+            let formats = WorkspaceStore::open(Path::new(database))?.set_profile_format_enabled(
+                utf8(workspace)?.parse()?,
+                utf8(profile)?.parse()?,
+                utf8(format)?.parse()?,
+                match utf8(state)? {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err("State must be on or off".into()),
+                },
+            )?;
+            println!("{}", serde_json::to_string(&formats)?);
+        }
         [database, command, workspace, profile, format, overrides]
             if command == "set-profile-format" =>
         {
@@ -703,8 +747,28 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&item)?);
         }
+        [database, command, workspace, item] if command == "motion-template" => {
+            let inputs = WorkspaceStore::open(Path::new(database))?
+                .motion_template_inputs(utf8(workspace)?.parse()?, utf8(item)?.parse()?)?;
+            println!("{}", serde_json::to_string(&inputs)?);
+        }
+        [database, command, workspace, item] if command == "motion-versions" => {
+            let versions = WorkspaceStore::open(Path::new(database))?
+                .motion_library_versions(utf8(workspace)?.parse()?, utf8(item)?.parse()?)?;
+            println!("{}", serde_json::to_string(&versions)?);
+        }
+        [database, command, workspace, item, version] if command == "restore-motion-version" => {
+            let item = WorkspaceStore::open(Path::new(database))?.restore_motion_library_version(
+                Path::new(database),
+                utf8(workspace)?.parse()?,
+                utf8(item)?.parse()?,
+                utf8(version)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
         [database, command, workspace, item, title] if command == "delete-motion-item" => {
             let deleted = WorkspaceStore::open(Path::new(database))?.delete_motion_library_item(
+                Path::new(database),
                 utf8(workspace)?.parse()?,
                 utf8(item)?.parse()?,
                 utf8(title)?,
@@ -999,6 +1063,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{expires}");
         }
+        [database, command, workspace, run, action, stage]
+            if command == "control-generation" && action == "stop" =>
+        {
+            let run = WorkspaceStore::open(Path::new(database))?.return_generation_to_stage(
+                utf8(workspace)?.parse()?,
+                utf8(run)?.parse()?,
+                utf8(stage)?.parse()?,
+            )?;
+            println!("{}", serde_json::to_string(&run)?);
+        }
         [database, command, workspace, run, action] if command == "control-generation" => {
             let action = match utf8(action)? {
                 "pause" => RunControl::Pause,
@@ -1038,6 +1112,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 utf8(request)?,
                 None,
+            )?;
+            println!("{}", serde_json::to_string(&item)?);
+        }
+        [database, command, workspace, request] if command == "generate-canvas-component" => {
+            let item = WorkspaceStore::open(Path::new(database))?.generate_canvas_component(
+                Path::new(database),
+                utf8(workspace)?.parse()?,
+                None,
+                utf8(request)?,
             )?;
             println!("{}", serde_json::to_string(&item)?);
         }
@@ -1716,7 +1799,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
                 "update-format <workspace-id> <format-id> <settings-json> | ",
                 "remove-format <workspace-id> <format-id> | ",
-                "profile-formats <workspace-id> <profile-id> | ",
+                "canvas-renderer | install-canvas-renderer | remove-canvas-renderer | storage-settings | set-delete-used-footage <on|off> | profile-formats <workspace-id> <profile-id> | set-profile-format-enabled <workspace-id> <profile-id> <format-id> <on|off> | ",
                 "set-profile-format <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "format-delivery <workspace-id> <format-id> | ",
                 "set-format-delivery <workspace-id> <format-id> <settings-json> | ",
@@ -1742,8 +1825,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "enqueue-draft <workspace-id> <draft-id> <request-key> <options-json> | ",
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | sweep-agent-sessions | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
-                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> | ",
-                "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
+                "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> [stage-index] | ",
+                "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | generate-canvas-component <workspace-id> <request> | motion-versions <workspace-id> <item-id> | motion-template <workspace-id> <item-id> | restore-motion-version <workspace-id> <item-id> <version> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
                 "read-completion-notification <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",

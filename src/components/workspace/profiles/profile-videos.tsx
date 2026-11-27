@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { madeProfileFormats } from "@/lib/profile-formats";
 import { ChevronRight, Film, RectangleHorizontal, RectangleVertical, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -63,7 +64,7 @@ export function ProfileVideos({ workspaceId, profile }: { workspaceId: number; p
     Promise.all([
       invoke<Draft[]>("list_video_drafts", { workspaceId }),
       invoke<Run[]>("list_generation_runs", { workspaceId }),
-      invoke<ProfileFormat[]>("list_profile_formats", { workspaceId, profileId: profile.id }),
+      madeProfileFormats<ProfileFormat>(workspaceId, profile.id),
       invoke<Feedback[]>("list_workspace_feedback", { workspaceId }),
       invoke<Scheduled[]>("list_scheduled_outputs", { workspaceId, profileId: profile.id, start: isoDate(today), end: isoDate(later) }),
       Promise.all([

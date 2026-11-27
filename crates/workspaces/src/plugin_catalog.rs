@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PluginCode, PluginPackageInfo, PluginSetting, RegistryReleaseSource, WorkspaceStore};
 
-pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 15] =
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+pub const SUPPORTED_PLUGIN_MANIFEST_SCHEMAS: [u32; 17] =
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 
 pub const MAX_PLUGIN_MANIFEST_BYTES: usize = 64 * 1024;
 
@@ -46,6 +46,13 @@ pub struct PluginManifest {
         skip_serializing_if = "Option::is_none"
     )]
     pub agent_provider: Option<ProviderDescriptor>,
+    /// Schema 17: draws animation layers agents write as web pages; see `canvas_render`.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub canvas_renderer: Option<crate::canvas_render::CanvasRendererDescriptor>,
     /// What the plugin adds, shown once in the plugin tour after it arrives (schema 8).
     #[serde(
         default,
@@ -137,6 +144,123 @@ pub(crate) struct AgentCli {
     /// Schema 12: the allowance the agent reports in its run output.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_event: Option<UsageEvent>,
+    /// Schema 16: the allowance a command of the agent prints as text without using it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_text: Option<UsageText>,
+}
+
+/// A command that prints the agent's allowance as text without using any of it, such as a usage
+/// report. Each window's pattern captures the share used (`used`, in percent) and may capture when
+/// it resets (`resets`, in local time, like `Dec 3, 2:59am` or `2:59pm`).
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct UsageText {
+    pub args: Vec<String>,
+    pub windows: Vec<TextWindow>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct TextWindow {
+    pub pattern: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<i64>,
+}
+
+impl UsageText {
+    fn valid(&self) -> bool {
+        (1..=8).contains(&self.args.len())
+            && self
+                .args
+                .iter()
+                .all(|arg| (1..=256).contains(&arg.len()) && !arg.contains('\0'))
+            && (1..=4).contains(&self.windows.len())
+            && self.windows.iter().all(|window| {
+                window.pattern.len() <= 512
+                    && regex::Regex::new(&window.pattern).is_ok_and(|pattern| {
+                        pattern.capture_names().flatten().any(|name| name == "used")
+                    })
+                    && window
+                        .minutes
+                        .is_none_or(|minutes| (1..=525_600).contains(&minutes))
+            })
+    }
+
+    /// Every declared window found in `output`, by declaration index, with reset times read as
+    /// local time after `now`.
+    pub(crate) fn read(
+        &self,
+        output: &str,
+        now: chrono::DateTime<chrono::Local>,
+    ) -> Vec<(usize, crate::agent_cli::AgentUsage)> {
+        self.windows
+            .iter()
+            .enumerate()
+            .filter_map(|(index, window)| {
+                let found = regex::Regex::new(&window.pattern).ok()?.captures(output)?;
+                let used: f64 = found.name("used")?.as_str().trim().parse().ok()?;
+                used.is_finite().then(|| {
+                    let resets = found
+                        .name("resets")
+                        .and_then(|text| local_reset(text.as_str(), now));
+                    (index, (used.clamp(0.0, 100.0), resets, window.minutes))
+                })
+            })
+            .collect()
+    }
+}
+
+/// `Dec 3, 2:59am`, `Dec 3 2pm` or `2:59pm` as the next such local time after `now`, in Unix seconds.
+fn local_reset(text: &str, now: chrono::DateTime<chrono::Local>) -> Option<i64> {
+    use chrono::{Datelike, Duration, NaiveDate, NaiveTime, TimeZone};
+    static FORMAT: OnceLock<regex::Regex> = OnceLock::new();
+    let found = FORMAT
+        .get_or_init(|| {
+            regex::Regex::new(
+                r"(?i)^\s*(?:(?P<month>[a-z]{3})[a-z]*\.? (?P<day>\d{1,2}),? )?(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<half>[ap])\.?m\.?\s*$",
+            )
+            .expect("valid reset format")
+        })
+        .captures(text)?;
+    let mut hour: u32 = found["hour"].parse().ok()?;
+    if !(1..=12).contains(&hour) {
+        return None;
+    }
+    hour %= 12;
+    if found["half"].eq_ignore_ascii_case("p") {
+        hour += 12;
+    }
+    let minute = found
+        .name("minute")
+        .map_or(Some(0), |minute| minute.as_str().parse().ok())?;
+    let time = NaiveTime::from_hms_opt(hour, minute, 0)?;
+    let today = now.date_naive();
+    let candidates: Vec<NaiveDate> = match (found.name("month"), found.name("day")) {
+        (Some(month), Some(day)) => {
+            let month = [
+                "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+            ]
+            .iter()
+            .position(|name| name.eq_ignore_ascii_case(month.as_str()))?
+                as u32
+                + 1;
+            let day = day.as_str().parse().ok()?;
+            [today.year(), today.year() + 1]
+                .into_iter()
+                .filter_map(|year| NaiveDate::from_ymd_opt(year, month, day))
+                .collect()
+        }
+        _ => vec![today, today + Duration::days(1)],
+    };
+    candidates
+        .into_iter()
+        .filter_map(|date| {
+            chrono::Local
+                .from_local_datetime(&date.and_time(time))
+                .earliest()
+        })
+        .find(|at| *at > now - Duration::minutes(1))
+        .map(|at| at.timestamp())
 }
 
 /// An event the agent prints during ordinary runs that reports its allowance: the line whose
@@ -783,6 +907,11 @@ impl PluginManifest {
                     .usage_event
                     .as_ref()
                     .is_some_and(|event| manifest.schema_version < 12 || !event.valid())
+                || provider
+                    .cli
+                    .usage_text
+                    .as_ref()
+                    .is_some_and(|text| manifest.schema_version < 16 || !text.valid())
                 || provider.cli.image_run.as_ref().is_some_and(|run| {
                     manifest.schema_version < 7
                         || !run.valid()
@@ -790,6 +919,13 @@ impl PluginManifest {
                 }))
         {
             return Err(invalid_manifest("Invalid plugin agent provider descriptor").into());
+        }
+        if manifest
+            .canvas_renderer
+            .as_ref()
+            .is_some_and(|canvas| manifest.schema_version < 17 || !canvas.valid())
+        {
+            return Err(invalid_manifest("Invalid plugin canvas renderer").into());
         }
         if !crate::plugin_text::valid_translations(&manifest) {
             return Err(invalid_manifest("Invalid plugin translations").into());

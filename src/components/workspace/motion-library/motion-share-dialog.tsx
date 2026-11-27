@@ -4,6 +4,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Users } from "lucide-react";
+import { IconAction } from "@/components/workspace/icon-action";
 import { useLocale } from "@/lib/locale-provider";
 
 export function MotionShareDialog({ workspaceId, itemId, title, ownerId, profiles, disabled, onSave }: {
@@ -58,9 +60,7 @@ export function MotionShareDialog({ workspaceId, itemId, title, ownerId, profile
       setOpen(next);
     }}>
       <DialogTrigger asChild>
-        <Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label={`${copy.share} · ${title}`}>
-          {copy.share}
-        </Button>
+        <IconAction label={copy.share} disabled={disabled}><Users /></IconAction>
       </DialogTrigger>
       <DialogContent className="max-h-[85dvh] overflow-y-auto">
         <DialogHeader>

@@ -251,6 +251,10 @@ pub(crate) fn read_package_manifest(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Err
             }
         }
     }
+    if let Some(canvas) = &parsed.canvas_renderer {
+        crate::canvas_render::check_package(bytes, canvas)
+            .map_err(|error| invalid_package(&error.to_string()))?;
+    }
     Ok(manifest)
 }
 

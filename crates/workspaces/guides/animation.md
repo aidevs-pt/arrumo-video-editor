@@ -2,15 +2,22 @@
 
 - One animation, one idea. Write down what the viewer should understand when it ends, then design only for that.
 - Make one thing for the topic, not words on a background: a chart of the real numbers, a diagram of the process, a card standing in for the interface, a figure that counts up. Use only numbers from the brief or the script.
+- Design the finished frame first and make it look intentional held still; the animation only decides when each placed element appears.
 - Give every moment one focal point. The viewer should know where to look within half a second: the focal element is the largest, brightest or most saturated thing on screen, and everything else steps back in size, colour or opacity.
 - Keep a clear hierarchy: at most three text sizes (a headline, a supporting line, small labels), with the number or word that matters biggest. Labels and kickers are small, muted and often uppercase; sentences are never all caps.
 - Emphasis is colour and light, not extra weight. Mark one word or short phrase per line of thought in the accent colour, at most one glow per frame, and never emphasise everything.
 - Build the palette from the brand: one background, one or two neutrals for text, one accent used sparingly. A dark background suits light that glows (rays, soft light behind the subject, a spark); a light one suits soft colour pools, shadows and clean cards.
 - Place text on calm areas. In a vertical frame, keep a kicker near the top, the visual in the middle and the headline or caption on a quiet band in the lower middle, clear of the bottom where players put their controls. Keep generous margins and line things up on a few shared edges.
 - Add depth with restraint: a soft light behind the focal element, a card lifted by a shadow or tilted back, a spark on the single most important moment. Depth supports the idea; it never competes with the text.
-- Motion should ease: things arrive fast and settle slowly, and continuous moves ease in and out. Constant-speed motion looks mechanical; bounces, shakes, whip moves and fast flashing look cheap.
+- Ease every movement for its job: arrivals start fast and settle slowly, exits start gently and leave faster and take less time than arrivals, and moves within the frame ease at both ends. Constant speed suits only continuous loops. Bigger and longer moves need more time: double the distance, add about a third.
+- Overshoot and bounce belong only to lively, playful tones and small pops, never to figures or serious content. Shakes and rapid flashing look cheap, and more than three flashes a second can harm viewers.
+- Move a few things at a time: while one element arrives, the rest hold still. A long slide across much of the frame feels like the whole layout shifting rather than something arriving; keep travel short and let a fade or a change of scale do the rest.
+- Direction carries meaning: new things arrive from the right or from below, going back leaves the way it came, and going deeper pushes in.
+- Let attached details settle a few hundredths of a second after the main element lands, such as its label or shadow, so the motion has weight.
 - Stagger what arrives together: words a few hundredths of a second apart, list items and bars a few tenths apart, never several blocks at once. Let the first readable text land within a second.
+- A number counts to its exact value, eases into it and never overshoots it.
 - Hold each finished state long enough to read, about two and a half words a second plus a beat, and hold the final frame for at least a second before the cut.
+- When a line replaces another in the same place, let the old one finish leaving before the new one arrives; two lines crossing in the same spot are unreadable.
 - When text types on, keep its anchor fixed to the full line so it does not slide while it grows.
 - Size everything relative to the frame so the same animation works in landscape and portrait.
 - An animation that plays over footage must leave the subject visible; an animation between clips can fill the frame.

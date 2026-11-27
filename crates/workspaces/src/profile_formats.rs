@@ -21,6 +21,8 @@ pub struct ProfileFormat {
     pub workspace_height: u32,
     /// Profile Markdown that applies only to this format.
     pub context: String,
+    /// Whether this profile's videos are made in this format.
+    pub enabled: bool,
 }
 
 impl WorkspaceStore {
@@ -35,7 +37,12 @@ impl WorkspaceStore {
                         COALESCE(custom.width, format.width),
                         COALESCE(custom.height, format.height),
                         custom.width, custom.height, format.width, format.height,
-                        COALESCE(context.markdown, '')
+                        COALESCE(context.markdown, ''),
+                        NOT EXISTS (
+                            SELECT 1 FROM profile_formats_off AS off
+                            WHERE off.workspace_id = profile.workspace_id
+                              AND off.profile_id = profile.id AND off.format_id = format.id
+                        )
                  FROM profiles AS profile
                  JOIN output_formats AS format ON format.workspace_id = profile.workspace_id
                  LEFT JOIN profile_format_overrides AS custom
@@ -62,9 +69,68 @@ impl WorkspaceStore {
                     workspace_width: row.get(6)?,
                     workspace_height: row.get(7)?,
                     context: row.get(8)?,
+                    enabled: row.get(9)?,
                 })
             })?
-            .collect()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map(|mut formats| {
+                // The workspace may since have removed every format the profile kept; it then
+                // makes all the others rather than none.
+                if !formats.iter().any(|format| format.enabled) {
+                    formats.iter_mut().for_each(|format| format.enabled = true);
+                }
+                formats
+            })
+    }
+
+    /// The formats this profile's videos are made in.
+    pub fn enabled_profile_formats(
+        &self,
+        workspace_id: i64,
+        profile_id: i64,
+    ) -> rusqlite::Result<Vec<ProfileFormat>> {
+        Ok(self
+            .list_profile_formats(workspace_id, profile_id)?
+            .into_iter()
+            .filter(|format| format.enabled)
+            .collect())
+    }
+
+    /// Turns one of the workspace's formats on or off for this profile. A profile keeps at least
+    /// one format.
+    pub fn set_profile_format_enabled(
+        &self,
+        workspace_id: i64,
+        profile_id: i64,
+        format_id: i64,
+        enabled: bool,
+    ) -> rusqlite::Result<Vec<ProfileFormat>> {
+        let tx = self.0.unchecked_transaction()?;
+        let formats = self.list_profile_formats(workspace_id, profile_id)?;
+        if !formats.iter().any(|format| format.id == format_id) {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        if enabled {
+            tx.execute(
+                "DELETE FROM profile_formats_off
+                 WHERE workspace_id = ?1 AND profile_id = ?2 AND format_id = ?3",
+                params![workspace_id, profile_id, format_id],
+            )?;
+        } else {
+            if !formats
+                .iter()
+                .any(|format| format.enabled && format.id != format_id)
+            {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            tx.execute(
+                "INSERT OR IGNORE INTO profile_formats_off (workspace_id, profile_id, format_id)
+                 VALUES (?1, ?2, ?3)",
+                params![workspace_id, profile_id, format_id],
+            )?;
+        }
+        tx.commit()?;
+        self.list_profile_formats(workspace_id, profile_id)
     }
 
     pub fn set_profile_format_overrides(
@@ -96,6 +162,97 @@ impl WorkspaceStore {
 mod tests {
     use super::*;
     use crate::OutputFormatSettings;
+
+    #[test]
+    fn a_profile_can_leave_out_formats_but_keeps_one() {
+        let mut store = WorkspaceStore::open(":memory:").unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let profile = store
+            .create_profile(workspace, "Shorts", "", None)
+            .unwrap()
+            .id;
+        let formats = store.list_profile_formats(workspace, profile).unwrap();
+        assert!(formats.iter().all(|format| format.enabled));
+        let (landscape, portrait) = (formats[0].id, formats[1].id);
+
+        let after = store
+            .set_profile_format_enabled(workspace, profile, landscape, false)
+            .unwrap();
+        assert!(!after[0].enabled && after[1].enabled);
+        assert_eq!(
+            store
+                .enabled_profile_formats(workspace, profile)
+                .unwrap()
+                .iter()
+                .map(|format| format.id)
+                .collect::<Vec<_>>(),
+            [portrait]
+        );
+        assert!(
+            store
+                .set_profile_format_enabled(workspace, profile, portrait, false)
+                .is_err(),
+            "the last format stays on"
+        );
+        let other = store.create("Other").unwrap().id;
+        let other_profile = store.create_profile(other, "Other", "", None).unwrap().id;
+        assert!(
+            store
+                .set_profile_format_enabled(workspace, other_profile, portrait, false)
+                .is_err()
+        );
+
+        let draft = store
+            .create_video_draft(
+                workspace,
+                crate::DraftSettings {
+                    title: "Short".into(),
+                    profile_id: Some(profile),
+                    intent: "A short".into(),
+                    source_ids: vec![],
+                },
+            )
+            .unwrap();
+        let run = store
+            .enqueue_video_draft(workspace, draft.id, "key", &crate::RunOptions::default())
+            .unwrap();
+        let ids: Vec<i64> = run.snapshot["formats"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["format"]["id"].as_i64().unwrap())
+            .collect();
+        assert_eq!(
+            ids,
+            [portrait],
+            "videos of the profile skip the format it left out"
+        );
+
+        store
+            .set_profile_format_enabled(workspace, profile, landscape, true)
+            .unwrap();
+        assert_eq!(
+            store
+                .enabled_profile_formats(workspace, profile)
+                .unwrap()
+                .len(),
+            2
+        );
+        store
+            .set_profile_format_enabled(workspace, profile, landscape, false)
+            .unwrap();
+        store.remove_output_format(workspace, portrait).unwrap();
+        assert_eq!(
+            store
+                .enabled_profile_formats(workspace, profile)
+                .unwrap()
+                .iter()
+                .map(|format| format.id)
+                .collect::<Vec<_>>(),
+            [landscape],
+            "with the format it kept gone, the profile makes the rest rather than nothing"
+        );
+    }
 
     #[test]
     fn inherits_each_dimension_and_tracks_workspace_enablement() {

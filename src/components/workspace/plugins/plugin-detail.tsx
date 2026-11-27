@@ -16,6 +16,7 @@ import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { PluginCredentialField } from "@/components/workspace/settings/plugin-credential-field";
 import { PluginFields, type PluginSettingDeclaration } from "@/components/workspace/settings/plugin-preferences";
 import { useStudioTrail } from "@/components/workspace/home/studio-trail";
+import { CanvasRenderer } from "./canvas-renderer";
 import { replayPluginTour } from "./plugin-tour";
 import { useLocale } from "@/lib/locale-provider";
 import { PLUGINS_CHANGED, PluginIcon, usePluginText } from "@/lib/plugin-text";
@@ -32,6 +33,7 @@ type Entry = {
     actions?: { id: string; label: string; description: string; scope: string }[];
     agentProvider?: unknown;
     introduction?: unknown;
+    canvasRenderer?: unknown;
   };
   package?: { release?: { version: string } };
 };
@@ -115,6 +117,7 @@ export function PluginDetail({ pluginId, backHref }: { pluginId: string; backHre
           <AlertDialogFooter><AlertDialogAction>{copy.refusedOk}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {entry.active && Boolean(manifest.canvasRenderer) && <CanvasRenderer pluginId={pluginId} />}
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Tabs defaultValue={fields.length ? "settings" : "actions"} className="min-w-0 gap-6">
           <TabsList variant="line" className="justify-start">

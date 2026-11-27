@@ -249,7 +249,9 @@ impl WorkspaceStore {
             }
         }
         let mut animations = self.0.prepare(
-            "SELECT id, kind, title, usage_markdown FROM motion_library
+            "SELECT id, CASE WHEN component_json IS NULL THEN kind ELSE 'component' END,
+                    title, usage_markdown
+             FROM motion_library
              WHERE workspace_id = ?1 AND spec_json IS NOT NULL ORDER BY id DESC LIMIT 20",
         )?;
         for row in animations.query_map(params![workspace_id], |row| {
@@ -263,10 +265,10 @@ impl WorkspaceStore {
             let (id, kind, title, usage) = row?;
             catalogue.push(Material {
                 id: format!("animation:{id}"),
-                kind: if kind == "transition" {
-                    "transition"
-                } else {
-                    "animation"
+                kind: match kind.as_str() {
+                    "transition" => "transition",
+                    "component" => "canvas component",
+                    _ => "animation",
                 },
                 title,
                 detail: shorten(&usage, 160),

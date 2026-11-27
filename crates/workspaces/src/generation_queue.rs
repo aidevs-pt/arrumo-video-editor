@@ -307,6 +307,11 @@ impl WorkspaceStore {
                 }
                 run
             } else {
+                // Its uploaded clips were deleted once it was finished; without them it would
+                // quietly become a different video.
+                if self.run_footage_removed(workspace_id, source_run_id)? {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
                 let snapshot = match mode {
                     ReplayMode::Captured => source.snapshot,
                     ReplayMode::Current => self.capture_generation_inputs(
@@ -380,7 +385,7 @@ impl WorkspaceStore {
             .find(|profile| profile.id == profile_id);
         let mut resolved = json!({"type": "profile", "profile_id": profile_id});
         if let Some(profile) = profile {
-            let formats = self.list_profile_formats(workspace_id, profile.id)?;
+            let formats = self.enabled_profile_formats(workspace_id, profile.id)?;
             let portrait = formats
                 .iter()
                 .find(|format| format.height > format.width)
@@ -427,7 +432,7 @@ impl WorkspaceStore {
         };
         let formats = match &profile {
             Some(profile) => self
-                .list_profile_formats(workspace_id, profile.id)?
+                .enabled_profile_formats(workspace_id, profile.id)?
                 .into_iter()
                 .map(|format| {
                     let delivery = self.profile_delivery(workspace_id, profile.id, format.id)?;
@@ -512,6 +517,8 @@ impl WorkspaceStore {
             .as_deref()
             .map(|provider| self.agent_options(workspace_id, provider))
             .unwrap_or_default();
+        let canvas_components =
+            self.offered_components(workspace_id, profile.as_ref().map(|profile| profile.id))?;
         Ok(json!({
             "schema_version": 1,
             "motion_renderer": motion_renderer,
@@ -533,6 +540,7 @@ impl WorkspaceStore {
             },
             "profile": profile,
             "formats": formats,
+            "canvas_components": canvas_components,
         }))
     }
 

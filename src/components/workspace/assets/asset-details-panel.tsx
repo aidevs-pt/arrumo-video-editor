@@ -1,8 +1,9 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { madeProfileFormats } from "@/lib/profile-formats";
 import { open } from "@tauri-apps/plugin-dialog";
-import { RectangleHorizontal, RectangleVertical, Sparkles, X } from "lucide-react";
+import { FileUp, RectangleHorizontal, RectangleVertical, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,10 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { MarkdownEditor } from "@/components/markdown/editor";
 import { useLocale } from "@/lib/locale-provider";
 import { TagInput } from "@/components/ui/tag-input";
+import { InspectorPanel } from "@/components/workspace/inspector-panel";
 import { cn } from "@/lib/utils";
 import { ConfirmTitleDelete } from "../confirm-title-delete";
+import { IconAction } from "../icon-action";
 import { type AssetRemoval, removalOutcome } from "./asset-removal";
 import { AssetPlayer, AssetThumbnail } from "./asset-thumbnail";
 import { AudioTransformDialog, type AudioTransformProvider } from "./audio-transform-dialog";
@@ -44,6 +47,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const single = assets.length === 1 ? assets[0] : null;
   const [notes, setNotes] = useState(single?.notes ?? "");
   const [replaceNotes, setReplaceNotes] = useState(single !== null);
+  const [removing, setRemoving] = useState(false);
   const [group, setGroup] = useState(single ? organizations[single.id]?.group ?? "" : "");
   const [labels, setLabels] = useState<string[]>(single ? organizations[single.id]?.labels ?? [] : []);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -81,7 +85,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   useEffect(() => {
     if (!profileId) return;
     let active = true;
-    invoke<Format[]>("list_profile_formats", { workspaceId, profileId: Number(profileId) })
+    madeProfileFormats<Format>(workspaceId, Number(profileId))
       .then((rows) => { if (active) setFormats(rows); }, () => { if (active) setFormats([]); });
     return () => { active = false; };
   }, [profileId, workspaceId]);
@@ -134,13 +138,36 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   const busy = state === "saving";
 
   return (
-    <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" aria-labelledby="asset-panel-title">
-      <div className="flex items-start justify-between gap-3">
+    <InspectorPanel aria-labelledby="asset-panel-title" bodyClassName="gap-5"
+      header={<>
         <h2 id="asset-panel-title" className="font-sans min-w-0 text-[1.125rem] leading-snug font-bold wrap-anywhere">
           {single ? copy.panelOne.replace("{name}", single.name) : copy.panelMany.replace("{count}", String(assets.length))}
         </h2>
         <Button variant="ghost" size="icon-sm" aria-label={copy.closePanel} onClick={onClose}><X /></Button>
-      </div>
+      </>}
+      footer={<div className="flex flex-wrap items-center gap-2">
+        <Button disabled={busy} className="min-w-0 flex-1" onClick={() => void save()}>
+          {busy ? copy.saving : state === "saved" ? copy.saved : single ? copy.saveOne : copy.saveMany.replace("{count}", String(assets.length))}
+        </Button>
+        {single && <>
+        <IconAction label={messages.assets.replaceFile} disabled={busy} onClick={() => void replace(single)}><FileUp /></IconAction>
+        {hasSound && (["voice-change", "voice-isolation"] as const).map((kind) => {
+          const offer = transforms.find((entry) => entry.transform === kind);
+          return offer && <AudioTransformDialog key={kind} workspaceId={workspaceId} assetId={single.id}
+            assetName={single.name} offer={offer} disabled={busy} onCreated={onCreated} />;
+        })}
+        {hasSound && dubbing[0] && <DubDialog workspaceId={workspaceId} assetId={single.id} assetName={single.name}
+          offer={dubbing[0]} disabled={busy} onCreated={onCreated} />}
+        <IconAction label={messages.assets.removal.deleteTitle} destructive disabled={busy}
+          onClick={() => setRemoving(true)}><Trash2 /></IconAction>
+        <ConfirmTitleDelete hideTrigger title={single.name} disabled={busy} copy={messages.assets.removal}
+          open={removing} onOpenChange={setRemoving}
+          onConfirm={async (confirmedName) => removalOutcome(
+            await invoke<AssetRemoval>("remove_asset", { workspaceId, assetId: single.id, confirmedName }),
+            messages.assets.removal, locale)}
+          onDelete={() => onRemoved(single.id)} />
+        </>}
+      </div>}>
       <ul className="flex flex-wrap gap-2">
         {assets.slice(0, 6).map((asset) => (
           <li key={asset.id} className={single ? "w-full" : undefined}>
@@ -206,24 +233,6 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
         </div>}
       </div>
       {state === "error" && <Alert variant="destructive"><AlertDescription>{copy.saveError}</AlertDescription></Alert>}
-      <Button size="lg" disabled={busy} onClick={() => void save()}>
-        {busy ? copy.saving : state === "saved" ? copy.saved : single ? copy.saveOne : copy.saveMany.replace("{count}", String(assets.length))}
-      </Button>
-      {single && <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => void replace(single)}>{messages.assets.replaceFile}</Button>
-        {hasSound && (["voice-change", "voice-isolation"] as const).map((kind) => {
-          const offer = transforms.find((entry) => entry.transform === kind);
-          return offer && <AudioTransformDialog key={kind} workspaceId={workspaceId} assetId={single.id}
-            assetName={single.name} offer={offer} disabled={busy} onCreated={onCreated} />;
-        })}
-        {hasSound && dubbing[0] && <DubDialog workspaceId={workspaceId} assetId={single.id} assetName={single.name}
-          offer={dubbing[0]} disabled={busy} onCreated={onCreated} />}
-        <ConfirmTitleDelete title={single.name} size="sm" disabled={busy} copy={messages.assets.removal}
-          onConfirm={async (confirmedName) => removalOutcome(
-            await invoke<AssetRemoval>("remove_asset", { workspaceId, assetId: single.id, confirmedName }),
-            messages.assets.removal, locale)}
-          onDelete={() => onRemoved(single.id)} />
-      </div>}
-    </aside>
+    </InspectorPanel>
   );
 }

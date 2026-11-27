@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MessageSquare, PencilLine, X } from "lucide-react";
+import { Check, MessageSquare, PencilLine, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/lib/locale-provider";
+import { bulkTargets, DecisionToggles, ReviewActionBar } from "./review-action-bar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type ScriptSection = { heading: string; timing: string; narration: string; idea: string };
@@ -69,11 +71,11 @@ export function ScriptSectionReview({ storageKey, sections, agent, reviewing, re
     try { sessionStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
   }
 
-  function decide(indexes: number[], decision: Decision, note?: string) {
+  function decide(indexes: number[], decision: Decision, note?: string, bulk = false) {
     const decisions = { ...staged.decisions };
     const notes = { ...staged.notes };
     for (const index of indexes) {
-      if (indexes.length === 1 && decisions[index] === decision && !note) delete decisions[index];
+      if (!bulk && indexes.length === 1 && decisions[index] === decision && !note) delete decisions[index];
       else decisions[index] = decision;
       if (note?.trim()) notes[index] = note.trim();
     }
@@ -100,12 +102,6 @@ export function ScriptSectionReview({ storageKey, sections, agent, reviewing, re
         {selected.length > 0 && <>
           <Input value={shared} onChange={(event) => setShared(event.target.value)} placeholder={copy.sharedComment}
             aria-label={copy.sharedComment} className="h-8 min-w-48 flex-1 bg-card" />
-          {options.map(({ value, icon: Icon }) => (
-            <Button key={value} type="button" size="sm" variant="outline" disabled={reviewing}
-              onClick={() => { decide(selected, value, shared); setSelected([]); setShared(""); }}>
-              <Icon data-icon="inline-start" />{plan[`item_${value}`]}
-            </Button>
-          ))}
         </>}
       </div>
       <ol className="flex flex-col gap-2">
@@ -144,38 +140,42 @@ export function ScriptSectionReview({ storageKey, sections, agent, reviewing, re
                     {marker && <span aria-hidden="true" className={cn("size-2.5 rounded-[2px]", marker)} />}
                     {decision ? labels[decision] : <span className="rounded-md bg-secondary px-2 py-0.5 font-normal text-muted-foreground">{copy.noDecision}</span>}
                   </span>
-                  <Button type="button" size="sm" variant="ghost" disabled={reviewing}
-                    onClick={() => setOpenNotes((current) => [...current, index])}><MessageSquare data-icon="inline-start" />{copy.comment}</Button>
-                  {options.map(({ value, icon: Icon, fill }) => (
-                    <Button key={value} type="button" size="sm" variant="outline" aria-pressed={decision === value} disabled={reviewing}
-                      className={cn(decision === value && fill)} onClick={() => decide([index], value)}>
-                      <Icon data-icon="inline-start" />{plan[`item_${value}`]}
-                    </Button>
-                  ))}
+                  <TooltipProvider delayDuration={250}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button type="button" size="icon-sm" variant="ghost" disabled={reviewing} aria-label={copy.commentFor.replace("{heading}", section.heading)}
+                          onClick={() => setOpenNotes((current) => [...current, index])}><MessageSquare /></Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{copy.comment}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <DecisionToggles value={decision} label={section.heading} disabled={reviewing} onChange={(value) => decide([index], value)} />
                 </div>
               </div>
             </li>
           );
         })}
       </ol>
-      <label className="flex flex-col gap-1.5 text-sm font-semibold">{copy.overall}
-        <Textarea value={staged.overall} maxLength={4000} onChange={(event) => update({ ...staged, overall: event.target.value })} className="font-normal" />
-      </label>
       {reviewError && <Alert variant="destructive"><AlertDescription>{plan.reviewError}</AlertDescription></Alert>}
-      <div className="sticky bottom-4 z-[1] flex flex-wrap items-center justify-between gap-3 rounded-lg bg-ink px-4 py-3 text-white">
-        <p className="text-sm" role="status">
-          {count ? <><span className="font-bold text-attention">{count === 1 ? copy.stagedOne : copy.staged.replace("{count}", String(count))}</span>{" "}
-            {copy.stagedHint.replace("{agent}", agentName)}</> : copy.nothingStaged}
-        </p>
-        <div className="ms-auto flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" size="sm" disabled={reviewing} onClick={() => void send("rejected")}
-            className="text-white/80 hover:bg-white/10 hover:text-white">{copy.rejectAll}</Button>
+      <ReviewActionBar total={sections.length} decided={count} selected={selected.length} reviewing={reviewing}
+        onDecide={(decision) => {
+          const indexes = sections.map((_, index) => index);
+          decide(bulkTargets(indexes, (index) => Boolean(staged.decisions[index]), (index) => selected.includes(index)), decision, shared, true);
+          setSelected([]);
+          setShared("");
+        }}
+        onClearSelection={() => setSelected([])}
+        notes={staged.overall} onNotes={(overall) => update({ ...staged, overall })} notesLabel={copy.overall}
+        status={<p className="text-sm" role="status" title={count ? copy.stagedHint.replace("{agent}", agentName) : copy.nothingStaged}>
+          {count ? <span className="font-bold text-attention">{count === 1 ? copy.stagedOne : copy.staged.replace("{count}", String(count))}</span> : copy.noDecisionsYet}
+        </p>}
+        menuItems={[{ label: copy.rejectAll, icon: Trash2, destructive: true, onSelect: () => void send("rejected") }]}
+        actions={<>
           <Button type="button" disabled={reviewing || (!count && !staged.overall.trim())} onClick={() => void send()}
             className="bg-attention text-ink hover:bg-[oklch(90%_.13_86)] disabled:bg-white/15 disabled:text-white/70 disabled:opacity-100">
             {count === 0 ? plan.sendNothing : count === 1 ? copy.sendOne : copy.send.replace("{count}", String(count))}
           </Button>
-        </div>
-      </div>
+        </>} />
     </div>
   );
 }

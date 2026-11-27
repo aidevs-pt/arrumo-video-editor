@@ -246,22 +246,27 @@ impl WorkspaceStore {
             else {
                 continue;
             };
+            let observed = || {
+                // Known only from the agent's last run, until that window resets.
+                self.0
+                    .query_row(
+                        "SELECT used_percent, resets_at, window_minutes
+                         FROM agent_usage_observations
+                         WHERE plugin_id = ?1 AND (resets_at IS NULL OR resets_at > unixepoch())
+                         ORDER BY used_percent DESC, window_minutes DESC LIMIT 1",
+                        [&manifest.id],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    )
+                    .optional()
+            };
             let read = match crate::agent_cli::read_agent_usage(plugin) {
+                Some(Err(error)) if plugin.cli.usage_event.is_some() => match observed()? {
+                    Some(seen) => Ok(seen),
+                    None => Err(error),
+                },
                 Some(read) => read,
                 None if plugin.cli.usage_event.is_some() => {
-                    // Known only from the agent's last run, until that window resets.
-                    let Some(seen) = self
-                        .0
-                        .query_row(
-                            "SELECT used_percent, resets_at, window_minutes
-                             FROM agent_usage_observations
-                             WHERE plugin_id = ?1 AND (resets_at IS NULL OR resets_at > unixepoch())
-                             ORDER BY used_percent DESC, window_minutes DESC LIMIT 1",
-                            [&manifest.id],
-                            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-                        )
-                        .optional()?
-                    else {
+                    let Some(seen) = observed()? else {
                         continue;
                     };
                     Ok(seen)
@@ -363,5 +368,67 @@ mod tests {
             usage_adapter(index).expect("valid usage adapter").unit,
             "characters"
         );
+    }
+
+    #[test]
+    fn usage_text_reads_percentages_and_local_reset_times() {
+        use chrono::TimeZone;
+        let text: crate::plugin_catalog::UsageText = serde_json::from_value(serde_json::json!({
+            "args": ["-p", "/usage"],
+            "windows": [
+                {"pattern": "Current session: (?P<used>\\d+(?:\\.\\d+)?)% used(?: · resets (?P<resets>[^(\\n]+?) \\()?", "minutes": 300},
+                {"pattern": "Current week \\(all models\\): (?P<used>\\d+(?:\\.\\d+)?)% used(?: · resets (?P<resets>[^(\\n]+?) \\()?", "minutes": 10080}
+            ]
+        }))
+        .unwrap();
+        let output = "You are currently using your subscription to power your Claude Code usage\n\n\
+            Current session: 19% used · resets Nov 27, 12:29pm (UTC)\n\
+            Current week (all models): 9% used · resets Dec 3, 2:59am (UTC)\n\
+            Current week (Fable): 0% used · resets Dec 3, 3am (UTC)\n";
+        let now = chrono::Local
+            .with_ymd_and_hms(2026, 11, 27, 10, 0, 0)
+            .unwrap();
+        let at = |month, day, hour, minute| {
+            chrono::Local
+                .with_ymd_and_hms(2026, month, day, hour, minute, 0)
+                .unwrap()
+                .timestamp()
+        };
+        assert_eq!(
+            text.read(output, now),
+            vec![
+                (0, (19.0, Some(at(11, 27, 12, 29)), Some(300))),
+                (1, (9.0, Some(at(12, 3, 2, 59)), Some(10_080))),
+            ]
+        );
+        // A time without a date is the next one; nothing found reads nothing.
+        let later = "Current session: 40% used · resets 9am (Europe/Lisbon)";
+        assert_eq!(
+            text.read(later, now),
+            vec![(0, (40.0, Some(at(11, 28, 9, 0)), Some(300)))]
+        );
+        assert!(
+            text.read("Usage is not available for API keys", now)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    #[cfg_attr(core_only, ignore = "needs the bundled default plugins")]
+    fn claude_code_reads_its_usage_report_without_using_it() {
+        let text = crate::agent_plugin("claude-code")
+            .and_then(|plugin| plugin.cli.usage_text.as_ref())
+            .expect("Claude Code prints its usage");
+        assert!(text.args.iter().any(|arg| arg == "/usage"));
+        let output = "Current session: 19% used · resets Nov 27, 12:30pm (UTC)\n\
+            Current week (all models): 64% used · resets Dec 3, 3am (UTC)\n";
+        let read = text.read(output, chrono::Local::now());
+        assert_eq!(
+            read.iter()
+                .map(|(_, (used, _, minutes))| (*used, *minutes))
+                .collect::<Vec<_>>(),
+            [(19.0, Some(300)), (64.0, Some(10_080))]
+        );
+        assert!(read.iter().all(|(_, (_, resets, _))| resets.is_some()));
     }
 }

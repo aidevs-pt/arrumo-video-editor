@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 
 use crate::{
     MotionKind,
-    brand_fonts::{FontRole, FontSet, FontWeight},
+    brand_fonts::{BrandKit, FontRole, FontWeight},
     motion_effects::{Atmosphere, CountUp, Tilt},
 };
 
@@ -37,7 +37,9 @@ const SOUND_ASSET_SECONDS: f64 = 4.0;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
 pub(crate) const MAX_SECONDS: f64 = 20.0;
 const MAX_STORED_SECONDS: f64 = 60.0;
-const MAX_TEXT: usize = 240;
+pub(crate) const MAX_TEXT: usize = 240;
+/// Room a fitted box leaves above and below its text, as a fraction of the frame height.
+const FIT_PADDING: f64 = 0.03;
 const FPS: u32 = 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -51,6 +53,8 @@ pub(crate) enum LayerType {
     Light,
     /// A four-point spark of light, `size` tall, centred on the layer's position.
     Spark,
+    /// A small web page that draws the layer's box frame by frame; see `crate::canvas_render`.
+    Canvas,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -134,6 +138,24 @@ pub(crate) struct Layer {
     /// How a box or image card sits in depth.
     #[serde(default, skip_serializing_if = "Tilt::is_none")]
     pub tilt: Tilt,
+    /// A box that holds a text layer (by its index) grows taller when that text needs more
+    /// lines, keeping its centre, so a card fits whatever a template is filled with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit_text: Option<usize>,
+    /// The page a canvas layer is drawn with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas: Option<CanvasCode>,
+}
+
+/// A canvas layer's page: HTML with its scripts, the renderer libraries it imports, and the
+/// template values it reads from `window.arrumo.values`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub(crate) struct CanvasCode {
+    pub html: String,
+    #[serde(default)]
+    pub libraries: Vec<String>,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub values: serde_json::Map<String, Value>,
 }
 
 /// From `from` to `to` seconds into the animation, everything in the clip outside a rounded area
@@ -223,6 +245,10 @@ pub(crate) struct MotionSpec {
         skip_serializing_if = "crate::scene_transitions::Transition::is_none"
     )]
     pub transition: crate::scene_transitions::Transition,
+    /// What a library template asks for each time it is used; text layers name them as
+    /// `{{key}}` (see [`crate::motion_templates`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inputs: Vec<crate::motion_templates::TemplateInput>,
 }
 
 /// The JSON schema agents answer with for one animation. `assets` are the image IDs it may use.
@@ -252,7 +278,7 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
         "additionalProperties": false,
         "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
             "color", "bold", "opacity", "start", "end", "enter", "exit",
-            "align", "radius", "gradientTo", "shadow", "font", "accent", "glow", "count", "tilt"],
+            "align", "radius", "gradientTo", "shadow", "font", "accent", "glow", "count", "tilt", "fitText"],
         "properties": {
             "type": {"enum": ["text", "box", "image", "light", "spark"]},
             "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
@@ -274,7 +300,8 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
             "accent": optional_color,
             "glow": {"type": "boolean"},
             "count": {"type": "boolean"},
-            "tilt": {"enum": ["none", "left", "right", "back"]}
+            "tilt": {"enum": ["none", "left", "right", "back"]},
+            "fitText": {"type": ["integer", "null"], "minimum": 0, "maximum": MAX_LAYERS}
         }
     });
     if !clips.is_empty() {
@@ -311,6 +338,28 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
         });
         if let Some(required) = layer["required"].as_array_mut() {
             required.extend([json!("clipStart"), json!("zoom"), json!("spotlight")]);
+        }
+    }
+    if let Some(canvas) = crate::canvas_render::active() {
+        if let Some(kinds) = layer["properties"]["type"]["enum"].as_array_mut() {
+            kinds.push(json!("canvas"));
+        }
+        let libraries: Vec<&str> = canvas
+            .libraries
+            .iter()
+            .map(|library| library.id.as_str())
+            .collect();
+        layer["properties"]["canvas"] = json!({"anyOf": [{"type": "null"}, {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["html", "libraries"],
+            "properties": {
+                "html": {"type": "string", "maxLength": crate::canvas_render::MAX_CANVAS_HTML},
+                "libraries": {"type": "array", "maxItems": 16, "items": {"enum": libraries}}
+            }
+        }]});
+        if let Some(required) = layer["required"].as_array_mut() {
+            required.push(json!("canvas"));
         }
     }
     if !sounds.is_empty() {
@@ -386,6 +435,49 @@ speech. For a polished look: align a column of text left (align sets where lines
 a left-aligned layer starts at x minus width/2), keep generous margins, one clear focal point per \
 moment, a few sizes of text with a strong hierarchy, and consistent spacing between items.";
 
+/// How canvas layers are described to the agent, added to `SPEC_GUIDE` when a canvas renderer is
+/// ready.
+const CANVAS_GUIDE: &str = "A canvas layer draws its box with a small web page you write in canvas.html: \
+body markup with inline <style> and <script> (no <html> or <head>), for what the other layers cannot \
+draw, such as 3D objects, particles, charts, generative patterns, vector animation or physics. Use \
+them sparingly, as one striking element rather than for text and cards, which other layers draw more \
+crisply. The page fills the layer's box and is transparent wherever it draws nothing. It has no \
+network or files: load only the libraries listed in canvas.libraries, which module scripts import by \
+name (import * as THREE from \"three\") and the others add as globals. window.arrumo gives width and \
+height in pixels, fps, duration in seconds and values, the template values by key. Define \
+window.render = (t) => { ... } to draw the frame t seconds after the layer starts; it may return a \
+promise. Draw from t alone, with no state carried from frame to frame, since frames may be drawn \
+in any order and at other sizes; requestAnimationFrame, performance.now and CSS or SVG animations \
+also follow this clock. Assign a promise to window.arrumoReady when setup is asynchronous. Size \
+everything from width and height. Brand fonts are the families brand-heading and brand-body. \
+window.arrumo.theme holds the video's colours: colors (the brand palette), background, text (this \
+layer's color) and accent (this layer's accent), also as the CSS variables --arrumo-background, \
+--arrumo-text, --arrumo-accent and --arrumo-color-1 onwards. Draw in them unless the brief asks for \
+other colours. Set text null, assetId null, and color to the main colour the page draws.";
+
+/// What the agent reads about animations: `SPEC_GUIDE`, and canvas layers when a renderer is ready.
+pub(crate) fn spec_guide() -> String {
+    let Some(canvas) = crate::canvas_render::active() else {
+        return SPEC_GUIDE.to_owned();
+    };
+    let mut guide = format!("{SPEC_GUIDE} {CANVAS_GUIDE}");
+    if !canvas.libraries.is_empty() {
+        guide.push_str(" Libraries:");
+        for library in &canvas.libraries {
+            write!(
+                guide,
+                " {} ({}): {};",
+                library.id,
+                if library.module { "module" } else { "global" },
+                library.description
+            )
+            .ok();
+        }
+    }
+    write!(guide, "\n\n{}", canvas.guide.trim()).ok();
+    guide
+}
+
 /// How clip layers are described to the agent, added to `SPEC_GUIDE` when it may use them.
 pub(crate) const CLIP_GUIDE: &str = "Video layers play a workspace clip (assetId) fitted inside their box, \
 starting clipStart seconds into the clip and playing for the layer's span; if the clip runs out, its last \
@@ -436,7 +528,7 @@ fn undrawable(c: char) -> bool {
         || c == '\u{200D}'
 }
 
-fn clean_text(value: &str, limit: usize) -> String {
+pub(crate) fn clean_text(value: &str, limit: usize) -> String {
     let kept: String = value
         .chars()
         .filter(|c| (!c.is_control() || *c == '\n') && !undrawable(*c))
@@ -504,7 +596,7 @@ impl MotionSpec {
         spec.light_color = spec.light_color.filter(|color| hex_color(color).is_some());
         let duration = spec.duration_seconds;
         spec.layers.truncate(MAX_LAYERS);
-        spec.layers.retain_mut(|layer| {
+        let check = |layer: &mut Layer| -> bool {
             layer.sound_asset_id = layer.sound_asset_id.filter(|id| sound_allowed(*id));
             layer.sound = Sound::None;
             let unit = |value: f64| {
@@ -560,7 +652,7 @@ impl MotionSpec {
             }
             if matches!(
                 layer.kind,
-                LayerType::Text | LayerType::Light | LayerType::Spark
+                LayerType::Text | LayerType::Light | LayerType::Spark | LayerType::Canvas
             ) {
                 layer.radius = 0.0;
                 layer.shadow = false;
@@ -632,6 +724,9 @@ impl MotionSpec {
                 layer.zoom.clear();
                 layer.spotlight.clear();
             }
+            if layer.kind != LayerType::Canvas {
+                layer.canvas = None;
+            }
             if layer.end - layer.start < 0.1 || hex_color(&layer.color).is_none() {
                 return false;
             }
@@ -655,11 +750,49 @@ impl MotionSpec {
                     layer.text = None;
                     layer.asset_id.is_some_and(&clip_allowed)
                 }
+                LayerType::Canvas => {
+                    layer.text = None;
+                    layer.asset_id = None;
+                    let runtime = crate::canvas_render::active();
+                    match (&mut layer.canvas, runtime) {
+                        (Some(canvas), Some(runtime)) => {
+                            canvas.values.clear();
+                            canvas.libraries.retain(|id| {
+                                runtime.libraries.iter().any(|library| &library.id == id)
+                            });
+                            canvas.libraries.dedup();
+                            !canvas.html.trim().is_empty()
+                                && canvas.html.len() <= crate::canvas_render::MAX_CANVAS_HTML
+                        }
+                        _ => false,
+                    }
+                }
             }
+        };
+        let mut kept = Vec::with_capacity(spec.layers.len());
+        spec.layers.retain_mut(|layer| {
+            let keep = check(layer);
+            kept.push(keep);
+            keep
         });
+        // Layers dropped above shift the indices boxes fit to.
+        let position = |original: usize| {
+            kept.get(original)
+                .copied()
+                .unwrap_or(false)
+                .then(|| kept[..original].iter().filter(|keep| **keep).count())
+        };
+        let kinds: Vec<LayerType> = spec.layers.iter().map(|layer| layer.kind).collect();
+        for layer in &mut spec.layers {
+            layer.fit_text = layer
+                .fit_text
+                .and_then(position)
+                .filter(|&index| layer.kind == LayerType::Box && kinds[index] == LayerType::Text);
+        }
         if spec.layers.is_empty() {
             return Err("The agent's animation has nothing to show");
         }
+        crate::motion_templates::clean_inputs(&mut spec);
         Ok(spec)
     }
 }
@@ -915,7 +1048,7 @@ fn motion_expressions(layer: &Layer, width: u32, height: u32) -> (String, String
 
 /// Copies the fonts drawtext uses into the job directory as `font-<role>-<weight>`, so filter
 /// arguments need no path escaping: the brand's files where there are some, else the system font.
-pub(crate) fn ensure_fonts(directory: &Path, fonts: &FontSet) -> io::Result<()> {
+pub(crate) fn ensure_fonts(directory: &Path, fonts: &BrandKit) -> io::Result<()> {
     for role in [FontRole::Heading, FontRole::Body] {
         for weight in [FontWeight::Regular, FontWeight::Bold] {
             let source = match fonts.file(role, weight) {
@@ -977,10 +1110,63 @@ struct LayerTarget<'a> {
     shift: f64,
     /// How long image and box sources last, in seconds of the base video.
     length: f64,
-    fonts: &'a FontSet,
+    fonts: &'a BrandKit,
 }
 
 impl LayerTarget<'_> {
+    /// Wraps a text layer's words the way it is drawn: by the real width of its font when the
+    /// font file is there, else by an average letter width.
+    fn wrap_text(
+        &self,
+        layer: &Layer,
+        text: &str,
+        font_px: f64,
+        weight: FontWeight,
+    ) -> (String, Option<TextFont>) {
+        let frame_w = f64::from(self.width);
+        let measured = TextFont::load(&self.directory.join(font_name(layer.font, weight)));
+        let wrapped = match &measured {
+            Some(face) => wrap_measured(text, layer.width * frame_w, |line| {
+                face.width(line, font_px)
+            }),
+            None => {
+                let advance = self.fonts.advance(layer.font, weight);
+                wrap(
+                    text,
+                    (layer.width * frame_w / (font_px * advance)).floor() as usize,
+                )
+            }
+        };
+        (wrapped, measured)
+    }
+
+    /// The heights boxes take to hold the text they fit (see [`Layer::fit_text`]), as fractions
+    /// of the frame; `None` keeps a layer as designed.
+    fn fitted_heights(&self, spec: &MotionSpec) -> Vec<Option<f64>> {
+        let frame_h = f64::from(self.height);
+        spec.layers
+            .iter()
+            .map(|layer| {
+                let text = spec.layers.get(layer.fit_text?)?;
+                if layer.kind != LayerType::Box || text.kind != LayerType::Text {
+                    return None;
+                }
+                let font_px = (text.size * frame_h).round().max(8.0);
+                let weight = if text.bold {
+                    FontWeight::Bold
+                } else {
+                    FontWeight::Regular
+                };
+                let (plain, _) =
+                    crate::motion_effects::parse_emphasis(text.text.as_deref().unwrap_or_default());
+                let (wrapped, _) = self.wrap_text(text, &plain, font_px, weight);
+                let lines = wrapped.lines().count().max(1) as f64;
+                let needed = (lines * font_px * 1.25 + FIT_PADDING * 2.0 * frame_h) / frame_h;
+                Some(layer.height.max(needed).min(1.0))
+            })
+            .collect()
+    }
+
     /// Appends the filters that draw `spec`'s layers over the `base` stream to `graph`, adding any
     /// image inputs to `args` from input index `first_input`, and returns the final stream label.
     fn draw(
@@ -1002,8 +1188,20 @@ impl LayerTarget<'_> {
         let mut current = base.to_owned();
         let mut next_input = first_input;
         let (frame_w, frame_h) = (f64::from(width), f64::from(height));
+        // A template drawn without values shows its defaults, never its placeholders.
+        let filled;
+        let spec = if spec.inputs.is_empty() {
+            spec
+        } else {
+            filled = spec.with_defaults();
+            &filled
+        };
+        let fitted = self.fitted_heights(spec);
         for (index, layer) in spec.layers.iter().enumerate() {
             let mut layer = layer.clone();
+            if let Some(height) = fitted[index] {
+                layer.height = height;
+            }
             layer.start += self.shift;
             layer.end += self.shift;
             let layer = &layer;
@@ -1024,19 +1222,7 @@ impl LayerTarget<'_> {
                         layer.text.as_deref().unwrap_or_default(),
                     );
                     let text = text.as_str();
-                    let measured = TextFont::load(&directory.join(&font));
-                    let wrapped = match &measured {
-                        Some(face) => wrap_measured(text, layer.width * frame_w, |line| {
-                            face.width(line, font_px)
-                        }),
-                        None => {
-                            let advance = self.fonts.advance(layer.font, weight);
-                            wrap(
-                                text,
-                                (layer.width * frame_w / (font_px * advance)).floor() as usize,
-                            )
-                        }
-                    };
+                    let (wrapped, measured) = self.wrap_text(layer, text, font_px, weight);
                     // FFmpeg 8's drawtext draws a missing-glyph box at each line break, so
                     // every line is its own centred drawtext.
                     let lines: Vec<&str> = wrapped.lines().collect();
@@ -1294,6 +1480,99 @@ impl LayerTarget<'_> {
                     )
                     .ok();
                     next_input += 1;
+                }
+                LayerType::Canvas => {
+                    let canvas = layer
+                        .canvas
+                        .as_ref()
+                        .ok_or_else(|| io::Error::other("A canvas layer has no page"))?;
+                    let runtime = crate::canvas_render::active().ok_or_else(|| {
+                        io::Error::other(
+                            "This animation has a canvas layer. Turn on a canvas renderer plugin \
+                             and download its browser in Settings › Plugins.",
+                        )
+                    })?;
+                    let even = |value: f64| ((value / 2.0).round() as u32).max(1) * 2;
+                    let (box_w, box_h) =
+                        (even(layer.width * frame_w), even(layer.height * frame_h));
+                    let span = (layer.end - layer.start).max(0.1);
+                    let frames = (span * f64::from(FPS)).ceil() as u32;
+                    let folder = format!("{prefix}canvas-{index}");
+                    let fonts: Vec<(&str, &str, PathBuf)> = [
+                        ("brand-heading", FontRole::Heading),
+                        ("brand-body", FontRole::Body),
+                    ]
+                    .into_iter()
+                    .flat_map(|(family, role)| {
+                        [("400", FontWeight::Regular), ("700", FontWeight::Bold)].map(
+                            move |(weight, font)| {
+                                (family, weight, directory.join(font_name(role, font)))
+                            },
+                        )
+                    })
+                    .collect();
+                    let palette = self.fonts.colors();
+                    let theme = serde_json::json!({
+                        "colors": palette,
+                        "background": spec.background,
+                        "text": layer.color,
+                        "accent": layer.accent.as_deref().or(spec.light_color.as_deref())
+                            .or(palette.iter().find(|color| !color.eq_ignore_ascii_case(&spec.background)).map(String::as_str)),
+                    });
+                    crate::canvas_render::render_frames(
+                        &runtime,
+                        &crate::canvas_render::CanvasPage {
+                            html: &canvas.html,
+                            libraries: &canvas.libraries,
+                            values: &canvas.values,
+                            fonts: &fonts,
+                            theme: &theme,
+                            components: self.fonts.components(),
+                        },
+                        (box_w, box_h),
+                        FPS,
+                        frames,
+                        &directory.join(&folder),
+                    )?;
+                    let ease = (span / 3.0).min(0.6);
+                    let mut fades = vec!["null".to_owned()];
+                    if layer.enter != Motion::None {
+                        fades.push(format!(
+                            "fade=t=in:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.start
+                        ));
+                    }
+                    if layer.exit != Motion::None {
+                        fades.push(format!(
+                            "fade=t=out:st={:.3}:d={ease:.3}:alpha=1",
+                            layer.end - ease
+                        ));
+                    }
+                    if layer.opacity < 1.0 {
+                        fades.push(format!("colorchannelmixer=aa={:.3}", layer.opacity));
+                    }
+                    // The browser writes opaque frames without alpha; the switch rebuilds the
+                    // filter graph, so the start is an input offset rather than a filter.
+                    args.extend([
+                        "-itsoffset".to_owned(),
+                        format!("{:.3}", layer.start),
+                        "-framerate".to_owned(),
+                        FPS.to_string(),
+                        "-i".to_owned(),
+                    ]);
+                    args.push(format!("{folder}/f%05d.png"));
+                    let input = next_input;
+                    next_input += 1;
+                    write!(
+                        graph,
+                        "[{input}:v]format=rgba,{}[{prefix}k{index}];\
+                         [{current}][{prefix}k{index}]overlay=x='{:.2}-overlay_w/2+{dx}':\
+                         y='{:.2}-overlay_h/2+{dy}':enable='{enable}':eof_action=pass:format=auto[{label}];",
+                        fades.join(","),
+                        layer.x * frame_w,
+                        layer.y * frame_h,
+                    )
+                    .ok();
                 }
                 LayerType::Video => {
                     let path = layer
@@ -2086,7 +2365,7 @@ pub(crate) fn overlay_graph(
     graph: &mut String,
     args: &mut Vec<String>,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
 ) -> io::Result<String> {
     ensure_fonts(directory, fonts)?;
     LayerTarget {
@@ -2111,7 +2390,7 @@ fn render_arguments(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
     audio: Option<&Path>,
 ) -> io::Result<Vec<String>> {
     let duration = spec.duration_seconds;
@@ -2380,7 +2659,7 @@ pub(crate) fn render_spec(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
     render_spec_with_audio(spec, size, directory, output, images, fonts, None, check)
@@ -2394,7 +2673,7 @@ pub(crate) fn render_spec_with_audio(
     directory: &Path,
     output: &str,
     images: &dyn Fn(i64) -> Option<PathBuf>,
-    fonts: &FontSet,
+    fonts: &BrandKit,
     audio: Option<&Path>,
     check: &mut dyn FnMut() -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -2571,6 +2850,84 @@ mod tests {
     }
 
     #[test]
+    fn canvas_layers_draw_their_page_with_template_values() {
+        let canvas_layer = json!({"type": "canvas", "text": "ignored", "assetId": null, "x": 0.25, "y": 0.5,
+            "width": 0.5, "height": 1.0, "size": 0.05, "color": "#00FF00", "bold": false, "opacity": 1,
+            "start": 0.5, "end": 2, "enter": "none", "exit": "none",
+            "canvas": {"html": "<canvas id=c></canvas><script type=module>import { ease } from 'tween';\
+const c = document.getElementById('c'); c.width = arrumo.width; c.height = arrumo.height;\
+const g = c.getContext('2d'); window.render = (t) => { g.clearRect(0, 0, c.width, c.height);\
+g.fillStyle = arrumo.values.tint; g.fillRect(0, 0, c.width, c.height * ease(Math.min(t, 1))); };</script>",
+                "libraries": ["tween", "missing"]}});
+        let mut answer = answer();
+        answer["layers"] = json!([canvas_layer]);
+        answer["inputs"] = json!([{"key": "tint", "label": "Tint", "kind": "text", "default": "#00ff00",
+            "maxLength": 20, "tips": "", "dos": [], "donts": []}]);
+        assert!(
+            MotionSpec::from_answer(&answer, |_| true).is_err(),
+            "without a renderer a canvas layer is dropped"
+        );
+        if !crate::canvas_render::use_test_runtime() {
+            eprintln!(
+                "skipped: set ARRUMO_TEST_CANVAS_BROWSER to a headless browser and install FFmpeg"
+            );
+            return;
+        }
+        assert!(spec_schema(&[]).to_string().contains("\"canvas\""));
+        assert!(spec_guide().contains("window.render"));
+        let spec = MotionSpec::from_answer(&answer, |_| true).unwrap();
+        let layer = &spec.layers[0];
+        assert_eq!(layer.text, None);
+        assert_eq!(layer.canvas.as_ref().unwrap().libraries, ["tween"]);
+        assert_eq!(spec.inputs.len(), 1, "the page reads the tint input");
+        let mut values = serde_json::Map::new();
+        values.insert("tint".into(), json!("#ff0000"));
+        let filled = spec.instantiate(&values).unwrap();
+        assert_eq!(
+            filled.layers[0].canvas.as_ref().unwrap().values["tint"],
+            "#ff0000"
+        );
+
+        let directory = tempfile::tempdir().unwrap();
+        render_spec(
+            &filled,
+            (320, 180),
+            directory.path(),
+            "out.mp4",
+            &|_| None,
+            &BrandKit::default(),
+            &mut || Ok(()),
+        )
+        .unwrap();
+        let frame_at = |at: &str| {
+            crate::quiet_command(crate::media_tools::ffmpeg())
+                .args(["-v", "error", "-ss", at, "-i"])
+                .arg(directory.path().join("out.mp4"))
+                .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+                .launch_output()
+                .unwrap()
+                .stdout
+        };
+        let pixel = |frame: &[u8], x: usize, y: usize| {
+            let at = (y * 320 + x) * 3;
+            [frame[at], frame[at + 1], frame[at + 2]]
+        };
+        let before = frame_at("0.2");
+        assert!(pixel(&before, 80, 10)[0] < 60, "the layer starts at 0.5 s");
+        let after = frame_at("1.8");
+        let red = pixel(&after, 80, 10);
+        assert!(
+            red[0] > 200 && red[1] < 60,
+            "the page drew with the value: {red:?}"
+        );
+        let outside = pixel(&after, 240, 10);
+        assert!(
+            outside[0] < 60,
+            "the box covers the left half only: {outside:?}"
+        );
+    }
+
+    #[test]
     fn stored_animations_keep_their_shape_without_new_effects() {
         let spec = MotionSpec::from_answer(&answer(), |_| true).unwrap();
         let saved = serde_json::to_value(&spec).unwrap();
@@ -2695,7 +3052,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &|_| None,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -2771,7 +3128,7 @@ mod tests {
                         "/media/image.png"
                     }))
                 },
-                &FontSet::default(),
+                &BrandKit::default(),
                 None,
             )
             .unwrap()
@@ -2998,7 +3355,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3097,7 +3454,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3155,7 +3512,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3212,7 +3569,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &|_| None,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3286,7 +3643,7 @@ mod tests {
                 &mut graph,
                 &mut inputs,
                 &|_| None,
-                &FontSet::default(),
+                &BrandKit::default(),
             )
             .unwrap();
         }
@@ -3361,7 +3718,7 @@ mod tests {
             directory.path(),
             "out.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3404,7 +3761,7 @@ mod tests {
             directory.path(),
             "effect.mp4",
             &resolve,
-            &FontSet::default(),
+            &BrandKit::default(),
             &mut || Ok(()),
         )
         .unwrap();
@@ -3457,7 +3814,7 @@ mod tests {
                 directory.path(),
                 &name,
                 &|_| None,
-                &FontSet::default(),
+                &BrandKit::default(),
                 &mut || Ok(()),
             )
             .unwrap();
@@ -3545,5 +3902,68 @@ mod tests {
         assert!(face.width("iii", 80.0) < face.width("WWW", 80.0));
         let line_box = face.line_box(80.0);
         assert!((80.0..100.0).contains(&line_box), "{line_box}");
+    }
+}
+
+#[cfg(test)]
+mod fit_tests {
+    use super::*;
+
+    fn card(text: &str) -> MotionSpec {
+        serde_json::from_value(serde_json::json!({
+            "title": "Card", "kind": "animation", "usage": "", "durationSeconds": 3.0, "background": "#101010",
+            "layers": [
+                {"type": "box", "text": null, "assetId": null, "x": 0.5, "y": 0.5, "width": 0.5, "height": 0.14,
+                 "size": 0.05, "color": "#2537B8", "bold": false, "opacity": 1.0, "start": 0.0, "end": 3.0,
+                 "enter": "fade", "exit": "fade", "fitText": 1},
+                {"type": "text", "text": text, "assetId": null, "x": 0.5, "y": 0.5, "width": 0.4, "height": 0.1,
+                 "size": 0.05, "color": "#FFFFFF", "bold": true, "opacity": 1.0, "start": 0.0, "end": 3.0,
+                 "enter": "fade", "exit": "fade"}
+            ]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_card_grows_for_long_text_and_keeps_its_size_for_short() {
+        let directory = tempfile::tempdir().unwrap();
+        let fonts = BrandKit::default();
+        let target = LayerTarget {
+            width: 1280,
+            height: 720,
+            directory: directory.path(),
+            prefix: "",
+            shift: 0.0,
+            length: 3.0,
+            fonts: &fonts,
+        };
+        let short = target.fitted_heights(&card("Open the app"));
+        assert_eq!(short[0], Some(0.14), "one line fits the card as designed");
+        assert_eq!(short[1], None);
+        let long = target.fitted_heights(&card(
+            "Open the settings, choose the workspace you want to export and press the export button",
+        ));
+        assert!(long[0].unwrap() > 0.2, "{long:?}");
+    }
+
+    #[test]
+    fn agents_fitting_a_box_to_a_dropped_or_wrong_layer_are_ignored() {
+        let mut answer = serde_json::to_value(card("Hi")).unwrap();
+        answer["layers"][0]["fitText"] = serde_json::json!(0);
+        let spec = MotionSpec::from_answer(&answer, |_| false).unwrap();
+        assert_eq!(spec.layers[0].fit_text, None, "a box can't fit itself");
+
+        let mut answer = serde_json::to_value(card("Hi")).unwrap();
+        let blank = serde_json::json!({"type": "text", "text": " ", "assetId": null, "x": 0.5, "y": 0.5,
+            "width": 0.4, "height": 0.1, "size": 0.05, "color": "#FFFFFF", "bold": false, "opacity": 1.0,
+            "start": 0.0, "end": 3.0, "enter": "fade", "exit": "fade"});
+        answer["layers"].as_array_mut().unwrap().insert(0, blank);
+        answer["layers"][1]["fitText"] = serde_json::json!(2);
+        let spec = MotionSpec::from_answer(&answer, |_| false).unwrap();
+        assert_eq!(
+            spec.layers[0].fit_text,
+            Some(1),
+            "indices follow the layers that stay"
+        );
     }
 }

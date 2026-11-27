@@ -103,7 +103,7 @@ function StudioLayout({ workspaces, workspace, view, onSelect, children }: Param
     <>
       <Sidebar collapsible="icon" className="border-r-0!" mobileTitle={copy.navigation}>
         <SidebarHeader className="relative gap-2 px-2 pt-3 pb-2 max-md:pe-12">
-          <Button variant="ghost" size="icon" className="absolute end-2 top-5 text-sidebar-foreground hover:bg-white/15 hover:text-sidebar-foreground md:hidden"
+          <Button variant="ghost" size="icon" className="size-8 absolute end-2 top-5 text-sidebar-foreground hover:bg-white/15 hover:text-sidebar-foreground md:hidden"
             onClick={() => setOpenMobile(false)} aria-label={copy.closeNavigation}><X /></Button>
           <SidebarMenu>
             <SidebarMenuItem>

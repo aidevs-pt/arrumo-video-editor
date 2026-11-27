@@ -108,7 +108,7 @@ function PluginTour({ stops, replaying, onFinish }: { stops: Stop[]; replaying: 
           <div className="flex items-center justify-between gap-4">
             <p className="font-bold">{heading}</p>
             <DialogClose asChild>
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" aria-label={copy.close}>
+              <Button variant="ghost" size="icon" className="size-8 text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" aria-label={copy.close}>
                 <X />
               </Button>
             </DialogClose>

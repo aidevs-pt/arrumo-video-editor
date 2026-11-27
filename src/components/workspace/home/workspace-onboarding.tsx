@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { OnboardingKeys } from "./onboarding-keys";
+import { FirstOpenPreferences } from "./first-open-preferences";
 import type { PluginSettingsManifest } from "@/components/workspace/settings/plugin-preferences";
 import { chooseAgentProgram } from "@/lib/agent-cli";
 import { useLocale } from "@/lib/locale-provider";
@@ -134,10 +135,13 @@ export function WorkspaceOnboarding({ desktop, onCreate }: {
               </li>
             ))}
           </ol>
-          <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs" aria-label={copy.language}>
-            {Object.entries({ en: "English", es: "Español", pt: "Português" }).map(([code, label]) => (
-              <button type="button" key={code} lang={code} aria-pressed={locale === code} className={cn("rounded-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring", locale === code ? "font-bold" : "underline")} onClick={() => setLocale(code)}>{label}</button>
-            ))}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+            <div className="flex flex-wrap gap-x-3 gap-y-2" role="group" aria-label={copy.language}>
+              {Object.entries({ en: "English", es: "Español", pt: "Português" }).map(([code, label]) => (
+                <button type="button" key={code} lang={code} aria-pressed={locale === code} className={cn("rounded-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring", locale === code ? "font-bold" : "underline")} onClick={() => setLocale(code)}>{label}</button>
+              ))}
+            </div>
+            {desktop && <FirstOpenPreferences />}
           </div>
         </div>
       </aside>

@@ -134,6 +134,15 @@ struct ProfileFormatInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProfileFormatSwitchInput {
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    enabled: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProfileOverridesInput<T> {
     workspace_id: i64,
     profile_id: i64,
@@ -181,7 +190,7 @@ struct BrandColorsInput {
     colors: Vec<String>,
 }
 
-pub(super) fn definitions() -> [Value; 29] {
+pub(super) fn definitions() -> [Value; 30] {
     let id = json!({"type": "integer", "minimum": 1});
     let name = json!({"type": "string", "minLength": 1});
     let color = json!({"type": ["string", "null"]});
@@ -277,8 +286,12 @@ pub(super) fn definitions() -> [Value; 29] {
         json!({"name": "set_format_delivery", "description": "Replace a workspace format's supplemental outputs. Omitted settings reset to defaults.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "formatId": id, "settings": supplemental},
                 "required": ["workspaceId", "formatId", "settings"], "additionalProperties": false}}),
-        json!({"name": "list_profile_formats", "description": "List enabled formats with inherited and overridden dimensions for a profile.",
+        json!({"name": "list_profile_formats", "description": "List the workspace's enabled formats for a profile, with inherited and overridden dimensions and whether the profile makes its videos in each (enabled).",
             "inputSchema": profile, "annotations": {"readOnlyHint": true}}),
+        json!({"name": "set_profile_format_enabled", "description": "Turn one of the workspace's formats on or off for a profile; its videos are made only in the formats left on. A profile keeps at least one format.",
+            "inputSchema": {"type": "object", "properties": {
+                "workspaceId": id, "profileId": id, "formatId": id, "enabled": {"type": "boolean"}
+            }, "required": ["workspaceId", "profileId", "formatId", "enabled"], "additionalProperties": false}}),
         json!({"name": "set_profile_format_overrides", "description": "Replace the profile's dimension overrides for one format. Omit a dimension to inherit it.",
             "inputSchema": {"type": "object", "properties": {
                 "workspaceId": id, "profileId": id, "formatId": id,
@@ -451,6 +464,17 @@ pub(super) fn call(
                 .list_profile_formats(args.workspace_id, args.profile_id)
                 .map(|formats| json!({"formats": formats}))
                 .map_err(|_| "Could not list profile formats")
+        }),
+        "set_profile_format_enabled" => parse(arguments).and_then(|args: ProfileFormatSwitchInput| {
+            store
+                .set_profile_format_enabled(
+                    args.workspace_id,
+                    args.profile_id,
+                    args.format_id,
+                    args.enabled,
+                )
+                .map(|formats| json!({"formats": formats}))
+                .map_err(|_| "Could not change the profile's formats. A profile keeps at least one")
         }),
         "set_profile_format_overrides" => {
             parse(arguments).and_then(|args: ProfileOverridesInput<DimensionOverrides>| {

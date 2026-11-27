@@ -725,9 +725,26 @@ mod tests {
         assert!(args.contains(&"web_search=\"live\"".to_owned()), "{args:?}");
         assert!(
             args.contains(&"sandbox_mode=\"workspace-write\"".to_owned())
-                && !args.contains(&"--ignore-user-config".to_owned()),
-            "agents may write files and use their own setup by default: {args:?}"
+                && args.contains(&"--ignore-user-config".to_owned()),
+            "agents may write files but leave the creator's own setup out by default: {args:?}"
         );
+        store
+            .set_plugin_setting(
+                "codex",
+                "installed-plugins",
+                Some(workspace),
+                Some(&Value::Bool(true)),
+            )
+            .unwrap();
+        let own_setup =
+            crate::agent_run::setting_arguments(codex, &store.agent_options(workspace, "codex"));
+        assert!(
+            !own_setup.contains(&"--ignore-user-config".to_owned()),
+            "{own_setup:?}"
+        );
+        store
+            .set_plugin_setting("codex", "installed-plugins", Some(workspace), None)
+            .unwrap();
         for id in ["codex", "claude-code"] {
             store
                 .set_plugin_setting(
@@ -786,10 +803,29 @@ mod tests {
                 "WebSearch,WebFetch"
             ]
         );
+        assert!(!writing.iter().any(|arg| arg == "--restricted"));
         assert!(
-            !writing
+            writing.contains(&"--safe-mode".to_owned())
+                && writing.contains(&"--strict-mcp-config".to_owned()),
+            "the creator's own plugins only load when they ask for them: {writing:?}"
+        );
+        store
+            .set_plugin_setting(
+                "claude-code",
+                "installed-plugins",
+                Some(workspace),
+                Some(&Value::Bool(true)),
+            )
+            .unwrap();
+        let own_setup = crate::agent_run::setting_arguments(
+            claude,
+            &store.agent_options(workspace, "claude-code"),
+        );
+        assert!(
+            !own_setup
                 .iter()
-                .any(|arg| arg == "--restricted" || arg == "--strict-mcp-config")
+                .any(|arg| arg == "--safe-mode" || arg == "--strict-mcp-config"),
+            "{own_setup:?}"
         );
         assert_eq!(run_work_folder("claude-code"), Some("local-tools"));
         assert_eq!(run_work_folder("codex"), Some("local-tools"));

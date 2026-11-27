@@ -81,6 +81,38 @@ fn set_media_order_limits(
 }
 
 #[tauri::command]
+fn get_storage_settings(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::StorageSettings, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .storage_settings()
+        .map_err(|_| "storage_settings_failed")
+}
+
+#[tauri::command]
+async fn set_storage_settings(
+    app: AppHandle,
+    settings: arrumo_workspaces::StorageSettings,
+) -> Result<arrumo_workspaces::StorageSettings, &'static str> {
+    let failed = "storage_settings_failed";
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite");
+    // Turning it on may delete many clips, so it runs off the shared store.
+    tauri::async_runtime::spawn_blocking(move || {
+        WorkspaceStore::open(&database)
+            .and_then(|store| store.apply_storage_settings(&database, &settings))
+            .map_err(|_| failed)
+    })
+    .await
+    .map_err(|_| failed)?
+}
+
+#[tauri::command]
 fn list_workspaces(store: State<'_, Store>) -> Result<Vec<Workspace>, &'static str> {
     store
         .lock()
@@ -232,6 +264,21 @@ async fn list_profile_formats(
         .map_err(|_| "store_unavailable")?
         .list_profile_formats(workspace_id, profile_id)
         .map_err(|_| "profile_format_list_failed")
+}
+
+#[tauri::command]
+async fn set_profile_format_enabled(
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    enabled: bool,
+    store: State<'_, Store>,
+) -> Result<Vec<ProfileFormat>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_profile_format_enabled(workspace_id, profile_id, format_id, enabled)
+        .map_err(|_| "profile_format_switch_failed")
 }
 
 #[tauri::command]
@@ -1201,6 +1248,37 @@ async fn generate_motion_library_item(
 }
 
 #[tauri::command]
+async fn generate_canvas_component(
+    workspace_id: i64,
+    profile_id: Option<i64>,
+    request: String,
+    app: AppHandle,
+) -> Result<arrumo_workspaces::MotionLibraryItem, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "store_unavailable".to_owned())?
+            .join("workspaces.sqlite");
+        WorkspaceStore::open(&database)
+            .map_err(|_| "store_unavailable".to_owned())?
+            .generate_canvas_component(&database, workspace_id, profile_id, &request)
+            .map_err(|error| {
+                arrumo_workspaces::report_failure("motion_library", &error);
+                match error.downcast_ref::<arrumo_workspaces::AgentRunError>() {
+                    Some(arrumo_workspaces::AgentRunError::Unavailable) => "agent_unavailable",
+                    Some(arrumo_workspaces::AgentRunError::TimedOut) => "agent_timed_out",
+                    Some(_) => "agent_failed",
+                    None => "motion_generation_failed",
+                }
+                .to_owned()
+            })
+    })
+    .await
+    .map_err(|_| "motion_generation_failed".to_owned())?
+}
+
+#[tauri::command]
 async fn set_workspace_context(
     workspace_id: i64,
     markdown: String,
@@ -1644,13 +1722,19 @@ async fn control_generation(
     workspace_id: i64,
     run_id: i64,
     action: RunControl,
+    stage_index: Option<usize>,
     store: State<'_, Store>,
 ) -> Result<GenerationRun, &'static str> {
-    store
-        .lock()
-        .map_err(|_| "store_unavailable")?
-        .control_generation(workspace_id, run_id, action)
-        .map_err(|_| "generation_control_failed")
+    let store = store.lock().map_err(|_| "store_unavailable")?;
+    match (action, stage_index) {
+        (RunControl::Stop, Some(stage)) => store
+            .return_generation_to_stage(workspace_id, run_id, stage)
+            .map_err(|_| "generation_control_failed"),
+        (_, Some(_)) => Err("generation_control_failed"),
+        (action, None) => store
+            .control_generation(workspace_id, run_id, action)
+            .map_err(|_| "generation_control_failed"),
+    }
 }
 
 #[tauri::command]
@@ -1874,6 +1958,7 @@ fn main() {
                 app.handle().clone(),
                 database.clone(),
             )?);
+            plugin_settings::ensure_canvas_renderer(database.clone());
             tauri::async_runtime::spawn_blocking(move || {
                 let Ok(store) = WorkspaceStore::open(&database) else {
                     eprintln!("Arrumo could not open the store to retry managed file cleanup.");
@@ -1897,6 +1982,9 @@ fn main() {
                     ),
                     Err(error) => cleanup_failed("delivery", &*error),
                 }
+                if let Err(error) = store.sweep_finished_footage(&database) {
+                    cleanup_failed("footage", &*error);
+                }
                 match store.recover_asset_cleanup(&database) {
                     Ok(0) => {}
                     Ok(remaining) => {
@@ -1917,6 +2005,11 @@ fn main() {
             motion_library::list_motion_library,
             motion_library::preview_motion_library_item,
             motion_library::preview_run_motion_item,
+            motion_library::list_motion_library_versions,
+            motion_library::restore_motion_library_version,
+            motion_library::preview_motion_library_version,
+            motion_library::preview_run_plan_use,
+            motion_library::motion_template_inputs,
             motion_library::saved_run_motion,
             motion_library::save_motion_result,
             motion_library::create_motion_library_item,
@@ -1930,10 +2023,15 @@ fn main() {
             set_preview_max_edge,
             get_media_order_limits,
             set_media_order_limits,
+            get_storage_settings,
+            set_storage_settings,
             agent_settings::get_agent_settings,
             agent_settings::list_agent_plugins,
             plugin_settings::list_plugin_catalog,
             plugin_settings::set_plugin_active,
+            plugin_settings::get_canvas_renderer,
+            plugin_settings::install_canvas_renderer,
+            plugin_settings::remove_canvas_renderer,
             plugin_settings::pending_plugin_tour,
             plugin_settings::plugin_tour,
             plugin_settings::finish_plugin_tour,
@@ -1988,6 +2086,7 @@ fn main() {
             update_output_format,
             remove_output_format,
             list_profile_formats,
+            set_profile_format_enabled,
             set_profile_format_overrides,
             get_format_delivery,
             set_format_delivery,
@@ -2028,6 +2127,7 @@ fn main() {
             list_video_models,
             provider_usage,
             generate_motion_library_item,
+            generate_canvas_component,
             apply_context_import,
             set_workspace_context,
             list_workspace_feedback,

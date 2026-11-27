@@ -11,6 +11,8 @@ Your judgement:
 - Leave about half a second of air when the speaker changes. Tighter feels urgent; looser feels calm. Match the profile's pacing.
 - Remove false starts, repeated explanations, filler, long silences, apologies and setup that the viewer does not need. Do not remove every pause: some breathing room keeps speech natural.
 - Keep demonstrations long enough to see what happens.
+- When the picture moves across a cut, cut while it is moving rather than when it has stopped, and keep its direction, so a movement to the left continues to the left in the next shot.
+- Shape the energy: let the opening settle in, tighten the cuts towards the key moment, then let the ending breathe. Cuts of the same length all the way through feel flat.
 - Order cuts by the script's beats, not by recording order, when the script asks for it.
 - Check the total against the target length. If you are over, drop a whole beat or trim tails rather than shaving every pause.
 - Give each cut a purpose so the creator can review your reasoning: the beat it serves and why that take.

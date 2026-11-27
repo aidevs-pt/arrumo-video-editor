@@ -18,6 +18,7 @@ pub fn list_plugin_catalog(store: State<'_, Store>) -> Result<Vec<CatalogPlugin>
 /// Turns a plugin on or off for the whole app. Errors are codes the interface translates.
 #[tauri::command]
 pub fn set_plugin_active(
+    app: AppHandle,
     plugin_id: String,
     active: bool,
     store: State<'_, Store>,
@@ -29,7 +30,24 @@ pub fn set_plugin_active(
         .map_err(|error| {
             arrumo_workspaces::plugin_activation_refusal_code(error.as_ref())
                 .unwrap_or("plugin_activation_failed")
-        })
+        })?;
+    if active && let Ok(directory) = app.path().app_local_data_dir() {
+        ensure_canvas_renderer(directory.join("workspaces.sqlite"));
+    }
+    Ok(())
+}
+
+/// Downloads the canvas browser in the background when a canvas renderer plugin is on and the
+/// browser is missing; a failure leaves the plugin page offering the download.
+pub fn ensure_canvas_renderer(database: std::path::PathBuf) {
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = WorkspaceStore::open(&database)
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)
+            .and_then(|store| store.ensure_canvas_browser());
+        if let Err(error) = result {
+            eprintln!("Arrumo could not download the canvas renderer: {error}");
+        }
+    });
 }
 
 #[tauri::command]
@@ -629,4 +647,57 @@ fn desktop_job(job: arrumo_workspaces::PluginActionJob) -> Result<serde_json::Va
         value["result"] = serde_json::Value::String(serialized);
     }
     Ok(value)
+}
+
+#[tauri::command]
+pub fn get_canvas_renderer(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .canvas_status()
+        .map_err(|_| "canvas_status_failed")
+}
+
+/// Downloads or removes the canvas browser off the shared store, since a download takes minutes.
+async fn change_canvas_renderer(
+    app: AppHandle,
+    install: bool,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    let failed = if install {
+        "canvas_install_failed"
+    } else {
+        "canvas_remove_failed"
+    };
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite");
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
+        if install {
+            store.install_canvas_browser()
+        } else {
+            store.remove_canvas_browser()
+        }
+        .map_err(|_| failed)
+    })
+    .await
+    .map_err(|_| failed)?
+}
+
+#[tauri::command]
+pub async fn install_canvas_renderer(
+    app: AppHandle,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    change_canvas_renderer(app, true).await
+}
+
+#[tauri::command]
+pub async fn remove_canvas_renderer(
+    app: AppHandle,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    change_canvas_renderer(app, false).await
 }

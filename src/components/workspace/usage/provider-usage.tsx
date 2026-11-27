@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocale } from "@/lib/locale-provider";
 import { PLUGINS_CHANGED, PluginIcon, usePluginText } from "@/lib/plugin-text";
 import { cn } from "@/lib/utils";
@@ -130,50 +132,87 @@ export function UsageBanner({ workspaceId }: { workspaceId: number }) {
   );
 }
 
-/** Settings › Services and keys: how much each keyed provider has left, one row per provider. */
+const ROWS_KEY = "arrumo.usage-rows.";
+
+/** Settings › Services and keys: how much each keyed provider has left, one table row per provider.
+ * While reading, placeholder rows hold the size of the last read so the page doesn't jump. */
 export function UsagePanel({ workspaceId, keysHref }: { workspaceId: number; keysHref: string }) {
   const { locale, messages: { usage: copy } } = useLocale();
   const pluginText = usePluginText();
   const usage = useProviderUsage(workspaceId);
-  if (!usage?.providers.length) return null;
+  const [expected] = useState(() => {
+    try { return Math.min(8, Math.max(1, Number(window.localStorage.getItem(ROWS_KEY + workspaceId) ?? 2) || 1)); } catch { return 2; }
+  });
+  useEffect(() => {
+    if (!usage) return;
+    try { window.localStorage.setItem(ROWS_KEY + workspaceId, String(usage.providers.length)); } catch {}
+  }, [usage, workspaceId]);
+  if (usage && !usage.providers.length) return null;
   const count = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
-  const day = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+  const day = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
   return (
-    <section aria-labelledby="usage-title">
+    <section aria-labelledby="usage-title" aria-busy={!usage}>
       <h2 id="usage-title" className="mb-3 text-[1.5rem]">{copy.panelTitle}</h2>
-      <ul className="divide-y rounded-xl border bg-card">
-        {usage.providers.map((entry) => {
-          const name = pluginText.name(entry.pluginId, usage.names[entry.pluginId] ?? entry.pluginId);
-          const left = entry.remainingPercent;
-          const agent = entry.unit === "percent";
-          const windowName = entry.windowMinutes === 10080 ? copy.weekly
-            : entry.windowMinutes && entry.windowMinutes % 60 === 0 ? copy.hourly.replace("{hours}", String(entry.windowMinutes / 60)) : copy.planLimit;
-          const tone = entry.level === "danger" ? "text-destructive" : entry.level === "warning" ? "text-[oklch(52%_.13_65)]" : "text-[oklch(50%_.13_150)]";
-          return (
-            <li key={entry.pluginId} className="grid items-center gap-x-5 gap-y-2 p-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,11rem)_minmax(0,1fr)_auto]">
-              <span className="flex min-w-0 items-center gap-2.5">
-                <PluginIcon pluginId={entry.pluginId} className="size-7 shrink-0" />
-                <span className="truncate font-semibold">{name}</span>
-              </span>
-              {left !== null ? <span className="flex flex-col gap-1.5">
-                <span className={cn("text-sm font-semibold tabular-nums", tone)}>{copy.left.replace("{percent}", percent(left, locale))}</span>
-                <Progress value={left} aria-label={copy.left.replace("{percent}", percent(left, locale))} className={cn(
-                  "h-1.5",
-                  entry.level === "danger" ? "*:data-[slot=progress-indicator]:bg-destructive"
-                    : entry.level === "warning" ? "*:data-[slot=progress-indicator]:bg-[oklch(60%_.14_65)]" : "*:data-[slot=progress-indicator]:bg-[oklch(55%_.14_150)]")} />
-              </span> : <span className="text-sm text-muted-foreground">{copy.unreadable}</span>}
-              <span className={cn("text-sm", left !== null && entry.level !== "ok" ? tone : "text-muted-foreground")}>
-                {left !== null
-                  ? <>{agent ? windowName : copy.usedOf.replace("{used}", count.format(entry.used ?? 0)).replace("{limit}", count.format(entry.limit ?? 0)).replace("{unit}", copy.units[entry.unit])}
-                    {entry.resetsAt ? `, ${copy.resets.replace("{date}", day.format(new Date(entry.resetsAt * 1000)))}` : ""}</>
-                  : (agent ? copy.unknownAgent : copy.unknown).replace("{reason}", entry.problem ?? "")}
-              </span>
-              {agent ? <span aria-hidden="true" /> : <Button asChild size="sm" variant="outline" className="justify-self-start sm:justify-self-end"><Link href={keysHref}>{copy.manageKey}</Link></Button>}
-            </li>
-          );
-        })}
-      </ul>
+      <div className="rounded-xl border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[32%] ps-4">{copy.columnService}</TableHead>
+              <TableHead className="w-44">{copy.columnLeft}</TableHead>
+              <TableHead className="hidden sm:table-cell">{copy.columnDetails}</TableHead>
+              <TableHead className="pe-4"><span className="sr-only">{copy.columnActions}</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!usage && Array.from({ length: expected }, (_, index) => (
+              <TableRow key={index} className="h-[4.25rem]">
+                <TableCell className="ps-4"><span className="flex items-center gap-2.5"><Skeleton className="size-7 rounded-md" /><Skeleton className="h-4 w-24" /></span></TableCell>
+                <TableCell><span className="flex w-36 flex-col gap-1.5"><Skeleton className="h-4 w-16" /><Skeleton className="h-1.5 w-full" /></span></TableCell>
+                <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
+                <TableCell className="pe-4" />
+              </TableRow>
+            ))}
+            {usage?.providers.map((entry) => {
+              const name = pluginText.name(entry.pluginId, usage.names[entry.pluginId] ?? entry.pluginId);
+              const left = entry.remainingPercent;
+              const agent = entry.unit === "percent";
+              const windowName = entry.windowMinutes === 10080 ? copy.weekly
+                : entry.windowMinutes && entry.windowMinutes % 60 === 0 ? copy.hourly.replace("{hours}", String(entry.windowMinutes / 60)) : copy.planLimit;
+              const tone = entry.level === "danger" ? "text-destructive" : entry.level === "warning" ? "text-[oklch(52%_.13_65)]" : "text-[oklch(50%_.13_150)]";
+              const details = left !== null
+                ? `${agent ? windowName : copy.usedOf.replace("{used}", count.format(entry.used ?? 0)).replace("{limit}", count.format(entry.limit ?? 0)).replace("{unit}", copy.units[entry.unit])}${entry.resetsAt ? `, ${copy.resets.replace("{date}", day.format(new Date(entry.resetsAt * 1000)))}` : ""}`
+                : (agent ? copy.unknownAgent : copy.unknown).replace("{reason}", entry.problem ?? "");
+              return (
+                <TableRow key={entry.pluginId} className="h-[4.25rem]">
+                  <TableCell className="ps-4">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <PluginIcon pluginId={entry.pluginId} className="size-7 shrink-0" />
+                      <span className="truncate font-semibold">{name}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {left !== null ? <span className="flex w-36 flex-col gap-1.5">
+                      <span className={cn("text-sm font-semibold tabular-nums", tone)}>{copy.left.replace("{percent}", percent(left, locale))}</span>
+                      <Progress value={left} aria-label={copy.left.replace("{percent}", percent(left, locale))} className={cn(
+                        "h-1.5",
+                        entry.level === "danger" ? "*:data-[slot=progress-indicator]:bg-destructive"
+                          : entry.level === "warning" ? "*:data-[slot=progress-indicator]:bg-[oklch(60%_.14_65)]" : "*:data-[slot=progress-indicator]:bg-[oklch(55%_.14_150)]")} />
+                      <span className="text-xs text-muted-foreground sm:hidden">{details}</span>
+                    </span> : <span className="text-sm text-muted-foreground">{copy.unreadable}</span>}
+                  </TableCell>
+                  <TableCell className={cn("hidden max-w-80 text-sm whitespace-normal sm:table-cell", left !== null && entry.level !== "ok" ? tone : "text-muted-foreground")}>
+                    {details}
+                  </TableCell>
+                  <TableCell className="pe-4 text-end">
+                    {!agent && <Button asChild size="sm" variant="outline"><Link href={keysHref}>{copy.manageKey}</Link></Button>}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
       <p className="mt-3 text-sm text-muted-foreground">{copy.panelDescription} {copy.vault}</p>
     </section>
   );

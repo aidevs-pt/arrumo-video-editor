@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::WorkspaceStore;
+use crate::{WorkspaceStore, canvas_components::CanvasComponent};
 
 const MAX_FONT_BYTES: u64 = 20 * 1024 * 1024;
 /// Letters and symbols every brand font must draw, so videos in English, Spanish and Portuguese
@@ -321,49 +321,60 @@ impl WorkspaceStore {
         Ok(fs::read(font_file(media_root, workspace_id, sha256)).io_step("Reading a file")?)
     }
 
-    /// The fonts a run's snapshot chose, so re-renders match the first render.
-    pub(crate) fn run_font_set(
+    /// The kit a run's snapshot recorded, so re-renders match the first render.
+    pub(crate) fn run_brand_kit(
         &self,
         media_root: &Path,
         workspace_id: i64,
         run_id: i64,
-    ) -> Result<FontSet, Box<dyn Error>> {
+    ) -> Result<BrandKit, Box<dyn Error>> {
         let snapshot: String = self.0.query_row(
             "SELECT snapshot_json FROM generation_runs WHERE workspace_id = ?1 AND id = ?2",
             params![workspace_id, run_id],
             |row| row.get(0),
         )?;
         let snapshot: Value = serde_json::from_str(&snapshot)?;
-        Ok(FontSet::from_fonts(
+        Ok(BrandKit::from_fonts(
             media_root,
             workspace_id,
             &serde_json::from_value::<Vec<BrandFont>>(snapshot["brand_fonts"].clone())
                 .unwrap_or_default(),
+        )
+        .with_colors(serde_json::from_value(snapshot["brand_colors"].clone()).unwrap_or_default())
+        .with_components(
+            crate::canvas_components::snapshot_components(&snapshot)
+                .into_iter()
+                .map(|offered| offered.component)
+                .collect(),
         ))
     }
 
-    /// The workspace's fonts as they are now, for library animations.
-    pub(crate) fn current_font_set(
+    /// The workspace's kit as it is now, for library animations.
+    pub(crate) fn current_brand_kit(
         &self,
         media_root: &Path,
         workspace_id: i64,
-    ) -> rusqlite::Result<FontSet> {
-        Ok(FontSet::from_fonts(
-            media_root,
-            workspace_id,
-            &self.brand_fonts(workspace_id)?,
-        ))
+    ) -> rusqlite::Result<BrandKit> {
+        Ok(
+            BrandKit::from_fonts(media_root, workspace_id, &self.brand_fonts(workspace_id)?)
+                .with_colors(self.video_brand_colors(workspace_id)?)
+                .with_components(self.workspace_components(workspace_id)?),
+        )
     }
 }
 
-/// The font files animation text is drawn with. A missing bold uses the regular file of the
-/// same role, a missing heading uses the body font, and a missing body uses the system font.
+/// What a render draws with: the font files for animation text, the brand colours videos use,
+/// which canvas pages are themed with, and the canvas components pages may import. A missing
+/// bold uses the regular file of the same role, a missing heading uses the body font, and a
+/// missing body uses the system font.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct FontSet {
+pub(crate) struct BrandKit {
     files: Vec<(FontRole, FontWeight, PathBuf, f64)>,
+    colors: Vec<String>,
+    components: Vec<CanvasComponent>,
 }
 
-impl FontSet {
+impl BrandKit {
     pub(crate) fn from_fonts(media_root: &Path, workspace_id: i64, fonts: &[BrandFont]) -> Self {
         let files = fonts
             .iter()
@@ -380,7 +391,37 @@ impl FontSet {
             })
             .filter(|(_, _, path, _)| path.is_file())
             .collect();
-        Self { files }
+        Self {
+            files,
+            colors: Vec::new(),
+            components: Vec::new(),
+        }
+    }
+
+    pub(crate) fn with_components(mut self, components: Vec<CanvasComponent>) -> Self {
+        self.components = components;
+        self
+    }
+
+    /// The kit with `component` added, in place of any with the same slug.
+    pub(crate) fn with_component(mut self, component: CanvasComponent) -> Self {
+        self.components.retain(|other| other.slug != component.slug);
+        self.components.push(component);
+        self
+    }
+
+    pub(crate) fn components(&self) -> &[CanvasComponent] {
+        &self.components
+    }
+
+    pub(crate) fn with_colors(mut self, colors: Vec<String>) -> Self {
+        self.colors = colors;
+        self
+    }
+
+    /// The brand colours for videos, in palette order.
+    pub(crate) fn colors(&self) -> &[String] {
+        &self.colors
     }
 
     fn find(&self, role: FontRole, weight: FontWeight) -> Option<(&Path, f64)> {
@@ -470,7 +511,7 @@ mod tests {
                 .is_err()
         );
 
-        let fonts = store.current_font_set(&root, workspace).unwrap();
+        let fonts = store.current_brand_kit(&root, workspace).unwrap();
         let regular = font_file(&root, workspace, &font.sha256);
         assert_eq!(
             fonts.file(FontRole::Heading, FontWeight::Bold),
@@ -481,7 +522,7 @@ mod tests {
             font.advance
         );
         assert!(
-            FontSet::default()
+            BrandKit::default()
                 .file(FontRole::Body, FontWeight::Regular)
                 .is_none()
         );

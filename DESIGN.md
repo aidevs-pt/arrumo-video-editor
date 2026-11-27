@@ -35,3 +35,4 @@ From the brief: Portuguese *arrumar* (put in order), video editing, the face log
 - Decisions staged until "Send N decisions" in a navy tray; batch bar with a shared comment; comments show "not sent yet".
 - Motion only answers actions (120–160ms), except the playhead. Respect reduced motion.
 - Copy: sentence case, buttons name the result ("Generate a Tool reviews video", "Send 2 decisions", "Replace everything").
+- Buttons in one row share a height: square icon buttons match the labelled buttons beside them (40px, or 32px for small ones), and each names itself with a tooltip.

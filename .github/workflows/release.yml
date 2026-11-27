@@ -354,50 +354,6 @@ jobs:
           elif ! tr '\n' '\0' < debug-files.txt | xargs -0 pnpm dlx @sentry/cli@2.39.1 debug-files upload --wait; then
             echo "::warning::The debug files could not be uploaded to the crash reporter"
           fi
-      # Tauri gives the disk image the app's icon; Finder shows Arrumo's install box instead. The
-      # disk image is rebuilt, signed again and uploaded over the one Tauri published. A failure
-      # leaves Tauri's disk image in the release.
-      - name: Give the disk image its volume icon
-        if: runner.os == 'macOS'
-        continue-on-error: true
-        working-directory: video-editor
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          set -euo pipefail
-          dmg=$(ls target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
-          work=$(mktemp -d)
-          hdiutil convert "$dmg" -format UDSP -o "$work/rw.sparseimage"
-          read -r _ current _ < <(hdiutil resize -limits "$work/rw.sparseimage" | tail -1)
-          hdiutil resize -sectors $((current + 20480)) "$work/rw.sparseimage"
-          hdiutil attach "$work/rw.sparseimage" -readwrite -noverify -noautoopen -nobrowse -mountpoint "$work/mnt"
-          cp src-tauri/dmg/volume-icon.icns "$work/mnt/.VolumeIcon.icns"
-          xcrun SetFile -c icnC "$work/mnt/.VolumeIcon.icns"
-          xcrun SetFile -a C "$work/mnt"
-          hdiutil detach "$work/mnt"
-          final="$work/$(basename "$dmg" | tr ' ' '.')"
-          hdiutil convert "$work/rw.sparseimage" -format UDZO -imagekey zlib-level=9 -o "$final"
-          if [ -n "${APPLE_CERTIFICATE:-}" ]; then
-            keychain="$work/sign.keychain-db"
-            password=$(openssl rand -hex 16)
-            security create-keychain -p "$password" "$keychain"
-            security set-keychain-settings -lut 3600 "$keychain"
-            security unlock-keychain -p "$password" "$keychain"
-            # codesign only finds identities in keychains on the search list.
-            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | xargs)
-            echo "$APPLE_CERTIFICATE" | base64 --decode > "$work/certificate.p12"
-            security import "$work/certificate.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-            rm "$work/certificate.p12"
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
-            security find-identity -v -p codesigning "$keychain"
-            codesign --force --timestamp --keychain "$keychain" --sign "$APPLE_SIGNING_IDENTITY" "$final"
-            security delete-keychain "$keychain"
-            codesign --verify --strict --verbose=2 "$final"
-          fi
-          hdiutil verify "$final"
-          gh release upload "v$VERSION" "$final" --clobber --repo "${{ github.repository }}"
-          cp "$final" "$dmg"
       # A signed build has to open without a Gatekeeper warning, so a bad certificate or a failed
       # notarization stops the release here instead of reaching users.
       - name: Check the macOS signature

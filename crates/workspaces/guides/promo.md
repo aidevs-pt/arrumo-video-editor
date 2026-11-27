@@ -1,0 +1,13 @@
+# Product, launch and ad videos
+
+- One offer, one message and one call to action per video. Two offers make two videos.
+- Something happens in the first two seconds. Strong openings name a problem the viewer has, show something unexpected, open a question the video answers, state the benefit outright or speak directly to the people it is for. The ending must deliver exactly what the opening promised.
+- Ads: the hook, the problem made felt, the product as the answer with one benefit, one proof (a figure, a result, a real customer's words), then the call to action in the last three seconds, held for at least two. A shorter version is re-edited around the hook and the payoff, not just trimmed.
+- Launch films: open without showing the product, tease it, reveal it on the strongest moment of the music with a single spark or flash, then a quick run of one benefit per shot, and end on a held card. Fewer, stronger shots make a better film than many average ones. Use the music as featured, and change shots on its accents where you can hear them.
+- Product demos from screen recordings: let each screen settle for half a second before anything moves; one step per scene at about four seconds; zoom towards the element in use, up to about twice its size, and hold for two to four seconds; move the view or the pointer, never both; one callout at a time and a short caption per step that names the benefit ("Invoices in one click"). To shorten a demo, drop steps rather than holds. Present screens in a simple window or device frame on a brand background.
+- Sales and offers: the occasion and the brand, then the discount as the loudest element, the old price struck through before the new one lands, the product, then the code and a real deadline held still, then the call to action. Calculate prices from the brief, never retype them.
+- Testimonials: quote the customer word for word, reveal the quote in reading order, emphasise one phrase of theirs, show a rating only when it is real, sign off with name, role and company, and hold the finished card for at least three seconds. With several testimonials, give each three to four seconds and cut between them.
+- Photo slideshows: never move two photos the same way in a row, zoom gently (no more than about a tenth) towards the subject, use one transition, hold three to six seconds per photo, put the best photo on the music's peak, and never distort a photo's proportions to fill the frame.
+- Keep the product and the message inside the central square of the frame so every format keeps them.
+
+Checks: the hook lands within two seconds; there is one offer; every price, figure and claim comes from the brief; the call to action holds at the end and answers the hook.

@@ -1143,7 +1143,7 @@ impl ActiveRender<'_> {
         let images = |id: i64| asset_path(root, self.workspace_id, id).canonicalize().ok();
         let fonts = self
             .store
-            .run_font_set(root, self.workspace_id, self.run_id)?;
+            .run_brand_kit(root, self.workspace_id, self.run_id)?;
         let mut renewed = Instant::now();
         let mut check = || self.keep_lease(&mut renewed);
         let mut manifest = String::new();
@@ -1567,7 +1567,7 @@ impl ActiveRender<'_> {
         };
         let fonts = self
             .store
-            .run_font_set(root, self.workspace_id, self.run_id)?;
+            .run_brand_kit(root, self.workspace_id, self.run_id)?;
         let mut renewed = Instant::now();
         let mut check = || self.keep_lease(&mut renewed);
         let mut parts = Vec::new();

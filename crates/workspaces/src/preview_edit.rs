@@ -551,6 +551,7 @@ fn storyboard(
 fn preview_prompt(
     snapshot: &Value,
     script: Option<&str>,
+    video_kinds: &[&'static str],
     footage: &[Value],
     earlier: &[Value],
 ) -> String {
@@ -579,8 +580,10 @@ fn preview_prompt(
          {revision}\
          The summary is one sentence to the creator about this cut, in the first person.\n\n\
          {guides}BRIEF (JSON):\n{brief}",
-        guides =
-            crate::editing_guides::guide_section(&["cutting", "sound", "animation", "platforms"]),
+        guides = crate::editing_guides::guide_section_for(
+            &["cutting", "sound", "animation", "direction", "platforms"],
+            video_kinds
+        ),
         revision = if earlier.is_empty() {
             ""
         } else {
@@ -642,10 +645,18 @@ impl WorkspaceStore {
             else {
                 continue;
             };
-            if seen.contains(&id) {
+            // A template placed several times plays once per use, each with its own values.
+            let use_key = (id, entry["values"].to_string());
+            if seen.contains(&use_key) {
                 continue;
             }
-            seen.push(id);
+            seen.push(use_key);
+            // The design as it was when planned, so later changes to the library item, or
+            // restoring an older version of it, don't change this video.
+            if entry["spec"].is_object() {
+                animations.push(entry["spec"].clone());
+                continue;
+            }
             let spec: Option<String> = self
                 .0
                 .query_row(
@@ -751,6 +762,7 @@ impl WorkspaceStore {
             .step("Listing the workspace sound effects")?;
         let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
         let script = self.approved_stage_result(run_id, "script")?;
+        let video_kinds = crate::editing_guides::video_kinds(script.as_ref());
         let script = script
             .as_ref()
             .and_then(|result| result.get("markdown"))
@@ -767,7 +779,7 @@ impl WorkspaceStore {
             "video": {"title": snapshot["draft"]["title"], "intent": snapshot["draft"]["intent"]},
             "approvedScript": script,
             "approvedAnimations": animations,
-            "approvedAssetPlan": approved.as_ref().map(|result| result["asset_plan"].clone()),
+            "approvedAssetPlan": approved.as_ref().map(|result| crate::motion_versions::plan_for_agent(&result["asset_plan"])),
             "workspaceContext": snapshot["workspace_context"],
             "learnedFeedback": snapshot["feedback"],
             "profile": snapshot["profile"],
@@ -827,12 +839,10 @@ impl WorkspaceStore {
              {music}\
              The summary is one sentence to the creator about this storyboard, in the first person.\n\n\
              {guides}BRIEF (JSON):\n{brief}",
-            guides = crate::editing_guides::guide_section(&[
-                "storyboard",
-                "animation",
-                "sound",
-                "platforms"
-            ]),
+            guides = crate::editing_guides::guide_section_for(
+                &["storyboard", "animation", "direction", "sound", "platforms"],
+                &video_kinds
+            ),
             made = if ordered.made.is_empty() {
                 ""
             } else {
@@ -859,7 +869,7 @@ impl WorkspaceStore {
                     .unwrap_or_default()
                 )
             },
-            guide = crate::motion_spec::SPEC_GUIDE,
+            guide = crate::canvas_components::run_spec_guide(snapshot),
             sound_guide = if sounds.is_empty() {
                 ""
             } else {
@@ -916,7 +926,7 @@ impl WorkspaceStore {
         )?;
         if let Some(scenes) = answer["scenes"].as_array_mut() {
             let fonts = self
-                .run_font_set(&crate::asset_root(database), workspace_id, run_id)
+                .run_brand_kit(&crate::asset_root(database), workspace_id, run_id)
                 .step("Loading the brand fonts")?;
             self.review_motion_answers(
                 database,
@@ -939,6 +949,7 @@ impl WorkspaceStore {
                     provider,
                     size: crate::motion_design::run_preview_size(snapshot),
                     fonts: &fonts,
+                    kit_for: None,
                 },
                 &mut || {
                     self.renew_generation_lease(workspace_id, run_id, attempt)?;
@@ -1039,6 +1050,7 @@ impl WorkspaceStore {
             clips.push((id, duration, name));
         }
         let script = self.approved_stage_result(run_id, "script")?;
+        let video_kinds = crate::editing_guides::video_kinds(script.as_ref());
         let script = script
             .as_ref()
             .and_then(|result| result.get("markdown"))
@@ -1075,7 +1087,7 @@ impl WorkspaceStore {
         let sounds = self.workspace_sounds(database, workspace_id)?;
         let sound_ids: Vec<i64> = sounds.iter().map(|sound| sound.id).collect();
         let voice = self.current_voice(workspace_id, snapshot)?;
-        let mut prompt = preview_prompt(snapshot, script, &footage, &earlier);
+        let mut prompt = preview_prompt(snapshot, script, &video_kinds, &footage, &earlier);
         if !ordered.made.is_empty() {
             prompt.push_str(&format!(
                 "\n\nFor this revision Arrumo made the media below, as the creator's notes asked. Use each \
@@ -1197,7 +1209,7 @@ impl WorkspaceStore {
             .unwrap_or_default(),
             first = animations.len(),
             second = animations.len() + 1,
-            guide = crate::motion_spec::SPEC_GUIDE,
+            guide = crate::canvas_components::run_spec_guide(snapshot),
             images = serde_json::to_string(
                 &images_for_new
                     .iter()
@@ -1274,7 +1286,7 @@ impl WorkspaceStore {
             .unwrap_or_default();
         designed.truncate(MAX_NEW_CUT_ANIMATIONS);
         if !designed.is_empty() {
-            let fonts = self.run_font_set(&root, workspace_id, run_id)?;
+            let fonts = self.run_brand_kit(&root, workspace_id, run_id)?;
             self.review_motion_answers(
                 database,
                 workspace_id,
@@ -1286,6 +1298,7 @@ impl WorkspaceStore {
                     provider,
                     size: crate::motion_design::run_preview_size(snapshot),
                     fonts: &fonts,
+                    kit_for: None,
                 },
                 &mut || {
                     self.renew_generation_lease(workspace_id, run_id, attempt)?;
@@ -1540,8 +1553,9 @@ mod tests {
     fn the_prompt_includes_footage_and_review_notes() {
         let snapshot = json!({"draft": {"title": "T", "intent": "I"}, "workspace_context": null, "feedback": [], "profile": null});
         let footage = [json!({"clipId": 1, "durationSeconds": 3.0, "transcript": "[0:00] Hello."})];
-        let first = preview_prompt(&snapshot, Some("## Hook"), &footage, &[]);
+        let first = preview_prompt(&snapshot, Some("## Hook"), &["talking-head"], &footage, &[]);
         assert!(first.contains("[0:00] Hello.") && !first.contains("earlierCuts"));
+        assert!(first.contains("# Talking heads") && first.contains("# Directing the look"));
         let guide = first.find("Cut in pauses").unwrap();
         assert!(
             guide < first.find("BRIEF (JSON)").unwrap(),
@@ -1550,6 +1564,7 @@ mod tests {
         let revised = preview_prompt(
             &snapshot,
             None,
+            &[],
             &footage,
             &[json!({"notes": "Tighter hook"})],
         );

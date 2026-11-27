@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { LayerGauge } from "@/components/workspace/layer-gauge";
 import { FormatDelivery } from "@/components/workspace/outputs/format-delivery";
 
@@ -23,6 +25,7 @@ type ProfileFormat = {
   workspace_width: number;
   workspace_height: number;
   overrides: { width: number | null; height: number | null };
+  enabled: boolean;
 };
 
 export function ProfileFormats({
@@ -40,6 +43,7 @@ export function ProfileFormats({
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState<number | null>(null);
   const [result, setResult] = useState<{ id: number; saved: boolean } | null>(null);
+  const [switchError, setSwitchError] = useState<"lastFormat" | "switchError">();
   const { messages } = useLocale();
   const copy = messages.profileFormats;
 
@@ -82,6 +86,19 @@ export function ProfileFormats({
     }
   }
 
+  async function setEnabled(format: ProfileFormat, enabled: boolean) {
+    setSwitchError(undefined);
+    if (!enabled && !formats?.some((other) => other.enabled && other.id !== format.id)) {
+      setSwitchError("lastFormat");
+      return;
+    }
+    try {
+      setFormats(await invoke<ProfileFormat[]>("set_profile_format_enabled", { workspaceId, profileId: profile.id, formatId: format.id, enabled }));
+    } catch {
+      setSwitchError("switchError");
+    }
+  }
+
   const selected = formats?.find((format) => format.id === selectedId) ?? formats?.[0];
 
   return (
@@ -106,11 +123,12 @@ export function ProfileFormats({
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <ToggleGroup type="single" variant="outline" value={String(selected.id)} aria-label={copy.title}
-              onValueChange={(value) => { if (value) { setResult(null); setSelectedId(Number(value)); } }}>
+              onValueChange={(value) => { if (value) { setResult(null); setSwitchError(undefined); setSelectedId(Number(value)); } }}>
               {formats.map((format) => {
                 const Icon = format.width > format.height ? RectangleHorizontal : format.width < format.height ? Smartphone : Square;
                 return <ToggleGroupItem key={format.id} value={String(format.id)} className="px-3">
-                  <Icon aria-hidden="true" />{format.name}
+                  <Icon aria-hidden="true" /><span className={cn(!format.enabled && "text-muted-foreground line-through")}>{format.name}</span>
+                  {!format.enabled && <span className="text-xs text-muted-foreground">{copy.offBadge}</span>}
                 </ToggleGroupItem>;
               })}
             </ToggleGroup>
@@ -121,12 +139,28 @@ export function ProfileFormats({
               </Button>
             </p>
           </div>
-          <FormatDelivery key={selected.id} workspaceId={workspaceId} profileId={profile.id} profileName={profile.name}
-            format={selected} embedded before={sizeCard(selected)} />
+          {selected.enabled ? <FormatDelivery key={selected.id} workspaceId={workspaceId} profileId={profile.id} profileName={profile.name}
+            format={selected} embedded before={<>{switchCard(selected)}{sizeCard(selected)}</>} /> : switchCard(selected)}
         </div>
       )}
     </WorkspaceShell>
   );
+
+  function switchCard(format: ProfileFormat) {
+    return (
+      <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p id={`profile-format-on-${format.id}`} className="font-semibold">{copy.madeHere.replace("{format}", format.name)}</p>
+            <p className="text-sm text-muted-foreground">{format.enabled ? copy.madeHereHint : copy.offNotice.replace("{format}", format.name)}</p>
+          </div>
+          <Switch aria-labelledby={`profile-format-on-${format.id}`} checked={format.enabled}
+            onCheckedChange={(enabled) => void setEnabled(format, enabled)} />
+        </div>
+        {switchError && <p role="alert" className="text-sm text-destructive">{copy[switchError]}</p>}
+      </div>
+    );
+  }
 
   function sizeCard(format: ProfileFormat) {
     const inherited = format.overrides.width === null && format.overrides.height === null;

@@ -216,6 +216,8 @@ impl WorkspaceStore {
             params![run_id, index, attempt, result],
         )?;
         tx.commit()?;
+        // The video is delivered either way; clips that could not be deleted stay in the library.
+        let _ = self.release_finished_footage(database, workspace_id, run_id);
         self.queue_video_completed_hooks(workspace_id, run_id);
         let snapshot = &completed.snapshot;
         self.track_usage(
