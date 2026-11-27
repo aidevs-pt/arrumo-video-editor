@@ -2,6 +2,10 @@
 
 What changed in each release of Arrumo AI Video Editor.
 
+## 0.1.14 (2026-11-27)
+
+Maintenance and small improvements.
+
 ## 0.1.13 (2026-11-26)
 
 ### New

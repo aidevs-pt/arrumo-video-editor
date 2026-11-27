@@ -54,6 +54,7 @@
     <display_length compare="ge">1024</display_length>
   </requires>
   <releases>
+    <release version="0.1.14" date="2026-11-27"/>
     <release version="0.1.13" date="2026-11-26"/>
     <release version="0.1.12" date="2026-11-26"/>
     <release version="0.1.11" date="2026-11-26"/>
