@@ -4,7 +4,27 @@ What changed in each release of Arrumo AI Video Editor.
 
 ## 0.1.14 (2026-11-27)
 
-Maintenance and small improvements.
+### New
+
+- Draw 3D scenes, charts, particles, routes, Lottie animations and shader effects in animations with the new Canvas layers plugin, rendered in an isolated browser with your brand colours (#109)
+- Reusable canvas components the agent writes once and other animations import (#109)
+- Sharper guides for the agent, a guide for the look and motion of a video, and a guide per kind of video: explainer, data story, promo, short vertical, talking head, titles and animated short (#109)
+- Change animations in place and bring back earlier versions (#104)
+- Animation templates whose text each video fills in, with a preview of every use (#104)
+- Select and delete several animations at once (#104)
+- Go back to any finished step of a video, and decide all, the rest or a selection at once (#103)
+- Switch formats off per profile (#106)
+- Optionally delete uploaded clips once their video is finished (#107)
+- Use your installed agent plugins with or without file and command access, and see your agent plan's usage, read between videos (#102)
+- Choose the theme, usage data and crash reports when Arrumo first opens (#102)
+
+### Fixes
+
+- The review bar stays in view while you scroll (#103)
+- Right-click in dialogs and menus no longer opens the menu of the item underneath (#105)
+- Icon buttons match the height of labelled buttons, and detail panels keep their title and actions in view (#105)
+- The usage table keeps its size while it loads (#102)
+- The macOS disk image no longer replaces its volume icon (#108)
 
 ## 0.1.13 (2026-11-26)
 
