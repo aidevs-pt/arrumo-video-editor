@@ -380,7 +380,7 @@ impl WorkspaceStore {
             .find(|profile| profile.id == profile_id);
         let mut resolved = json!({"type": "profile", "profile_id": profile_id});
         if let Some(profile) = profile {
-            let formats = self.list_profile_formats(workspace_id, profile.id)?;
+            let formats = self.enabled_profile_formats(workspace_id, profile.id)?;
             let portrait = formats
                 .iter()
                 .find(|format| format.height > format.width)
@@ -427,7 +427,7 @@ impl WorkspaceStore {
         };
         let formats = match &profile {
             Some(profile) => self
-                .list_profile_formats(workspace_id, profile.id)?
+                .enabled_profile_formats(workspace_id, profile.id)?
                 .into_iter()
                 .map(|format| {
                     let delivery = self.profile_delivery(workspace_id, profile.id, format.id)?;

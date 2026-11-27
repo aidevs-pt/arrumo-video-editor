@@ -358,6 +358,7 @@ impl WorkspaceStore {
             include_str!("../migrations/070-media-order-limits.sql"),
             include_str!("../migrations/071-agent-rounds.sql"),
             include_str!("../migrations/072-crash-report-id.sql"),
+            include_str!("../migrations/073-profile-formats-off.sql"),
         ];
         let pending = usize::try_from(version)
             .ok()

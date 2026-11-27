@@ -851,7 +851,13 @@
     "saveError": "Overrides couldn’t be saved. If the workspace format changed, reopen this view and try again.",
     "fromWorkspace": "Formats come from Workspace › Outputs.",
     "addFormat": "Add a format",
-    "size": "Size"
+    "size": "Size",
+    "madeHere": "Make this profile's videos in {format}",
+    "madeHereHint": "Turn it off to leave this format out of this profile's videos. Other profiles still use it.",
+    "offNotice": "This profile doesn't make {format} videos. Turn it on to set its size and delivery here.",
+    "offBadge": "Off",
+    "lastFormat": "A profile needs at least one format.",
+    "switchError": "Couldn't change this format. Try again."
   },
   "queue": {
     "moreActions": "Actions",

@@ -235,6 +235,21 @@ async fn list_profile_formats(
 }
 
 #[tauri::command]
+async fn set_profile_format_enabled(
+    workspace_id: i64,
+    profile_id: i64,
+    format_id: i64,
+    enabled: bool,
+    store: State<'_, Store>,
+) -> Result<Vec<ProfileFormat>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .set_profile_format_enabled(workspace_id, profile_id, format_id, enabled)
+        .map_err(|_| "profile_format_switch_failed")
+}
+
+#[tauri::command]
 async fn set_profile_format_overrides(
     workspace_id: i64,
     profile_id: i64,
@@ -1994,6 +2009,7 @@ fn main() {
             update_output_format,
             remove_output_format,
             list_profile_formats,
+            set_profile_format_enabled,
             set_profile_format_overrides,
             get_format_delivery,
             set_format_delivery,

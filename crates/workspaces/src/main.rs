@@ -619,6 +619,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .list_profile_formats(utf8(workspace)?.parse()?, utf8(profile)?.parse()?)?;
             println!("{}", serde_json::to_string(&formats)?);
         }
+        [database, command, workspace, profile, format, state]
+            if command == "set-profile-format-enabled" =>
+        {
+            let formats = WorkspaceStore::open(Path::new(database))?.set_profile_format_enabled(
+                utf8(workspace)?.parse()?,
+                utf8(profile)?.parse()?,
+                utf8(format)?.parse()?,
+                match utf8(state)? {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err("State must be on or off".into()),
+                },
+            )?;
+            println!("{}", serde_json::to_string(&formats)?);
+        }
         [database, command, workspace, profile, format, overrides]
             if command == "set-profile-format" =>
         {
@@ -1726,7 +1741,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
                 "update-format <workspace-id> <format-id> <settings-json> | ",
                 "remove-format <workspace-id> <format-id> | ",
-                "profile-formats <workspace-id> <profile-id> | ",
+                "profile-formats <workspace-id> <profile-id> | set-profile-format-enabled <workspace-id> <profile-id> <format-id> <on|off> | ",
                 "set-profile-format <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "format-delivery <workspace-id> <format-id> | ",
                 "set-format-delivery <workspace-id> <format-id> <settings-json> | ",

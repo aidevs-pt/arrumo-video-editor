@@ -851,7 +851,13 @@
     "saveError": "Não foi possível guardar as definições. Se o formato mudou, volta a abrir esta vista e tenta novamente.",
     "fromWorkspace": "Os formatos vêm de Espaço de trabalho › Saídas.",
     "addFormat": "Adicionar um formato",
-    "size": "Tamanho"
+    "size": "Tamanho",
+    "madeHere": "Fazer os vídeos deste perfil em {format}",
+    "madeHereHint": "Desativa para deixar este formato fora dos vídeos deste perfil. Os outros perfis continuam a usá-lo.",
+    "offNotice": "Este perfil não faz vídeos em {format}. Ativa para definir aqui o tamanho e a entrega.",
+    "offBadge": "Desativado",
+    "lastFormat": "Um perfil precisa de pelo menos um formato.",
+    "switchError": "Não foi possível alterar este formato. Tenta de novo."
   },
   "queue": {
     "moreActions": "Ações",

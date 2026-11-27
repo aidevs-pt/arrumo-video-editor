@@ -38,7 +38,7 @@ function useDeliveryPlan(workspaceId: number, profileId: number | null) {
     (async () => {
       const formats = profileId === null
         ? (await invoke<(Format & { enabled: boolean })[]>("list_output_formats", { workspaceId })).filter((format) => format.enabled)
-        : await invoke<Format[]>("list_profile_formats", { workspaceId, profileId });
+        : (await invoke<(Format & { enabled: boolean })[]>("list_profile_formats", { workspaceId, profileId })).filter((format) => format.enabled);
       const deliveries = await Promise.all(formats.map((format) => profileId === null
         ? invoke<{ supplemental: Supplemental }>("get_format_delivery", { workspaceId, formatId: format.id })
         : invoke<{ effective: { supplemental: Supplemental } }>("get_profile_delivery", { workspaceId, profileId, formatId: format.id })

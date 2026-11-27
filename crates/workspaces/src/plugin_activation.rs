@@ -250,7 +250,7 @@ mod tests {
             store
                 .0
                 .execute_batch(
-                    "DROP TABLE plugin_activation; DROP TABLE agent_usage_observations;
+                    "DROP TABLE plugin_activation; DROP TABLE agent_usage_observations; DROP TABLE profile_formats_off;
                      DROP TABLE brand_fonts; DROP TABLE agent_executables;
                      ALTER TABLE privacy_settings DROP COLUMN install_reported;
                      ALTER TABLE privacy_settings DROP COLUMN crash_report_id;
