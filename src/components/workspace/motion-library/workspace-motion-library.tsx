@@ -21,7 +21,7 @@ import { workspaceHref, type Workspace } from "@/components/workspace/home/works
 import { useLocale } from "@/lib/locale-provider";
 import { cn } from "@/lib/utils";
 
-import { ComponentDetails, type CanvasComponent } from "./component-details";
+import { ComponentCode, ComponentDetails, type CanvasComponent } from "./component-details";
 import { GenerateMotionDialog } from "./generate-motion-dialog";
 import { MotionClip } from "./motion-clip";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
@@ -333,6 +333,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
                 workspaceId={workspaceId} itemId={chosen.id} title={chosen.settings.title}
                 ownerId={chosen.settings.profile_id} profiles={catalog.profiles} disabled={open}
                 onSave={() => setAttempt((value) => value + 1)} />}
+              {chosen.component && <ComponentCode title={chosen.settings.title} source={chosen.component.source} disabled={open} />}
               <IconAction label={copy.deletion.deleteTitle} destructive disabled={open} onClick={() => setDeletingItem(chosen.id)}><Trash2 /></IconAction>
               <ConfirmTitleDelete hideTrigger title={chosen.settings.title} disabled={open} copy={copy.deletion}
                 open={deletingItem === chosen.id} onOpenChange={(value) => setDeletingItem(value ? chosen.id : null)}

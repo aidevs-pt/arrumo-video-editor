@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { IconAction } from "@/components/workspace/icon-action";
 import { useLocale } from "@/lib/locale-provider";
 
+import { HighlightedCode } from "./code-highlight";
 import { MotionClip } from "./motion-clip";
 
 export type CanvasComponent = {
@@ -17,8 +18,8 @@ export type CanvasComponent = {
   libraries: string[];
 };
 
-/** What a canvas component is and does: its demo playing on a loop, how pages import it, its
- * options, and its code to read. Changes go through the agent. */
+/** What a canvas component is and does: its demo playing on a loop, how pages import it and its
+ * options. Changes go through the agent. */
 export function ComponentDetails({ workspaceId, profileId, itemId, title, component, revision, thumbnail }: {
   workspaceId: number;
   profileId: number | null;
@@ -30,13 +31,13 @@ export function ComponentDetails({ workspaceId, profileId, itemId, title, compon
   thumbnail: { kind: "image" | "video"; assetId: number };
 }) {
   const { messages: { motionLibrary: copy } } = useLocale();
-  const [copied, setCopied] = useState<"import" | "code">();
+  const [copied, setCopied] = useState(false);
   const importPath = `workspace/${component.slug}`;
 
-  function copyText(text: string, what: "import" | "code") {
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(what);
-      setTimeout(() => setCopied(undefined), 1500);
+  function copyImport() {
+    void navigator.clipboard.writeText(importPath).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }, () => {});
   }
 
@@ -49,8 +50,8 @@ export function ComponentDetails({ workspaceId, profileId, itemId, title, compon
         <h3 className="mb-1 font-bold">{copy.importPath}</h3>
         <div className="flex items-center gap-2">
           <code className="min-w-0 flex-1 truncate rounded-md bg-secondary px-2 py-1 font-mono text-sm">{importPath}</code>
-          <IconAction label={copied === "import" ? copy.copied : copy.copyImport} onClick={() => copyText(importPath, "import")}>
-            {copied === "import" ? <Check /> : <Copy />}
+          <IconAction label={copied ? copy.copied : copy.copyImport} onClick={copyImport}>
+            {copied ? <Check /> : <Copy />}
           </IconAction>
         </div>
       </div>
@@ -67,27 +68,43 @@ export function ComponentDetails({ workspaceId, profileId, itemId, title, compon
         <span className="font-bold">{copy.usesLibraries}</span>
         {component.libraries.map((library) => <Badge key={library} variant="secondary">{library}</Badge>)}
       </p>}
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button type="button" variant="outline"><Code data-icon="inline-start" />{copy.viewCode}</Button>
-        </DialogTrigger>
-        <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{copy.codeTitle.replace("{title}", title)}</DialogTitle>
-            <DialogDescription>{copy.codeDescription}</DialogDescription>
-          </DialogHeader>
-          <pre tabIndex={0} aria-label={copy.codeTitle.replace("{title}", title)}
-            className="min-h-0 flex-1 overflow-auto rounded-lg bg-ink p-4 font-mono text-sm leading-relaxed text-white">
-            <code>{component.source}</code>
-          </pre>
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" onClick={() => copyText(component.source, "code")}>
-              {copied === "code" ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-              {copied === "code" ? copy.copied : copy.copyCode}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
+  );
+}
+
+/** The component's code in a read-only dialog, opened from a small icon button. */
+export function ComponentCode({ title, source, disabled }: { title: string; source: string; disabled?: boolean }) {
+  const { messages: { motionLibrary: copy } } = useLocale();
+  const [copied, setCopied] = useState(false);
+
+  function copyCode() {
+    void navigator.clipboard.writeText(source).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }, () => {});
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <IconAction label={copy.viewCode} disabled={disabled}><Code /></IconAction>
+      </DialogTrigger>
+      <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{copy.codeTitle.replace("{title}", title)}</DialogTitle>
+          <DialogDescription>{copy.codeDescription}</DialogDescription>
+        </DialogHeader>
+        <pre tabIndex={0} aria-label={copy.codeTitle.replace("{title}", title)}
+          className="min-h-0 flex-1 overflow-auto rounded-lg bg-ink p-4 font-mono text-sm leading-relaxed text-white">
+          <code><HighlightedCode source={source} /></code>
+        </pre>
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={copyCode}>
+            {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+            {copied ? copy.copied : copy.copyCode}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
