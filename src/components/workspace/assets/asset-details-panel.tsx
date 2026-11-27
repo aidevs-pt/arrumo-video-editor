@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { madeProfileFormats } from "@/lib/profile-formats";
 import { open } from "@tauri-apps/plugin-dialog";
 import { RectangleHorizontal, RectangleVertical, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -81,7 +82,7 @@ export function AssetDetailsPanel({ workspaceId, assets, organizations, onClose,
   useEffect(() => {
     if (!profileId) return;
     let active = true;
-    invoke<Format[]>("list_profile_formats", { workspaceId, profileId: Number(profileId) })
+    madeProfileFormats<Format>(workspaceId, Number(profileId))
       .then((rows) => { if (active) setFormats(rows); }, () => { if (active) setFormats([]); });
     return () => { active = false; };
   }, [profileId, workspaceId]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { madeProfileFormats } from "@/lib/profile-formats";
 import { ChevronDown, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useState, type FormEvent } from "react";
@@ -34,7 +35,7 @@ export function ProfileContext({ workspace, profile, onUpdate }: {
     let active = true;
     Promise.all([
       invoke<string | null>("get_workspace_context", { workspaceId }),
-      invoke<ProfileFormat[]>("list_profile_formats", { workspaceId, profileId: profile.id }),
+      madeProfileFormats<ProfileFormat>(workspaceId, profile.id),
     ]).then(([context, entries]) => {
       if (!active) return;
       setWorkspaceContext(context);

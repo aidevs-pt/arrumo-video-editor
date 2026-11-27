@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { madeProfileFormats } from "@/lib/profile-formats";
 import { open } from "@tauri-apps/plugin-dialog";
 import { CircleAlert, FolderInput, Share2, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,7 +45,7 @@ export function ProfileAssets({ workspaceId, profile }: { workspaceId: number; p
     Promise.all([
       invoke<Shared[]>("list_profile_assets", { workspaceId, profileId: profile.id }),
       invoke<Asset[]>("list_assets", { workspaceId }),
-      invoke<Format[]>("list_profile_formats", { workspaceId, profileId: profile.id }),
+      madeProfileFormats<Format>(workspaceId, profile.id),
       invoke<Profile[]>("list_profiles", { workspaceId }),
     ]).then(([shared, library, formats, profiles]) => {
       if (active) setCatalog({ shared, library, formats, profiles });
@@ -240,7 +241,7 @@ function ShareDialog({ asset, onClose, workspaceId, profile, catalog, onShare, b
   useEffect(() => {
     if (!asset || !targetId) return;
     let active = true;
-    invoke<Format[]>("list_profile_formats", { workspaceId, profileId: targetId }).then(
+    madeProfileFormats<Format>(workspaceId, targetId).then(
       (entries) => { if (active) setFormats(entries); }, () => { if (active) setFormats([]); });
     return () => { active = false; };
   }, [asset, targetId, workspaceId]);
