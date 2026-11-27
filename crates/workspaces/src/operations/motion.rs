@@ -102,7 +102,7 @@ struct RenderRun {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 13] {
+pub(super) fn definitions() -> [Value; 14] {
     let id = json!({"type": "integer", "minimum": 1});
     let optional_id = json!({"type": ["integer", "null"], "minimum": 1});
     let title = json!({"type": "string", "minLength": 1});
@@ -134,6 +134,10 @@ pub(super) fn definitions() -> [Value; 13] {
                 "request": {"type": "string", "minLength": 1, "maxLength": 4000}
             }, "required": ["workspaceId", "request"], "additionalProperties": false}}),
         json!({"name": "list_motion_library_versions", "description": "List a motion item's current state and the earlier versions it replaced, newest first. A change made with the agent, or new media chosen by hand, keeps the previous state as a version; the last 10 stay.",
+            "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id},
+                "required": ["workspaceId", "itemId"], "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "get_motion_template_inputs", "description": "Read the inputs a library animation asks for each time a video uses it (key, label, kind, default, maxLength, tips, dos, donts). Empty for an animation that plays as saved.",
             "inputSchema": {"type": "object", "properties": {"workspaceId": id, "itemId": id},
                 "required": ["workspaceId", "itemId"], "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
@@ -221,6 +225,11 @@ pub(super) fn call(
             store.motion_library_versions(args.workspace_id, args.item_id)
                 .map(|versions| json!({"versions": versions}))
                 .map_err(|_| "Could not read versions. Check the workspace and item")
+        }),
+        "get_motion_template_inputs" => parse(arguments).and_then(|args: ReadShares| {
+            store.motion_template_inputs(args.workspace_id, args.item_id)
+                .map(|inputs| json!({"inputs": inputs}))
+                .map_err(|_| "Could not read the template. Check the workspace and item")
         }),
         "restore_motion_library_version" => parse(arguments).and_then(|args: Restore| {
             store.restore_motion_library_version(database, args.workspace_id, args.item_id, args.version)

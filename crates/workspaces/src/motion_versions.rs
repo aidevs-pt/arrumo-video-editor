@@ -205,7 +205,8 @@ impl WorkspaceStore {
         let Some(plan) = result["asset_plan"].as_array_mut() else {
             return Ok(());
         };
-        for entry in plan {
+        // Templates were filled per use when the plan was made.
+        for entry in plan.iter_mut().filter(|entry| entry.get("spec").is_none()) {
             let Some(id) = entry["reference"]
                 .as_str()
                 .and_then(|reference| reference.strip_prefix("motion-"))

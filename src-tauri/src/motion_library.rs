@@ -208,6 +208,35 @@ pub async fn preview_motion_library_version(
 }
 
 #[tauri::command]
+pub async fn preview_run_plan_use(
+    workspace_id: i64,
+    run_id: i64,
+    result_id: i64,
+    index: usize,
+    app: tauri::AppHandle,
+    stream: State<'_, crate::delivery_stream::DeliveryStream>,
+) -> Result<MotionPreview, &'static str> {
+    let (database, store) = open_store(&app)?;
+    let settings = store
+        .run_plan_use(workspace_id, run_id, result_id, index)
+        .map_err(|_| "motion_library_preview_failed")?;
+    motion_preview(&database, &store, workspace_id, &settings, &stream)
+}
+
+#[tauri::command]
+pub async fn motion_template_inputs(
+    workspace_id: i64,
+    item_id: i64,
+    store: State<'_, Store>,
+) -> Result<Vec<arrumo_workspaces::TemplateInput>, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .motion_template_inputs(workspace_id, item_id)
+        .map_err(|_| "motion_template_failed")
+}
+
+#[tauri::command]
 pub async fn preview_run_motion_item(
     workspace_id: i64,
     run_id: i64,

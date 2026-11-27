@@ -93,6 +93,8 @@ struct LibraryEntry {
     notes: String,
     /// The motion spec Arrumo rendered the item from, when it has one.
     design: Option<Value>,
+    /// A library animation that asks for inputs each time it is used.
+    template: Option<crate::motion_spec::MotionSpec>,
 }
 
 /// Keeps placements of known library entries, with the names the creator recognises.
@@ -124,13 +126,31 @@ fn asset_plan(
                 .trim()
                 .to_owned()
         };
-        plan.push(json!({
+        let mut placed = json!({
             "section": text("section"),
             "reference": entry.reference,
             "name": entry.name,
             "kind": entry.kind,
             "use": text("use"),
-        }));
+        });
+        if let Some(template) = &entry.template {
+            let pairs: Vec<(String, String)> = placement
+                .get("values")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|pair| {
+                    Some((
+                        pair.get("key")?.as_str()?.to_owned(),
+                        pair.get("value")?.as_str()?.to_owned(),
+                    ))
+                })
+                .collect();
+            let (spec, values) = template.fill_leniently(&pairs);
+            placed["values"] = Value::Object(values);
+            placed["spec"] = serde_json::to_value(&spec).map_err(|_| invalid)?;
+        }
+        plan.push(placed);
     }
     let summary = answer
         .get("summary")
@@ -164,6 +184,9 @@ fn plan_prompt(
             let mut value = json!({"reference": entry.reference, "name": entry.name, "kind": entry.kind, "notes": entry.notes});
             if let Some(design) = &entry.design {
                 value["design"] = design.clone();
+            }
+            if let Some(template) = &entry.template {
+                value["inputs"] = json!(template.inputs);
             }
             value
         })
@@ -200,7 +223,10 @@ fn plan_prompt(
          First choose library entries that help a section of the approved script land: logos and brand marks, screenshots, \
          b-roll, music, animations and transitions. Name the script section by its heading and say in a short phrase how \
          each entry is used. Use only references from the library and skip anything that does not fit. A library \
-         animation plays exactly as saved, so never place one whose text does not fit this video.\n\
+         animation with inputs is a template: place it once for every use, such as once per step, and give the \
+         values for that use, following each input's tips, dos and donts and staying within its maxLength. \
+         One without inputs plays exactly as saved, so never place one whose text does not fit this video. \
+         Give an empty values list for everything else.\n\
          Then design up to {max} new animations or transitions this video needs that the library does not already have, \
          such as a title card, lower thirds, key-point callouts, a chart or list reveal, or an end card. {footage}\
          Library animations with a design show the creator's house style: when a new animation does a similar job, \
@@ -339,6 +365,7 @@ impl WorkspaceStore {
                     kind,
                     notes,
                     design: None,
+                    template: None,
                 })),
                 Err(error) => Some(Err(error)),
             })
@@ -351,13 +378,19 @@ impl WorkspaceStore {
                  ORDER BY id DESC LIMIT ?3",
             )?
             .query_map(params![workspace_id, profile, MAX_LIBRARY], |row| {
+                let spec: Option<String> = row.get(4)?;
                 Ok(LibraryEntry {
                     reference: format!("motion-{}", row.get::<_, i64>(0)?),
                     name: row.get(1)?,
                     kind: row.get(2)?,
                     notes: row.get(3)?,
-                    design: row
-                        .get::<_, Option<String>>(4)?
+                    template: spec
+                        .as_deref()
+                        .and_then(|spec| {
+                            serde_json::from_str::<crate::motion_spec::MotionSpec>(spec).ok()
+                        })
+                        .filter(|spec| !spec.inputs.is_empty()),
+                    design: spec
                         .filter(|spec| spec.len() <= MAX_DESIGN_BYTES)
                         .and_then(|spec| serde_json::from_str(&spec).ok()),
                 })
@@ -477,6 +510,13 @@ impl WorkspaceStore {
         }
         let mut result = asset_plan(&answer, &library, &provider.id).map_err(io::Error::other)?;
         self.pin_library_designs(workspace_id, &mut result)?;
+        let _ = self.render_plan_previews(
+            database,
+            workspace_id,
+            run_preview_size(snapshot),
+            &mut result,
+            &mut || renew(),
+        );
         if !kinds.is_empty() {
             self.generate_planned_media(
                 database,
@@ -697,6 +737,7 @@ mod tests {
                 kind: "image".into(),
                 notes: "Main logo".into(),
                 design: None,
+                template: None,
             },
             LibraryEntry {
                 reference: "motion-2".into(),
@@ -704,8 +745,39 @@ mod tests {
                 kind: "animation".into(),
                 notes: String::new(),
                 design: Some(json!({"duration": 5, "layers": []})),
+                template: None,
             },
         ]
+    }
+
+    #[test]
+    fn templates_are_filled_once_per_use() {
+        let template: crate::motion_spec::MotionSpec = serde_json::from_value(json!({
+            "title": "Step card", "kind": "animation", "usage": "", "durationSeconds": 3.0, "background": "#101010",
+            "layers": [{"type": "text", "text": "{{title}}", "assetId": null, "x": 0.5, "y": 0.5, "width": 0.5,
+                "height": 0.1, "size": 0.05, "color": "#FFFFFF", "bold": true, "opacity": 1.0, "start": 0.0,
+                "end": 3.0, "enter": "fade", "exit": "fade"}],
+            "inputs": [{"key": "title", "label": "Title", "kind": "text", "default": "Step", "maxLength": 12,
+                "tips": "", "dos": [], "donts": []}]
+        }))
+        .unwrap();
+        let mut entries = library();
+        entries[1].template = Some(template);
+        let answer = json!({"summary": "", "placements": [
+            {"section": "One", "reference": "motion-2", "use": "", "values": [{"key": "title", "value": "Open the app"}]},
+            {"section": "Two", "reference": "motion-2", "use": "", "values": [{"key": "title", "value": "Export the finished video"}, {"key": "colour", "value": "red"}]},
+            {"section": "Three", "reference": "asset-4", "use": "", "values": []}
+        ]});
+        let plan = asset_plan(&answer, &entries, "codex").unwrap()["asset_plan"].clone();
+        assert_eq!(plan[0]["values"], json!({"title": "Open the app"}));
+        assert_eq!(plan[0]["spec"]["layers"][0]["text"], "Open the app");
+        assert_eq!(
+            plan[1]["values"],
+            json!({"title": "Export the f"}),
+            "cut to fit, unknown keys ignored"
+        );
+        assert_eq!(plan[1]["spec"]["title"], "Step card · Export the f");
+        assert!(plan[2].get("spec").is_none() && plan[2].get("values").is_none());
     }
 
     #[test]

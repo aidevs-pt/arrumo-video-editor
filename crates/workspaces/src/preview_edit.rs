@@ -642,10 +642,12 @@ impl WorkspaceStore {
             else {
                 continue;
             };
-            if seen.contains(&id) {
+            // A template placed several times plays once per use, each with its own values.
+            let use_key = (id, entry["values"].to_string());
+            if seen.contains(&use_key) {
                 continue;
             }
-            seen.push(id);
+            seen.push(use_key);
             // The design as it was when planned, so later changes to the library item, or
             // restoring an older version of it, don't change this video.
             if entry["spec"].is_object() {

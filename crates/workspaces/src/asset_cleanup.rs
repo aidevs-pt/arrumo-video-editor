@@ -70,6 +70,13 @@ fn asset_uses(
                  UNION
                  SELECT DISTINCT {title} FROM production_results AS result
                    JOIN generation_runs AS run ON run.id = result.run_id
+                   JOIN json_each(result.result_json, '$.asset_plan') AS item
+                 WHERE run.workspace_id = ?1 AND item.type = 'object'
+                   AND ?2 IN (json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.preview_asset_id'),
+                              json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.thumbnail_asset_id'))
+                 UNION
+                 SELECT DISTINCT {title} FROM production_results AS result
+                   JOIN generation_runs AS run ON run.id = result.run_id
                    JOIN json_each(result.result_json, '$.supplemental_media') AS item
                  WHERE run.workspace_id = ?1 AND item.type = 'object'
                    AND json_extract(CASE WHEN item.type = 'object' THEN item.value END, '$.asset_id') = ?2"

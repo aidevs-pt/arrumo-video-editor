@@ -1976,6 +1976,8 @@ fn main() {
             motion_library::list_motion_library_versions,
             motion_library::restore_motion_library_version,
             motion_library::preview_motion_library_version,
+            motion_library::preview_run_plan_use,
+            motion_library::motion_template_inputs,
             motion_library::saved_run_motion,
             motion_library::save_motion_result,
             motion_library::create_motion_library_item,

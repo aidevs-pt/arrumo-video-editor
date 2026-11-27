@@ -37,7 +37,9 @@ const SOUND_ASSET_SECONDS: f64 = 4.0;
 pub(crate) const MIN_SECONDS: f64 = 1.0;
 pub(crate) const MAX_SECONDS: f64 = 20.0;
 const MAX_STORED_SECONDS: f64 = 60.0;
-const MAX_TEXT: usize = 240;
+pub(crate) const MAX_TEXT: usize = 240;
+/// Room a fitted box leaves above and below its text, as a fraction of the frame height.
+const FIT_PADDING: f64 = 0.03;
 const FPS: u32 = 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -134,6 +136,10 @@ pub(crate) struct Layer {
     /// How a box or image card sits in depth.
     #[serde(default, skip_serializing_if = "Tilt::is_none")]
     pub tilt: Tilt,
+    /// A box that holds a text layer (by its index) grows taller when that text needs more
+    /// lines, keeping its centre, so a card fits whatever a template is filled with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit_text: Option<usize>,
 }
 
 /// From `from` to `to` seconds into the animation, everything in the clip outside a rounded area
@@ -223,6 +229,10 @@ pub(crate) struct MotionSpec {
         skip_serializing_if = "crate::scene_transitions::Transition::is_none"
     )]
     pub transition: crate::scene_transitions::Transition,
+    /// What a library template asks for each time it is used; text layers name them as
+    /// `{{key}}` (see [`crate::motion_templates`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inputs: Vec<crate::motion_templates::TemplateInput>,
 }
 
 /// The JSON schema agents answer with for one animation. `assets` are the image IDs it may use.
@@ -252,7 +262,7 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
         "additionalProperties": false,
         "required": ["type", "text", "assetId", "x", "y", "width", "height", "size",
             "color", "bold", "opacity", "start", "end", "enter", "exit",
-            "align", "radius", "gradientTo", "shadow", "font", "accent", "glow", "count", "tilt"],
+            "align", "radius", "gradientTo", "shadow", "font", "accent", "glow", "count", "tilt", "fitText"],
         "properties": {
             "type": {"enum": ["text", "box", "image", "light", "spark"]},
             "text": {"type": ["string", "null"], "maxLength": MAX_TEXT},
@@ -274,7 +284,8 @@ pub(crate) fn spec_schema_with_media(images: &[i64], clips: &[i64], sounds: &[i6
             "accent": optional_color,
             "glow": {"type": "boolean"},
             "count": {"type": "boolean"},
-            "tilt": {"enum": ["none", "left", "right", "back"]}
+            "tilt": {"enum": ["none", "left", "right", "back"]},
+            "fitText": {"type": ["integer", "null"], "minimum": 0, "maximum": MAX_LAYERS}
         }
     });
     if !clips.is_empty() {
@@ -436,7 +447,7 @@ fn undrawable(c: char) -> bool {
         || c == '\u{200D}'
 }
 
-fn clean_text(value: &str, limit: usize) -> String {
+pub(crate) fn clean_text(value: &str, limit: usize) -> String {
     let kept: String = value
         .chars()
         .filter(|c| (!c.is_control() || *c == '\n') && !undrawable(*c))
@@ -504,7 +515,7 @@ impl MotionSpec {
         spec.light_color = spec.light_color.filter(|color| hex_color(color).is_some());
         let duration = spec.duration_seconds;
         spec.layers.truncate(MAX_LAYERS);
-        spec.layers.retain_mut(|layer| {
+        let check = |layer: &mut Layer| -> bool {
             layer.sound_asset_id = layer.sound_asset_id.filter(|id| sound_allowed(*id));
             layer.sound = Sound::None;
             let unit = |value: f64| {
@@ -656,10 +667,31 @@ impl MotionSpec {
                     layer.asset_id.is_some_and(&clip_allowed)
                 }
             }
+        };
+        let mut kept = Vec::with_capacity(spec.layers.len());
+        spec.layers.retain_mut(|layer| {
+            let keep = check(layer);
+            kept.push(keep);
+            keep
         });
+        // Layers dropped above shift the indices boxes fit to.
+        let position = |original: usize| {
+            kept.get(original)
+                .copied()
+                .unwrap_or(false)
+                .then(|| kept[..original].iter().filter(|keep| **keep).count())
+        };
+        let kinds: Vec<LayerType> = spec.layers.iter().map(|layer| layer.kind).collect();
+        for layer in &mut spec.layers {
+            layer.fit_text = layer
+                .fit_text
+                .and_then(position)
+                .filter(|&index| layer.kind == LayerType::Box && kinds[index] == LayerType::Text);
+        }
         if spec.layers.is_empty() {
             return Err("The agent's animation has nothing to show");
         }
+        crate::motion_templates::clean_inputs(&mut spec);
         Ok(spec)
     }
 }
@@ -981,6 +1013,59 @@ struct LayerTarget<'a> {
 }
 
 impl LayerTarget<'_> {
+    /// Wraps a text layer's words the way it is drawn: by the real width of its font when the
+    /// font file is there, else by an average letter width.
+    fn wrap_text(
+        &self,
+        layer: &Layer,
+        text: &str,
+        font_px: f64,
+        weight: FontWeight,
+    ) -> (String, Option<TextFont>) {
+        let frame_w = f64::from(self.width);
+        let measured = TextFont::load(&self.directory.join(font_name(layer.font, weight)));
+        let wrapped = match &measured {
+            Some(face) => wrap_measured(text, layer.width * frame_w, |line| {
+                face.width(line, font_px)
+            }),
+            None => {
+                let advance = self.fonts.advance(layer.font, weight);
+                wrap(
+                    text,
+                    (layer.width * frame_w / (font_px * advance)).floor() as usize,
+                )
+            }
+        };
+        (wrapped, measured)
+    }
+
+    /// The heights boxes take to hold the text they fit (see [`Layer::fit_text`]), as fractions
+    /// of the frame; `None` keeps a layer as designed.
+    fn fitted_heights(&self, spec: &MotionSpec) -> Vec<Option<f64>> {
+        let frame_h = f64::from(self.height);
+        spec.layers
+            .iter()
+            .map(|layer| {
+                let text = spec.layers.get(layer.fit_text?)?;
+                if layer.kind != LayerType::Box || text.kind != LayerType::Text {
+                    return None;
+                }
+                let font_px = (text.size * frame_h).round().max(8.0);
+                let weight = if text.bold {
+                    FontWeight::Bold
+                } else {
+                    FontWeight::Regular
+                };
+                let (plain, _) =
+                    crate::motion_effects::parse_emphasis(text.text.as_deref().unwrap_or_default());
+                let (wrapped, _) = self.wrap_text(text, &plain, font_px, weight);
+                let lines = wrapped.lines().count().max(1) as f64;
+                let needed = (lines * font_px * 1.25 + FIT_PADDING * 2.0 * frame_h) / frame_h;
+                Some(layer.height.max(needed).min(1.0))
+            })
+            .collect()
+    }
+
     /// Appends the filters that draw `spec`'s layers over the `base` stream to `graph`, adding any
     /// image inputs to `args` from input index `first_input`, and returns the final stream label.
     fn draw(
@@ -1002,8 +1087,20 @@ impl LayerTarget<'_> {
         let mut current = base.to_owned();
         let mut next_input = first_input;
         let (frame_w, frame_h) = (f64::from(width), f64::from(height));
+        // A template drawn without values shows its defaults, never its placeholders.
+        let filled;
+        let spec = if spec.inputs.is_empty() {
+            spec
+        } else {
+            filled = spec.with_defaults();
+            &filled
+        };
+        let fitted = self.fitted_heights(spec);
         for (index, layer) in spec.layers.iter().enumerate() {
             let mut layer = layer.clone();
+            if let Some(height) = fitted[index] {
+                layer.height = height;
+            }
             layer.start += self.shift;
             layer.end += self.shift;
             let layer = &layer;
@@ -1024,19 +1121,7 @@ impl LayerTarget<'_> {
                         layer.text.as_deref().unwrap_or_default(),
                     );
                     let text = text.as_str();
-                    let measured = TextFont::load(&directory.join(&font));
-                    let wrapped = match &measured {
-                        Some(face) => wrap_measured(text, layer.width * frame_w, |line| {
-                            face.width(line, font_px)
-                        }),
-                        None => {
-                            let advance = self.fonts.advance(layer.font, weight);
-                            wrap(
-                                text,
-                                (layer.width * frame_w / (font_px * advance)).floor() as usize,
-                            )
-                        }
-                    };
+                    let (wrapped, measured) = self.wrap_text(layer, text, font_px, weight);
                     // FFmpeg 8's drawtext draws a missing-glyph box at each line break, so
                     // every line is its own centred drawtext.
                     let lines: Vec<&str> = wrapped.lines().collect();
@@ -3545,5 +3630,68 @@ mod tests {
         assert!(face.width("iii", 80.0) < face.width("WWW", 80.0));
         let line_box = face.line_box(80.0);
         assert!((80.0..100.0).contains(&line_box), "{line_box}");
+    }
+}
+
+#[cfg(test)]
+mod fit_tests {
+    use super::*;
+
+    fn card(text: &str) -> MotionSpec {
+        serde_json::from_value(serde_json::json!({
+            "title": "Card", "kind": "animation", "usage": "", "durationSeconds": 3.0, "background": "#101010",
+            "layers": [
+                {"type": "box", "text": null, "assetId": null, "x": 0.5, "y": 0.5, "width": 0.5, "height": 0.14,
+                 "size": 0.05, "color": "#2537B8", "bold": false, "opacity": 1.0, "start": 0.0, "end": 3.0,
+                 "enter": "fade", "exit": "fade", "fitText": 1},
+                {"type": "text", "text": text, "assetId": null, "x": 0.5, "y": 0.5, "width": 0.4, "height": 0.1,
+                 "size": 0.05, "color": "#FFFFFF", "bold": true, "opacity": 1.0, "start": 0.0, "end": 3.0,
+                 "enter": "fade", "exit": "fade"}
+            ]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_card_grows_for_long_text_and_keeps_its_size_for_short() {
+        let directory = tempfile::tempdir().unwrap();
+        let fonts = FontSet::default();
+        let target = LayerTarget {
+            width: 1280,
+            height: 720,
+            directory: directory.path(),
+            prefix: "",
+            shift: 0.0,
+            length: 3.0,
+            fonts: &fonts,
+        };
+        let short = target.fitted_heights(&card("Open the app"));
+        assert_eq!(short[0], Some(0.14), "one line fits the card as designed");
+        assert_eq!(short[1], None);
+        let long = target.fitted_heights(&card(
+            "Open the settings, choose the workspace you want to export and press the export button",
+        ));
+        assert!(long[0].unwrap() > 0.2, "{long:?}");
+    }
+
+    #[test]
+    fn agents_fitting_a_box_to_a_dropped_or_wrong_layer_are_ignored() {
+        let mut answer = serde_json::to_value(card("Hi")).unwrap();
+        answer["layers"][0]["fitText"] = serde_json::json!(0);
+        let spec = MotionSpec::from_answer(&answer, |_| false).unwrap();
+        assert_eq!(spec.layers[0].fit_text, None, "a box can't fit itself");
+
+        let mut answer = serde_json::to_value(card("Hi")).unwrap();
+        let blank = serde_json::json!({"type": "text", "text": " ", "assetId": null, "x": 0.5, "y": 0.5,
+            "width": 0.4, "height": 0.1, "size": 0.05, "color": "#FFFFFF", "bold": false, "opacity": 1.0,
+            "start": 0.0, "end": 3.0, "enter": "fade", "exit": "fade"});
+        answer["layers"].as_array_mut().unwrap().insert(0, blank);
+        answer["layers"][1]["fitText"] = serde_json::json!(2);
+        let spec = MotionSpec::from_answer(&answer, |_| false).unwrap();
+        assert_eq!(
+            spec.layers[0].fit_text,
+            Some(1),
+            "indices follow the layers that stay"
+        );
     }
 }

@@ -735,6 +735,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             println!("{}", serde_json::to_string(&item)?);
         }
+        [database, command, workspace, item] if command == "motion-template" => {
+            let inputs = WorkspaceStore::open(Path::new(database))?
+                .motion_template_inputs(utf8(workspace)?.parse()?, utf8(item)?.parse()?)?;
+            println!("{}", serde_json::to_string(&inputs)?);
+        }
         [database, command, workspace, item] if command == "motion-versions" => {
             let versions = WorkspaceStore::open(Path::new(database))?
                 .motion_library_versions(utf8(workspace)?.parse()?, utf8(item)?.parse()?)?;
@@ -1800,7 +1805,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "replay-generation <workspace-id> <source-run-id> <request-key> <captured|current> | ",
                 "claim-generation <workspace-id> | sweep-agent-sessions | checkpoint-generation <workspace-id> <run-id> <attempt> <json> | ",
                 "control-generation <workspace-id> <run-id> <pause|resume|retry|cancel|stop> [stage-index] | ",
-                "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | motion-versions <workspace-id> <item-id> | restore-motion-version <workspace-id> <item-id> <version> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
+                "generation-activity <workspace-id> <run-id> | agent-logs <workspace-id> [run-id] | generate-motion-item <workspace-id> <request> | motion-versions <workspace-id> <item-id> | motion-template <workspace-id> <item-id> | restore-motion-version <workspace-id> <item-id> <version> | agent-log <workspace-id> <log-id> | generation-notifications <workspace-id> <after-id> | ",
                 "read-completion-notification <workspace-id> <run-id> | ",
                 "fail-generation <workspace-id> <run-id> <attempt> <detail> | ",
                 "prepare-generation-plan <workspace-id> <run-id> <attempt> | generation-plan <workspace-id> <run-id> | ",
