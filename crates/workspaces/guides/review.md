@@ -9,6 +9,6 @@ Check your own work as a critic would before the creator sees it. Be specific: a
 - Check every name, price, figure and link against its source, and that required legal text stays long enough to read.
 - Check readability on a phone: text size, contrast and time on screen, and nothing important under a platform's buttons.
 - Measure rather than assume. Loudness, peaks and lengths are numbers; say what you measured and what you could not check.
-- Compare against the creator's notes and learned feedback, and confirm each one was addressed. Read a vague note by where it points, which quality it is about (pace, colour, type, scale, sound or message), and what it compares with.
-- Apply the checks of the video's kind when its guide is included.
+- Compare against the creator's notes and learned feedback, and confirm each one was addressed. Read a vague note by where it points, which quality it is about, such as pacing, colour, lettering, size, audio or meaning, and what it compares with.
+- When you know the video's kind, also run the checks that close its guide.
 - Rank problems by how much they hurt the viewer, and fix the top ones first. If problems remain after a few passes, report them instead of looping.
