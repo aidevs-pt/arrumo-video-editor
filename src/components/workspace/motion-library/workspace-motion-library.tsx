@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { GenerateMotionDialog } from "./generate-motion-dialog";
 import { MotionPreviewDialog } from "./motion-preview-dialog";
 import { MotionShareDialog } from "./motion-share-dialog";
+import { MotionTemplateInputs } from "./motion-template-inputs";
 import { MotionVersionHistory } from "./motion-version-history";
 
 type Kind = "animation" | "transition";
@@ -281,6 +282,7 @@ function MotionLibraryScope({ workspace, scope, embedded }: { workspace: Workspa
               <h3 className="mb-1 font-bold">{copy.usage}</h3>
               <p className="whitespace-pre-wrap text-muted-foreground wrap-anywhere">{chosen.settings.usage_markdown}</p>
             </div>}
+            <MotionTemplateInputs workspaceId={workspaceId} itemId={chosen.id} revision={chosen.settings} />
             <p className="flex flex-wrap items-center gap-2 font-bold">{copy.sharedWith}
               <span className="rounded-md bg-secondary px-2 py-0.5 text-sm">{scopeName(chosen.settings.profile_id)}</span></p>
             <div className="flex items-center gap-2 border-t pt-4">

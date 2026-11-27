@@ -527,7 +527,14 @@
     "versionRestored": "Brought back version {version}",
     "versionReplaced": "Replaced {date}",
     "versionRestore": "Bring back version {version}",
-    "versionRestoreError": "Couldn't bring that version back. Try again."
+    "versionRestoreError": "Couldn't bring that version back. Try again.",
+    "templateInputs": "What each video fills in",
+    "templateHint": "Videos use this animation as a template: each use gets its own values and preview, and the library keeps this one.",
+    "templateExample": "For example: {value}",
+    "templateLimit": "Up to {count} characters",
+    "templateNumber": "A number",
+    "templateDo": "Do",
+    "templateDont": "Don't"
   },
   "assets": {
     "replaceFile": "Replace file",
@@ -1389,7 +1396,8 @@
     "batch_menu": "Decide all",
     "rest_menu": "Decide the rest",
     "selected_menu": "Decide {count} selected",
-    "moreActions": "More"
+    "moreActions": "More",
+    "templateValues": "Filled in for this use"
   },
   "markdownEditor": {
     "loading": "Loading rich text editor…",

@@ -12,7 +12,7 @@ type Preview = { video_url: string; sound_url: string | null };
 
 /** A library item, one of its earlier versions, or an item a run's Assets stage proposes for review. */
 type Source = { profileId: number | null; itemId: number } | { itemId: number; version: number }
-  | { runId: number; resultId: number; index: number };
+  | { runId: number; resultId: number; index: number } | { runId: number; resultId: number; planIndex: number };
 
 export function MotionPreviewDialog({ workspaceId, title, compact = false, ...source }: Source & {
   workspaceId: number;
@@ -20,7 +20,9 @@ export function MotionPreviewDialog({ workspaceId, title, compact = false, ...so
   /** An icon button, for rows of versions. */
   compact?: boolean;
 }) {
-  const request = "version" in source
+  const request = "planIndex" in source
+    ? ["preview_run_plan_use", { workspaceId, runId: source.runId, resultId: source.resultId, index: source.planIndex }] as const
+    : "version" in source
     ? ["preview_motion_library_version", { workspaceId, itemId: source.itemId, version: source.version }] as const
     : "itemId" in source
     ? ["preview_motion_library_item", { workspaceId, profileId: source.profileId, itemId: source.itemId }] as const

@@ -417,3 +417,63 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod render_tests {
+    use serde_json::json;
+
+    use crate::quiet_process::Launch;
+
+    use crate::WorkspaceStore;
+
+    #[test]
+    fn each_use_in_a_plan_gets_its_own_rendered_preview() {
+        if crate::quiet_command(crate::media_tools::ffmpeg())
+            .arg("-version")
+            .launch_output()
+            .is_err()
+        {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let database = directory.path().join("workspaces.sqlite");
+        let store = WorkspaceStore::open(&database).unwrap();
+        let workspace = store.create("Studio").unwrap().id;
+        let spec = |title: &str| {
+            json!({"title": title, "kind": "animation", "usage": "", "durationSeconds": 1.0, "background": "#101010",
+                "layers": [{"type": "text", "text": title, "assetId": null, "x": 0.5, "y": 0.5, "width": 0.6,
+                    "height": 0.1, "size": 0.06, "color": "#FFFFFF", "bold": true, "opacity": 1.0, "start": 0.0,
+                    "end": 1.0, "enter": "fade", "exit": "fade"}]})
+        };
+        let mut result = json!({"asset_plan": [
+            {"reference": "motion-1", "name": "Step", "values": {"title": "One"}, "spec": spec("One")},
+            {"reference": "motion-1", "name": "Step", "values": {"title": "Two"}, "spec": spec("Two")},
+            {"reference": "asset-3", "name": "Logo"}
+        ]});
+        store
+            .render_plan_previews(
+                &database,
+                workspace,
+                (320, 180),
+                &mut result,
+                &mut || Ok(()),
+            )
+            .unwrap();
+        let plan = result["asset_plan"].as_array().unwrap();
+        let first = plan[0]["preview_asset_id"].as_i64().unwrap();
+        let second = plan[1]["preview_asset_id"].as_i64().unwrap();
+        assert_ne!(first, second);
+        assert!(plan[2].get("preview_asset_id").is_none());
+        let root = crate::asset_root(&database.canonicalize().unwrap());
+        assert!(crate::asset_path(&root, workspace, first).is_file());
+        let hidden: bool = store
+            .0
+            .query_row(
+                "SELECT generated FROM workspace_assets WHERE id = ?1",
+                [first],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(hidden, "previews stay out of the asset library");
+    }
+}

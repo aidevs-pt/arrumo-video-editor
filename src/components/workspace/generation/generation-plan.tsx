@@ -607,7 +607,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
             {hasPreviewReview && reviewControls("media", index, formats.find((format) => format.id === formatId)?.name ?? filename)}
           </div>
         ))}</div>}
-        {stage === "assets" && <AssetPlan workspaceId={workspaceId} plan={result.result.asset_plan} agent={agent} />}
+        {stage === "assets" && <AssetPlan workspaceId={workspaceId} runId={runId} resultId={result.id} plan={result.result.asset_plan} agent={agent} />}
         {previews.length > 0 && <CutList cuts={result.result.cuts} notes={result.result.cut_notes} agent={agent} />}
         {previews.length > 0 && <JoinReview review={result.result.join_review} agent={agent} notes={draft.notes}
           onAdd={reviewing || result.decision ? undefined : (line) => updateDraft({ ...draft, notes: [draft.notes.trim(), line].filter(Boolean).join("\n") })} />}
@@ -657,7 +657,7 @@ function StageReview({ workspaceId, runId, stage, result, formats, agent, versio
   );
 }
 
-type Placement = { section: string; name: string; kind: string; use: string; reference?: string };
+type Placement = { section: string; name: string; kind: string; use: string; reference?: string; values?: Record<string, string>; preview_asset_id?: number };
 
 function isAssetPlan(value: unknown): value is Placement[] {
   return Array.isArray(value) && value.every((entry) => entry && typeof entry.name === "string" && typeof entry.kind === "string");
@@ -666,14 +666,17 @@ function isAssetPlan(value: unknown): value is Placement[] {
 const placementIcons: Record<string, typeof Film> = { image: ImageIcon, video: Film, audio: Music };
 
 /** Shows a planned library item as it is: an image to enlarge, a clip or sound to play, or an animation's preview. */
-function PlacementPreview({ workspaceId, entry }: { workspaceId: number; entry: Placement }) {
+function PlacementPreview({ workspaceId, entry, use }: { workspaceId: number; entry: Placement; use?: { runId: number; resultId: number; planIndex: number } }) {
   const { messages: { productionPlan: copy } } = useLocale();
   const [open, setOpen] = useState(false);
   const motionItem = /^motion-(\d+)$/.exec(entry.reference ?? "");
   const assetItem = /^asset-(\d+)$/.exec(entry.reference ?? "");
   const kind = entry.kind === "image" || entry.kind === "video" || entry.kind === "audio" ? entry.kind : undefined;
   if (motionItem) {
-    return <MotionPreviewDialog workspaceId={workspaceId} profileId={null} itemId={Number(motionItem[1])} title={entry.name} />;
+    // A template placed with values shows this use, rendered with them.
+    return use && entry.preview_asset_id !== undefined
+      ? <MotionPreviewDialog workspaceId={workspaceId} {...use} title={entry.name} />
+      : <MotionPreviewDialog workspaceId={workspaceId} profileId={null} itemId={Number(motionItem[1])} title={entry.name} />;
   }
   if (!assetItem || !kind) return null;
   const assetId = Number(assetItem[1]);
@@ -692,7 +695,7 @@ function PlacementPreview({ workspaceId, entry }: { workspaceId: number; entry: 
   );
 }
 
-function AssetPlan({ workspaceId, plan, agent }: { workspaceId: number; plan: unknown; agent?: string }) {
+function AssetPlan({ workspaceId, runId, resultId, plan, agent }: { workspaceId: number; runId: number; resultId: number; plan: unknown; agent?: string }) {
   const { messages: { productionPlan: copy } } = useLocale();
   if (!isAssetPlan(plan)) return null;
   if (plan.length === 0) return <p className="rounded-lg bg-secondary px-3 py-2.5 text-sm">{copy.assetPlanEmpty}</p>;
@@ -711,9 +714,15 @@ function AssetPlan({ workspaceId, plan, agent }: { workspaceId: number; plan: un
                   <div className="flex items-start gap-3">
                     <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
                     <span className="min-w-0 flex-1"><span className="font-semibold wrap-anywhere">{entry.name}</span>
-                      {entry.use && <span className="block text-muted-foreground wrap-anywhere">{entry.use}</span>}</span>
+                      {entry.use && <span className="block text-muted-foreground wrap-anywhere">{entry.use}</span>}
+                      {entry.values && Object.keys(entry.values).length > 0 && <span className="mt-1 flex flex-wrap gap-1.5" aria-label={copy.templateValues}>
+                        {Object.values(entry.values).map((value, position) => (
+                          <span key={position} className="rounded-md bg-secondary px-1.5 py-0.5 text-xs font-semibold wrap-anywhere">{value}</span>
+                        ))}
+                      </span>}</span>
                   </div>
-                  <div className="ps-7"><PlacementPreview workspaceId={workspaceId} entry={entry} /></div>
+                  <div className="ps-7"><PlacementPreview workspaceId={workspaceId} entry={entry}
+                    use={{ runId, resultId, planIndex: plan.indexOf(entry) }} /></div>
                 </li>
               );
             })}

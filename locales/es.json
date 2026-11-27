@@ -527,7 +527,14 @@
     "versionRestored": "Recuperó la versión {version}",
     "versionReplaced": "Sustituida el {date}",
     "versionRestore": "Recuperar la versión {version}",
-    "versionRestoreError": "No se ha podido recuperar esa versión. Vuelve a intentarlo."
+    "versionRestoreError": "No se ha podido recuperar esa versión. Vuelve a intentarlo.",
+    "templateInputs": "Lo que rellena cada vídeo",
+    "templateHint": "Los vídeos usan esta animación como plantilla: cada uso tiene sus propios valores y su vista previa, y la biblioteca conserva esta.",
+    "templateExample": "Por ejemplo: {value}",
+    "templateLimit": "Hasta {count} caracteres",
+    "templateNumber": "Un número",
+    "templateDo": "Sí",
+    "templateDont": "No"
   },
   "assets": {
     "replaceFile": "Reemplazar archivo",
@@ -1389,7 +1396,8 @@
     "batch_menu": "Decidir todo",
     "rest_menu": "Decidir el resto",
     "selected_menu": "Decidir {count} seleccionados",
-    "moreActions": "Más"
+    "moreActions": "Más",
+    "templateValues": "Rellenado para este uso"
   },
   "markdownEditor": {
     "loading": "Cargando el editor de texto enriquecido…",
