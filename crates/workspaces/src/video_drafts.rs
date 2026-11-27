@@ -88,10 +88,6 @@ impl WorkspaceStore {
             )?
         };
         for (position, asset_id) in settings.source_ids.iter().enumerate() {
-            tx.execute(
-                "UPDATE workspace_assets SET footage = 1 WHERE workspace_id = ?1 AND id = ?2",
-                params![workspace_id, asset_id],
-            )?;
             tx.query_row(
                 "INSERT INTO video_draft_sources (workspace_id, draft_id, asset_id, position)
                  SELECT workspace_id, ?2, id, ?4 FROM workspace_assets

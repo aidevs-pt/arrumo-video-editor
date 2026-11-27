@@ -120,7 +120,7 @@ fn invoke_static(
             .or_else(|| setup::call(store, name, &arguments))
             .or_else(|| profiles::call(store, name, &arguments))
             .or_else(|| providers::call(store, name, &arguments))
-            .or_else(|| settings::call(store, name, &arguments))
+            .or_else(|| settings::call(store, database, name, &arguments))
             .or_else(|| subtitles::call(store, database, name, &arguments))
             .or_else(|| app_data::call(store, database, name, &arguments))
             .or_else(|| generation::call(store, database, name, arguments))?,

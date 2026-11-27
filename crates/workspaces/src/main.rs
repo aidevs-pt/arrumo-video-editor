@@ -474,7 +474,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{}", serde_json::to_string(&settings)?);
         }
         [database, command, delete] if command == "set-delete-used-footage" => {
-            let settings = WorkspaceStore::open(Path::new(database))?.set_storage_settings(
+            let settings = WorkspaceStore::open(Path::new(database))?.apply_storage_settings(
+                Path::new(database),
                 &arrumo_workspaces::StorageSettings {
                     delete_used_footage: match utf8(delete)? {
                         "on" => true,

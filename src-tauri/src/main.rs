@@ -92,15 +92,24 @@ fn get_storage_settings(
 }
 
 #[tauri::command]
-fn set_storage_settings(
+async fn set_storage_settings(
+    app: AppHandle,
     settings: arrumo_workspaces::StorageSettings,
-    store: State<'_, Store>,
 ) -> Result<arrumo_workspaces::StorageSettings, &'static str> {
-    store
-        .lock()
-        .map_err(|_| "store_unavailable")?
-        .set_storage_settings(&settings)
-        .map_err(|_| "storage_settings_failed")
+    let failed = "storage_settings_failed";
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite");
+    // Turning it on may delete many clips, so it runs off the shared store.
+    tauri::async_runtime::spawn_blocking(move || {
+        WorkspaceStore::open(&database)
+            .and_then(|store| store.apply_storage_settings(&database, &settings))
+            .map_err(|_| failed)
+    })
+    .await
+    .map_err(|_| failed)?
 }
 
 #[tauri::command]
@@ -1940,6 +1949,9 @@ fn main() {
                         report.pending_run_ids.len()
                     ),
                     Err(error) => cleanup_failed("delivery", &*error),
+                }
+                if let Err(error) = store.sweep_finished_footage(&database) {
+                    cleanup_failed("footage", &*error);
                 }
                 match store.recover_asset_cleanup(&database) {
                     Ok(0) => {}

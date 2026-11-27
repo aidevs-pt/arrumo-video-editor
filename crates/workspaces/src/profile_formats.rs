@@ -72,7 +72,15 @@ impl WorkspaceStore {
                     enabled: row.get(9)?,
                 })
             })?
-            .collect()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map(|mut formats| {
+                // The workspace may since have removed every format the profile kept; it then
+                // makes all the others rather than none.
+                if !formats.iter().any(|format| format.enabled) {
+                    formats.iter_mut().for_each(|format| format.enabled = true);
+                }
+                formats
+            })
     }
 
     /// The formats this profile's videos are made in.
@@ -229,6 +237,20 @@ mod tests {
                 .unwrap()
                 .len(),
             2
+        );
+        store
+            .set_profile_format_enabled(workspace, profile, landscape, false)
+            .unwrap();
+        store.remove_output_format(workspace, portrait).unwrap();
+        assert_eq!(
+            store
+                .enabled_profile_formats(workspace, profile)
+                .unwrap()
+                .iter()
+                .map(|format| format.id)
+                .collect::<Vec<_>>(),
+            [landscape],
+            "with the format it kept gone, the profile makes the rest rather than nothing"
         );
     }
 

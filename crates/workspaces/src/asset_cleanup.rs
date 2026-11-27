@@ -78,7 +78,9 @@ fn asset_uses(
         (
             AssetUseKind::Animation,
             "SELECT title FROM motion_library WHERE workspace_id = ?1
-               AND ?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id)"
+               AND (?2 IN (preview_asset_id, thumbnail_asset_id, sound_asset_id)
+                 OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(spec_json) THEN spec_json END) AS layer
+                            WHERE layer.key IN ('assetId', 'soundAssetId') AND layer.atom = ?2))"
                 .to_owned(),
         ),
     ];
@@ -280,12 +282,42 @@ impl WorkspaceStore {
                 Err(error) => return Err(error.into()),
             }
         }
+        remove_cached_frames(root, workspace_id, asset_id)?;
         self.0.execute(
             "DELETE FROM pending_asset_cleanup WHERE workspace_id = ?1 AND asset_id = ?2",
             params![workspace_id, asset_id],
         )?;
         Ok(())
     }
+}
+
+/// Stills taken of a removed video live beside the media folder (see [`crate::frame_cache`]).
+fn remove_cached_frames(media_root: &Path, workspace_id: i64, asset_id: i64) -> io::Result<()> {
+    let Some(database) = media_root
+        .to_str()
+        .and_then(|root| root.strip_suffix(".media"))
+    else {
+        return Ok(());
+    };
+    let directory = crate::frame_cache(Path::new(database)).join(workspace_id.to_string());
+    let entries = match fs::read_dir(&directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let prefix = format!("{asset_id}-");
+    for entry in entries {
+        let entry = entry?;
+        if entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| name.starts_with(&prefix))
+            && entry.file_type()?.is_file()
+        {
+            fs::remove_file(entry.path())?;
+        }
+    }
+    Ok(())
 }
 
 fn check_asset_file(source: &Path) -> io::Result<bool> {

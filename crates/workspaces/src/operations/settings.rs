@@ -240,6 +240,7 @@ pub(super) fn definitions() -> [Value; 25] {
 
 pub(super) fn call(
     store: &WorkspaceStore,
+    database: &std::path::Path,
     name: &str,
     arguments: &Map<String, Value>,
 ) -> Option<Result<Value, &'static str>> {
@@ -293,7 +294,7 @@ pub(super) fn call(
         "get_storage_settings" => Err("This tool takes no arguments"),
         "set_storage_settings" => parse(arguments).and_then(|settings: crate::StorageSettings| {
             store
-                .set_storage_settings(&settings)
+                .apply_storage_settings(database, &settings)
                 .map(|settings| json!({"settings": settings}))
                 .map_err(|_| "Could not save storage settings")
         }),
