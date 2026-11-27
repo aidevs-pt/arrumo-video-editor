@@ -150,6 +150,9 @@ pub(crate) struct CanvasRuntime {
 }
 
 static ACTIVE: Mutex<Option<Arc<CanvasRuntime>>> = Mutex::new(None);
+/// One download at a time; a second request waits and then finds the browser in place.
+static INSTALLING: Mutex<()> = Mutex::new(());
+static DOWNLOADING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The renderer canvas layers are drawn with in this process, when one is ready.
 pub(crate) fn active() -> Option<Arc<CanvasRuntime>> {
@@ -203,6 +206,8 @@ pub struct CanvasStatus {
     /// How pages are isolated: `browser` (the browser's own sandbox) or `bubblewrap`.
     pub sandbox: Option<&'static str>,
     pub ready: bool,
+    /// Whether this process is downloading the browser now.
+    pub downloading: bool,
     /// Why a supported, installed renderer still can't run.
     pub problem: Option<String>,
     pub libraries: Vec<CanvasLibraryInfo>,
@@ -273,6 +278,7 @@ impl WorkspaceStore {
             installed: false,
             sandbox: None,
             ready: false,
+            downloading: DOWNLOADING.load(std::sync::atomic::Ordering::Relaxed),
             problem: None,
             libraries: Vec::new(),
         };
@@ -359,7 +365,18 @@ impl WorkspaceStore {
             .canvas_root()
             .ok_or_else(|| io::Error::other("Canvas layers need a saved workspace database"))?;
         let target = root.join(&download.sha256);
+        let _installing = INSTALLING
+            .lock()
+            .map_err(|_| io::Error::other("Canvas download failed"))?;
         if !target.join(&download.executable).is_file() {
+            DOWNLOADING.store(true, std::sync::atomic::Ordering::Relaxed);
+            struct Done;
+            impl Drop for Done {
+                fn drop(&mut self) {
+                    DOWNLOADING.store(false, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            let _done = Done;
             fs::create_dir_all(&root)?;
             let mut archive = tempfile::tempfile_in(&root)?;
             let client = reqwest::blocking::Client::builder()
@@ -412,8 +429,21 @@ impl WorkspaceStore {
         self.canvas_status()
     }
 
+    /// Downloads the browser when a canvas renderer plugin is on and its browser for this
+    /// computer is missing, so canvas layers work without the creator asking.
+    pub fn ensure_canvas_browser(&self) -> Result<CanvasStatus, Box<dyn Error>> {
+        let status = self.canvas_status()?;
+        if status.supported && !status.installed {
+            return self.install_canvas_browser();
+        }
+        Ok(status)
+    }
+
     /// Removes downloaded canvas browsers.
     pub fn remove_canvas_browser(&self) -> Result<CanvasStatus, Box<dyn Error>> {
+        let _installing = INSTALLING
+            .lock()
+            .map_err(|_| io::Error::other("Canvas removal failed"))?;
         if let Some(root) = self.canvas_root()
             && root.is_dir()
         {

@@ -18,6 +18,7 @@ pub fn list_plugin_catalog(store: State<'_, Store>) -> Result<Vec<CatalogPlugin>
 /// Turns a plugin on or off for the whole app. Errors are codes the interface translates.
 #[tauri::command]
 pub fn set_plugin_active(
+    app: AppHandle,
     plugin_id: String,
     active: bool,
     store: State<'_, Store>,
@@ -29,7 +30,24 @@ pub fn set_plugin_active(
         .map_err(|error| {
             arrumo_workspaces::plugin_activation_refusal_code(error.as_ref())
                 .unwrap_or("plugin_activation_failed")
-        })
+        })?;
+    if active && let Ok(directory) = app.path().app_local_data_dir() {
+        ensure_canvas_renderer(directory.join("workspaces.sqlite"));
+    }
+    Ok(())
+}
+
+/// Downloads the canvas browser in the background when a canvas renderer plugin is on and the
+/// browser is missing; a failure leaves the plugin page offering the download.
+pub fn ensure_canvas_renderer(database: std::path::PathBuf) {
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = WorkspaceStore::open(&database)
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)
+            .and_then(|store| store.ensure_canvas_browser());
+        if let Err(error) = result {
+            eprintln!("Arrumo could not download the canvas renderer: {error}");
+        }
+    });
 }
 
 #[tauri::command]

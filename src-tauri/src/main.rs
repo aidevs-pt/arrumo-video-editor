@@ -1927,6 +1927,7 @@ fn main() {
                 app.handle().clone(),
                 database.clone(),
             )?);
+            plugin_settings::ensure_canvas_renderer(database.clone());
             tauri::async_runtime::spawn_blocking(move || {
                 let Ok(store) = WorkspaceStore::open(&database) else {
                     eprintln!("Arrumo could not open the store to retry managed file cleanup.");

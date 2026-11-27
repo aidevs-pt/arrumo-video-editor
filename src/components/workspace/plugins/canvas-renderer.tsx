@@ -17,6 +17,7 @@ type CanvasStatus = {
   installed: boolean;
   sandbox: "browser" | "bubblewrap" | null;
   ready: boolean;
+  downloading: boolean;
   problem: string | null;
   libraries: { id: string; version: string; license: string }[];
 };
@@ -29,11 +30,15 @@ export function CanvasRenderer({ pluginId }: { pluginId: string }) {
   const [busy, setBusy] = useState<"install" | "remove">();
   const [error, setError] = useState<string>();
 
+  const downloading = busy === "install" || status?.downloading === true;
   useEffect(() => {
     let active = true;
-    invoke<CanvasStatus>("get_canvas_renderer").then((next) => { if (active) setStatus(next); }, () => {});
-    return () => { active = false; };
-  }, []);
+    const read = () => invoke<CanvasStatus>("get_canvas_renderer").then((next) => { if (active) setStatus(next); }, () => {});
+    read();
+    // Arrumo downloads the renderer by itself when the plugin is on; follow it until it lands.
+    const timer = status?.downloading ? window.setInterval(read, 2000) : undefined;
+    return () => { active = false; window.clearInterval(timer); };
+  }, [status?.downloading]);
 
   if (!status) return <Skeleton className="h-28" />;
   if (status.pluginId !== pluginId) return null;
@@ -71,9 +76,9 @@ export function CanvasRenderer({ pluginId }: { pluginId: string }) {
             {busy === "remove" ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Trash2 data-icon="inline-start" />}
             {copy.remove}
           </Button>
-          : <Button disabled={busy !== undefined} onClick={() => change("install")}>
-            {busy === "install" ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
-            {busy === "install" ? copy.downloading : copy.download}
+          : <Button disabled={busy !== undefined || downloading} onClick={() => change("install")}>
+            {downloading ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
+            {downloading ? copy.downloading : copy.download}
           </Button>)}
       </div>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
