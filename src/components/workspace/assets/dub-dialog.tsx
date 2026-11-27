@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { IconAction } from "@/components/workspace/icon-action";
 import { useLocale } from "@/lib/locale-provider";
 import { soundLength } from "./audio-transform-dialog";
 
@@ -53,7 +54,7 @@ export function DubDialog({ workspaceId, assetId, assetName, offer, disabled, on
   return (
     <Dialog open={open} onOpenChange={(next) => { if (state !== "working") { setOpen(next); if (next) setState("idle"); } }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}><Languages data-icon="inline-start" />{copy.action}</Button>
+        <IconAction label={copy.action} disabled={disabled}><Languages /></IconAction>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

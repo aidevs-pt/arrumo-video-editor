@@ -1,7 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { AudioLines, Info } from "lucide-react";
+import { AudioLines, MicVocal, Info } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { IconAction } from "@/components/workspace/icon-action";
 import { useLocale } from "@/lib/locale-provider";
 
 export type AudioTransformProvider = {
@@ -57,7 +58,7 @@ export function AudioTransformDialog({ workspaceId, assetId, assetName, offer, d
   return (
     <Dialog open={open} onOpenChange={(next) => { if (state !== "working") { setOpen(next); if (next) setState("idle"); } }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}><AudioLines data-icon="inline-start" />{text.action}</Button>
+        <IconAction label={text.action} disabled={disabled}>{offer.transform === "voice-isolation" ? <MicVocal /> : <AudioLines />}</IconAction>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
