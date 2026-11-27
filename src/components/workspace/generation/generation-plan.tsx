@@ -209,7 +209,7 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
                   className="relative flex min-w-0 flex-col pb-2.5">
                   {canGoBack(index) ? (
                     <button type="button" onClick={() => setGoBackTo(index)}
-                      aria-label={copy.goBackLabel.replace("{stage}", stageName(step.stage))} title={copy.goBackLabel.replace("{stage}", stageName(step.stage))}
+                      aria-label={copy.goBackLabel.replace("{stage}", copy[step.stage])} title={copy.goBackLabel.replace("{stage}", copy[step.stage])}
                       className="group flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-xs pt-1.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-white/80">
                       {stepFace(step.stage, complete, current, "group-hover:bg-white group-hover:border-white")}
                     </button>
@@ -233,8 +233,8 @@ export function GenerationPlan({ workspaceId, runId, pendingReviewId, runState, 
       <AlertDialog open={goBackTo !== undefined} onOpenChange={(open) => { if (!open && !goingBack) setGoBackTo(undefined); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{goBackTo !== undefined && plan ? copy.goBackTitle.replace("{stage}", stageName(plan.steps[goBackTo].stage)) : ""}</AlertDialogTitle>
-            <AlertDialogDescription>{goBackTo !== undefined && plan ? copy.goBackDescription.replace("{stage}", stageName(plan.steps[goBackTo].stage)) : ""}</AlertDialogDescription>
+            <AlertDialogTitle>{goBackTo !== undefined && plan ? copy.goBackTitle.replace("{stage}", copy[plan.steps[goBackTo].stage]) : ""}</AlertDialogTitle>
+            <AlertDialogDescription>{goBackTo !== undefined && plan ? copy.goBackDescription.replace("{stage}", copy[plan.steps[goBackTo].stage]) : ""}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={goingBack}>{copy.goBackCancel}</AlertDialogCancel>

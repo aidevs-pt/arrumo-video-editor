@@ -158,8 +158,8 @@ export function UsagePanel({ workspaceId, keysHref }: { workspaceId: number; key
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="ps-4">{copy.columnService}</TableHead>
-              <TableHead>{copy.columnLeft}</TableHead>
+              <TableHead className="w-[32%] ps-4">{copy.columnService}</TableHead>
+              <TableHead className="w-44">{copy.columnLeft}</TableHead>
               <TableHead className="hidden sm:table-cell">{copy.columnDetails}</TableHead>
               <TableHead className="pe-4"><span className="sr-only">{copy.columnActions}</span></TableHead>
             </TableRow>
