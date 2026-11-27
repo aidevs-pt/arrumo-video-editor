@@ -324,7 +324,11 @@ impl WorkspaceStore {
         } else {
             "browser"
         });
-        let package = self.resolve_plugin_package(&plugin.manifest.id, None)?;
+        let Ok(package) = self.resolve_plugin_package(&plugin.manifest.id, None) else {
+            status.problem = Some("The canvas renderer plugin's package is unavailable.".into());
+            set_active(None);
+            return Ok(status);
+        };
         let guide = String::from_utf8(read_entry(&package.bytes, &canvas.guide, MAX_GUIDE_BYTES)?)?;
         let mut libraries = Vec::new();
         for library in &canvas.libraries {
