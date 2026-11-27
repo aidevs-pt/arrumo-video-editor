@@ -168,12 +168,12 @@ function CalendarContent({ workspaceId, profileId, monthQuery, monthHref }: {
               : copy.intro.replace("{workspace}", workspace?.name ?? "")}</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="icon" className="size-10" aria-label={copy.previousMonth} disabled={year === 1 && monthIndex === 0}
+            <Button variant="outline" size="icon" aria-label={copy.previousMonth} disabled={year === 1 && monthIndex === 0}
               onClick={() => showMonth(-1)}><ChevronLeft /></Button>
             <Button variant="outline" onClick={() => router.push(
               monthHref?.(today.slice(0, 7)) ?? calendarHref(workspaceId, profileId ?? undefined, today.slice(0, 7)), { scroll: false },
             )}>{copy.today}</Button>
-            <Button variant="outline" size="icon" className="size-10" aria-label={copy.nextMonth} disabled={year >= 9999 && monthIndex === 11}
+            <Button variant="outline" size="icon" aria-label={copy.nextMonth} disabled={year >= 9999 && monthIndex === 11}
               onClick={() => showMonth(1)}><ChevronRight /></Button>
           </div>
         </header>

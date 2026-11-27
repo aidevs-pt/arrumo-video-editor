@@ -79,7 +79,7 @@ export function OutputDateField({ workspaceId, runId, formatId, savedDate, onSav
           </Popover>
           {savedDate && <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" size="icon" variant="ghost" aria-label={copy.clearDate} disabled={pending} onClick={() => void save("")}>
+              <Button type="button" size="icon" className="size-8" variant="ghost" aria-label={copy.clearDate} disabled={pending} onClick={() => void save("")}>
                 <X />
               </Button>
             </TooltipTrigger>
