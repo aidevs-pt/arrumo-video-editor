@@ -118,7 +118,7 @@ struct RemovePackageInput {
     package_sha256: String,
 }
 
-pub(super) fn definitions() -> [Value; 25] {
+pub(super) fn definitions() -> [Value; 28] {
     let workspace_id = json!({"type": "integer", "minimum": 1});
     let workspace = json!({"type": "integer", "minimum": 1, "description": "Omit for app scope."});
     let id = json!({"type": "string", "minLength": 1});
@@ -174,6 +174,15 @@ pub(super) fn definitions() -> [Value; 25] {
             "inputSchema": {"type": "object", "properties": {"deleteUsedFootage": {"type": "boolean"}},
                 "required": ["deleteUsedFootage"], "additionalProperties": false},
             "annotations": {"idempotentHint": true}}),
+        json!({"name": "get_canvas_renderer", "description": "Report whether agents can draw canvas layers: animation layers written as small web pages (WebGL, three.js, Lottie, canvas, SVG, CSS), drawn frame by frame by a headless browser without network or file access. Says which plugin provides them, whether its browser is downloaded for this computer and its size, how pages are isolated, and the libraries offered.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"readOnlyHint": true}}),
+        json!({"name": "install_canvas_renderer", "description": "Download the headless browser the canvas renderer plugin names for this computer, check its size and SHA-256, and unpack it next to the app's data. It is about 100 MB; ask the creator before downloading.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"idempotentHint": true, "openWorldHint": true}}),
+        json!({"name": "remove_canvas_renderer", "description": "Delete the downloaded canvas browser to free space. Animations with canvas layers can't be rendered until it is downloaded again.",
+            "inputSchema": {"type": "object", "additionalProperties": false},
+            "annotations": {"destructiveHint": true, "idempotentHint": true}}),
         json!({"name": "list_plugin_catalog", "description": "List bundled and installed plugins with declared capabilities, settings metadata, and package information.",
             "inputSchema": {"type": "object", "additionalProperties": false},
             "annotations": {"readOnlyHint": true}}),
@@ -298,6 +307,23 @@ pub(super) fn call(
                 .map(|settings| json!({"settings": settings}))
                 .map_err(|_| "Could not save storage settings")
         }),
+        "get_canvas_renderer" | "install_canvas_renderer" | "remove_canvas_renderer"
+            if !arguments.is_empty() =>
+        {
+            Err("This tool takes no arguments")
+        }
+        "get_canvas_renderer" => store
+            .canvas_status()
+            .map(|status| json!({"canvas": status}))
+            .map_err(|_| "Could not read the canvas renderer"),
+        "install_canvas_renderer" => store
+            .install_canvas_browser()
+            .map(|status| json!({"canvas": status}))
+            .map_err(|_| "Could not download the canvas browser. Check the connection and that a canvas renderer plugin is on"),
+        "remove_canvas_renderer" => store
+            .remove_canvas_browser()
+            .map(|status| json!({"canvas": status}))
+            .map_err(|_| "Could not remove the canvas browser"),
         "list_plugin_catalog" if arguments.is_empty() => store
             .plugin_catalog()
             .map(|plugins| json!({"plugins": plugins}))

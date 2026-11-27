@@ -630,3 +630,56 @@ fn desktop_job(job: arrumo_workspaces::PluginActionJob) -> Result<serde_json::Va
     }
     Ok(value)
 }
+
+#[tauri::command]
+pub fn get_canvas_renderer(
+    store: State<'_, Store>,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    store
+        .lock()
+        .map_err(|_| "store_unavailable")?
+        .canvas_status()
+        .map_err(|_| "canvas_status_failed")
+}
+
+/// Downloads or removes the canvas browser off the shared store, since a download takes minutes.
+async fn change_canvas_renderer(
+    app: AppHandle,
+    install: bool,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    let failed = if install {
+        "canvas_install_failed"
+    } else {
+        "canvas_remove_failed"
+    };
+    let database = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| failed)?
+        .join("workspaces.sqlite");
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = WorkspaceStore::open(&database).map_err(|_| failed)?;
+        if install {
+            store.install_canvas_browser()
+        } else {
+            store.remove_canvas_browser()
+        }
+        .map_err(|_| failed)
+    })
+    .await
+    .map_err(|_| failed)?
+}
+
+#[tauri::command]
+pub async fn install_canvas_renderer(
+    app: AppHandle,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    change_canvas_renderer(app, true).await
+}
+
+#[tauri::command]
+pub async fn remove_canvas_renderer(
+    app: AppHandle,
+) -> Result<arrumo_workspaces::CanvasStatus, &'static str> {
+    change_canvas_renderer(app, false).await
+}

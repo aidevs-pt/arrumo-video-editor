@@ -382,7 +382,9 @@ impl WorkspaceStore {
         }
         migration.commit()?;
         agent_cli::load_executables(&connection)?;
-        Ok(Self(connection))
+        let store = Self(connection);
+        canvas_render::load_once(&store);
+        Ok(store)
     }
 
     pub fn create(&self, name: &str) -> rusqlite::Result<Workspace> {

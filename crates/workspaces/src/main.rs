@@ -469,6 +469,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             store.set_preview_max_edge(max_edge)?;
             println!("{}", serde_json::to_string(&store.preview_settings()?)?);
         }
+        [database, command] if command == "canvas-renderer" => {
+            let status = WorkspaceStore::open(Path::new(database))?.canvas_status()?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
+        [database, command] if command == "install-canvas-renderer" => {
+            let status = WorkspaceStore::open(Path::new(database))?.install_canvas_browser()?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
+        [database, command] if command == "remove-canvas-renderer" => {
+            let status = WorkspaceStore::open(Path::new(database))?.remove_canvas_browser()?;
+            println!("{}", serde_json::to_string(&status)?);
+        }
         [database, command] if command == "storage-settings" => {
             let settings = WorkspaceStore::open(Path::new(database))?.storage_settings()?;
             println!("{}", serde_json::to_string(&settings)?);
@@ -1778,7 +1790,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "formats <workspace-id> | create-format <workspace-id> <settings-json> | ",
                 "update-format <workspace-id> <format-id> <settings-json> | ",
                 "remove-format <workspace-id> <format-id> | ",
-                "storage-settings | set-delete-used-footage <on|off> | profile-formats <workspace-id> <profile-id> | set-profile-format-enabled <workspace-id> <profile-id> <format-id> <on|off> | ",
+                "canvas-renderer | install-canvas-renderer | remove-canvas-renderer | storage-settings | set-delete-used-footage <on|off> | profile-formats <workspace-id> <profile-id> | set-profile-format-enabled <workspace-id> <profile-id> <format-id> <on|off> | ",
                 "set-profile-format <workspace-id> <profile-id> <format-id> <overrides-json> | ",
                 "format-delivery <workspace-id> <format-id> | ",
                 "set-format-delivery <workspace-id> <format-id> <settings-json> | ",

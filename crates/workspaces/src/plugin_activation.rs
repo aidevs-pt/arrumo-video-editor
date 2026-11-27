@@ -131,6 +131,7 @@ impl WorkspaceStore {
             params![plugin_id, i64::from(active)],
         )?;
         transaction.commit()?;
+        let _ = self.canvas_status();
         Ok(())
     }
 

@@ -165,6 +165,17 @@ thread_local! {
     static TEST_ACTIVE: std::cell::RefCell<Option<Arc<CanvasRuntime>>> = const { std::cell::RefCell::new(None) };
 }
 
+/// Readies canvas layers from the first saved database this process opens; turning plugins on or
+/// off and downloading the browser refresh it after that.
+pub(crate) fn load_once(store: &WorkspaceStore) {
+    static LOADED: std::sync::Once = std::sync::Once::new();
+    if store.canvas_root().is_some() {
+        LOADED.call_once(|| {
+            let _ = store.canvas_status();
+        });
+    }
+}
+
 fn set_active(runtime: Option<CanvasRuntime>) {
     if let Ok(mut active) = ACTIVE.lock() {
         *active = runtime.map(Arc::new);
